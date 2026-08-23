@@ -13,7 +13,7 @@ Detailed architecture/history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-23
 
-STATUS: **DEMO MODERNIZATION + SEMANTIC PROPERTYEDITOR SOURCE/BOOKKEEPING COMPLETE; COMBINED WINDOWS BUILD + VISUAL ACCEPTANCE PENDING.**
+STATUS: **CONTROL HYGIENE + DEMO MODERNIZATION + SEMANTIC PROPERTYEDITOR SOURCE/BOOKKEEPING COMPLETE; COMBINED WINDOWS BUILD + VISUAL ACCEPTANCE PENDING.**
 
 Authoritative branch: `main`.
 
@@ -21,7 +21,64 @@ Do not claim Windows acceptance until the exact current main line is built and e
 
 ---
 
-## 1. SEMANTIC PROPERTYEDITOR CHECKPOINT
+## 1. CONTROL HYGIENE CHECKPOINT
+
+A focused hygiene pass was performed across the current Ui control surface, with extra attention on recently touched controls and PropertyEditor integration.
+
+Hygiene base:
+
+- `cb5ff715e770169f0b630112a490639c06d54d2d` — `Document semantic PropertyEditor expansion`.
+
+Hygiene source checkpoint through:
+
+- `3aecaccc7ea9b6f6ccc388dc287f2689ab812a8f` — `Clean UiMultiEdit public documentation`.
+
+The hygiene source line is eleven commits ahead of the recorded hygiene base, zero behind at the source-review checkpoint. Final bookkeeping commits may advance `main`; validation must always use the then-current exact HEAD.
+
+### Source fixes and tests
+
+- `UiSlider`
+  - corrected the vertical geometry contract so `track_size.cx` consistently represents preferred major-axis length and `track_size.cy` track thickness, matching `UiRangeSlider`;
+  - added keyboard focus participation to both constructors;
+  - disabled sliders now reject keyboard and mouse-wheel value editing;
+  - tick configuration now invalidates natural layout as well as paint;
+  - added deterministic `Utilities/UiSliderRunTests` coverage for value normalization, data binding, disabled input, event counts, horizontal/vertical geometry, expanding tracks and tick sizing.
+
+- `UiRangeSlider`
+  - added keyboard focus participation;
+  - bound-handle requests normalize to the corresponding lower/upper selection handle while adjustable bounds are disabled;
+  - disabling adjustable bounds cannot leave a stale inactive bound handle as the keyboard/wheel target;
+  - extended `Utilities/UiRangeSliderRunTests` for disabled input and active-handle normalization.
+
+- edit family
+  - removed the stale undefined one-argument `UiBaseEdit::GetPos(int line)` declaration while retaining the implemented `GetPos(int line, int col = 0)` authority;
+  - cleaned stale/corrupted `UiPasswordEdit` API documentation and implementation comments without changing password semantics;
+  - cleaned `UiMultiEdit` documentation so examples and recommendations use real current APIs.
+
+- `UiCheckBox`
+  - removed damaged/stale public-header changelog text.
+
+### Reviewed without further source change
+
+The pass also re-read the relevant implementation/package slices for:
+
+- `UiLabel`;
+- `UiButton`, `UiToolButton`, `UiSplitButton`;
+- `UiRadioButton`, `UiToggle`;
+- `UiDropdown`;
+- `UiLineEdit`, `UiIntEdit`, `UiFloatEdit`, `UiMaskEdit`;
+- `UiTab`;
+- `UiMatrixSelector`;
+- `UiDateTime`;
+- `UiProgressBar`;
+- `UiScrollBar`;
+- production `Utilities/PropertyEditor`, including layout, inline editors, interaction, paint, rich/semantic value editors and package membership.
+
+No additional architecture change was justified in those reviewed slices. In particular, PropertyEditor retains the existing model/host authority, focused numeric wheel routing, rich editor metadata, semantic adapter registration, viewport-bounded inline editors, and separate reset/override/action-editor responsibilities. The hygiene pass did not add a parallel PropertyEditor state or editor framework.
+
+---
+
+## 2. SEMANTIC PROPERTYEDITOR CHECKPOINT
 
 Semantic PropertyEditor work was built directly on the previously recorded demo-modernization checkpoint:
 
@@ -100,7 +157,7 @@ Existing Range, Adjustable Range, Matrix, Icon, Font, Image, point Curve and cub
 
 ---
 
-## 2. DEMO MODERNIZATION CHECKPOINT RETAINED
+## 3. DEMO MODERNIZATION CHECKPOINT RETAINED
 
 The earlier demo tranche remains source-reviewed and still awaits the same Windows acceptance run.
 
@@ -148,34 +205,44 @@ Current demo tranche:
 
 ---
 
-## 3. COMBINED WINDOWS ACCEPTANCE GATE
+## 4. COMBINED WINDOWS ACCEPTANCE GATE
 
-Validate **current final `upp_Ui/main`**, not an earlier semantic or demo ancestor. Fetch first and report the exact SHA. If main has advanced, confirm the semantic checkpoint and demo checkpoint remain ancestors before testing.
+Validate **current final `upp_Ui/main`**, not an earlier hygiene, semantic or demo ancestor. Fetch first and report the exact SHA. If main has advanced, confirm the recorded checkpoints remain ancestors before testing.
 
 ### Automated — Debug + Release
 
-1. `Utilities/PropertyEditorSemanticRunTests`
+1. `Utilities/UiSliderRunTests`
+   - require `UISLIDER_SUMMARY ... failed=0`.
+2. `Utilities/UiRangeSliderRunTests`
+   - require `Fails: 0`.
+3. `Utilities/PropertyEditorSemanticRunTests`
    - require `PROPERTYEDITOR_SEMANTIC_SUMMARY ... failed=0`.
-2. `Utilities/PropertyEditorV1RunTests`
+4. `Utilities/PropertyEditorV1RunTests`
    - require `Fails: 0`.
-3. `Utilities/PropertyEditorTests`
+5. `Utilities/PropertyEditorTests`
    - run if present/buildable in the current assembly; require zero failures and report its actual summary.
-4. `Utilities/UiButtonInteractionContractTest`
+6. `Utilities/UiButtonInteractionContractTest`
    - require `Fails: 0`.
-5. Run the existing RangeSlider-focused deterministic test package if present in the local assembly; require zero failures. If no separate package exists, report that rather than inventing one.
 
 ### Build — Debug + Release
 
-6. `Utilities/PropertyEditorSemanticDemo`
-7. `UiLabelDemo`
-8. `UiButtonDemo`
-9. `UiCheckBoxDemo`
-10. `UiRadioButtonDemo`
-11. `UiToggleDemo`
-12. `UiDropdownDemo`
-13. `UiSliderDemo`
-14. `UiEditDemo`
-15. `UiTabDemo`
+7. `Utilities/PropertyEditorSemanticDemo`
+8. `UiLabelDemo`
+9. `UiButtonDemo`
+10. `UiCheckBoxDemo`
+11. `UiRadioButtonDemo`
+12. `UiToggleDemo`
+13. `UiDropdownDemo`
+14. `UiSliderDemo`
+15. `UiEditDemo`
+16. `UiTabDemo`
+
+### Hygiene-focused visual / interaction smoke
+
+- Slider: horizontal and vertical tracks use the expected major axis; keyboard focus works; disabled keyboard/wheel input is inert; expanding track consumes allocated major-axis space.
+- RangeSlider: keyboard focus works; lower/upper selection remains editable after adjustable bounds are disabled; no stale hidden bound handle owns wheel/keyboard input.
+- Edit family: Line/Password/Mask/Multi still edit normally; Password visibility eye remains functional without stealing edit focus; multiline scrolling/layout remains coherent.
+- PropertyEditor: focused numeric wheel changes the numeric value rather than the outer rail; numeric slider-toggle, Cardinal4, icon, colour, range and semantic editors remain coherent; reset/override state remains separate from editor action controls.
 
 ### Semantic PropertyEditor visual / interaction smoke
 
@@ -207,13 +274,13 @@ Launch Debug `PropertyEditorSemanticDemo` and check:
 - Tab: all placements/visuals, tab icon/layout controls, Body vs Tab Surface vs Indicator styling, active tab interaction, all Code modes.
 - Light/Dark for every demo should update preview and PropertyEditor coherently.
 
-Leave Debug `PropertyEditorSemanticDemo`, `UiTabDemo` and `UiEditDemo` running for Curt to inspect/close after the smoke.
+Leave Debug `PropertyEditorSemanticDemo`, `UiSliderDemo` and `UiEditDemo` running for Curt to inspect/close after the smoke.
 
 If a compile/runtime failure is substantive, stop and report exact HEAD, package/configuration, complete diagnostic and shortest reproduction. Mechanical U++ build/API corrections are acceptable; do not redesign PropertyEditor or demo architecture during validation.
 
 ---
 
-## 4. OTHER PENDING LINES — DO NOT CONFLATE
+## 5. OTHER PENDING LINES — DO NOT CONFLATE
 
 Separate older validation/work lines remain for:
 
@@ -226,11 +293,11 @@ Do not move those subsystems under this combined gate unless a concrete shared r
 
 ---
 
-## 5. NEXT AFTER ACCEPTANCE
+## 6. NEXT AFTER ACCEPTANCE
 
 After the combined gate passes:
 
-1. mark the semantic PropertyEditor and current demo tranche Windows-accepted with the exact tested SHA and results;
+1. mark the control hygiene, semantic PropertyEditor and current demo tranche Windows-accepted with the exact tested SHA and results;
 2. retain the semantic demo as the capability matrix/reference for future PropertyEditor additions;
 3. continue demo modernization with a small group such as SplitButton / ProgressBar / ScrollBar / MatrixSelector;
 4. then continue the remaining model-backed List/Tree/Table/Gallery/Menu demos using the accepted Dropdown Data-page pattern deliberately.
