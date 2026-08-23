@@ -145,6 +145,23 @@ struct UiItemRenderStyle : Moveable<UiItemRenderStyle> {
     }
 };
 
+// Reserve a control-owned decoration lane without changing the renderer's
+// allocated bounds or face. Repeated calls accumulate, so a host can place
+// multiple external icons/grips/badges on either side and every decoration's
+// actual extent plus authored gap is reflected in renderer content geometry.
+inline void UiReserveItemRenderDecoration(UiItemRenderStyle& style, UiAlign side,
+                                          int extent, int gap = 0)
+{
+    int reserve = max(0, extent) + max(0, gap);
+    switch(side) {
+    case UiAlign::LEFT:   style.metrics.content_margin.left   += reserve; break;
+    case UiAlign::RIGHT:  style.metrics.content_margin.right  += reserve; break;
+    case UiAlign::TOP:    style.metrics.content_margin.top    += reserve; break;
+    case UiAlign::BOTTOM: style.metrics.content_margin.bottom += reserve; break;
+    default: break;
+    }
+}
+
 class UiItemRender {
 public:
     UiItemRender();
