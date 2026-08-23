@@ -331,9 +331,13 @@ UiList& UiList::EnableRenameOnDblClick(bool on)
 
 UiList& UiList::EnableDragReorder(bool on)
 {
+    if(drag_reorder_enabled_ == on)
+        return *this;
     drag_reorder_enabled_ = on;
     if(!on)
         EndRowDrag(true);
+    ResetItemRenderPool();
+    RefreshLayout();
     Refresh();
     return *this;
 }
