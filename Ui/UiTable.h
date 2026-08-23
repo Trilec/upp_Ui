@@ -106,6 +106,8 @@ public:
         int cell_padding_y = DPI(5);
         int header_padding_x = DPI(8);
         int resize_hit_width = DPI(6);
+        int sort_indicator_size = DPI(10);
+        int sort_indicator_gap = DPI(6);
         bool show_row_headers = true;
         bool show_column_headers = true;
         bool alternate_rows = true;
@@ -142,7 +144,8 @@ public:
               % table_bg % header_bg % header_hot_bg % header_ink % row_header_bg
               % cell_ink % muted_ink % grid_color % alternate_row_bg % hover_bg
               % selection_bg % selection_border % active_bg % active_border
-              % read_only_bg % warning_bg % error_bg % resize_guide;
+              % read_only_bg % warning_bg % error_bg % resize_guide
+              % sort_indicator_size % sort_indicator_gap;
         }
     };
 
@@ -290,6 +293,7 @@ private:
     Rect GetCellRect(int row, int col) const;
     Rect GetColumnHeaderCellRect(int col) const;
     Rect GetRowHeaderCellRect(int row) const;
+    Rect GetSortIndicatorRect(UiTableAxis axis, int index, const Rect& rect) const;
     HitInfo HitTest(Point p) const;
     int FindVisibleColumn(int x_content) const;
     int FindVisibleRow(int y_content) const;
