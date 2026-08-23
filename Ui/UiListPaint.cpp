@@ -1,5 +1,6 @@
 #include <Ui/UiList.h>
 #include <Ui/UiTheme.h>
+#include <cmath>
 
 namespace Upp {
 
@@ -47,6 +48,47 @@ static void PaintListBadge(Draw& w, const Rect& row, const Rect& badge,
     w.DrawText(x, y, item.right_text, font,
                enabled ? style.badge_ink : style.disabled_ink);
     w.End();
+}
+
+static int ResolveListViewportRadius(const Rect& outer, const Rect& viewport,
+                                     const UiList::Style& style)
+{
+    if(viewport.IsEmpty() || style.metrics.radius <= 0)
+        return 0;
+    Rect surface = UiStyledSurfaceRect(outer, style.metrics);
+    if(surface.IsEmpty())
+        return 0;
+    int left = max(0, viewport.left - surface.left);
+    int top = max(0, viewport.top - surface.top);
+    int right = max(0, surface.right - viewport.right);
+    int bottom = max(0, surface.bottom - viewport.bottom);
+    int inset = min(min(left, right), min(top, bottom));
+    int radius = max(0, style.metrics.radius - inset);
+    return min(radius, min(viewport.GetWidth(), viewport.GetHeight()) / 2);
+}
+
+static void ExcludeListRoundedCorners(Draw& w, const Rect& viewport, int radius)
+{
+    if(radius <= 0 || viewport.IsEmpty())
+        return;
+
+    const double rr = (double)radius * radius;
+    for(int y = 0; y < radius; y++) {
+        double dy = radius - y - 0.5;
+        double dx = std::sqrt(max(0.0, rr - dy * dy));
+        int cut = clamp((int)std::ceil(radius - dx), 0, radius);
+        if(cut <= 0)
+            continue;
+
+        int top = viewport.top + y;
+        int bottom = viewport.bottom - 1 - y;
+        w.ExcludeClip(Rect(viewport.left, top, viewport.left + cut, top + 1));
+        w.ExcludeClip(Rect(viewport.right - cut, top, viewport.right, top + 1));
+        if(bottom != top) {
+            w.ExcludeClip(Rect(viewport.left, bottom, viewport.left + cut, bottom + 1));
+            w.ExcludeClip(Rect(viewport.right - cut, bottom, viewport.right, bottom + 1));
+        }
+    }
 }
 
 void UiList::PaintRow(Draw& w, int index, const Rect& row) const
@@ -119,25 +161,43 @@ void UiList::Paint(Draw& w)
         viewport_skin = StyledSkin();
     }
 
-    UiPaintStyledSurface(w, GetSize(), viewport_palette, viewport_metrics, viewport_skin,
-                         IsEnabled() ? ST_NORMAL : ST_DISABLED,
-                         HasFocus(), false, false);
+    StyledState state = IsEnabled() ? ST_NORMAL : ST_DISABLED;
+    // Paint the viewport body first but defer its frame/focus chrome until after
+    // rows. That makes the border the final visual authority at rounded edges.
+    StyledMetrics background_metrics = viewport_metrics;
+    background_metrics.frame_enabled = false;
+    background_metrics.focus_enabled = false;
+    UiPaintStyledBackground(w, GetSize(), viewport_palette, background_metrics,
+                            viewport_skin, state, HasFocus());
 
     last_paint_item_count_ = 0;
     Rect vp = GetViewportRect();
     UiVisibleRange visible = GetVisibleRange();
-    if(vp.IsEmpty() || visible.IsEmpty())
-        return;
-
-    w.Clip(vp);
-    for(int i = visible.first; i <= visible.last; i++) {
-        Rect row = GetRowRect(i);
-        if(row.bottom <= vp.top || row.top >= vp.bottom)
-            continue;
-        PaintRow(w, i, row);
-        last_paint_item_count_++;
+    if(!vp.IsEmpty() && !visible.IsEmpty()) {
+        w.Begin();
+        w.Clip(vp);
+        ExcludeListRoundedCorners(w, vp, ResolveListViewportRadius(GetSize(), vp, style));
+        for(int i = visible.first; i <= visible.last; i++) {
+            Rect row = GetRowRect(i);
+            if(row.bottom <= vp.top || row.top >= vp.bottom)
+                continue;
+            PaintRow(w, i, row);
+            last_paint_item_count_++;
+        }
+        w.End();
     }
-    w.End();
+
+    if(viewport_metrics.frame_enabled && viewport_metrics.frame_width > 0) {
+        StyledMetrics frame_metrics = viewport_metrics;
+        frame_metrics.face_enabled = false;
+        frame_metrics.shadow.enabled = false;
+        frame_metrics.highlight.enabled = false;
+        frame_metrics.focus_enabled = false;
+        UiPaintFaceFrameDash(w, UiStyledSurfaceRect(GetSize(), viewport_metrics),
+                             viewport_palette, frame_metrics, state);
+    }
+    UiPaintStyledForeground(w, GetSize(), viewport_palette, viewport_metrics,
+                            viewport_skin, state, HasFocus());
 }
 
 void UiList::Layout()
