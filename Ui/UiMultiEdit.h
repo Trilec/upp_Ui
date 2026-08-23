@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiMultiEdit_h_
+#ifndef _Ui_UiMultiEdit_h_
 #define _Ui_UiMultiEdit_h_
 
 /*
@@ -21,7 +21,9 @@
     - GUI thread only.
 
     Usage
-    - Use for comments, notes, logs, and other multi-line text input surfaces.
+    - Use for comments, notes, logs, and other multi-line plain-text input.
+    - Use SetText()/SetTextUtf8(), SetAcceptsTabs(), and the inherited
+      UiBaseEdit styling/side-control APIs as needed.
 
     Changelog
     - 2026-03: added release-standard header documentation.
@@ -32,38 +34,22 @@
 namespace Upp {
 
 // ============================================================================
-//  UiMultiEdit
+// UiMultiEdit
 // ============================================================================
-//  A multi-line plain text editor derived from UiBaseEdit.
-//  It provides a standard text area with vertical and horizontal scrolling,
-//  suitable for comments, descriptions, logs, or code snippets.
+// Multi-line plain text editor derived from UiBaseEdit.
 //
-//  Change Log:
-//  -----------
-//  - Refactored to inherit from UiBaseEdit.
-//  - Enabled vertical and horizontal scrollbars by default (with AutoHide).
-//  - Fixed infinite recursion bug in Layout().
-//  - Integrated with UiStyle for consistent theming.
+// - Enter/Return inserts line breaks.
+// - Tab insertion is enabled by default.
+// - Vertical and horizontal scrolling are enabled.
+// - Text does not word-wrap; horizontal overflow is scrolled.
+// - Styling, caret/selection behavior, clipboard operations and side controls
+//   come from UiBaseEdit.
 //
-//  Features:
-//  - Multi-line editing (Accepts Enter/Return).
-//  - Tab support (Accepts Tab key).
-//  - Vertical and Horizontal scrolling (No Word Wrap).
-//  - Inherits all styling, icon, and caret capabilities from UiBaseEdit.
+// Example:
 //
-//  Note:
-//  This control does NOT perform word wrapping. If you need a wrapping editor,
-//  use UiDocEdit (or a similar wrapping implementation).
-//
-//  Usage Guide:
-//  ------------
-//  UiMultiEdit edit;
-//  edit.SetText("Line 1\nLine 2\nLine 3");
-//  edit.SetRect(0, 0, 300, 150);
-//
-//  // Enable an icon (e.g., for a "Notes" field)
-//  edit.SetIcon(CtrlImg::write()).SetIconAlign(UiAlign::LEFT);
-//
+//     UiMultiEdit edit;
+//     edit.SetTextUtf8("Line 1\nLine 2\nLine 3");
+//     edit.SetRect(0, 0, 300, 150);
 // ============================================================================
 
 class UiMultiEdit : public UiBaseEdit {
@@ -73,19 +59,13 @@ public:
     UiMultiEdit();
     virtual ~UiMultiEdit() {}
 
-    // ------------------------------------------------------------------------
-    // Layout & Sizing
-    // ------------------------------------------------------------------------
-
     // Returns a default minimum size suitable for multi-line content.
-    // Typically ~3 lines high and ~10 chars wide, plus padding/borders.
     virtual Size GetMinSize() const override;
 
-    // Ensures scrollbars are correctly positioned and sized.
+    // Keeps the shared edit scrollbars and text viewport synchronized.
     virtual void Layout() override;
 };
 
 } // namespace Upp
 
 #endif
-
