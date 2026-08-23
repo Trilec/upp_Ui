@@ -77,6 +77,23 @@ CONSOLE_APP_MAIN
     Check(!data.has_metadata,
           "List show_metadata_marker=false suppresses default-renderer metadata data");
 
+    UiItemRenderStyle reserved = UiListOwnedItemRenderStyle(style, 0);
+    int base_left = reserved.metrics.content_margin.left;
+    int base_right = reserved.metrics.content_margin.right;
+    UiReserveItemRenderDecoration(reserved, UiAlign::LEFT, 20, 6);
+    UiReserveItemRenderDecoration(reserved, UiAlign::LEFT, 12, 4);
+    UiReserveItemRenderDecoration(reserved, UiAlign::RIGHT, 30, 8);
+    Check(reserved.metrics.content_margin.left == base_left + 42 &&
+              reserved.metrics.content_margin.right == base_right + 38,
+          "multiple external decoration lanes accumulate actual extent plus gap on each side");
+
+    style.right_text_as_badge = true;
+    item.right_text = "Exact";
+    data = UiListOwnedItemRenderData(style, item);
+    Check(data.right_text.IsEmpty(),
+          "List-owned badge mode removes duplicate renderer right text");
+    style.right_text_as_badge = false;
+
     style.hot_as_underline = true;
     style.selected_as_underline = true;
     UiItemRenderStyle underline = UiListOwnedItemRenderStyle(style, 0);
