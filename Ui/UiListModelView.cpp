@@ -69,9 +69,10 @@ void UiList::HandleModelChange(const UiModelChange& change)
 
 UiList& UiList::ShowDragHandle(bool on)
 {
+    if(GetEffectiveStyle().show_drag_handle == on)
+        return *this;
     StyleEdit().show_drag_handle = on;
-    RefreshLayout();
-    Refresh();
+    OnStyleChanged();
     return *this;
 }
 
@@ -79,9 +80,10 @@ UiList& UiList::SetDragSide(UiAlign side)
 {
     if(side != UiAlign::LEFT && side != UiAlign::RIGHT)
         side = UiAlign::RIGHT;
+    if(GetEffectiveStyle().drag_side == side)
+        return *this;
     StyleEdit().drag_side = side;
-    RefreshLayout();
-    Refresh();
+    OnStyleChanged();
     return *this;
 }
 
