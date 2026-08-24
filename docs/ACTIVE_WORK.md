@@ -8,16 +8,64 @@ Detailed architecture/history:
 - `docs/11_UI_PROPERTY_OVERRIDE_LAYOUT.md`
 - `docs/12_UI_DEMO_MODERNIZATION_PLAN.md`
 - `docs/13_UI_MODEL_MUTATION_SCALE_CONTRACT.md`
+- `docs/14_UIGRAPH_RENDER_LOD.md`
 - `docs/ACTIVE_WORK_ARCHIVE_PRE_FOUR_CONTROL_2026-08-17.md`
 - `docs/ACTIVE_WORK_UI_OVERRIDE_ROLLOUT.md`
 
-## CURRENT SUPERVISORY STATE — 2026-08-23
+## CURRENT SUPERVISORY STATE — 2026-08-24
 
-STATUS: **ITEM-DECORATION LAYOUT REPAIR + CONTROL HYGIENE + DEMO MODERNIZATION + SEMANTIC PROPERTYEDITOR SOURCE/BOOKKEEPING COMPLETE; WINDOWS BUILD + VISUAL ACCEPTANCE PENDING.**
+STATUS: **UIGRAPH RENDERING LOD + SHAPE PRESENTATION IMPLEMENTATION COMPLETE; WINDOWS PERFORMANCE/VISUAL VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
 
 Authoritative branch: `main`.
 
 Do not claim Windows acceptance until the exact current main line is built and exercised on Windows/U++.
+
+### UIGRAPH RENDERING LOD CHECKPOINT — 2026-08-24
+
+BASE: `7309358f51af357d5676d376658996c3c13c5486` — verified `main` before this Graph rendering slice.
+
+TASK: `UIGRAPH-LOD-R2` — address measured low-zoom connector cost and shape-rendering defects without changing `UiGraphModel` semantic authority or serialized graph/style formats.
+
+TOUCHED:
+
+- `Ui/UiGraph/UiNodeGraph.h`
+- `Ui/UiGraph/UiNodeGraph.cpp`
+- `Ui/UiGraph/UiNodeGraphSpatial.cpp`
+- `Utilities/UiNodeGraphScaleTest/main.cpp`
+- `Utilities/UiNodeGraphRenderLodTest/UiNodeGraphRenderLodTest.upp`
+- `Utilities/UiNodeGraphRenderLodTest/main.cpp`
+- `docs/14_UIGRAPH_RENDER_LOD.md`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+PUBLISHED: `2a6e3945e2cf4ccb6706e610361a3526c7ae34aa` — coherent source/test/design checkpoint on `agent/uigraph-render-lod-r2` immediately before this recovery-log commit. Final `main` publication SHA may legitimately differ after carrying this slice onto a newer non-conflicting tip.
+
+VALIDATION:
+
+- complete touched production header/source, spatial path, focused test, scale-test and package-membership slice source-reviewed;
+- `UiNodeGraph::LodPolicy` is runtime view policy and is deliberately outside `Style::Serialize`, preserving existing serialized graph/style contracts;
+- built-in Straight/Bezier/Orthogonal world bounds now follow route envelopes instead of isotropic `max(96, distance * 0.5)` inflation; custom routes and state-sensitive edge-style resolvers retain conservative bounds;
+- prepared and dirty-paint query margins shrink with detail instead of using a fixed 160-screen-pixel margin;
+- connectors progressively reduce Bezier samples, dash complexity, width and arrow size, become direct endpoint segments below `minimal_edge_zoom`, and can be omitted below configurable `edge_hide_zoom`;
+- ports, connector editing hit tests, edge labels, node title/secondary text and shadows have independent LOD thresholds;
+- non-rectangular soft shadows use two bounded path layers instead of one offset fill per scaled shadow-distance pixel; shadows fade/disable before low connector detail;
+- built-in non-rectangular text/attached controls use shape-safe inscribed content regions; this avoids capsule/diamond/document silhouette escapes without per-node offscreen masking or changing rectangular U++ child-control semantics;
+- committed selection uses an expanded actual node path with the semantic bright-blue selection colour and configurable thicker outline;
+- `UiNodeGraph::Paint()` now exposes last-paint microseconds plus simplified/hidden connector evidence;
+- `UiNodeGraphScaleTest` adds static and middle-button-pan `zoom=0.20` profiles with prepared/visited/painted node/edge counts and microseconds; timing is diagnostic evidence, not a machine-independent pass threshold;
+- new `UiNodeGraphRenderLodTest` provides 16 deterministic checks for full/reduced/simplified/hidden edge states, low-detail hit gating, policy normalization, and capsule/diamond child-control safe geometry;
+- no `UiGraphModel` execution/AgentFlow state was added and no production package membership change is required because all touched Graph production files are already in `Ui/Ui.upp`;
+- connector waypoint/Bezier-handle editing remains intentionally separate: the model already stores `UiGraphEdge::waypoints`, but a request-first route-edit interaction contract must be added before the view may edit them;
+- Windows CLANGx64 Debug/Release, measured interactive pan profiling and visual inspection are not available in this supervisor environment and remain mandatory;
+- local `git diff --check` is still required on the published range.
+
+NEXT ACTION:
+
+1. refresh `main`, verify no touched-file conflict, and carry/publish only this reviewed Graph slice onto the newest tip;
+2. Gary builds/runs the focused render-LOD, scale, Graph and model-binding regression gates in CLANGx64 Debug + Release and reports the low-zoom profile lines;
+3. manually inspect `UiGraphDemo` at approximately 1.0 / 0.6 / 0.3 / 0.2 zoom for panning, connector dominance, text/port/shadow LOD, shape-safe capsule/diamond content, non-rectangular shadow artifacts and shape-following blue selection;
+4. after this renderer checkpoint is accepted, implement selected/hovered connector route editing through a request-first waypoint/Bezier interaction contract rather than direct ad-hoc model mutation.
 
 ### UIGRAPH ACCEPTANCE CHECKPOINT — 2026-08-23
 
@@ -277,7 +325,7 @@ Important source checkpoints include:
 Shared PropertyEditor behavior retained below both tranches:
 
 - `00502ca0b779187314d72d51fc11fbb16f5ebad2` — Cardinal4 editors preserve canonical caller values;
-- `9d89914ef3068bd88b53697a3552051d174efe0d` — focused numeric mouse wheel edits the numeric value rather than scrolling the outer PropertyEditor.
+- `9d89914ef3068bd88b53697a3552051d174efe0d` — focused numeric mouse wheel edits the numeric value rather than the outer rail.
 
 ### Demo rules still locked
 

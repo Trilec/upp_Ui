@@ -49,6 +49,8 @@
       address reuse while preserving the canonical non-owning binding contract.
     - 2026-08: reconciled selection, active gestures, hover and attached-control
       bindings across model authority changes and authoritative object removal.
+    - 2026-08: added runtime rendering LOD policy and low-zoom paint evidence
+      without changing serialized Graph style/model contracts.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -103,7 +105,11 @@ struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
     int content_cell_gap = DPI(6);
     double content_cell_min_zoom = 0.65;
 
-    bool show_header_band = true;
+    // Keep text/icon content visually subordinate to the authored node body by
+    // default. Rectangular header bands remain available as an explicit style
+    // choice, but are not imposed on circles, capsules, diamonds or other
+    // silhouettes by the stock style.
+    bool show_header_band = false;
     bool show_icon = true;
     bool show_description = true;
     bool show_port_labels = true;
@@ -184,6 +190,26 @@ public:
         void Serialize(Stream& s);
     };
 
+    // Runtime rendering/performance policy. This is intentionally separate from
+    // serialised Style: LOD thresholds describe view workload, not durable skin
+    // or graph data, and may be tuned per host/device without stream migration.
+    struct LodPolicy : Moveable<LodPolicy> {
+        double full_detail_zoom = 0.75;
+        double edge_simplify_zoom = 0.50;
+        double minimal_edge_zoom = 0.25;
+        double edge_hide_zoom = 0.12;
+        double edge_label_zoom = 0.65;
+        double arrow_zoom = 0.50;
+        double shadow_zoom = 0.60;
+        double title_zoom = 0.48;
+        double secondary_text_zoom = 0.65;
+        double port_zoom = 0.40;
+        double port_label_zoom = 0.65;
+        double paint_query_margin_full = 96.0;
+        double paint_query_margin_low = 24.0;
+        double selection_outline_width = 3.0;
+    };
+
     static const Style& StyleDefault();
     static UiGraphNodeStyle StyleForRole(const UiGraphNodeStyle& base, UiGraphNodeRole role);
     static bool ShapeContains(const UiGraphNode& node, const Rect& surface, Point point);
@@ -201,6 +227,9 @@ public:
     bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetCustomStyle() const { return style_; }
+
+    UiNodeGraph& SetLodPolicy(const LodPolicy& policy);
+    const LodPolicy& GetLodPolicy() const { return lod_policy_; }
 
     UiNodeGraph& SetNodeStyleClass(const String& name, const UiGraphNodeStyle& style);
     UiNodeGraph& RemoveNodeStyleClass(const String& name);
@@ -276,6 +305,9 @@ public:
     int GetLastPaintEdgeVisitCount() const { return last_paint_edge_visit_count_; }
     int GetLastPaintedNodeCount() const { return last_painted_node_count_; }
     int GetLastPaintedEdgeCount() const { return last_painted_edge_count_; }
+    int GetLastSimplifiedEdgeCount() const { return last_simplified_edge_count_; }
+    int GetLastHiddenEdgeCount() const { return last_hidden_edge_count_; }
+    int64 GetLastPaintUsecs() const { return last_paint_usecs_; }
     int GetLastNodeHitCandidateCount() const { return last_node_hit_candidate_count_; }
     int GetLastPortHitCandidateCount() const { return last_port_hit_candidate_count_; }
     int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
@@ -366,6 +398,7 @@ private:
         Vector<Point> points;
         Rect bounds;
         Point label_point;
+        bool simplified = false;
     };
 
     struct WorldRect : Moveable<WorldRect> {
@@ -404,6 +437,11 @@ private:
     UiGraphVisualState GetNodeVisualState(const UiGraphNode& node) const;
     UiGraphVisualState GetEdgeVisualState(const UiGraphEdge& edge) const;
     static int VisualStateIndex(UiGraphVisualState state);
+    double EdgeDetailFactor() const;
+    double ShadowDetailFactor() const;
+    double GetPaintQueryMargin() const;
+    Rect GetShapeSafeContentRect(const UiGraphNode& node, const Rect& content,
+                                 const Rect& surface) const;
 
     void BindModel(UiGraphModel& model);
     bool ReconcileModelState(bool reset_like);
@@ -505,6 +543,7 @@ private:
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
     bool has_custom_style_ = false;
+    LodPolicy lod_policy_;
     VectorMap<String, UiGraphNodeStyle> node_styles_;
     VectorMap<String, UiGraphEdgeStyle> edge_styles_;
 
@@ -547,6 +586,9 @@ private:
     int last_paint_edge_visit_count_ = 0;
     int last_painted_node_count_ = 0;
     int last_painted_edge_count_ = 0;
+    int last_simplified_edge_count_ = 0;
+    int last_hidden_edge_count_ = 0;
+    int64 last_paint_usecs_ = 0;
     mutable int last_node_hit_candidate_count_ = 0;
     mutable int last_port_hit_candidate_count_ = 0;
     mutable int last_edge_hit_candidate_count_ = 0;

@@ -16,6 +16,30 @@ void RemoveId(Vector<UiGraphId>& ids, UiGraphId id)
         ids.Remove(q);
 }
 
+Pointf PortAnchorWorld(const UiGraphNode& node, UiGraphPortSide side)
+{
+    Pointf pos = node.position;
+    Sizef size = node.size;
+    if(node.shape == UiGraphNodeShape::Square || node.shape == UiGraphNodeShape::Circle) {
+        double extent = max(size.cx, size.cy);
+        size = Sizef(extent, extent);
+    }
+
+    switch(side) {
+    case UiGraphPortSide::Left:
+        return Pointf(pos.x, pos.y + size.cy * 0.5);
+    case UiGraphPortSide::Right:
+        return Pointf(pos.x + size.cx, pos.y + size.cy * 0.5);
+    case UiGraphPortSide::Top:
+        return Pointf(pos.x + size.cx * 0.5, pos.y);
+    case UiGraphPortSide::Bottom:
+        return Pointf(pos.x + size.cx * 0.5, pos.y + size.cy);
+    case UiGraphPortSide::Auto:
+    default:
+        return pos + Pointf(size.cx * 0.5, size.cy * 0.5);
+    }
+}
+
 } // namespace
 
 void UiNodeGraph::WorldRect::Include(Pointf p)
@@ -105,23 +129,46 @@ UiNodeGraph::WorldRect UiNodeGraph::GetEdgeWorldBounds(const UiGraphEdge& edge) 
     for(const Pointf& p : edge.waypoints)
         out.Include(p);
 
-    Pointf a, b;
-    bool have_a = false, have_b = false;
-    if(source) {
-        a = source->position + Pointf(source->size.cx * 0.5, source->size.cy * 0.5);
-        have_a = true;
+    if(!source || !target)
+        return out.Inflated(32.0);
+
+    const UiGraphPort* source_port = model_ ? model_->FindPort(edge.source) : nullptr;
+    const UiGraphPort* target_port = model_ ? model_->FindPort(edge.target) : nullptr;
+    UiGraphPortSide source_side = source_port ? ResolvePortSide(*source_port) : UiGraphPortSide::Right;
+    UiGraphPortSide target_side = target_port ? ResolvePortSide(*target_port) : UiGraphPortSide::Left;
+    Pointf a = PortAnchorWorld(*source, source_side);
+    Pointf b = PortAnchorWorld(*target, target_side);
+    out.Include(a);
+    out.Include(b);
+
+    const UiGraphEdgeStyle& style = FindEdgeStyleClass(edge.style_class);
+    UiGraphRouteStyle route = edge.route == UiGraphRouteStyle::Inherit ? style.route : edge.route;
+    double dx = b.x - a.x;
+    double dy = b.y - a.y;
+    double distance = std::sqrt(dx * dx + dy * dy);
+    double paint_margin = max(24.0, style.interaction_width + style.arrow_size + 8.0);
+
+    // A custom route or state-sensitive style callback can legally leave the
+    // ordinary route envelope. Keep the established conservative bound for
+    // those extension points; normal built-in routes use their actual envelope.
+    if(route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle)
+        return out.Inflated(max(96.0, distance * 0.50));
+
+    if(route == UiGraphRouteStyle::Bezier) {
+        double handle = max(24.0, distance * minmax(style.bezier_tension, 0.05, 1.25));
+        out.Include(a + SideVector(source_side) * handle);
+        out.Include(b + SideVector(target_side) * handle);
+        return out.Inflated(paint_margin);
     }
-    if(target) {
-        b = target->position + Pointf(target->size.cx * 0.5, target->size.cy * 0.5);
-        have_b = true;
+
+    if(route == UiGraphRouteStyle::Orthogonal) {
+        double lead = max(0.0, style.orthogonal_lead);
+        out.Include(a + SideVector(source_side) * lead);
+        out.Include(b + SideVector(target_side) * lead);
+        return out.Inflated(paint_margin);
     }
-    double distance = have_a && have_b
-                    ? std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y))
-                    : 0.0;
-    // Bezier handles can leave the endpoint bounding box. This deliberately
-    // overestimates ordinary route extent; false-positive candidates are cheap,
-    // while false-negative culling would be a rendering bug.
-    return out.Inflated(max(96.0, distance * 0.50));
+
+    return out.Inflated(paint_margin);
 }
 
 UiNodeGraph::WorldRect UiNodeGraph::GetViewportWorldBounds(double screen_margin) const
@@ -424,7 +471,7 @@ UiGraphPortRef UiNodeGraph::HitTestPortSpatial(Point p) const
     self->PrepareGeometry();
     self->EnsureSpatialIndex();
     last_port_hit_candidate_count_ = 0;
-    if(!model_)
+    if(!model_ || zoom_ < lod_policy_.port_zoom)
         return UiGraphPortRef();
 
     // Broad enough for custom per-style hit radii while still touching only a
@@ -468,7 +515,7 @@ UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
     self->PrepareGeometry();
     self->EnsureSpatialIndex();
     last_edge_hit_candidate_count_ = 0;
-    if(!model_)
+    if(!model_ || zoom_ < lod_policy_.edge_simplify_zoom)
         return UiGraphEdgeRef();
 
     const int r = max(10, DPI(24));

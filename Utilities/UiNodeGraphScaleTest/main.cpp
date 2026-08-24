@@ -125,6 +125,20 @@ Point FindBlankPoint(UiNodeGraph& graph)
     return Point(-1, -1);
 }
 
+void PrintLowZoomProfile(const char *phase, UiNodeGraph& graph, int64 paint_us)
+{
+    Cout() << "UINODEGRAPH_LOW_ZOOM_PROFILE"
+           << " phase=" << phase
+           << " zoom=" << graph.GetZoom()
+           << " prepared_nodes=" << graph.GetPreparedNodeCount()
+           << " prepared_edges=" << graph.GetPreparedEdgeCount()
+           << " node_visits=" << graph.GetLastPaintNodeVisitCount()
+           << " edge_visits=" << graph.GetLastPaintEdgeVisitCount()
+           << " painted_nodes=" << graph.GetLastPaintedNodeCount()
+           << " painted_edges=" << graph.GetLastPaintedEdgeCount()
+           << " paint_us=" << paint_us << '\n';
+}
+
 void RunModelScale(TestCtx& t, UiGraphModel& model, Vector<UiGraphNodeRef>& nodes)
 {
     const int width = 100;
@@ -353,6 +367,35 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
     graph.LeftDouble(centre_hit, 0);
     t.Expect(graph.GetSelectedNodes().GetCount() == 1 && graph.IsNodeSelected(centre),
              "double-click clears prior selection and leaves only the double-clicked node selected");
+
+    graph.SetZoom(0.20, Point(600, 400));
+    graph.CenterOnNode(centre);
+    graph.ClearSelection();
+    int low_zoom_spatial = graph.GetSpatialBuildSerial();
+    int low_zoom_geometry = graph.GetGeometryBuildSerial();
+    int64 paint_started = usecs();
+    graph.Paint(draw);
+    int64 low_zoom_paint_us = usecs() - paint_started;
+    PrintLowZoomProfile("static", graph, low_zoom_paint_us);
+    t.Expect(graph.GetGeometryBuildSerial() == low_zoom_geometry
+             && graph.GetLastPaintEdgeVisitCount() < model.GetEdgeCount(),
+             "0.20 zoom paint remains geometry-read-only and does not visit the full 19,800-edge model");
+
+    graph.MiddleDown(Point(600, 400), 0);
+    graph.MouseMove(Point(650, 430), 0);
+    int pan_geometry = graph.GetGeometryBuildSerial();
+    paint_started = usecs();
+    graph.Paint(draw);
+    int64 low_zoom_pan_paint_us = usecs() - paint_started;
+    PrintLowZoomProfile("middle_pan", graph, low_zoom_pan_paint_us);
+    graph.MiddleUp(Point(650, 430), 0);
+    t.Expect(graph.GetSpatialBuildSerial() == low_zoom_spatial
+             && graph.GetGeometryBuildSerial() == pan_geometry
+             && graph.GetLastPaintedEdgeCount() <= graph.GetLastPaintEdgeVisitCount(),
+             "0.20 zoom middle-button pan reuses the world index and reports bounded paint work");
+
+    graph.SetZoom(0.5, Point(600, 400));
+    graph.CenterOnNode(centre);
 
     Vector<UiGraphNodeRef> batch_nodes;
     for(int y = 60; y < 63; y++)

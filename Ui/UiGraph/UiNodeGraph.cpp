@@ -31,6 +31,14 @@ double VectorLength(Pointf v)
     return std::sqrt(v.x * v.x + v.y * v.y);
 }
 
+double SmoothUnit(double value, double low, double high)
+{
+    if(high <= low)
+        return value >= high ? 1.0 : 0.0;
+    double t = minmax((value - low) / (high - low), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
 Vector<Pointf> RoundedPolygon(const Vector<Pointf>& vertices, double radius, int samples = 5)
 {
     Vector<Pointf> out;
@@ -149,6 +157,29 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
     }
 }
 
+Vector<Pointf> InflatePath(const Vector<Pointf>& path, double amount)
+{
+    if(path.IsEmpty() || amount <= 0.0)
+        return clone(path);
+    double left = path[0].x, right = path[0].x;
+    double top = path[0].y, bottom = path[0].y;
+    for(const Pointf& p : path) {
+        left = min(left, p.x); right = max(right, p.x);
+        top = min(top, p.y); bottom = max(bottom, p.y);
+    }
+    double width = max(1.0, right - left);
+    double height = max(1.0, bottom - top);
+    Pointf centre((left + right) * 0.5, (top + bottom) * 0.5);
+    double sx = (width + amount * 2.0) / width;
+    double sy = (height + amount * 2.0) / height;
+    Vector<Pointf> out;
+    out.Reserve(path.GetCount());
+    for(const Pointf& p : path)
+        out.Add(Pointf(centre.x + (p.x - centre.x) * sx,
+                       centre.y + (p.y - centre.y) * sy));
+    return out;
+}
+
 void PainterPath(Painter& p, const Vector<Pointf>& points)
 {
     if(points.IsEmpty())
@@ -195,6 +226,8 @@ void StrokePath(Painter& p, const Vector<Pointf>& points, double width, Color co
 
 void StrokeSegment(Painter& p, Pointf a, Pointf b, double width, Color color)
 {
+    if(width <= 0.02)
+        return;
     p.Begin();
     p.Move(a);
     p.Line(b);
@@ -205,7 +238,7 @@ void StrokeSegment(Painter& p, Pointf a, Pointf b, double width, Color color)
 void StrokePolyline(Painter& p, const Vector<Point>& points, double width, Color color,
                     UiLineStyle line_style, double dash_length, double dash_gap)
 {
-    if(points.GetCount() < 2)
+    if(points.GetCount() < 2 || width <= 0.02)
         return;
     if(line_style == SOLID) {
         p.Begin();
@@ -217,8 +250,8 @@ void StrokePolyline(Painter& p, const Vector<Point>& points, double width, Color
         return;
     }
 
-    double on = line_style == DOTTED ? max(width, 1.5) : max(1.0, dash_length);
-    double off = max(1.0, dash_gap);
+    double on = line_style == DOTTED ? max(width, 0.35) : max(0.35, dash_length);
+    double off = max(0.35, dash_gap);
     bool drawing = true;
     double remaining = on;
     for(int i = 1; i < points.GetCount(); i++) {
@@ -248,7 +281,7 @@ void PaintArrow(Painter& p, const Vector<Point>& points,
                 UiGraphArrowStyle arrow, double size, Color color)
 {
     if(arrow == UiGraphArrowStyle::Inherit || arrow == UiGraphArrowStyle::None ||
-       points.GetCount() < 2 || size <= 0.0)
+       points.GetCount() < 2 || size <= 0.20)
         return;
     Pointf tip(points.Top().x, points.Top().y);
     Pointf prev(points[points.GetCount() - 2].x, points[points.GetCount() - 2].y);
@@ -259,8 +292,9 @@ void PaintArrow(Painter& p, const Vector<Point>& points,
     Pointf base = tip - dir * size;
 
     if(arrow == UiGraphArrowStyle::Open) {
-        StrokeSegment(p, tip, base + side * size * 0.55, 1.5, color);
-        StrokeSegment(p, tip, base - side * size * 0.55, 1.5, color);
+        double stroke = max(0.35, min(1.5, size * 0.22));
+        StrokeSegment(p, tip, base + side * size * 0.55, stroke, color);
+        StrokeSegment(p, tip, base - side * size * 0.55, stroke, color);
         return;
     }
     if(arrow == UiGraphArrowStyle::Circle) {
@@ -664,6 +698,107 @@ void UiNodeGraph::OnStyleChanged()
     UpdateAttachedCtrls();
     RefreshLayout();
     Refresh();
+}
+
+UiNodeGraph& UiNodeGraph::SetLodPolicy(const LodPolicy& policy)
+{
+    lod_policy_ = policy;
+    lod_policy_.full_detail_zoom = max(0.01, lod_policy_.full_detail_zoom);
+    lod_policy_.edge_simplify_zoom = min(lod_policy_.full_detail_zoom,
+                                         max(0.01, lod_policy_.edge_simplify_zoom));
+    lod_policy_.minimal_edge_zoom = min(lod_policy_.edge_simplify_zoom,
+                                        max(0.01, lod_policy_.minimal_edge_zoom));
+    lod_policy_.edge_hide_zoom = min(lod_policy_.minimal_edge_zoom,
+                                     max(0.0, lod_policy_.edge_hide_zoom));
+    lod_policy_.edge_label_zoom = max(0.0, lod_policy_.edge_label_zoom);
+    lod_policy_.arrow_zoom = max(0.0, lod_policy_.arrow_zoom);
+    lod_policy_.shadow_zoom = max(0.0, lod_policy_.shadow_zoom);
+    lod_policy_.title_zoom = max(0.0, lod_policy_.title_zoom);
+    lod_policy_.secondary_text_zoom = max(0.0, lod_policy_.secondary_text_zoom);
+    lod_policy_.port_zoom = max(0.0, lod_policy_.port_zoom);
+    lod_policy_.port_label_zoom = max(lod_policy_.port_zoom, lod_policy_.port_label_zoom);
+    lod_policy_.paint_query_margin_low = max(0.0, lod_policy_.paint_query_margin_low);
+    lod_policy_.paint_query_margin_full = max(lod_policy_.paint_query_margin_low,
+                                              lod_policy_.paint_query_margin_full);
+    lod_policy_.selection_outline_width = max(1.0, lod_policy_.selection_outline_width);
+    InvalidateGeometry();
+    PrepareGeometry();
+    UpdateAttachedCtrls();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
+double UiNodeGraph::EdgeDetailFactor() const
+{
+    return SmoothUnit(zoom_, lod_policy_.edge_hide_zoom, lod_policy_.full_detail_zoom);
+}
+
+double UiNodeGraph::ShadowDetailFactor() const
+{
+    return SmoothUnit(zoom_, lod_policy_.shadow_zoom, lod_policy_.full_detail_zoom);
+}
+
+double UiNodeGraph::GetPaintQueryMargin() const
+{
+    double t = SmoothUnit(zoom_, lod_policy_.minimal_edge_zoom, lod_policy_.full_detail_zoom);
+    return lod_policy_.paint_query_margin_low
+         + (lod_policy_.paint_query_margin_full - lod_policy_.paint_query_margin_low) * t;
+}
+
+Rect UiNodeGraph::GetShapeSafeContentRect(const UiGraphNode& node, const Rect& content,
+                                          const Rect& surface) const
+{
+    if(content.IsEmpty() || surface.IsEmpty())
+        return RectC(0, 0, 0, 0);
+
+    auto centred = [&](double width_factor, double height_factor,
+                       double offset_y = 0.0) {
+        int w = max(1, fround(surface.GetWidth() * width_factor));
+        int h = max(1, fround(surface.GetHeight() * height_factor));
+        int x = surface.left + (surface.GetWidth() - w) / 2;
+        int y = surface.top + (surface.GetHeight() - h) / 2
+              + fround(surface.GetHeight() * offset_y);
+        return content & RectC(x, y, w, h);
+    };
+
+    switch(node.shape) {
+    case UiGraphNodeShape::Circle:
+    case UiGraphNodeShape::Ellipse:
+        return centred(0.68, 0.68);
+    case UiGraphNodeShape::Diamond:
+        return centred(0.50, 0.50);
+    case UiGraphNodeShape::Triangle:
+        return centred(0.46, 0.40, 0.12);
+    case UiGraphNodeShape::Hexagon:
+        return centred(0.72, 0.82);
+    case UiGraphNodeShape::Capsule:
+        if(surface.GetWidth() >= surface.GetHeight()) {
+            int inset = max(1, fround(surface.GetHeight() * 0.28));
+            return content & Rect(surface.left + inset, surface.top,
+                                  surface.right - inset, surface.bottom);
+        }
+        else {
+            int inset = max(1, fround(surface.GetWidth() * 0.28));
+            return content & Rect(surface.left, surface.top + inset,
+                                  surface.right, surface.bottom - inset);
+        }
+    case UiGraphNodeShape::Cloud:
+        return centred(0.64, 0.56);
+    case UiGraphNodeShape::Document: {
+        int fold = max(1, fround(min(surface.GetWidth(), surface.GetHeight()) * 0.22));
+        return content & Rect(surface.left, surface.top,
+                              max(surface.left, surface.right - fold), surface.bottom);
+    }
+    case UiGraphNodeShape::Database:
+        return centred(0.82, 0.64);
+    case UiGraphNodeShape::Rectangle:
+    case UiGraphNodeShape::RoundedRectangle:
+    case UiGraphNodeShape::Square:
+    case UiGraphNodeShape::Custom:
+    default:
+        return content;
+    }
 }
 
 UiNodeGraph& UiNodeGraph::SetNodeStyleClass(const String& name, const UiGraphNodeStyle& style)
@@ -1079,7 +1214,7 @@ void UiNodeGraph::UpdateAttachedCtrls()
         }
         UiGraphNodeStyle style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
         bool show = node->visible && !node->collapsed && geometry &&
-                    zoom_ >= style.content_cell_min_zoom &&
+                    zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom) &&
                     !geometry->control.IsEmpty() && !(geometry->control & viewport).IsEmpty();
         if(show) {
             if(ctrl->GetParent() != this) Add(*ctrl);
@@ -1446,12 +1581,14 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
     StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
     out.surface = UiStyledSurfaceRect(out.rect, metrics);
-    out.content = UiStyledInnerRect(out.rect, metrics, skin);
+    out.content = GetShapeSafeContentRect(node, UiStyledInnerRect(out.rect, metrics, skin), out.surface);
     out.hit_path = NodeShapePath(node, out.surface);
 
     Rect heading = out.content;
     Ctrl* child = GetNodeCtrl(node.ref);
-    if(child && !node.collapsed && !out.content.IsEmpty()) {
+    bool use_child = child && !node.collapsed && !out.content.IsEmpty()
+                  && zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom);
+    if(use_child) {
         int gap = ScaleMetric(style.content_cell_gap, zoom_);
         Size child_min = child->GetMinSize();
         int reserve = ScaleMetric(style.content_cell_reserve, zoom_);
@@ -1486,11 +1623,12 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
                  : min(heading.GetHeight(), max(0, ScaleMetric(style.header_height, zoom_)));
     out.header = Rect(heading.left, heading.top, heading.right, heading.top + header_h);
     Rect text_lane = out.header;
-    bool have_icon = !out.compact && style.show_icon && !IsNull(node.icon) && !out.header.IsEmpty();
+    bool have_icon = zoom_ >= lod_policy_.secondary_text_zoom
+                  && !out.compact && style.show_icon && !IsNull(node.icon) && !out.header.IsEmpty();
     if(have_icon) {
         Size icon_size = node.icon_size.cx > 0 && node.icon_size.cy > 0 ? node.icon_size : style.icon_size;
-        icon_size.cx = min(ScaleMetric(icon_size.cx, max(0.75, zoom_)), max(0, out.header.GetWidth()));
-        icon_size.cy = min(ScaleMetric(icon_size.cy, max(0.75, zoom_)), max(0, out.header.GetHeight()));
+        icon_size.cx = min(ScaleMetric(icon_size.cx, max(0.01, zoom_)), max(0, out.header.GetWidth()));
+        icon_size.cy = min(ScaleMetric(icon_size.cy, max(0.01, zoom_)), max(0, out.header.GetHeight()));
         int gap = ScaleMetric(style.icon_text_gap, zoom_);
         if(style.icon_side == UiAlign::RIGHT) {
             out.icon = RectC(out.header.right - icon_size.cx, out.header.top + (out.header.GetHeight() - icon_size.cy) / 2, icon_size.cx, icon_size.cy);
@@ -1502,8 +1640,10 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
         }
     }
 
-    int title_h = out.micro || node.title.IsEmpty() ? 0 : max(1, GetTextSize(node.title, style.title_font).cy);
-    int subtitle_h = out.compact || node.subtitle.IsEmpty() ? 0 : max(1, GetTextSize(node.subtitle, style.subtitle_font).cy);
+    int title_h = out.micro || zoom_ < lod_policy_.title_zoom || node.title.IsEmpty()
+                ? 0 : max(1, GetTextSize(node.title, style.title_font).cy);
+    int subtitle_h = out.compact || zoom_ < lod_policy_.secondary_text_zoom || node.subtitle.IsEmpty()
+                   ? 0 : max(1, GetTextSize(node.subtitle, style.subtitle_font).cy);
     int title_gap = title_h > 0 && subtitle_h > 0 ? ScaleMetric(style.title_subtitle_gap, zoom_) : 0;
     int text_top = text_lane.top + max(0, (text_lane.GetHeight() - title_h - title_gap - subtitle_h) / 2);
     if(title_h > 0) {
@@ -1512,7 +1652,8 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     }
     if(subtitle_h > 0)
         out.subtitle = Rect(text_lane.left, text_top, text_lane.right, min(text_lane.bottom, text_top + subtitle_h));
-    if(!out.compact && style.show_description && !node.description.IsEmpty() && heading.bottom > out.header.bottom) {
+    if(zoom_ >= lod_policy_.full_detail_zoom && !out.compact && style.show_description
+       && !node.description.IsEmpty() && heading.bottom > out.header.bottom) {
         int top = min(heading.bottom, out.header.bottom + ScaleMetric(style.subtitle_description_gap, zoom_));
         out.description = Rect(heading.left, top, heading.right, heading.bottom);
     }
@@ -1554,14 +1695,16 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
             else if(si == 2) anchor = Point(fround(axis), out.surface.top);
             else anchor = Point(fround(axis), out.surface.bottom);
             out.anchors.Add(port.id, anchor);
-            int hit = max(DPI(4), fround(style.port_hit_radius * zoom_));
-            Rect hit_rect = RectC(anchor.x - hit, anchor.y - hit, hit * 2 + 1, hit * 2 + 1);
-            out.port_hits.Add(port.id, hit_rect);
-            out.paint_bounds |= hit_rect;
-            if(!out.compact && style.show_port_labels) {
+            if(zoom_ >= lod_policy_.port_zoom) {
+                int hit = max(DPI(2), fround(style.port_hit_radius * zoom_));
+                Rect hit_rect = RectC(anchor.x - hit, anchor.y - hit, hit * 2 + 1, hit * 2 + 1);
+                out.port_hits.Add(port.id, hit_rect);
+                out.paint_bounds |= hit_rect;
+            }
+            if(zoom_ >= lod_policy_.port_label_zoom && !out.compact && style.show_port_labels) {
                 String label = PortLabel(port, style.show_port_type);
                 Size tsz = GetTextSize(label, style.port_font);
-                int gap = max(2, fround(style.port_label_gap * zoom_));
+                int gap = max(1, fround(style.port_label_gap * zoom_));
                 Rect lr;
                 if(si == 0) lr = RectC(anchor.x + gap, anchor.y - tsz.cy / 2, tsz.cx, tsz.cy);
                 else if(si == 1) lr = RectC(anchor.x - gap - tsz.cx, anchor.y - tsz.cy / 2, tsz.cx, tsz.cy);
@@ -1572,7 +1715,7 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
             }
         }
     }
-    out.paint_bounds = out.paint_bounds.Inflated(max(2, fround(2 * max(0.75, zoom_))));
+    out.paint_bounds = out.paint_bounds.Inflated(max(1, fround(2 * min(1.0, max(0.25, zoom_)))));
 }
 
 Vector<Pointf> UiNodeGraph::BuildStraightRoute(Pointf source, Pointf target, const Vector<Pointf>& waypoints)
@@ -1695,21 +1838,45 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
     }
     Pointf a(source.x, source.y), b(target.x, target.y);
     Vector<Pointf> route;
-    if(route_style == UiGraphRouteStyle::Straight)
-        route = BuildStraightRoute(a, b, waypoints);
-    else if(route_style == UiGraphRouteStyle::Orthogonal)
-        route = BuildOrthogonalRoute(a, source_side, b, target_side,
-                                     style.orthogonal_lead * zoom_, style.orthogonal_radius * zoom_, waypoints);
-    else if(route_style == UiGraphRouteStyle::Custom && WhenBuildCustomRoute)
-        route = WhenBuildCustomRoute(edge, a, source_side, b, target_side, style);
-    else
-        route = BuildBezierRoute(a, source_side, b, target_side, style.bezier_tension);
     out.ref = edge.ref;
-    for(const Pointf& q : route) out.points.Add(Point(fround(q.x), fround(q.y)));
-    out.bounds = RouteBounds(out.points, fround(style.interaction_width));
+    out.simplified = false;
+
+    if(zoom_ < lod_policy_.minimal_edge_zoom) {
+        route << a << b;
+        out.simplified = true;
+    }
+    else {
+        double route_detail = SmoothUnit(zoom_, lod_policy_.minimal_edge_zoom,
+                                         lod_policy_.full_detail_zoom);
+        if(route_style == UiGraphRouteStyle::Straight)
+            route = BuildStraightRoute(a, b, waypoints);
+        else if(route_style == UiGraphRouteStyle::Orthogonal)
+            route = BuildOrthogonalRoute(a, source_side, b, target_side,
+                                         style.orthogonal_lead * zoom_,
+                                         style.orthogonal_radius * zoom_ * route_detail,
+                                         waypoints);
+        else if(route_style == UiGraphRouteStyle::Custom && WhenBuildCustomRoute
+                && zoom_ >= lod_policy_.edge_simplify_zoom)
+            route = WhenBuildCustomRoute(edge, a, source_side, b, target_side, style);
+        else if(route_style == UiGraphRouteStyle::Custom) {
+            route << a << b;
+            out.simplified = true;
+        }
+        else {
+            int samples = max(4, fround(5.0 + 19.0 * route_detail));
+            route = BuildBezierRoute(a, source_side, b, target_side, style.bezier_tension, samples);
+        }
+        if(zoom_ < lod_policy_.edge_simplify_zoom)
+            out.simplified = true;
+    }
+
+    for(const Pointf& q : route)
+        out.points.Add(Point(fround(q.x), fround(q.y)));
+    int interaction = fround(max(2.0, style.interaction_width * max(0.25, min(1.0, zoom_))));
+    out.bounds = RouteBounds(out.points, interaction);
     if(!out.points.IsEmpty()) {
         out.label_point = out.points[out.points.GetCount() / 2];
-        if(!edge.title.IsEmpty()) {
+        if(zoom_ >= lod_policy_.edge_label_zoom && !edge.title.IsEmpty()) {
             Size ts = GetTextSize(edge.title, style.label_font);
             out.bounds |= RectC(out.label_point.x - ts.cx / 2 - DPI(5), out.label_point.y - ts.cy / 2 - DPI(3), ts.cx + DPI(10), ts.cy + DPI(6));
         }
@@ -1732,6 +1899,7 @@ void UiNodeGraph::RebuildGeometry()
     edge_geometry_.Clear();
     last_node_candidate_count_ = 0;
     last_edge_candidate_count_ = 0;
+    last_hidden_edge_count_ = 0;
     if(!model_) {
         model_revision_ = -1;
         geometry_zoom_ = zoom_;
@@ -1750,22 +1918,24 @@ void UiNodeGraph::RebuildGeometry()
 
     Index<UiGraphId> node_candidates;
     Index<UiGraphId> edge_candidates;
-    QuerySpatial(GetViewportWorldBounds(160.0), node_candidates, edge_candidates);
+    QuerySpatial(GetViewportWorldBounds(GetPaintQueryMargin()), node_candidates, edge_candidates);
 
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_candidates.FindAdd(ref.id);
-        for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
-            edge_candidates.FindAdd(edge.id);
+        if(zoom_ >= lod_policy_.edge_hide_zoom)
+            for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
+                edge_candidates.FindAdd(edge.id);
     }
 
-    for(int i = 0; i < edge_candidates.GetCount(); i++) {
-        const UiGraphEdge* edge = model_->FindEdge(UiGraphEdgeRef{edge_candidates[i]});
-        if(edge) {
-            node_candidates.FindAdd(edge->source.node.id);
-            node_candidates.FindAdd(edge->target.node.id);
+    if(zoom_ >= lod_policy_.edge_hide_zoom)
+        for(int i = 0; i < edge_candidates.GetCount(); i++) {
+            const UiGraphEdge* edge = model_->FindEdge(UiGraphEdgeRef{edge_candidates[i]});
+            if(edge) {
+                node_candidates.FindAdd(edge->source.node.id);
+                node_candidates.FindAdd(edge->target.node.id);
+            }
         }
-    }
 
     last_node_candidate_count_ = node_candidates.GetCount();
     last_edge_candidate_count_ = edge_candidates.GetCount();
@@ -1792,15 +1962,18 @@ void UiNodeGraph::RebuildGeometry()
         node_geometry_.Add(ref.id, pick(g));
     }
 
-    for(int i = 0; i < edge_candidates.GetCount(); i++) {
-        UiGraphEdgeRef ref{edge_candidates[i]};
-        const UiGraphEdge* edge = model_->FindEdge(ref);
-        if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target))
-            continue;
-        EdgeGeometry g;
-        BuildEdgeGeometry(*edge, g);
-        edge_geometry_.Add(ref.id, pick(g));
-    }
+    if(zoom_ < lod_policy_.edge_hide_zoom)
+        last_hidden_edge_count_ = edge_candidates.GetCount();
+    else
+        for(int i = 0; i < edge_candidates.GetCount(); i++) {
+            UiGraphEdgeRef ref{edge_candidates[i]};
+            const UiGraphEdge* edge = model_->FindEdge(ref);
+            if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target))
+                continue;
+            EdgeGeometry g;
+            BuildEdgeGeometry(*edge, g);
+            edge_geometry_.Add(ref.id, pick(g));
+        }
 
     model_revision_ = model_->GetRevision();
     geometry_zoom_ = zoom_;
@@ -1978,15 +2151,30 @@ void UiNodeGraph::PaintGrid(Draw& w, const Rect& outer) const
 void UiNodeGraph::PaintEdge(Painter& p, const UiGraphEdge& edge, const EdgeGeometry& g,
                             const UiGraphEdgeStyle& style, UiGraphVisualState state)
 {
-    int si = VisualStateIndex(state); Color color = style.color[si];
-    double width = max(0.5, style.width[si] * max(0.65, zoom_));
+    if(zoom_ < lod_policy_.edge_hide_zoom)
+        return;
+    int si = VisualStateIndex(state);
+    Color color = style.color[si];
+    double detail = EdgeDetailFactor();
+    double width = style.width[si] * min(1.0, max(0.01, zoom_)) * (0.35 + 0.65 * detail);
+    if(width <= 0.02)
+        return;
     UiLineStyle line_style = style.line_style;
     if(edge.stroke == UiGraphStrokeStyle::Solid) line_style = SOLID;
     else if(edge.stroke == UiGraphStrokeStyle::Dashed) line_style = DASHED;
     else if(edge.stroke == UiGraphStrokeStyle::Dotted) line_style = DOTTED;
-    StrokePolyline(p, g.points, width, color, line_style, style.dash_length * zoom_, style.dash_gap * zoom_);
-    UiGraphArrowStyle arrow = edge.arrow == UiGraphArrowStyle::Inherit ? style.arrow : edge.arrow;
-    if(edge.directed) PaintArrow(p, g.points, arrow, style.arrow_size * max(0.75, zoom_), color);
+    if(g.simplified || zoom_ < lod_policy_.edge_simplify_zoom)
+        line_style = SOLID;
+    StrokePolyline(p, g.points, width, color, line_style,
+                   style.dash_length * zoom_, style.dash_gap * zoom_);
+
+    double arrow_factor = SmoothUnit(zoom_, lod_policy_.arrow_zoom,
+                                     lod_policy_.full_detail_zoom);
+    if(edge.directed && arrow_factor > 0.01) {
+        UiGraphArrowStyle arrow = edge.arrow == UiGraphArrowStyle::Inherit ? style.arrow : edge.arrow;
+        double arrow_size = style.arrow_size * min(1.0, max(0.01, zoom_)) * arrow_factor;
+        PaintArrow(p, g.points, arrow, arrow_size, color);
+    }
 }
 
 void UiNodeGraph::PaintNodeSurface(Draw& w, const UiGraphNode& node, const NodeGeometry& g,
@@ -1995,7 +2183,13 @@ void UiNodeGraph::PaintNodeSurface(Draw& w, const UiGraphNode& node, const NodeG
     bool handled = false;
     if(WhenPaintNodeBackground) WhenPaintNodeBackground(w, node, g.rect, style, state, handled);
     if(handled || !UsesRectangularStyledSurface(node.shape)) return;
-    StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_); StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
+    StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
+    StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
+    double shadow_detail = ShadowDetailFactor();
+    if(g.micro || shadow_detail <= 0.01)
+        metrics.shadow.enabled = false;
+    else
+        metrics.shadow.alpha = clamp(fround(metrics.shadow.alpha * shadow_detail), 0, 255);
     if(node.shape == UiGraphNodeShape::Rectangle) metrics.radius = 0;
     else if(node.shape == UiGraphNodeShape::Capsule) metrics.radius = max(0, min(g.surface.GetWidth(), g.surface.GetHeight()) / 2);
     else metrics.radius = max(0, fround(node.corner_radius * zoom_));
@@ -2011,27 +2205,41 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
     StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
     if(!rectangular && !custom_body && !g.hit_path.IsEmpty()) {
         const StyledShadow& shadow = metrics.shadow;
-        if(shadow.enabled && !shadow.inset && shadow.alpha > 0 && shadow.distance > 0) {
-            int extent = max(1, shadow.distance);
-            for(int d = extent; d >= 1; --d) {
-                double t = ((double)d - 0.5) / max(1, extent);
-                double falloff = shadow.mode == SHADOW_HARD ? 1.0 : (1.0 - UiShadowCurveEval(shadow.curve, t));
-                int alpha = clamp((int)std::round(shadow.alpha * falloff / extent), 0, 255);
-                if(alpha <= 0) continue;
-                Vector<Pointf> shape = clone(g.hit_path); Pointf off((double)shadow.offset_x * d / extent, (double)shadow.offset_y * d / extent);
-                for(Pointf& q : shape) q += off;
-                RGBA rgba(shadow.color); rgba.a = (byte)alpha; FillPath(p, shape, rgba);
+        double shadow_detail = ShadowDetailFactor();
+        if(!g.micro && shadow_detail > 0.01 && shadow.enabled && !shadow.inset
+           && shadow.alpha > 0 && shadow.distance > 0) {
+            int layers = shadow.mode == SHADOW_HARD ? 1 : 2;
+            for(int layer = layers; layer >= 1; --layer) {
+                double t = (double)layer / layers;
+                double spread = shadow.mode == SHADOW_HARD ? 0.0
+                              : shadow.distance * (0.12 + 0.24 * t);
+                Vector<Pointf> shape = InflatePath(g.hit_path, spread);
+                Pointf off(shadow.offset_x * (0.70 + 0.30 * t),
+                           shadow.offset_y * (0.70 + 0.30 * t));
+                for(Pointf& q : shape)
+                    q += off;
+                double weight = shadow.mode == SHADOW_HARD ? 0.70
+                              : (layer == layers ? 0.20 : 0.34);
+                int alpha = clamp(fround(shadow.alpha * shadow_detail * weight), 0, 255);
+                if(alpha > 0) {
+                    RGBA rgba(shadow.color);
+                    rgba.a = (byte)alpha;
+                    FillPath(p, shape, rgba);
+                }
             }
         }
         FillPath(p, g.hit_path, ResolveFace(style.palette.face[si], White()));
-        StrokePath(p, g.hit_path, max(0.75, (double)metrics.frame_width), style.palette.frame[si], true);
+        StrokePath(p, g.hit_path, max(0.50, (double)metrics.frame_width), style.palette.frame[si], true);
     }
-    if(!g.micro && !custom_body && style.show_header_band && !node.collapsed && g.header.GetHeight() > 0) {
+    if(zoom_ >= lod_policy_.secondary_text_zoom && !g.micro && !custom_body
+       && style.show_header_band && !node.collapsed && g.header.GetHeight() > 0) {
         Rect hr = g.header.Deflated(max(1, fround(2 * zoom_)), max(1, fround(2 * zoom_)));
         Vector<Pointf> header; header << Pointf(hr.left, hr.top) << Pointf(hr.right, hr.top) << Pointf(hr.right, hr.bottom) << Pointf(hr.left, hr.bottom);
         FillPath(p, RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55), 5), style.header_face[si]);
     }
-    int port_radius = max(2, fround(style.port_radius * max(0.75, zoom_)));
+    if(zoom_ < lod_policy_.port_zoom)
+        return;
+    int port_radius = max(1, fround(style.port_radius * min(1.0, zoom_)));
     for(int i = 0; i < g.anchors.GetCount(); i++) {
         String port_id = g.anchors.GetKey(i); const UiGraphPort* port = model_->FindPort(UiGraphPortRef{node.ref, port_id});
         if(!port) continue;
@@ -2050,7 +2258,7 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
             shape << Pointf(pr.left, pr.top) << Pointf(pr.right, pr.top) << Pointf(pr.right, pr.bottom) << Pointf(pr.left, pr.bottom);
             shape = RoundedPolygon(shape, port_radius * 0.25, 3);
         }
-        FillPath(p, shape, fill); StrokePath(p, shape, max(1.0, zoom_), frame, true);
+        FillPath(p, shape, fill); StrokePath(p, shape, max(0.50, min(1.0, zoom_)), frame, true);
     }
 }
 
@@ -2087,7 +2295,9 @@ void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeom
 
 void UiNodeGraph::PaintConnectionPreview(Painter& p)
 {
-    if(interaction_ != InteractionMode::Connect || !connection_source_.IsValid()) return;
+    if(interaction_ != InteractionMode::Connect || !connection_source_.IsValid()
+       || zoom_ < lod_policy_.edge_simplify_zoom)
+        return;
     UiGraphPortSide source_side = UiGraphPortSide::Right, target_side = UiGraphPortSide::Left;
     Point a = GetPortAnchor(connection_source_, &source_side); Point b = last_point_;
     if(connection_target_.IsValid()) b = GetPortAnchor(connection_target_, &target_side);
@@ -2129,18 +2339,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_paint_edge_visit_count_ = 0;
     last_painted_node_count_ = 0;
     last_painted_edge_count_ = 0;
+    last_simplified_edge_count_ = 0;
 
     WorldRect paint_world;
     paint_world.Include(ScreenToWorld(paint.TopLeft()));
     paint_world.Include(ScreenToWorld(paint.BottomRight()));
-    paint_world = paint_world.Inflated(160.0 / max(zoom_, 0.01));
+    paint_world = paint_world.Inflated(GetPaintQueryMargin() / max(zoom_, 0.01));
     Index<UiGraphId> node_ids;
     Index<UiGraphId> edge_ids;
     QuerySpatial(paint_world, node_ids, edge_ids);
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_ids.FindAdd(ref.id);
-        if(model_)
+        if(model_ && zoom_ >= lod_policy_.edge_hide_zoom)
             for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
                 edge_ids.FindAdd(edge.id);
     }
@@ -2160,41 +2371,48 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
     Vector<int> paint_edges;
     paint_edges.Reserve(edge_ids.GetCount());
-    for(int i = 0; i < edge_ids.GetCount(); i++) {
-        int q = edge_geometry_.Find(edge_ids[i]);
-        if(q >= 0 && !(edge_geometry_[q].bounds & paint).IsEmpty())
-            paint_edges.Add(q);
-    }
+    if(zoom_ >= lod_policy_.edge_hide_zoom)
+        for(int i = 0; i < edge_ids.GetCount(); i++) {
+            int q = edge_geometry_.Find(edge_ids[i]);
+            if(q >= 0 && !(edge_geometry_[q].bounds & paint).IsEmpty())
+                paint_edges.Add(q);
+        }
 
     last_paint_node_visit_count_ = paint_nodes.GetCount();
     last_paint_edge_visit_count_ = paint_edges.GetCount();
 
-    ImageBuffer edge_buffer(paint.GetSize());
-    BufferPainter ep(edge_buffer, MODE_ANTIALIASED);
-    ep.Clear(RGBAZero());
-    ep.Translate(-paint.left, -paint.top);
-    for(int q : paint_edges) {
-        const EdgeGeometry& g = edge_geometry_[q];
-        const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
-        last_painted_edge_count_++;
-        UiGraphVisualState state = GetEdgeVisualState(*edge);
-        PaintEdge(ep, *edge, g, ResolveEdgeStyle(*edge, state), state);
-    }
-    PaintConnectionPreview(ep);
-    ep.Finish();
-    w.DrawImage(paint.left, paint.top, edge_buffer);
-
-    for(int q : paint_edges) {
-        const EdgeGeometry& g = edge_geometry_[q];
-        const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
-        UiGraphVisualState state = GetEdgeVisualState(*edge); UiGraphEdgeStyle style = ResolveEdgeStyle(*edge,state); int si = VisualStateIndex(state);
-        if(!edge->title.IsEmpty()) {
-            Size ts=GetTextSize(edge->title,style.label_font); Rect lr=RectC(g.label_point.x-ts.cx/2-DPI(4),g.label_point.y-ts.cy/2-DPI(2),ts.cx+DPI(8),ts.cy+DPI(4));
-            if(style.draw_label_background) w.DrawRect(lr,style.label_background);
-            w.DrawText(lr.left+DPI(4),lr.top+DPI(2),edge->title,style.label_font,style.label_ink[si]);
+    if(!paint_edges.IsEmpty() || interaction_ == InteractionMode::Connect) {
+        ImageBuffer edge_buffer(paint.GetSize());
+        BufferPainter ep(edge_buffer, MODE_ANTIALIASED);
+        ep.Clear(RGBAZero());
+        ep.Translate(-paint.left, -paint.top);
+        for(int q : paint_edges) {
+            const EdgeGeometry& g = edge_geometry_[q];
+            const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
+            last_painted_edge_count_++;
+            if(g.simplified)
+                last_simplified_edge_count_++;
+            UiGraphVisualState state = GetEdgeVisualState(*edge);
+            PaintEdge(ep, *edge, g, ResolveEdgeStyle(*edge, state), state);
         }
-        if(WhenPaintEdgeOverlay) WhenPaintEdgeOverlay(w,*edge,g.points,state);
+        PaintConnectionPreview(ep);
+        ep.Finish();
+        w.DrawImage(paint.left, paint.top, edge_buffer);
     }
+
+    if(zoom_ >= lod_policy_.edge_label_zoom)
+        for(int q : paint_edges) {
+            const EdgeGeometry& g = edge_geometry_[q];
+            const UiGraphEdge* edge = model_->FindEdge(g.ref); if(!edge) continue;
+            UiGraphVisualState state = GetEdgeVisualState(*edge); UiGraphEdgeStyle style = ResolveEdgeStyle(*edge,state); int si = VisualStateIndex(state);
+            if(!edge->title.IsEmpty()) {
+                Size ts=GetTextSize(edge->title,style.label_font); Rect lr=RectC(g.label_point.x-ts.cx/2-DPI(4),g.label_point.y-ts.cy/2-DPI(2),ts.cx+DPI(8),ts.cy+DPI(4));
+                if(style.draw_label_background) w.DrawRect(lr,style.label_background);
+                w.DrawText(lr.left+DPI(4),lr.top+DPI(2),edge->title,style.label_font,style.label_ink[si]);
+            }
+            if(WhenPaintEdgeOverlay && zoom_ >= lod_policy_.edge_simplify_zoom)
+                WhenPaintEdgeOverlay(w,*edge,g.points,state);
+        }
 
     for(int q : paint_nodes) {
         const NodeGeometry& g = node_geometry_[q];
@@ -2219,13 +2437,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         const NodeGeometry& g=node_geometry_[q];
         const UiGraphNode* node=model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state=GetNodeVisualState(*node); UiGraphNodeStyle style=ResolveNodeStyle(*node,state);
-        PaintNodeText(w,*node,g,style,state); if(WhenPaintNodeOverlay) WhenPaintNodeOverlay(w,*node,g.rect,state);
-        bool handled=false; if(WhenPaintNodeForeground) WhenPaintNodeForeground(w,*node,g.rect,style,state,handled);
+        if(zoom_ >= lod_policy_.title_zoom)
+            PaintNodeText(w,*node,g,style,state);
+        if(WhenPaintNodeOverlay && zoom_ >= lod_policy_.secondary_text_zoom)
+            WhenPaintNodeOverlay(w,*node,g.surface,state);
+        bool handled=false;
+        if(WhenPaintNodeForeground)
+            WhenPaintNodeForeground(w,*node,g.surface,style,state,handled);
         if(!handled && UsesRectangularStyledSurface(node->shape)) {
             StyledMetrics metrics=ScaleNodeMetrics(style.metrics,zoom_); StyledSkin skin=ScaleNodeSkin(style.skin,zoom_);
             if(node->shape==UiGraphNodeShape::Rectangle) metrics.radius=0;
             else if(node->shape==UiGraphNodeShape::Capsule) metrics.radius=max(0,min(g.surface.GetWidth(),g.surface.GetHeight())/2);
             else metrics.radius=max(0,fround(node->corner_radius*zoom_));
+            metrics.shadow.enabled = false;
             UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&!IsNodeSelected(node->ref));
         }
     }
@@ -2262,10 +2486,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         sp.Clear(RGBAZero());
         sp.Translate(-paint.left, -paint.top);
         const Color selection = GetEffectiveStyle().selection_box_frame;
+        double stroke_width = max(2.0, (double)DPI(fround(lod_policy_.selection_outline_width)));
         for(int q : paint_nodes) {
             const NodeGeometry& g = node_geometry_[q];
-            if(IsNodeSelected(g.ref) && !g.hit_path.IsEmpty())
-                StrokePath(sp, g.hit_path, (double)DPI(2), selection, true);
+            if(!IsNodeSelected(g.ref) || g.hit_path.IsEmpty())
+                continue;
+            const UiGraphNode* node = model_->FindNode(g.ref);
+            double frame = 1.0;
+            if(node) {
+                UiGraphNodeStyle style = ResolveNodeStyle(*node, UiGraphVisualState::Selected);
+                frame = max(1.0, (double)ScaleNodeMetrics(style.metrics, zoom_).frame_width);
+            }
+            Vector<Pointf> outline = InflatePath(g.hit_path, frame * 0.5 + stroke_width * 0.5);
+            StrokePath(sp, outline, stroke_width, selection, true);
         }
         sp.Finish();
         w.DrawImage(paint.left, paint.top, selection_buffer);
@@ -2274,12 +2507,14 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
 void UiNodeGraph::Paint(Draw& w)
 {
+    int64 started = usecs();
     Rect outer(Point(0,0),GetSize()); const Style& style=GetEffectiveStyle();
     UiPaintStyledBackground(w,outer,style.canvas_palette,style.canvas_metrics,style.canvas_skin,ST_NORMAL,HasFocus());
     PaintGrid(w,outer);
     if(model_) PaintGraphGeometry(w);
     PaintMarquee(w);
     UiPaintStyledForeground(w,outer,style.canvas_palette,style.canvas_metrics,style.canvas_skin,ST_NORMAL,HasFocus());
+    last_paint_usecs_ = max<int64>(0, usecs() - started);
 }
 
 void UiNodeGraph::Layout()
