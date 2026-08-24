@@ -174,7 +174,8 @@ void UiList::Paint(Draw& w)
     Rect vp = GetViewportRect();
     UiVisibleRange visible = GetVisibleRange();
     if(!vp.IsEmpty() && !visible.IsEmpty()) {
-        w.Begin();
+        // Draw::Clip opens a draw level; the matching End below closes it.
+        // Do not add an extra Begin here or CtrlPaint will detect an imbalance.
         w.Clip(vp);
         ExcludeListRoundedCorners(w, vp, ResolveListViewportRadius(GetSize(), vp, style));
         for(int i = visible.first; i <= visible.last; i++) {
