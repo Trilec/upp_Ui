@@ -197,10 +197,69 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
 {
     if(interaction_ != InteractionMode::NodeDrag)
         return;
+
     Pointf delta((p.x - press_point_.x) / max(zoom_, 1e-9),
                  (p.y - press_point_.y) / max(zoom_, 1e-9));
     const Style& style = GetStyle();
     double grid = style.grid_size > 0 ? style.grid_size : 1;
+
+    bool changed = false;
+    for(int i = 0; i < drag_start_positions_.GetCount(); i++) {
+        Pointf next = drag_start_positions_[i] + delta;
+        if(style.snap_to_grid) {
+            next.x = std::round(next.x / grid) * grid;
+            next.y = std::round(next.y / grid) * grid;
+        }
+        int j = drag_preview_positions_.Find(drag_start_positions_.GetKey(i));
+        if(j >= 0 && (abs(drag_preview_positions_[j].x - next.x) > 1e-9 ||
+                      abs(drag_preview_positions_[j].y - next.y) > 1e-9)) {
+            changed = true;
+            break;
+        }
+    }
+
+    last_point_ = p;
+    if(!changed)
+        return;
+
+    // Drag preview is transient view state. Keep the authoritative world-space
+    // spatial index untouched until commit, and update only the retained screen
+    // geometry for moved nodes and their unique incident edges.
+    PrepareGeometry();
+    Rect damage;
+    Index<UiGraphId> affected_edges;
+    int damage_pad = DPI(4);
+
+    for(int i = 0; i < drag_start_positions_.GetCount(); i++) {
+        UiGraphNodeRef ref{drag_start_positions_.GetKey(i)};
+        const NodeGeometry* old_geometry = FindNodeGeometry(ref);
+        if(old_geometry)
+            damage |= old_geometry->paint_bounds;
+
+        const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
+        if(node) {
+            UiGraphNodeStyle node_style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
+            const StyledShadow& shadow = node_style.metrics.shadow;
+            if(shadow.enabled && !shadow.inset && shadow.alpha > 0) {
+                double z = max(0.01, zoom_);
+                int extent = max(0, fround(shadow.distance * z));
+                int ox = abs(fround(shadow.offset_x * z));
+                int oy = abs(fround(shadow.offset_y * z));
+                damage_pad = max(damage_pad, extent + max(ox, oy) + DPI(2));
+            }
+            for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
+                affected_edges.FindAdd(edge.id);
+        }
+    }
+    damage_pad = max(damage_pad,
+                     DPI(fround(lod_policy_.selection_outline_width)) + DPI(2));
+
+    for(int i = 0; i < affected_edges.GetCount(); i++) {
+        const EdgeGeometry* old_geometry = FindEdgeGeometry(UiGraphEdgeRef{affected_edges[i]});
+        if(old_geometry)
+            damage |= old_geometry->bounds;
+    }
+
     for(int i = 0; i < drag_start_positions_.GetCount(); i++) {
         Pointf next = drag_start_positions_[i] + delta;
         if(style.snap_to_grid) {
@@ -211,11 +270,44 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
         if(j >= 0)
             drag_preview_positions_[j] = next;
     }
-    last_point_ = p;
-    InvalidateGeometry();
-    PrepareGeometry();
+
+    // Rebuild all moved node geometries first so an edge between two dragged
+    // nodes sees both new endpoints and is then rebuilt only once.
+    for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
+        UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
+        const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
+        if(!node || !node->visible)
+            continue;
+        NodeGeometry fresh;
+        BuildNodeGeometry(*node, fresh);
+        damage |= fresh.paint_bounds;
+        int q = node_geometry_.Find(ref.id);
+        if(q >= 0)
+            node_geometry_[q] = pick(fresh);
+        else
+            node_geometry_.Add(ref.id, pick(fresh));
+    }
+
+    for(int i = 0; i < affected_edges.GetCount(); i++) {
+        UiGraphEdgeRef ref{affected_edges[i]};
+        int q = edge_geometry_.Find(ref.id);
+        const UiGraphEdge* edge = model_ ? model_->FindEdge(ref) : nullptr;
+        if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target)) {
+            if(q >= 0)
+                edge_geometry_.Remove(q);
+            continue;
+        }
+        EdgeGeometry fresh;
+        BuildEdgeGeometry(*edge, fresh);
+        damage |= fresh.bounds;
+        if(q >= 0)
+            edge_geometry_[q] = pick(fresh);
+        else
+            edge_geometry_.Add(ref.id, pick(fresh));
+    }
+
     UpdateAttachedCtrls();
-    Refresh();
+    RefreshDamage(damage.Inflated(damage_pad));
 }
 
 void UiNodeGraph::CommitNodeDrag()
