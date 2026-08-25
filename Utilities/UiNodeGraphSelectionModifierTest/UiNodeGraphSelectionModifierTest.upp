@@ -1,0 +1,12 @@
+description "UiNodeGraph point and marquee modifier semantics tests";
+
+uses
+	Core,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";
