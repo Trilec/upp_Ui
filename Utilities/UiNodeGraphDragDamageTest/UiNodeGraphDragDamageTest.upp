@@ -1,0 +1,12 @@
+description "UiNodeGraph localized drag-preview damage and retained-geometry contract tests";
+
+uses
+	Core,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";
