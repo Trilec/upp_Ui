@@ -1,0 +1,12 @@
+description "UiNodeGraph request-first midpoint route editing tests";
+
+uses
+	Core,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";
