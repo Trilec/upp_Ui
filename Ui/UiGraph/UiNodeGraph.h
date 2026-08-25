@@ -51,6 +51,8 @@
       bindings across model authority changes and authoritative object removal.
     - 2026-08: added runtime rendering LOD policy and low-zoom paint evidence
       without changing serialized Graph style/model contracts.
+    - 2026-08: added request-first middle-handle edge route editing, compressed
+      text/icon LOD thresholds and phase timing evidence for large-graph tuning.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -146,6 +148,15 @@ struct UiGraphNodeMoveRequest : Moveable<UiGraphNodeMoveRequest> {
     bool handled = false;
 };
 
+struct UiGraphEdgeRouteRequest : Moveable<UiGraphEdgeRouteRequest> {
+    UiGraphEdgeRef edge;
+    UiGraphRouteStyle route = UiGraphRouteStyle::Inherit;
+    Vector<Pointf> before;
+    Vector<Pointf> after;
+    bool accept = true;
+    bool handled = false;
+};
+
 struct UiGraphConnectionRequest : Moveable<UiGraphConnectionRequest> {
     UiGraphPortRef source;
     UiGraphPortRef target;
@@ -198,13 +209,15 @@ public:
         double edge_simplify_zoom = 0.50;
         double minimal_edge_zoom = 0.25;
         double edge_hide_zoom = 0.12;
-        double edge_label_zoom = 0.65;
+        double edge_label_zoom = 0.45;
         double arrow_zoom = 0.50;
         double shadow_zoom = 0.60;
-        double title_zoom = 0.48;
-        double secondary_text_zoom = 0.65;
-        double port_zoom = 0.40;
-        double port_label_zoom = 0.65;
+        double icon_zoom = 0.70;
+        double title_zoom = 0.34;
+        double secondary_text_zoom = 0.42;
+        double port_zoom = 0.32;
+        double port_label_zoom = 0.45;
+        double route_edit_zoom = 0.55;
         double paint_query_margin_full = 96.0;
         double paint_query_margin_low = 24.0;
         double selection_outline_width = 3.0;
@@ -244,17 +257,10 @@ public:
     const UiGraphModel& Model() const { return *model_; }
     UiNodeGraph& ClearModel() { Model().Clear(); return *this; }
 
-    // Coalesce view/spatial work around multiple authoritative Model()
-    // mutations. Model contents and notifications remain immediate; this scope
-    // only defers UiNodeGraph's retained-index/geometry response until the
-    // outermost EndBatchUpdate(). Do not switch model bindings while open.
     UiNodeGraph& BeginBatchUpdate();
     UiNodeGraph& EndBatchUpdate();
     bool IsBatchUpdating() const { return batch_update_depth_ > 0; }
 
-    // Child controls are externally owned. UiNodeGraph only tracks guarded
-    // pointers, attaches them while visible, and removes them from the scene
-    // when their node or the external control disappears.
     UiNodeGraph& SetNodeCtrl(UiGraphNodeRef node, Ctrl& ctrl);
     UiNodeGraph& ClearNodeCtrl(UiGraphNodeRef node);
     void ClearNodeCtrls();
@@ -291,6 +297,7 @@ public:
     UiGraphNodeRef HitTestNode(Point p) const;
     UiGraphEdgeRef HitTestEdge(Point p) const;
     UiGraphPortRef HitTestPort(Point p) const;
+    Rect GetEdgeRouteHandleRect(UiGraphEdgeRef edge) const;
 
     // Read-only scale evidence. These counters expose real production work and
     // do not alter model semantics or geometry preparation.
@@ -308,6 +315,9 @@ public:
     int GetLastSimplifiedEdgeCount() const { return last_simplified_edge_count_; }
     int GetLastHiddenEdgeCount() const { return last_hidden_edge_count_; }
     int64 GetLastPaintUsecs() const { return last_paint_usecs_; }
+    int64 GetLastGeometryPrepareUsecs() const { return last_geometry_prepare_usecs_; }
+    int64 GetLastEdgePaintUsecs() const { return last_edge_paint_usecs_; }
+    int64 GetLastNodePaintUsecs() const { return last_node_paint_usecs_; }
     int GetLastNodeHitCandidateCount() const { return last_node_hit_candidate_count_; }
     int GetLastPortHitCandidateCount() const { return last_port_hit_candidate_count_; }
     int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
@@ -342,6 +352,7 @@ public:
     Event<> WhenViewport;
     Event<UiGraphNodeRef> WhenNodeAction;
     Event<UiGraphNodeMoveRequest&> WhenNodeMoveRequest;
+    Event<UiGraphEdgeRouteRequest&> WhenEdgeRouteRequest;
     Event<UiGraphConnectionRequest&> WhenConnectionRequest;
     Event<UiGraphDeleteRequest&> WhenDeleteRequest;
     Event<const UiGraphNode&, UiGraphVisualState, UiGraphNodeStyle&> WhenResolveNodeStyle;
@@ -364,7 +375,8 @@ public:
     static Vector<Pointf> BuildBezierRoute(Pointf source, UiGraphPortSide source_side,
                                            Pointf target, UiGraphPortSide target_side,
                                            double tension = 0.42,
-                                           int samples = 24);
+                                           int samples = 24,
+                                           const Vector<Pointf>& waypoints = Vector<Pointf>());
     static Vector<Pointf> BuildOrthogonalRoute(Pointf source, UiGraphPortSide source_side,
                                                Pointf target, UiGraphPortSide target_side,
                                                double lead = 32.0,
@@ -398,6 +410,8 @@ private:
         Vector<Point> points;
         Rect bounds;
         Point label_point;
+        Point route_handle;
+        Rect route_handle_hit;
         bool simplified = false;
     };
 
@@ -422,6 +436,7 @@ private:
     enum class InteractionMode : byte {
         None = 0,
         NodeDrag,
+        EdgeRouteDrag,
         Pan,
         Connect,
         Marquee,
@@ -468,6 +483,7 @@ private:
     UiGraphNodeRef HitTestNodeSpatial(Point p) const;
     UiGraphPortRef HitTestPortSpatial(Point p) const;
     UiGraphEdgeRef HitTestEdgeSpatial(Point p) const;
+    UiGraphEdgeRef HitTestEdgeRouteHandle(Point p) const;
     void AddNodeToSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
     void AddEdgeToSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds, bool force_global);
     void RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
@@ -491,6 +507,7 @@ private:
     const EdgeGeometry* FindEdgeGeometry(UiGraphEdgeRef ref) const;
     Point GetPortAnchor(const UiGraphPortRef& port, UiGraphPortSide* resolved_side = nullptr) const;
     Pointf GetDisplayNodePosition(const UiGraphNode& node) const;
+    Vector<Pointf> GetDisplayEdgeWaypoints(const UiGraphEdge& edge) const;
     Rect GetGraphScreenBounds(bool selection_only) const;
     bool PointInNodeGeometry(const UiGraphNode& node, const NodeGeometry& geometry, Point p) const;
 
@@ -524,6 +541,10 @@ private:
     void UpdateNodeDrag(Point p);
     void CommitNodeDrag();
     void CancelNodeDrag();
+    void BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge);
+    void UpdateEdgeRouteDrag(Point p);
+    void CommitEdgeRouteDrag();
+    void CancelEdgeRouteDrag();
     void BeginConnection(Point p, const UiGraphPortRef& source);
     void UpdateConnection(Point p);
     void CommitConnection(Point p);
@@ -589,6 +610,9 @@ private:
     int last_simplified_edge_count_ = 0;
     int last_hidden_edge_count_ = 0;
     int64 last_paint_usecs_ = 0;
+    int64 last_geometry_prepare_usecs_ = 0;
+    int64 last_edge_paint_usecs_ = 0;
+    int64 last_node_paint_usecs_ = 0;
     mutable int last_node_hit_candidate_count_ = 0;
     mutable int last_port_hit_candidate_count_ = 0;
     mutable int last_edge_hit_candidate_count_ = 0;
@@ -618,6 +642,10 @@ private:
     Index<UiGraphId> marquee_preview_nodes_;
     bool marquee_preview_deferred_ = false;
     UiGraphNodeRef pressed_node_;
+    UiGraphEdgeRef route_edge_;
+    int route_waypoint_index_ = -1;
+    Vector<Pointf> route_before_waypoints_;
+    Vector<Pointf> route_preview_waypoints_;
     UiGraphPortRef connection_source_;
     UiGraphPortRef connection_target_;
     UiGraphConnectionDecision connection_decision_;
