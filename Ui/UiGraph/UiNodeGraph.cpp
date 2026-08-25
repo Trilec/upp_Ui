@@ -20,6 +20,22 @@ Color ResolveFace(const UiFill& fill, Color fallback)
     return fill.IsSolid() && !IsNull(fill.color) ? fill.color : fallback;
 }
 
+RGBA PremultipliedRGBA(Color color, int alpha)
+{
+    alpha = clamp(alpha, 0, 255);
+    if(IsNull(color) || alpha == 0)
+        return RGBAZero();
+    auto scale = [alpha](int channel) {
+        return (byte)((channel * alpha + 127) / 255);
+    };
+    RGBA out;
+    out.r = scale(color.GetR());
+    out.g = scale(color.GetG());
+    out.b = scale(color.GetB());
+    out.a = (byte)alpha;
+    return out;
+}
+
 Pointf NormalizeVector(Pointf v)
 {
     double d = std::sqrt(v.x * v.x + v.y * v.y);
@@ -2208,23 +2224,20 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         double shadow_detail = ShadowDetailFactor();
         if(!g.micro && shadow_detail > 0.01 && shadow.enabled && !shadow.inset
            && shadow.alpha > 0 && shadow.distance > 0) {
-            int layers = shadow.mode == SHADOW_HARD ? 1 : 2;
+            int layers = shadow.mode == SHADOW_HARD ? 1 : 4;
             for(int layer = layers; layer >= 1; --layer) {
                 double t = (double)layer / layers;
                 double spread = shadow.mode == SHADOW_HARD ? 0.0
-                              : shadow.distance * (0.12 + 0.24 * t);
+                              : shadow.distance * (0.25 + 0.75 * t);
                 Vector<Pointf> shape = InflatePath(g.hit_path, spread);
-                Pointf off(shadow.offset_x * (0.70 + 0.30 * t),
-                           shadow.offset_y * (0.70 + 0.30 * t));
+                Pointf off(shadow.offset_x, shadow.offset_y);
                 for(Pointf& q : shape)
                     q += off;
                 double weight = shadow.mode == SHADOW_HARD ? 0.70
-                              : (layer == layers ? 0.20 : 0.34);
+                              : 0.08 + 0.18 * (1.0 - t);
                 int alpha = clamp(fround(shadow.alpha * shadow_detail * weight), 0, 255);
                 if(alpha > 0) {
-                    RGBA rgba(shadow.color);
-                    rgba.a = (byte)alpha;
-                    FillPath(p, shape, rgba);
+                    FillPath(p, shape, PremultipliedRGBA(shadow.color, alpha));
                 }
             }
         }
@@ -2311,8 +2324,8 @@ void UiNodeGraph::PaintMarquee(Draw& w) const
 {
     if(interaction_ != InteractionMode::Marquee || marquee_.IsEmpty()) return;
     const Style& style = GetEffectiveStyle();
-    RGBA fill(style.selection_box_fill);
-    fill.a = (byte)minmax(style.selection_box_alpha, 0, 255);
+    RGBA fill = PremultipliedRGBA(style.selection_box_fill,
+                                  minmax(style.selection_box_alpha, 0, 255));
 
     ImageBuffer ib(Size(1, 1));
     BufferPainter bp(ib, MODE_ANTIALIASED);
@@ -2464,8 +2477,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         pp.Clear(RGBAZero());
         pp.Translate(-paint.left, -paint.top);
         const Color selection = GetEffectiveStyle().selection_box_frame;
-        RGBA wash(selection);
-        wash.a = 18;
+        RGBA wash = PremultipliedRGBA(selection, 18);
         for(int q : paint_nodes) {
             const NodeGeometry& g = node_geometry_[q];
             if(marquee_preview_nodes_.Find(g.ref.id) >= 0 && !IsNodeSelected(g.ref) && !g.hit_path.IsEmpty()) {
@@ -2485,20 +2497,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         BufferPainter sp(selection_buffer, MODE_ANTIALIASED);
         sp.Clear(RGBAZero());
         sp.Translate(-paint.left, -paint.top);
-        const Color selection = GetEffectiveStyle().selection_box_frame;
         double stroke_width = max(2.0, (double)DPI(fround(lod_policy_.selection_outline_width)));
         for(int q : paint_nodes) {
             const NodeGeometry& g = node_geometry_[q];
             if(!IsNodeSelected(g.ref) || g.hit_path.IsEmpty())
                 continue;
             const UiGraphNode* node = model_->FindNode(g.ref);
-            double frame = 1.0;
+            Color selection = Color(37, 99, 235);
             if(node) {
                 UiGraphNodeStyle style = ResolveNodeStyle(*node, UiGraphVisualState::Selected);
-                frame = max(1.0, (double)ScaleNodeMetrics(style.metrics, zoom_).frame_width);
+                if(!IsNull(style.metrics.focus_color))
+                    selection = style.metrics.focus_color;
             }
-            Vector<Pointf> outline = InflatePath(g.hit_path, frame * 0.5 + stroke_width * 0.5);
-            StrokePath(sp, outline, stroke_width, selection, true);
+            StrokePath(sp, g.hit_path, stroke_width, selection, true);
         }
         sp.Finish();
         w.DrawImage(paint.left, paint.top, selection_buffer);
