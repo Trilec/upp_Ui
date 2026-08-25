@@ -8,6 +8,8 @@ namespace {
 
 constexpr double kNodeGraphSpatialCell = 256.0;
 constexpr int kNodeGraphMaxCellsPerObject = 256;
+constexpr double kNodeGraphOverviewEdgeTilePx = 64.0;
+constexpr int kNodeGraphOverviewMinEdgeCandidates = 512;
 
 void RemoveId(Vector<UiGraphId>& ids, UiGraphId id)
 {
@@ -38,6 +40,19 @@ Pointf PortAnchorWorld(const UiGraphNode& node, UiGraphPortSide side)
     default:
         return pos + Pointf(size.cx * 0.5, size.cy * 0.5);
     }
+}
+
+int OverviewDirectionBucket(Pointf delta)
+{
+    constexpr double pi = 3.14159265358979323846;
+    double angle = std::atan2(delta.y, delta.x);
+    double normalized = (angle + pi) / (2.0 * pi);
+    int bucket = (int)std::floor(normalized * 8.0);
+    if(bucket < 0)
+        bucket = 0;
+    if(bucket > 7)
+        bucket = 7;
+    return bucket;
 }
 
 } // namespace
@@ -377,7 +392,7 @@ void UiNodeGraph::UpdateSpatialEdge(UiGraphEdgeRef ref)
     const UiGraphEdge* edge = model_ ? model_->FindEdge(ref) : nullptr;
     if(edge && edge->visible) {
         WorldRect bounds = GetEdgeWorldBounds(*edge);
-        edge_world_bounds_.Add(ref.id, bounds);
+        edge_world_bounds_.Add(edge->ref.id, bounds);
         UiGraphRouteStyle route = edge->route;
         if(route == UiGraphRouteStyle::Inherit)
             route = FindEdgeStyleClass(edge->style_class).route;
@@ -396,6 +411,7 @@ void UiNodeGraph::QuerySpatial(const WorldRect& area,
     if(!area.valid)
         return;
 
+    Index<UiGraphId> raw_edges;
     int x0, y0, x1, y1;
     SpatialCellRange(area, x0, y0, x1, y1);
     for(int y = y0; y <= y1; y++)
@@ -412,7 +428,7 @@ void UiNodeGraph::QuerySpatial(const WorldRect& area,
             for(UiGraphId id : cell.edges) {
                 int q = edge_world_bounds_.Find(id);
                 if(q >= 0 && edge_world_bounds_[q].Intersects(area))
-                    edges.FindAdd(id);
+                    raw_edges.FindAdd(id);
             }
         }
 
@@ -423,7 +439,71 @@ void UiNodeGraph::QuerySpatial(const WorldRect& area,
             nodes.FindAdd(id);
     }
     for(int i = 0; i < spatial_global_edges_.GetCount(); i++)
-        edges.FindAdd(spatial_global_edges_[i]);
+        raw_edges.FindAdd(spatial_global_edges_[i]);
+
+    // Overview reduction is only part of a dirty prepared-geometry rebuild.
+    // All ordinary spatial queries remain exact, so pointer hit tests, marquee
+    // queries and dirty-paint lookup never receive a sampled topology set.
+    // The semantic model is untouched; this only bounds the number of retained
+    // EdgeGeometry records prepared for the minimum zoom overview.
+    bool overview = geometry_dirty_ && model_ &&
+                    zoom_ < lod_policy_.minimal_edge_zoom &&
+                    raw_edges.GetCount() > kNodeGraphOverviewMinEdgeCandidates &&
+                    !WhenResolveEdgeStyle;
+    if(!overview) {
+        for(int i = 0; i < raw_edges.GetCount(); i++)
+            edges.FindAdd(raw_edges[i]);
+        return;
+    }
+
+    const double world_tile = kNodeGraphOverviewEdgeTilePx / max(zoom_, 0.01);
+    VectorMap<String, UiGraphId> overview_bins;
+    for(int i = 0; i < raw_edges.GetCount(); i++) {
+        UiGraphId id = raw_edges[i];
+        const UiGraphEdge* edge = model_->FindEdge(UiGraphEdgeRef{id});
+        if(!edge)
+            continue;
+
+        bool preserve = selected_edges_.Find(id) >= 0 ||
+                        hot_edge_ == edge->ref ||
+                        selected_nodes_.Find(edge->source.node.id) >= 0 ||
+                        selected_nodes_.Find(edge->target.node.id) >= 0;
+        if(preserve) {
+            edges.FindAdd(id);
+            continue;
+        }
+
+        const UiGraphNode* source = model_->FindNode(edge->source.node);
+        const UiGraphNode* target = model_->FindNode(edge->target.node);
+        if(!source || !target) {
+            edges.FindAdd(id);
+            continue;
+        }
+
+        const UiGraphPort* source_port = model_->FindPort(edge->source);
+        const UiGraphPort* target_port = model_->FindPort(edge->target);
+        UiGraphPortSide source_side = source_port ? ResolvePortSide(*source_port) : UiGraphPortSide::Right;
+        UiGraphPortSide target_side = target_port ? ResolvePortSide(*target_port) : UiGraphPortSide::Left;
+        Pointf a = PortAnchorWorld(*source, source_side);
+        Pointf b = PortAnchorWorld(*target, target_side);
+        Pointf midpoint((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+        int bx = (int)std::floor(midpoint.x / world_tile);
+        int by = (int)std::floor(midpoint.y / world_tile);
+        int direction = OverviewDirectionBucket(b - a);
+
+        String key;
+        key << bx << ':' << by << ':' << direction << ':'
+            << edge->style_class << ':' << (int)edge->enabled << ':'
+            << (int)edge->directed;
+        int q = overview_bins.Find(key);
+        if(q < 0)
+            overview_bins.Add(key, id);
+        else if(id < overview_bins[q])
+            overview_bins[q] = id;
+    }
+
+    for(int i = 0; i < overview_bins.GetCount(); i++)
+        edges.FindAdd(overview_bins[i]);
 }
 
 UiGraphNodeRef UiNodeGraph::HitTestNodeSpatial(Point p) const
