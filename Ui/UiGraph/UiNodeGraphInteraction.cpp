@@ -8,9 +8,26 @@ namespace {
 
 constexpr int64 kMarqueePreviewMaxCells = 256;
 
-bool HasSelectionModifier(dword flags)
+enum class SelectionOperation : byte {
+    Replace = 0,
+    Add,
+    Toggle,
+    Subtract,
+};
+
+SelectionOperation ResolveSelectionOperation(dword flags, bool multi_selection)
 {
-    return (flags & (K_CTRL | K_SHIFT)) != 0;
+    if(!multi_selection)
+        return SelectionOperation::Replace;
+    // Spatial analogue of familiar desktop selection: Shift adds, Ctrl toggles,
+    // Alt subtracts. Alt wins over Ctrl/Shift when modifiers are combined.
+    if(flags & K_ALT)
+        return SelectionOperation::Subtract;
+    if(flags & K_CTRL)
+        return SelectionOperation::Toggle;
+    if(flags & K_SHIFT)
+        return SelectionOperation::Add;
+    return SelectionOperation::Replace;
 }
 
 void RemoveIndexedId(Index<UiGraphId>& ids, UiGraphId id)
@@ -34,8 +51,6 @@ void UiNodeGraph::ReleaseInteractionCapture()
 {
     if(!interaction_capture_owned_)
         return;
-    // Win32/U++ can synchronously re-enter CancelMode while releasing capture.
-    // Clear ownership first so that callback cannot recursively release again.
     interaction_capture_owned_ = false;
     if(HasCapture())
         ReleaseCapture();
@@ -131,8 +146,6 @@ void UiNodeGraph::FlushBatchModelChanges()
         last_batch_edge_update_count_ = model_ ? model_->GetEdgeCount() : 0;
     }
     else {
-        // Node geometry changes also move/re-anchor current incident edges. Add
-        // their final IDs once here rather than per intermediate model event.
         if(model_)
             for(int i = 0; i < batch_nodes_.GetCount(); i++) {
                 UiGraphNodeRef node{batch_nodes_[i]};
@@ -222,9 +235,6 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
     if(!changed)
         return;
 
-    // Drag preview is transient view state. Keep the authoritative world-space
-    // spatial index untouched until commit, and update only the retained screen
-    // geometry for moved nodes and their unique incident edges.
     PrepareGeometry();
     Rect damage;
     Index<UiGraphId> affected_edges;
@@ -271,8 +281,6 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
             drag_preview_positions_[j] = next;
     }
 
-    // Rebuild all moved node geometries first so an edge between two dragged
-    // nodes sees both new endpoints and is then rebuilt only once.
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
@@ -355,6 +363,118 @@ void UiNodeGraph::CancelNodeDrag()
     Refresh();
 }
 
+void UiNodeGraph::BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge_ref)
+{
+    const UiGraphEdge* edge = model_ ? model_->FindEdge(edge_ref) : nullptr;
+    const EdgeGeometry* geometry = FindEdgeGeometry(edge_ref);
+    if(!editable_ || !edge || !edge->visible || !edge->selectable || !geometry ||
+       geometry->route_handle_hit.IsEmpty() || zoom_ < lod_policy_.route_edit_zoom)
+        return;
+
+    UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
+    UiGraphRouteStyle route = edge->route == UiGraphRouteStyle::Inherit ? style.route : edge->route;
+    if(route == UiGraphRouteStyle::Custom)
+        return;
+
+    interaction_ = InteractionMode::EdgeRouteDrag;
+    route_edge_ = edge_ref;
+    route_before_waypoints_ = clone(edge->waypoints);
+    route_preview_waypoints_ = clone(edge->waypoints);
+    if(route_preview_waypoints_.IsEmpty()) {
+        route_preview_waypoints_.Add(ScreenToWorld(geometry->route_handle));
+        route_waypoint_index_ = 0;
+    }
+    else
+        route_waypoint_index_ = route_preview_waypoints_.GetCount() / 2;
+    press_point_ = last_point_ = p;
+    AcquireInteractionCapture();
+}
+
+void UiNodeGraph::UpdateEdgeRouteDrag(Point p)
+{
+    if(interaction_ != InteractionMode::EdgeRouteDrag || !route_edge_.IsValid() ||
+       route_waypoint_index_ < 0 || route_waypoint_index_ >= route_preview_waypoints_.GetCount())
+        return;
+
+    Pointf next = ScreenToWorld(p);
+    const Style& style = GetStyle();
+    if(style.snap_to_grid && style.grid_size > 0) {
+        double grid = style.grid_size;
+        next.x = std::round(next.x / grid) * grid;
+        next.y = std::round(next.y / grid) * grid;
+    }
+    Pointf old = route_preview_waypoints_[route_waypoint_index_];
+    last_point_ = p;
+    if(abs(old.x - next.x) <= 1e-9 && abs(old.y - next.y) <= 1e-9)
+        return;
+
+    Rect damage = GetEdgeDamage(route_edge_);
+    route_preview_waypoints_[route_waypoint_index_] = next;
+    damage |= RebuildEdge(route_edge_);
+    RefreshDamage(damage.Inflated(DPI(9)));
+}
+
+void UiNodeGraph::CommitEdgeRouteDrag()
+{
+    if(interaction_ != InteractionMode::EdgeRouteDrag)
+        return;
+
+    UiGraphEdgeRef ref = route_edge_;
+    const UiGraphEdge* edge = model_ ? model_->FindEdge(ref) : nullptr;
+    if(!edge || last_point_ == press_point_) {
+        CancelEdgeRouteDrag();
+        return;
+    }
+
+    UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
+    UiGraphEdgeRouteRequest request;
+    request.edge = ref;
+    request.route = edge->route == UiGraphRouteStyle::Inherit ? style.route : edge->route;
+    request.before = clone(route_before_waypoints_);
+    request.after = clone(route_preview_waypoints_);
+    WhenEdgeRouteRequest(request);
+
+    bool apply_internal = request.accept && internal_mutation_ && !request.handled && model_;
+    Rect damage = GetEdgeDamage(ref);
+
+    route_edge_ = UiGraphEdgeRef();
+    route_waypoint_index_ = -1;
+    route_before_waypoints_.Clear();
+    route_preview_waypoints_.Clear();
+    interaction_ = InteractionMode::None;
+    ReleaseInteractionCapture();
+
+    if(apply_internal) {
+        const UiGraphEdge* current = model_->FindEdge(ref);
+        if(current) {
+            UiGraphEdge updated = *current;
+            updated.waypoints = clone(request.after);
+            model_->UpdateEdge(ref, updated);
+        }
+    }
+    else {
+        damage |= RebuildEdge(ref);
+        RefreshDamage(damage.Inflated(DPI(9)));
+    }
+}
+
+void UiNodeGraph::CancelEdgeRouteDrag()
+{
+    UiGraphEdgeRef ref = route_edge_;
+    Rect damage = GetEdgeDamage(ref);
+    route_edge_ = UiGraphEdgeRef();
+    route_waypoint_index_ = -1;
+    route_before_waypoints_.Clear();
+    route_preview_waypoints_.Clear();
+    if(interaction_ == InteractionMode::EdgeRouteDrag)
+        interaction_ = InteractionMode::None;
+    ReleaseInteractionCapture();
+    if(ref.IsValid()) {
+        damage |= RebuildEdge(ref);
+        RefreshDamage(damage.Inflated(DPI(9)));
+    }
+}
+
 void UiNodeGraph::BeginConnection(Point p, const UiGraphPortRef& source)
 {
     const UiGraphPort* port = model_ ? model_->FindPort(source) : nullptr;
@@ -418,10 +538,6 @@ void UiNodeGraph::BeginPan(Point p)
     interaction_ = InteractionMode::Pan;
     press_point_ = last_point_ = p;
     pan_at_press_ = pan_;
-
-    // U++ mouse capture is defined for left/right button interactions only.
-    // Middle-button panning therefore remains an in-view interaction and is
-    // terminated on MiddleUp or MouseLeave rather than taking Ctrl capture.
 }
 
 void UiNodeGraph::UpdatePan(Point p)
@@ -469,9 +585,6 @@ void UiNodeGraph::UpdateMarquee(Point p)
     last_marquee_candidate_count_ = 0;
     marquee_preview_deferred_ = false;
 
-    // Live candidate preview is intentionally opportunistic. Local rectangles
-    // query the retained hash every move; a very large/zoomed-out marquee skips
-    // live candidate work and resolves once on mouse-up instead.
     if(model_ && !marquee_.IsEmpty()) {
         EnsureSpatialIndex();
         WorldRect area;
@@ -498,8 +611,6 @@ void UiNodeGraph::UpdateMarquee(Point p)
             marquee_preview_deferred_ = true;
     }
 
-    // Repaint only the old/new border plus the changed translucent-fill strips.
-    // The overlapping interior is visually identical and does not need damage.
     auto refresh_border = [&](Rect r) {
         if(r.IsEmpty())
             return;
@@ -554,15 +665,12 @@ void UiNodeGraph::CommitMarquee(dword flags)
     if(interaction_ != InteractionMode::Marquee)
         return;
 
-    bool additive = multi_selection_ && HasSelectionModifier(flags);
-    if(!additive) {
+    SelectionOperation op = ResolveSelectionOperation(flags, multi_selection_);
+    if(op == SelectionOperation::Replace) {
         selected_nodes_.Clear();
         selected_edges_.Clear();
     }
 
-    // Large rectangles deliberately skip live candidate preview. Resolve that
-    // one final selection here; ordinary rectangles commit the cached preview
-    // without a second spatial query.
     if(marquee_preview_deferred_ && model_ && !marquee_.IsEmpty()) {
         EnsureSpatialIndex();
         WorldRect area;
@@ -584,7 +692,17 @@ void UiNodeGraph::CommitMarquee(dword flags)
         for(int i = 0; i < marquee_preview_nodes_.GetCount(); i++) {
             UiGraphNodeRef ref{marquee_preview_nodes_[i]};
             const UiGraphNode* node = model_->FindNode(ref);
-            if(node && node->selectable)
+            if(!node || !node->selectable)
+                continue;
+            int q = selected_nodes_.Find(ref.id);
+            if(op == SelectionOperation::Subtract) {
+                if(q >= 0) selected_nodes_.Remove(q);
+            }
+            else if(op == SelectionOperation::Toggle) {
+                if(q >= 0) selected_nodes_.Remove(q);
+                else selected_nodes_.Add(ref.id);
+            }
+            else
                 selected_nodes_.FindAdd(ref.id);
         }
 
@@ -630,6 +748,14 @@ void UiNodeGraph::DeleteSelection()
 void UiNodeGraph::LeftDown(Point p, dword flags)
 {
     SetFocus();
+
+    UiGraphEdgeRef route_handle = HitTestEdgeRouteHandle(p);
+    if(route_handle.IsValid() && editable_) {
+        BeginEdgeRouteDrag(p, route_handle);
+        if(interaction_ == InteractionMode::EdgeRouteDrag)
+            return;
+    }
+
     UiGraphPortRef port = HitTestPortSpatial(p);
     if(port.IsValid()) {
         const UiGraphPort* pp = model_ ? model_->FindPort(port) : nullptr;
@@ -639,20 +765,43 @@ void UiNodeGraph::LeftDown(Point p, dword flags)
         }
     }
 
+    SelectionOperation op = ResolveSelectionOperation(flags, multi_selection_);
     UiGraphNodeRef node = HitTestNodeSpatial(p);
-    bool additive = multi_selection_ && HasSelectionModifier(flags);
     if(node.IsValid()) {
         const UiGraphNode* n = model_ ? model_->FindNode(node) : nullptr;
-        if(n && n->selectable && (!IsNodeSelected(node) || additive))
-            SelectNode(node, additive);
-        if(editable_ && n && n->movable)
+        if(n && n->selectable) {
+            if(op == SelectionOperation::Replace) {
+                if(!IsNodeSelected(node))
+                    SelectNode(node, false);
+            }
+            else if(op == SelectionOperation::Add) {
+                if(!IsNodeSelected(node))
+                    SelectNode(node, true);
+            }
+            else if(op == SelectionOperation::Toggle)
+                SelectNode(node, true);
+            else if(op == SelectionOperation::Subtract && IsNodeSelected(node))
+                SelectNode(node, true);
+        }
+        if(editable_ && n && n->movable && IsNodeSelected(node))
             BeginNodeDrag(p, node);
         return;
     }
 
     UiGraphEdgeRef edge = HitTestEdgeSpatial(p);
     if(edge.IsValid()) {
-        SelectEdge(edge, additive);
+        if(op == SelectionOperation::Replace) {
+            if(!IsEdgeSelected(edge))
+                SelectEdge(edge, false);
+        }
+        else if(op == SelectionOperation::Add) {
+            if(!IsEdgeSelected(edge))
+                SelectEdge(edge, true);
+        }
+        else if(op == SelectionOperation::Toggle)
+            SelectEdge(edge, true);
+        else if(op == SelectionOperation::Subtract && IsEdgeSelected(edge))
+            SelectEdge(edge, true);
         return;
     }
 
@@ -663,6 +812,10 @@ void UiNodeGraph::LeftUp(Point p, dword flags)
 {
     if(interaction_ == InteractionMode::NodeDrag)
         CommitNodeDrag();
+    else if(interaction_ == InteractionMode::EdgeRouteDrag) {
+        UpdateEdgeRouteDrag(p);
+        CommitEdgeRouteDrag();
+    }
     else if(interaction_ == InteractionMode::Connect)
         CommitConnection(p);
     else if(interaction_ == InteractionMode::Marquee) {
@@ -692,11 +845,12 @@ void UiNodeGraph::MiddleUp(Point, dword)
 
 void UiNodeGraph::MouseMove(Point p, dword)
 {
-    // Active interactions own their geometry/update path. Marquee movement may
-    // query a bounded set of spatial cells for transient preview IDs, but must
-    // never rebuild the spatial index, prepared geometry, or semantic selection.
     if(interaction_ == InteractionMode::NodeDrag) {
         UpdateNodeDrag(p);
+        return;
+    }
+    if(interaction_ == InteractionMode::EdgeRouteDrag) {
+        UpdateEdgeRouteDrag(p);
         return;
     }
     if(interaction_ == InteractionMode::Connect) {
@@ -719,8 +873,6 @@ void UiNodeGraph::MouseMove(Point p, dword)
         hot_port_ = port;
         hot_node_ = node;
         hot_edge_ = edge;
-        // Style resolvers are allowed to change metrics by state, so rebuild
-        // geometry rather than assuming hover is paint-only.
         InvalidateGeometry();
         PrepareGeometry();
         UpdateAttachedCtrls();
@@ -830,6 +982,8 @@ void UiNodeGraph::CancelMode()
 {
     if(interaction_ == InteractionMode::NodeDrag)
         CancelNodeDrag();
+    else if(interaction_ == InteractionMode::EdgeRouteDrag)
+        CancelEdgeRouteDrag();
     else if(interaction_ == InteractionMode::Connect)
         CancelConnection();
     else if(interaction_ == InteractionMode::Pan)
