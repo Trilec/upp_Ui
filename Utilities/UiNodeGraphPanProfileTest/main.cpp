@@ -1,0 +1,131 @@
+#include <Ui/Ui.h>
+
+using namespace Upp;
+
+namespace {
+
+struct TestCtx {
+    int checks = 0;
+    int fails = 0;
+
+    void Expect(bool ok, const String& text)
+    {
+        checks++;
+        Cout() << (ok ? "PASS: " : "FAIL: ") << text << '\n';
+        if(!ok)
+            fails++;
+    }
+};
+
+UiGraphPort Port(const String& id, UiGraphPortDirection direction)
+{
+    UiGraphPort port;
+    port.id = id;
+    port.direction = direction;
+    port.type = UiGraphDataType::Flow;
+    port.multiplicity = UiGraphPortMultiplicity::Multiple;
+    port.side = direction == UiGraphPortDirection::Input ? UiGraphPortSide::Left
+                                                          : UiGraphPortSide::Right;
+    return port;
+}
+
+void BuildGrid(UiGraphModel& model, Vector<UiGraphNodeRef>& nodes)
+{
+    const int width = 100;
+    const int height = 100;
+    nodes.Reserve(width * height);
+    for(int y = 0; y < height; y++)
+        for(int x = 0; x < width; x++) {
+            UiGraphNode node;
+            node.title = Format("N%d_%d", x, y);
+            node.position = Pointf(x * 96.0, y * 72.0);
+            node.size = Sizef(64, 44);
+            node.ports.Add(Port("in", UiGraphPortDirection::Input));
+            node.ports.Add(Port("out", UiGraphPortDirection::Output));
+            nodes.Add(model.AddNode(node));
+        }
+
+    for(int y = 0; y < height; y++)
+        for(int x = 0; x < width; x++) {
+            int i = y * width + x;
+            if(x + 1 < width)
+                model.Connect(UiGraphPortRef{nodes[i], "out"},
+                              UiGraphPortRef{nodes[i + 1], "in"},
+                              UiGraphRouteStyle::Straight);
+            if(y + 1 < height)
+                model.Connect(UiGraphPortRef{nodes[i], "out"},
+                              UiGraphPortRef{nodes[i + width], "in"},
+                              UiGraphRouteStyle::Orthogonal);
+        }
+}
+
+void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
+                UiGraphNodeRef centre, double zoom, const char *phase)
+{
+    graph.SetZoom(zoom, Point(600, 400));
+    graph.CenterOnNode(centre);
+    int spatial_before = graph.GetSpatialBuildSerial();
+    int geometry_before = graph.GetGeometryBuildSerial();
+
+    graph.MiddleDown(Point(600, 400), 0);
+    graph.MouseMove(Point(664, 438), 0);
+    int64 geometry_us = graph.GetLastGeometryPrepareUsecs();
+    int geometry_after_move = graph.GetGeometryBuildSerial();
+
+    int64 started = usecs();
+    graph.Paint(draw);
+    int64 paint_us = usecs() - started;
+    graph.MiddleUp(Point(664, 438), 0);
+
+    Cout() << "UINODEGRAPH_PAN_PROFILE"
+           << " phase=" << phase
+           << " zoom=" << zoom
+           << " prepared_nodes=" << graph.GetPreparedNodeCount()
+           << " prepared_edges=" << graph.GetPreparedEdgeCount()
+           << " painted_nodes=" << graph.GetLastPaintedNodeCount()
+           << " painted_edges=" << graph.GetLastPaintedEdgeCount()
+           << " geometry_us=" << geometry_us
+           << " edge_paint_us=" << graph.GetLastEdgePaintUsecs()
+           << " node_paint_us=" << graph.GetLastNodePaintUsecs()
+           << " paint_us=" << paint_us << '\n';
+
+    t.Expect(graph.GetSpatialBuildSerial() == spatial_before,
+             Format("%s pan reuses the retained world spatial index", phase));
+    t.Expect(geometry_after_move == geometry_before + 1,
+             Format("%s pan prepares viewport geometry once for the moved view", phase));
+    t.Expect(geometry_us >= 0 && graph.GetLastEdgePaintUsecs() >= 0
+             && graph.GetLastNodePaintUsecs() >= 0 && paint_us >= 0,
+             Format("%s exposes non-negative preparation/edge/node/total timing", phase));
+    t.Expect(graph.GetPreparedNodeCount() < 10000
+             && graph.GetPreparedEdgeCount() < 19800,
+             Format("%s remains viewport/LOD bounded below total graph size", phase));
+}
+
+} // namespace
+
+CONSOLE_APP_MAIN
+{
+    TestCtx t;
+    UiGraphModel model;
+    Vector<UiGraphNodeRef> nodes;
+    BuildGrid(model, nodes);
+    t.Expect(model.GetNodeCount() == 10000 && model.GetEdgeCount() == 19800,
+             "profile fixture contains 10,000 nodes and 19,800 connectors");
+
+    UiNodeGraph graph;
+    graph.SetAutoFitOnFirstPaint(false);
+    graph.SetRect(0, 0, 1200, 800);
+    graph.SetModel(model);
+    graph.Layout();
+
+    UiGraphNodeRef centre = nodes[50 * 100 + 50];
+    ImageDraw draw(1200, 800);
+    draw.DrawRect(0, 0, 1200, 800, White());
+
+    ProfilePan(t, graph, draw, centre, 0.50, "mid");
+    ProfilePan(t, graph, draw, centre, 0.20, "overview");
+
+    Cout() << "\nUINODEGRAPH_PAN_PROFILE_SUMMARY checks=" << t.checks
+           << " failed=" << t.fails << '\n';
+    SetExitCode(t.fails ? 1 : 0);
+}
