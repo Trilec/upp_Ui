@@ -55,11 +55,23 @@ double SmoothUnit(double value, double low, double high)
     return t * t * (3.0 - 2.0 * t);
 }
 
+Color BlendGraphColor(Color background, Color foreground, double amount)
+{
+    if(IsNull(foreground))
+        return foreground;
+    if(IsNull(background))
+        background = White();
+    amount = minmax(amount, 0.0, 1.0);
+    return Color(fround(background.GetR() + (foreground.GetR() - background.GetR()) * amount),
+                 fround(background.GetG() + (foreground.GetG() - background.GetG()) * amount),
+                 fround(background.GetB() + (foreground.GetB() - background.GetB()) * amount));
+}
+
 double GraphTextScale(double zoom)
 {
     zoom = max(0.01, zoom);
     if(zoom <= 1.0)
-        return max(0.58, std::pow(zoom, 0.45));
+        return max(0.42, std::pow(zoom, 0.45));
     return min(2.0, std::sqrt(zoom));
 }
 
@@ -773,6 +785,7 @@ const UiNodeGraph::Style& UiNodeGraph::StyleDefault()
         s.node.metrics.shadow.mode = SHADOW_CURVE;
         s.node.metrics.shadow.curve = ShadowSoft();
         s.node.skin = StyledSkin();
+        s.node.content_cell_min_zoom = 0.42;
         s.selection_box_fill = Color(59, 130, 246);
         s.selection_box_frame = Color(59, 130, 246);
     }
@@ -1781,6 +1794,9 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     if(use_child) {
         int gap = ScaleMetric(style.content_cell_gap, zoom_);
         Size child_min = child->GetMinSize();
+        double child_scale = min(1.0, max(0.45, GraphTextScale(zoom_)));
+        child_min.cx = max(1, fround(child_min.cx * child_scale));
+        child_min.cy = max(1, fround(child_min.cy * child_scale));
         int reserve = ScaleMetric(style.content_cell_reserve, zoom_);
         if(style.content_cell_side == UiAlign::LEFT || style.content_cell_side == UiAlign::RIGHT) {
             reserve = max(reserve, max(0, child_min.cx));
@@ -1831,9 +1847,11 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
         }
     }
 
-    int title_h = out.micro || zoom_ < lod_policy_.title_zoom || node.title.IsEmpty()
+    double title_floor = max(0.16, lod_policy_.title_zoom - 0.16);
+    double secondary_floor = max(title_floor, lod_policy_.secondary_text_zoom - 0.12);
+    int title_h = zoom_ < title_floor || node.title.IsEmpty()
                 ? 0 : max(1, GetTextSize(node.title, title_font).cy);
-    int subtitle_h = zoom_ < lod_policy_.secondary_text_zoom || node.subtitle.IsEmpty()
+    int subtitle_h = zoom_ < secondary_floor || node.subtitle.IsEmpty()
                    ? 0 : max(1, GetTextSize(node.subtitle, subtitle_font).cy);
     int title_gap = title_h > 0 && subtitle_h > 0 ? max(1, fround(style.title_subtitle_gap * GraphTextScale(zoom_))) : 0;
     int text_top = text_lane.top + max(0, (text_lane.GetHeight() - title_h - title_gap - subtitle_h) / 2);
@@ -1913,6 +1931,14 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
 
 Vector<Pointf> UiNodeGraph::BuildStraightRoute(Pointf source, Pointf target, const Vector<Pointf>& waypoints)
 {
+    if(waypoints.GetCount() == 1) {
+        double tolerance = max(2.0, min(8.0, VectorLength(target - source) * 0.04));
+        if(DistanceToSegment(waypoints[0], source, target) <= tolerance) {
+            Vector<Pointf> direct;
+            direct << source << target;
+            return direct;
+        }
+    }
     Vector<Pointf> route;
     route.Add(source); route.Append(clone(waypoints)); route.Add(target);
     return SimplifyRoute(route);
@@ -2024,6 +2050,43 @@ Vector<Pointf> UiNodeGraph::BuildOrthogonalRoute(Pointf source, UiGraphPortSide 
                                                   double lead, double corner_radius,
                                                   const Vector<Pointf>& waypoints)
 {
+    lead = max(0.0, lead);
+    Pointf a = source + SideVector(source_side) * lead;
+    Pointf b = target + SideVector(target_side) * lead;
+    bool sh = source_side == UiGraphPortSide::Left || source_side == UiGraphPortSide::Right;
+    bool th = target_side == UiGraphPortSide::Left || target_side == UiGraphPortSide::Right;
+
+    if(waypoints.GetCount() == 1) {
+        Pointf middle = waypoints[0];
+        Pointf default_middle((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+        Vector<Pointf> route;
+        route << source << a;
+
+        if(sh && th) {
+            // A single handle controls a stable corridor instead of being treated
+            // as an arbitrary sequence point. Predominantly vertical motion makes
+            // a horizontal detour; predominantly horizontal motion moves the
+            // vertical bridge. Neither case changes topology while dragging.
+            if(abs(middle.y - default_middle.y) >= abs(middle.x - default_middle.x))
+                route << Pointf(a.x, middle.y) << Pointf(b.x, middle.y);
+            else
+                route << Pointf(middle.x, a.y) << Pointf(middle.x, b.y);
+        }
+        else if(!sh && !th) {
+            if(abs(middle.x - default_middle.x) >= abs(middle.y - default_middle.y))
+                route << Pointf(middle.x, a.y) << Pointf(middle.x, b.y);
+            else
+                route << Pointf(a.x, middle.y) << Pointf(b.x, middle.y);
+        }
+        else if(sh)
+            route << Pointf(b.x, a.y);
+        else
+            route << Pointf(a.x, b.y);
+
+        route << b << target;
+        return RoundPolyline(SimplifyRoute(route), corner_radius);
+    }
+
     if(!waypoints.IsEmpty()) {
         Vector<Pointf> route;
         route.Add(source);
@@ -2042,11 +2105,6 @@ Vector<Pointf> UiNodeGraph::BuildOrthogonalRoute(Pointf source, UiGraphPortSide 
         return RoundPolyline(SimplifyRoute(route), corner_radius);
     }
 
-    lead = max(0.0, lead);
-    Pointf a = source + SideVector(source_side) * lead;
-    Pointf b = target + SideVector(target_side) * lead;
-    bool sh = source_side == UiGraphPortSide::Left || source_side == UiGraphPortSide::Right;
-    bool th = target_side == UiGraphPortSide::Left || target_side == UiGraphPortSide::Right;
     Vector<Pointf> route; route << source << a;
     if(sh && th) {
         double mx = (a.x + b.x) * 0.5; route << Pointf(mx, a.y) << Pointf(mx, b.y);
@@ -2420,22 +2478,48 @@ UiGraphEdgeRef UiNodeGraph::HitTestEdge(Point p) const
 void UiNodeGraph::PaintGrid(Draw& w, const Rect& outer) const
 {
     const Style& style = GetEffectiveStyle();
-    if(!style.show_grid || style.grid_size <= 0) return;
+    if(!style.show_grid || style.grid_size <= 0)
+        return;
+
     double spacing = style.grid_size * zoom_;
-    if(spacing < 4.0) return;
     int major_every = max(1, style.major_grid_every);
-    double ox = std::fmod(pan_.x, spacing), oy = std::fmod(pan_.y, spacing);
-    if(ox < 0) ox += spacing; if(oy < 0) oy += spacing;
-    int column = fround((outer.left - pan_.x) / spacing);
-    for(double x = outer.left + ox; x < outer.right; x += spacing, column++) {
-        bool major = ((column % major_every) + major_every) % major_every == 0;
-        w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, major ? style.grid_major : style.grid_minor);
+    double major_spacing = spacing * major_every;
+    double minor_factor = SmoothUnit(zoom_, 0.28, 0.48);
+    double major_factor = SmoothUnit(zoom_, 0.20, 0.40);
+    if(major_factor <= 0.01 || major_spacing < 3.0)
+        return;
+
+    Color paper = ResolveFace(style.canvas_palette.face[ST_NORMAL], SColorPaper());
+    Color minor = BlendGraphColor(paper, style.grid_minor, minor_factor);
+    Color major = BlendGraphColor(paper, style.grid_major, major_factor);
+
+    // Once the minor grid is visually gone, stop iterating over its lines as
+    // well. The remaining major grid keeps orientation without overview noise.
+    if(minor_factor <= 0.04) {
+        double ox = std::fmod(pan_.x, major_spacing);
+        double oy = std::fmod(pan_.y, major_spacing);
+        if(ox < 0) ox += major_spacing;
+        if(oy < 0) oy += major_spacing;
+        for(double x = outer.left + ox; x < outer.right; x += major_spacing)
+            w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, major);
+        for(double y = outer.top + oy; y < outer.bottom; y += major_spacing)
+            w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, major);
     }
-    int row = fround((outer.top - pan_.y) / spacing);
-    for(double y = outer.top + oy; y < outer.bottom; y += spacing, row++) {
-        bool major = ((row % major_every) + major_every) % major_every == 0;
-        w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, major ? style.grid_major : style.grid_minor);
+    else if(spacing >= 3.0) {
+        double ox = std::fmod(pan_.x, spacing), oy = std::fmod(pan_.y, spacing);
+        if(ox < 0) ox += spacing; if(oy < 0) oy += spacing;
+        int column = fround((outer.left - pan_.x) / spacing);
+        for(double x = outer.left + ox; x < outer.right; x += spacing, column++) {
+            bool is_major = ((column % major_every) + major_every) % major_every == 0;
+            w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, is_major ? major : minor);
+        }
+        int row = fround((outer.top - pan_.y) / spacing);
+        for(double y = outer.top + oy; y < outer.bottom; y += spacing, row++) {
+            bool is_major = ((row % major_every) + major_every) % major_every == 0;
+            w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, is_major ? major : minor);
+        }
     }
+
     if(style.show_origin) {
         Point origin = WorldToScreen(Pointf(0, 0));
         w.DrawLine(origin.x, outer.top, origin.x, outer.bottom, 1, Color(248, 113, 113));
@@ -2452,6 +2536,8 @@ void UiNodeGraph::PaintEdge(Painter& p, const UiGraphEdge& edge, const EdgeGeome
     Color color = style.color[si];
     double detail = EdgeDetailFactor();
     double width = style.width[si] * min(1.0, max(0.01, zoom_)) * (0.35 + 0.65 * detail);
+    if(zoom_ < lod_policy_.edge_simplify_zoom)
+        width = min(width, 1.0);
     if(width <= 0.02)
         return;
     UiLineStyle line_style = style.line_style;
@@ -2550,28 +2636,37 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         Vector<Pointf> header; header << Pointf(hr.left, hr.top) << Pointf(hr.right, hr.top) << Pointf(hr.right, hr.bottom) << Pointf(hr.left, hr.bottom);
         FillPath(p, RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55), 5), style.header_face[si]);
     }
-    if(zoom_ < lod_policy_.port_zoom)
+
+    double port_visual_floor = max(0.12, lod_policy_.port_zoom - 0.04);
+    double port_visual_full = max(port_visual_floor + 0.08, lod_policy_.port_zoom + 0.16);
+    double port_factor = SmoothUnit(zoom_, port_visual_floor, port_visual_full);
+    if(port_factor <= 0.01)
         return;
-    int port_radius = max(1, fround(style.port_radius * min(1.0, max(0.32, zoom_))));
+
+    int port_radius = max(1, fround(style.port_radius * min(1.0, max(0.20, zoom_))));
+    Color node_face = ResolveFace(style.palette.face[si], White());
     for(int i = 0; i < g.anchors.GetCount(); i++) {
         String port_id = g.anchors.GetKey(i); const UiGraphPort* port = model_->FindPort(UiGraphPortRef{node.ref, port_id});
         if(!port) continue;
-        Point anchor = g.anchors[i]; Color fill = IsNull(port->color) ? UiGraphDefaultTypeColor(port->type) : port->color; Color frame = style.port_frame[si];
+        Point anchor = g.anchors[i];
+        Color raw_fill = IsNull(port->color) ? UiGraphDefaultTypeColor(port->type) : port->color;
         UiGraphPortRef candidate{node.ref, port_id};
-        if(connection_source_.IsValid() && candidate == connection_target_)
-            frame = connection_decision_.IsAllowed() ? Color(34, 197, 94) : Color(239, 68, 68);
+        double local_factor = port_factor;
+        if(connection_source_.IsValid() && candidate == connection_target_) {
+            raw_fill = connection_decision_.IsAllowed() ? Color(34, 197, 94) : Color(239, 68, 68);
+            local_factor = max(local_factor, 0.65);
+        }
+        Color fill = BlendGraphColor(node_face, raw_fill, local_factor);
         Rect pr = RectC(anchor.x - port_radius, anchor.y - port_radius, port_radius * 2 + 1, port_radius * 2 + 1);
         Vector<Pointf> shape;
-        if(port->direction == UiGraphPortDirection::Input) shape = EllipsePath(pr, 24);
+        if(port->direction == UiGraphPortDirection::Input) shape = EllipsePath(pr, 20);
         else if(port->direction == UiGraphPortDirection::Bidirectional) {
             shape << Pointf(anchor.x, pr.top) << Pointf(pr.right, anchor.y) << Pointf(anchor.x, pr.bottom) << Pointf(pr.left, anchor.y);
-            shape = RoundedPolygon(shape, port_radius * 0.2, 3);
         }
         else {
             shape << Pointf(pr.left, pr.top) << Pointf(pr.right, pr.top) << Pointf(pr.right, pr.bottom) << Pointf(pr.left, pr.bottom);
-            shape = RoundedPolygon(shape, port_radius * 0.25, 3);
         }
-        FillPath(p, shape, fill); StrokePath(p, shape, max(0.50, min(1.0, zoom_)), frame, true);
+        FillPath(p, shape, fill);
     }
 }
 
@@ -2587,14 +2682,34 @@ void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeom
         UiIconRenderMode mode = node.icon_render_mode == UiIconRenderMode::Auto ? style.icon_render_mode : node.icon_render_mode;
         UiPaintStyledIcon(w, g.icon, node.icon, true, true, mode, style.palette.icon[si], node.enabled && IsEnabled());
     }
-    auto paint_one = [&](const String& text, const Rect& r, Font font, Color ink, UiAlign valign, UiAlign halign) {
-        if(text.IsEmpty() || r.IsEmpty()) return;
-        Vector<String> lines; Vector<Size> sizes; lines.Add(text); sizes.Add(GetTextSize(text, font));
-        UiPaintStyledText(w, r, lines, sizes, halign, valign, font, ink, 0, false, 0, 0);
+
+    Color face = ResolveFace(style.palette.face[si], White());
+    auto paint_one = [&](const String& text, const Rect& r, Font font, Color ink,
+                         UiAlign valign, UiAlign halign, double visibility) {
+        if(text.IsEmpty() || r.IsEmpty() || visibility <= 0.01)
+            return;
+        ink = BlendGraphColor(face, ink, visibility);
+        Size ts = GetTextSize(text, font);
+        if(ts.cx <= r.GetWidth()) {
+            Vector<String> lines; Vector<Size> sizes; lines.Add(text); sizes.Add(ts);
+            UiPaintStyledText(w, r, lines, sizes, halign, valign, font, ink, 0, false, 0, 0);
+        }
+        else {
+            int y = r.top + max(0, (r.GetHeight() - font.GetHeight()) / 2);
+            DrawTextEllipsis(w, r.left, y, max(0, r.GetWidth()), text, "...", font, ink);
+        }
     };
+
+    double title_floor = max(0.16, lod_policy_.title_zoom - 0.16);
+    double secondary_floor = max(title_floor, lod_policy_.secondary_text_zoom - 0.12);
+    double title_visibility = SmoothUnit(zoom_, title_floor, lod_policy_.title_zoom + 0.08);
+    double secondary_visibility = SmoothUnit(zoom_, secondary_floor,
+                                             lod_policy_.secondary_text_zoom + 0.08);
     UiAlign title_align = g.compact ? UiAlign::CENTER : style.text_align_h;
-    paint_one(node.title, g.title, title_font, style.title_ink[si], UiAlign::CENTER, title_align);
-    paint_one(node.subtitle, g.subtitle, subtitle_font, style.subtitle_ink[si], UiAlign::CENTER, style.text_align_h);
+    paint_one(node.title, g.title, title_font, style.title_ink[si],
+              UiAlign::CENTER, title_align, title_visibility);
+    paint_one(node.subtitle, g.subtitle, subtitle_font, style.subtitle_ink[si],
+              UiAlign::CENTER, style.text_align_h, secondary_visibility);
     if(!g.compact && style.show_description && !node.description.IsEmpty() && !g.description.IsEmpty()) {
         Vector<String> lines; Vector<Size> sizes; UiBuildStyledTextLines(node.description, description_font, lines, sizes);
         UiPaintStyledText(w, g.description, lines, sizes, style.text_align_h, UiAlign::TOP, description_font, style.description_ink[si], 0, false, 0, 0);
@@ -2760,13 +2875,15 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     np.Finish();
     w.DrawImage(paint.left,paint.top,node_buffer);
 
+    double content_floor = max(0.24, lod_policy_.secondary_text_zoom - 0.08);
     for(int q : paint_nodes) {
         const NodeGeometry& g=node_geometry_[q];
         const UiGraphNode* node=model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state=GetNodeVisualState(*node); UiGraphNodeStyle style=ResolveNodeStyle(*node,state);
-        if(WhenPaintNodeContent && zoom_ >= lod_policy_.secondary_text_zoom && !g.micro && !g.content.IsEmpty())
+        if(WhenPaintNodeContent && zoom_ >= content_floor && !g.content.IsEmpty())
             WhenPaintNodeContent(w,*node,g.content,style,state);
-        if(zoom_ >= lod_policy_.title_zoom)
+        if(!g.title.IsEmpty() || !g.subtitle.IsEmpty() || !g.icon.IsEmpty()
+           || !g.description.IsEmpty() || !g.port_labels.IsEmpty())
             PaintNodeText(w,*node,g,style,state);
         if(WhenPaintNodeOverlay && zoom_ >= lod_policy_.secondary_text_zoom)
             WhenPaintNodeOverlay(w,*node,g.surface,state);

@@ -10,8 +10,8 @@
     - Uses the production PropertyEditor shell established by UiLabelDemo.
     - Reference mode uses UiNodeGraph's retained internal model.
     - Scale mode binds a separate deterministic 10,000-node external model.
-    - Selection projects the active UiGraphNode into PropertyEditor; there is no
-      parallel node store.
+    - Selection projects the active UiGraphNode or UiGraphEdge into PropertyEditor;
+      there is no parallel graph store.
     - Style editing is view/presentation state. Semantic topology remains solely
       in UiGraphModel.
     - Image-rich reference nodes keep fixture Images in the demo and paint them
@@ -37,6 +37,7 @@ private:
     void BuildPreview();
     void BuildRightRail();
     void BuildNodeEditorModel();
+    void BuildEdgeEditorModel();
     void BuildStyleEditorModel();
     void ConfigureEditors();
     void ConnectEvents();
@@ -55,6 +56,7 @@ private:
     void SyncNodeEditor();
     void SyncStyleEditor();
     void ApplyNodeProperty(const String& id, const Value& value);
+    void ApplyEdgeProperty(const String& id, const Value& value);
     void ApplyStyleProperty(const String& id, const Value& value);
     void SetStylePreviewProperty(const String& id);
 
@@ -69,6 +71,8 @@ private:
 
     const UiGraphNode* SelectedNode() const;
     UiGraphNode* SelectedNode();
+    const UiGraphEdge* SelectedEdge() const;
+    UiGraphEdge* SelectedEdge();
 
 private:
     UiTitleCard tc_header;
@@ -91,6 +95,7 @@ private:
 
     PropertyEditorFactory pe_factory;
     PropertyEditorModel pe_model_node;
+    PropertyEditorModel pe_model_edge;
     PropertyEditorModel pe_model_style;
 
     UiGraphModel scale_model_;
@@ -105,6 +110,7 @@ private:
     UiGraphNodeRef reference_toggle_node_;
 
     UiGraphNodeRef selected_node_;
+    UiGraphEdgeRef selected_edge_;
     bool scale_mode_ = false;
     bool syncing_editors_ = false;
     int style_preview_state_ = ST_NORMAL;

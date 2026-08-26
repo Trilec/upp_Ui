@@ -142,6 +142,69 @@ String GraphDemoRoleName(UiGraphNodeRole role)
     }
 }
 
+String GraphDemoRouteName(UiGraphRouteStyle route)
+{
+    switch(route) {
+    case UiGraphRouteStyle::Straight:   return "Straight";
+    case UiGraphRouteStyle::Bezier:     return "Bezier";
+    case UiGraphRouteStyle::Orthogonal: return "Orthogonal";
+    case UiGraphRouteStyle::Custom:     return "Custom";
+    case UiGraphRouteStyle::Inherit:
+    default:                            return "Inherit";
+    }
+}
+
+UiGraphRouteStyle GraphDemoParseRoute(const String& value)
+{
+    if(value == "Straight") return UiGraphRouteStyle::Straight;
+    if(value == "Bezier") return UiGraphRouteStyle::Bezier;
+    if(value == "Orthogonal") return UiGraphRouteStyle::Orthogonal;
+    if(value == "Custom") return UiGraphRouteStyle::Custom;
+    return UiGraphRouteStyle::Inherit;
+}
+
+String GraphDemoStrokeName(UiGraphStrokeStyle stroke)
+{
+    switch(stroke) {
+    case UiGraphStrokeStyle::Solid:  return "Solid";
+    case UiGraphStrokeStyle::Dashed: return "Dashed";
+    case UiGraphStrokeStyle::Dotted: return "Dotted";
+    case UiGraphStrokeStyle::Inherit:
+    default:                         return "Inherit";
+    }
+}
+
+UiGraphStrokeStyle GraphDemoParseStroke(const String& value)
+{
+    if(value == "Solid") return UiGraphStrokeStyle::Solid;
+    if(value == "Dashed") return UiGraphStrokeStyle::Dashed;
+    if(value == "Dotted") return UiGraphStrokeStyle::Dotted;
+    return UiGraphStrokeStyle::Inherit;
+}
+
+String GraphDemoArrowName(UiGraphArrowStyle arrow)
+{
+    switch(arrow) {
+    case UiGraphArrowStyle::None:     return "None";
+    case UiGraphArrowStyle::Triangle: return "Triangle";
+    case UiGraphArrowStyle::Open:     return "Open";
+    case UiGraphArrowStyle::Circle:   return "Circle";
+    case UiGraphArrowStyle::Diamond:  return "Diamond";
+    case UiGraphArrowStyle::Inherit:
+    default:                          return "Inherit";
+    }
+}
+
+UiGraphArrowStyle GraphDemoParseArrow(const String& value)
+{
+    if(value == "None") return UiGraphArrowStyle::None;
+    if(value == "Triangle") return UiGraphArrowStyle::Triangle;
+    if(value == "Open") return UiGraphArrowStyle::Open;
+    if(value == "Circle") return UiGraphArrowStyle::Circle;
+    if(value == "Diamond") return UiGraphArrowStyle::Diamond;
+    return UiGraphArrowStyle::Inherit;
+}
+
 String GraphDemoPresetName(const String& style_class)
 {
     if(style_class.IsEmpty()) return "Default";
@@ -206,6 +269,7 @@ UiGraphDemo::UiGraphDemo()
     BuildRightRail();
     BuildReferenceGraph();
     BuildNodeEditorModel();
+    BuildEdgeEditorModel();
     BuildStyleEditorModel();
     ConfigureEditors();
     ConnectEvents();
@@ -275,9 +339,9 @@ void UiGraphDemo::BuildRightRail()
     box_right_tools.SetGap(DPI(4)).SetInset(Rect(DPI(2), 0, DPI(2), 0))
                    .SetAlignItems(UiCrossAlign::Center);
 
-    btn_inspector_mode.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Selected node Inspector");
+    btn_inspector_mode.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Selected graph object Inspector");
     btn_style_mode.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Selected node Style");
-    btn_code_mode.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Generated selected-node C++");
+    btn_code_mode.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Generated selected-object C++");
     box_right_tools.Add(btn_inspector_mode).Fixed(DPI(38));
     box_right_tools.Add(btn_style_mode).Fixed(DPI(38));
     box_right_tools.Add(btn_code_mode).Fixed(DPI(38));
@@ -334,6 +398,35 @@ void UiGraphDemo::BuildNodeEditorModel()
     pe_model_node.SetGroupSubtitle("Presentation", "shape, semantic role and reusable style token");
     pe_model_node.SetGroupSubtitle("Layout", "world-space node geometry at authored 1:1 scale");
     pe_model_node.StructureChanged();
+}
+
+void UiGraphDemo::BuildEdgeEditorModel()
+{
+    pe_model_edge.AddReadOnly("id", "Edge ID", Value((int64)0), "Identity");
+    pe_model_edge.AddText("title", "Title", String(), "Identity");
+    pe_model_edge.AddReadOnly("source", "Source", String(), "Identity");
+    pe_model_edge.AddReadOnly("target", "Target", String(), "Identity");
+
+    pe_model_edge.AddChoice("route", "Route", "Inherit", "Connector")
+                 .AddChoice("Inherit", "Inherit").AddChoice("Straight", "Straight")
+                 .AddChoice("Bezier", "Bezier").AddChoice("Orthogonal", "Orthogonal");
+    pe_model_edge.AddChoice("stroke", "Stroke", "Inherit", "Connector")
+                 .AddChoice("Inherit", "Inherit").AddChoice("Solid", "Solid")
+                 .AddChoice("Dashed", "Dashed").AddChoice("Dotted", "Dotted");
+    pe_model_edge.AddChoice("arrow", "Arrow", "Inherit", "Connector")
+                 .AddChoice("Inherit", "Inherit").AddChoice("None", "None")
+                 .AddChoice("Triangle", "Triangle").AddChoice("Open", "Open")
+                 .AddChoice("Circle", "Circle").AddChoice("Diamond", "Diamond");
+    pe_model_edge.AddBoolean("directed", "Directed", true, "Connector");
+
+    pe_model_edge.AddBoolean("enabled", "Enabled", true, "Behaviour");
+    pe_model_edge.AddBoolean("visible", "Visible", true, "Behaviour");
+    pe_model_edge.AddBoolean("selectable", "Selectable", true, "Behaviour");
+
+    pe_model_edge.SetGroupSubtitle("Identity", "authoritative UiGraphModel edge and endpoints");
+    pe_model_edge.SetGroupSubtitle("Connector", "route, stroke and arrow presentation stored on the edge");
+    pe_model_edge.SetGroupSubtitle("Behaviour", "generic graph visibility and interaction flags");
+    pe_model_edge.StructureChanged();
 }
 
 void UiGraphDemo::BuildStyleEditorModel()
@@ -443,12 +536,17 @@ void UiGraphDemo::ConnectEvents()
     graph_.WhenSelection = [=] { SyncSelection(); };
     graph_.WhenViewport = [=] { UpdateStatus(); };
 
-    auto apply_node = [=](String id, Value value) {
-        if(!syncing_editors_) ApplyNodeProperty(id, value);
+    auto apply_inspector = [=](String id, Value value) {
+        if(syncing_editors_)
+            return;
+        if(selected_edge_.IsValid() && !selected_node_.IsValid())
+            ApplyEdgeProperty(id, value);
+        else
+            ApplyNodeProperty(id, value);
     };
-    pe_inspector.WhenPreview = apply_node;
-    pe_inspector.WhenCommit = apply_node;
-    pe_inspector.WhenCancel = apply_node;
+    pe_inspector.WhenPreview = apply_inspector;
+    pe_inspector.WhenCommit = apply_inspector;
+    pe_inspector.WhenCancel = apply_inspector;
 
     pe_style.WhenSelection = [=](String id) { SetStylePreviewProperty(id); };
     pe_style.WhenBeginEdit = [=](String id, Value value) { BeginStyleTransaction(id, value); };
@@ -472,6 +570,16 @@ UiGraphNode* UiGraphDemo::SelectedNode()
     return selected_node_.IsValid() ? graph_.Model().FindNode(selected_node_) : nullptr;
 }
 
+const UiGraphEdge* UiGraphDemo::SelectedEdge() const
+{
+    return selected_edge_.IsValid() ? graph_.Model().FindEdge(selected_edge_) : nullptr;
+}
+
+UiGraphEdge* UiGraphDemo::SelectedEdge()
+{
+    return selected_edge_.IsValid() ? graph_.Model().FindEdge(selected_edge_) : nullptr;
+}
+
 void UiGraphDemo::SetScaleMode(bool scale)
 {
     if(scale == scale_mode_ && graph_.Model().GetNodeCount() > 0) {
@@ -485,6 +593,7 @@ void UiGraphDemo::SetScaleMode(bool scale)
     CommitStyleTransaction();
     scale_mode_ = scale;
     style_preview_state_ = ST_NORMAL;
+    selected_edge_ = UiGraphEdgeRef();
     if(scale) {
         graph_.SetAutoFitOnFirstPaint(false);
         EnsureScaleGraph();
@@ -512,14 +621,17 @@ void UiGraphDemo::SelectReferenceStartNode()
 {
     if(scale_mode_ || graph_.Model().GetNodeCount() == 0)
         return;
+    selected_edge_ = UiGraphEdgeRef();
     selected_node_ = graph_.Model().GetNodeRef(0);
     graph_.SelectNode(selected_node_);
 }
 
 void UiGraphDemo::SyncSelection()
 {
-    Vector<UiGraphNodeRef> selected = graph_.GetSelectedNodes();
-    selected_node_ = selected.IsEmpty() ? UiGraphNodeRef() : selected[0];
+    Vector<UiGraphNodeRef> nodes = graph_.GetSelectedNodes();
+    Vector<UiGraphEdgeRef> edges = graph_.GetSelectedEdges();
+    selected_node_ = nodes.IsEmpty() ? UiGraphNodeRef() : nodes[0];
+    selected_edge_ = selected_node_.IsValid() || edges.IsEmpty() ? UiGraphEdgeRef() : edges[0];
     style_preview_state_ = ST_NORMAL;
     SyncNodeEditor();
     SyncStyleEditor();
@@ -532,29 +644,50 @@ void UiGraphDemo::SyncNodeEditor()
 {
     syncing_editors_ = true;
     const UiGraphNode* node = SelectedNode();
-    for(int i = 0; i < pe_model_node.GetCount(); i++)
-        pe_model_node[i].enabled = node != nullptr || pe_model_node[i].read_only;
-    if(node) {
-        pe_model_node.SetValue("id", Value(node->ref.id), false);
-        pe_model_node.SetValue("title", node->title, false);
-        pe_model_node.SetValue("subtitle", node->subtitle, false);
-        pe_model_node.SetValue("description", node->description, false);
-        pe_model_node.SetValue("shape", GraphDemoShapeName(node->shape), false);
-        pe_model_node.SetValue("role", GraphDemoRoleName(node->role), false);
-        pe_model_node.SetValue("style_preset", GraphDemoPresetName(node->style_class), false);
-        pe_model_node.SetValue("x", node->position.x, false);
-        pe_model_node.SetValue("y", node->position.y, false);
-        pe_model_node.SetValue("width", node->size.cx, false);
-        pe_model_node.SetValue("height", node->size.cy, false);
-        pe_model_node.SetValue("corner_radius", node->corner_radius, false);
-        pe_model_node.SetValue("enabled", node->enabled, false);
-        pe_model_node.SetValue("visible", node->visible, false);
-        pe_model_node.SetValue("selectable", node->selectable, false);
-        pe_model_node.SetValue("movable", node->movable, false);
-        pe_model_node.SetValue("collapsed", node->collapsed, false);
+    const UiGraphEdge* edge = SelectedEdge();
+
+    if(edge && !node) {
+        pe_inspector.SetModel(&pe_model_edge);
+        for(int i = 0; i < pe_model_edge.GetCount(); i++)
+            pe_model_edge[i].enabled = !pe_model_edge[i].read_only;
+        pe_model_edge.SetValue("id", Value(edge->ref.id), false);
+        pe_model_edge.SetValue("title", edge->title, false);
+        pe_model_edge.SetValue("source", Format("%lld:%s", (long long)edge->source.node.id, edge->source.port_id), false);
+        pe_model_edge.SetValue("target", Format("%lld:%s", (long long)edge->target.node.id, edge->target.port_id), false);
+        pe_model_edge.SetValue("route", GraphDemoRouteName(edge->route), false);
+        pe_model_edge.SetValue("stroke", GraphDemoStrokeName(edge->stroke), false);
+        pe_model_edge.SetValue("arrow", GraphDemoArrowName(edge->arrow), false);
+        pe_model_edge.SetValue("directed", edge->directed, false);
+        pe_model_edge.SetValue("enabled", edge->enabled, false);
+        pe_model_edge.SetValue("visible", edge->visible, false);
+        pe_model_edge.SetValue("selectable", edge->selectable, false);
     }
-    else
-        pe_model_node.SetValue("id", Value(), false);
+    else {
+        pe_inspector.SetModel(&pe_model_node);
+        for(int i = 0; i < pe_model_node.GetCount(); i++)
+            pe_model_node[i].enabled = node != nullptr || pe_model_node[i].read_only;
+        if(node) {
+            pe_model_node.SetValue("id", Value(node->ref.id), false);
+            pe_model_node.SetValue("title", node->title, false);
+            pe_model_node.SetValue("subtitle", node->subtitle, false);
+            pe_model_node.SetValue("description", node->description, false);
+            pe_model_node.SetValue("shape", GraphDemoShapeName(node->shape), false);
+            pe_model_node.SetValue("role", GraphDemoRoleName(node->role), false);
+            pe_model_node.SetValue("style_preset", GraphDemoPresetName(node->style_class), false);
+            pe_model_node.SetValue("x", node->position.x, false);
+            pe_model_node.SetValue("y", node->position.y, false);
+            pe_model_node.SetValue("width", node->size.cx, false);
+            pe_model_node.SetValue("height", node->size.cy, false);
+            pe_model_node.SetValue("corner_radius", node->corner_radius, false);
+            pe_model_node.SetValue("enabled", node->enabled, false);
+            pe_model_node.SetValue("visible", node->visible, false);
+            pe_model_node.SetValue("selectable", node->selectable, false);
+            pe_model_node.SetValue("movable", node->movable, false);
+            pe_model_node.SetValue("collapsed", node->collapsed, false);
+        }
+        else
+            pe_model_node.SetValue("id", Value(), false);
+    }
     pe_inspector.RefreshModel();
     syncing_editors_ = false;
 }
@@ -659,6 +792,29 @@ void UiGraphDemo::ApplyNodeProperty(const String& id, const Value& value)
     if(id == "role" || id == "style_preset") SyncStyleEditor();
 }
 
+void UiGraphDemo::ApplyEdgeProperty(const String& id, const Value& value)
+{
+    const UiGraphEdge* current = SelectedEdge();
+    if(!current || id == "id" || id == "source" || id == "target")
+        return;
+    UiGraphEdge edge = *current;
+
+    if(id == "title") edge.title = AsString(value);
+    else if(id == "route") edge.route = GraphDemoParseRoute(AsString(value));
+    else if(id == "stroke") edge.stroke = GraphDemoParseStroke(AsString(value));
+    else if(id == "arrow") edge.arrow = GraphDemoParseArrow(AsString(value));
+    else if(id == "directed") edge.directed = (bool)value;
+    else if(id == "enabled") edge.enabled = (bool)value;
+    else if(id == "visible") edge.visible = (bool)value;
+    else if(id == "selectable") edge.selectable = (bool)value;
+    else return;
+
+    graph_.Model().UpdateEdge(selected_edge_, edge);
+    SyncNodeEditor();
+    UpdateStatus();
+    UpdateGeneratedCode();
+}
+
 String UiGraphDemo::EnsureCustomStyle(UiGraphNodeRef ref, const UiGraphNodeStyle& style)
 {
     String name = Format("custom:%lld", (long long)ref.id);
@@ -739,7 +895,8 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
         else face_recipes_[q] = value;
     }
     pe_model_node.SetValue("style_preset", "Custom", false);
-    pe_inspector.RefreshValue("style_preset");
+    if(pe_inspector.GetModel() == &pe_model_node)
+        pe_inspector.RefreshValue("style_preset");
     UpdateGeneratedCode();
     UpdateStatus();
 }
@@ -846,7 +1003,11 @@ void UiGraphDemo::ToggleTheme()
 void UiGraphDemo::UpdateStatus()
 {
     String mode = scale_mode_ ? "10k scale" : "Reference";
-    String selection = selected_node_.IsValid() ? Format("  selected=%lld", (long long)selected_node_.id) : String();
+    String selection;
+    if(selected_node_.IsValid())
+        selection = Format("  node=%lld", (long long)selected_node_.id);
+    else if(selected_edge_.IsValid())
+        selection = Format("  edge=%lld", (long long)selected_edge_.id);
     lbl_status.SetText(Format("%s  nodes=%d  edges=%d  prepared=%d/%d  candidates=%d/%d  zoom=%.2f%s",
                               mode, graph_.Model().GetNodeCount(), graph_.Model().GetEdgeCount(),
                               graph_.GetPreparedNodeCount(), graph_.GetPreparedEdgeCount(),
@@ -857,12 +1018,30 @@ void UiGraphDemo::UpdateStatus()
 void UiGraphDemo::UpdateGeneratedCode()
 {
     const UiGraphNode* node = SelectedNode();
-    if(!node) {
-        edit_generated_code.SetData("// Select a node to generate its UiGraphModel configuration.\n");
+    const UiGraphEdge* edge = SelectedEdge();
+    if(!node && !edge) {
+        edit_generated_code.SetData("// Select a node or connector to generate its UiGraphModel configuration.\n");
         return;
     }
 
     String out;
+    if(edge && !node) {
+        out << "// Selected UiNodeGraph connector\n"
+               "UiGraphEdge edge;\n";
+        out << "edge.source = UiGraphPortRef{UiGraphNodeRef{" << edge->source.node.id << "}, "
+            << GraphDemoCppString(edge->source.port_id) << "};\n";
+        out << "edge.target = UiGraphPortRef{UiGraphNodeRef{" << edge->target.node.id << "}, "
+            << GraphDemoCppString(edge->target.port_id) << "};\n";
+        if(!edge->title.IsEmpty()) out << "edge.title = " << GraphDemoCppString(edge->title) << ";\n";
+        out << "edge.route = UiGraphRouteStyle::" << GraphDemoRouteName(edge->route) << ";\n";
+        out << "edge.stroke = UiGraphStrokeStyle::" << GraphDemoStrokeName(edge->stroke) << ";\n";
+        out << "edge.arrow = UiGraphArrowStyle::" << GraphDemoArrowName(edge->arrow) << ";\n";
+        out << "edge.directed = " << (edge->directed ? "true" : "false") << ";\n";
+        out << "UiGraphEdgeRef ref = graph.Model().AddEdge(edge);\n";
+        edit_generated_code.SetData(out);
+        return;
+    }
+
     out << "// Selected UiNodeGraph node\n"
            "UiGraphNode node;\n";
     out << "node.title = " << GraphDemoCppString(node->title) << ";\n";

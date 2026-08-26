@@ -146,17 +146,18 @@ void UiGraphDemo::BuildReferenceGraph()
 
     // Demo-owned retained content. UiGraphModel does not know about Images and
     // no child Ctrl is allocated for thumbnails. Graph supplies the shape-safe
-    // content rectangle, while the demo decides image source, aspect fitting and
-    // an extra thumbnail LOD above the generic content hook cutoff.
+    // content rectangle; the demo reserves the same scaled title/subtitle lane
+    // before fitting the media so the thumbnail cannot climb into its metadata.
     graph_.WhenPaintNodeContent = [=](Draw& w, const UiGraphNode& node, const Rect& content,
                                        const UiGraphNodeStyle&, UiGraphVisualState) {
-        if(scale_mode_ || graph_.GetZoom() < 0.55)
+        if(scale_mode_ || graph_.GetZoom() < 0.42)
             return;
         int q = reference_images_.Find(node.ref.id);
         if(q < 0 || reference_images_[q].IsEmpty() || content.IsEmpty())
             return;
         Rect area = content.Deflated(DPI(4));
-        int title_lane = min(area.GetHeight() / 3, DPI(26));
+        int title_lane = min(area.GetHeight() / 2,
+                             max(DPI(12), fround(DPI(50) * min(1.0, graph_.GetZoom()))));
         area.top = min(area.bottom, area.top + title_lane);
         Rect target = GraphDemoAspectFit(reference_images_[q], area);
         if(!target.IsEmpty())
@@ -389,6 +390,9 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
         return;
 
     GraphDemoPastelPalette(node, style);
+    // Reference child controls should follow Graph detail LOD instead of
+    // disappearing at the older 0.65 hard threshold.
+    style.content_cell_min_zoom = min(style.content_cell_min_zoom, 0.42);
 
     if(preset.IsEmpty())
         return;
