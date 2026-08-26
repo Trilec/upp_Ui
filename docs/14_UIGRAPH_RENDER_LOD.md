@@ -52,7 +52,12 @@ The node body path also has an overview-specific allocation guard. The canonical
 - node-paint microseconds;
 - total last `Paint()` duration.
 
-`Utilities/UiNodeGraphScaleTest` prints `UINODEGRAPH_LOW_ZOOM_PROFILE` records at zoom `0.20`. `Utilities/UiNodeGraphPanProfileTest` builds 10,000 nodes / 19,800 connectors and prints `UINODEGRAPH_PAN_PROFILE` records at zoom `0.50` and `0.20`, separating geometry, edge-paint, node-paint and total timings. Timings are diagnostic evidence, not machine-independent pass thresholds.
+The scale evidence deliberately separates two workloads instead of conflating them:
+
+- `Utilities/UiNodeGraphScaleTest` retains the heavier 10,000-node / 19,800-edge grid as the generic model/spatial/render stress contract and prints `UINODEGRAPH_LOW_ZOOM_PROFILE` records at zoom `0.20`;
+- `UiGraphDemo` 10k mode and `Utilities/UiNodeGraphPanProfileTest` use the representative visual/pan fixture: 10,000 nodes and 9,900 horizontal row-neighbour connectors, with no redundant arrowheads. `UiNodeGraphPanProfileTest` prints `UINODEGRAPH_PAN_PROFILE` records at zoom `0.50` and `0.20`, separating geometry, edge-paint, node-paint and total timings.
+
+The visual fixture intentionally does not add a second vertical connector from every interior node merely to inflate edge count. Input-circle/output-square markers already communicate direction at this density, so arrowheads are also omitted. This keeps the interactive 10k view focused on real retained-node/pan cost while the 19,800-edge regression continues to exercise the denser generic topology separately. Timings are diagnostic evidence, not machine-independent pass thresholds.
 
 ## Low-detail interaction
 
@@ -90,6 +95,17 @@ Marquee chrome uses the Graph blue frame and a low-alpha light-blue wash. Spatia
 This hook deliberately does not add media semantics to `UiGraphNode` or `UiGraphModel`. The host/demo owns loaded `Image` objects or other presentation resources and maps them to node identity externally. No child `Ctrl` is required per image. The generic hook follows the existing secondary-detail LOD gate; a host may impose a stricter media threshold when full thumbnail detail would be wasteful.
 
 `UiGraphDemo` proves the intended pattern with the published `tests/Images/Elephant.png`, `FilmNoir.png`, `sifi.png` and `Castle.png` fixtures. The demo owns all four `Image`s, aspect-fits them inside shape-safe node content, reserves a title lane, and omits thumbnails below zoom `0.55`. Its `UiGraphModel` still contains only ordinary Graph node/port/edge data.
+
+## Demo scale presentation
+
+The 10k demo intentionally keeps style/shape variety while dropping scale-only decorative work that obscures the retained-scene measurement:
+
+- `raised` and `glow` still retain their authored shadow treatment, but their extra outer `StyledHighlight` rectangle is suppressed only while 10k scale mode is active;
+- the reference view continues to show those highlights so the style feature remains demonstrable;
+- scale connectors are row-neighbour only and have `UiGraphArrowStyle::None` because port marker shapes already communicate direction;
+- no production Graph style, serializer, route contract or model topology rule is changed by these demo choices.
+
+This distinction matters: visual benchmark cleanup belongs in the benchmark/demo fixture, not in generic Graph rendering policy.
 
 ## Shadows
 
@@ -142,11 +158,12 @@ Focused deterministic gates:
   - stable large-bias Bezier midpoint/tangent behavior;
   - repeated overview paint reuses the small rounded/capsule AA surface cache.
 - `Utilities/UiNodeGraphPanProfileTest`
-  - 10,000-node / 19,800-edge fixture;
+  - 10,000-node / 9,900 visible row-connector fixture matching the interactive scale view;
+  - no redundant per-edge arrowheads in the representative pan profile;
   - retained spatial-index reuse while panning;
   - viewport/LOD-bounded prepared geometry;
   - separated preparation/edge/node timing output.
 - `Utilities/UiNodeGraphScaleTest`
-  - existing 10,000-node spatial/prepared/paint bounds and low-zoom profile evidence.
+  - existing 10,000-node / 19,800-edge spatial/prepared/paint stress bounds and low-zoom profile evidence.
 
-Windows interactive validation must still inspect the four retained thumbnails, shape-aware port placement, single-frame node selection, progressive text/media LOD, marquee modifiers, midpoint route gestures, connection/node-drag regressions, and dense panning at the requested zooms. The phase timings remain evidence for whether any further 10k optimization tranche is justified; they are not fixed pass/fail speed thresholds.
+Windows interactive validation must still inspect the four retained thumbnails, shape-aware port placement, single-frame node selection, progressive text/media LOD, marquee modifiers, midpoint route gestures, connection/node-drag regressions, and dense panning at the requested zooms. In 10k mode it must also confirm there is no second vertical connector/arrow from every node and no raised/glow outer highlight rectangle. The phase timings remain evidence for whether any further 10k optimization tranche is justified; they are not fixed pass/fail speed thresholds.
