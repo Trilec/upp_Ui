@@ -309,7 +309,12 @@ void UiGraphDemo::AttachReferenceControls()
 
 void UiGraphDemo::EnsureScaleGraph()
 {
-    if(scale_model_.GetNodeCount() == 10000 && scale_model_.GetEdgeCount() == 19800)
+    // The interactive 10k view is a visual/pan fixture, not an edge-density
+    // benchmark. One row-neighbour connector per node is enough to prove the
+    // retained scene without drawing a second vertical edge and arrow from every
+    // interior node. The heavier 19,800-edge topology remains covered separately
+    // by UiNodeGraphScaleTest.
+    if(scale_model_.GetNodeCount() == 10000 && scale_model_.GetEdgeCount() == 9900)
         return;
 
     scale_model_.Clear();
@@ -359,26 +364,20 @@ void UiGraphDemo::EnsureScaleGraph()
     }
 
     for(int y = 0; y < height; y++) {
-        for(int x = 0; x < width; x++) {
+        for(int x = 0; x + 1 < width; x++) {
             int i = y * width + x;
             uint32 mixed = GraphDemoMix((uint32)i + 17U);
-            if(x + 1 < width) {
-                UiGraphEdge edge;
-                edge.source = UiGraphPortRef{scale_nodes_[i], "out"};
-                edge.target = UiGraphPortRef{scale_nodes_[i + 1], "in"};
-                edge.route = (mixed & 1) ? UiGraphRouteStyle::Straight : UiGraphRouteStyle::Bezier;
-                edge.arrow = UiGraphArrowStyle::Triangle;
-                if((mixed & 31U) == 0) edge.stroke = UiGraphStrokeStyle::Dashed;
-                scale_model_.AddEdge(edge);
-            }
-            if(y + 1 < height) {
-                UiGraphEdge edge;
-                edge.source = UiGraphPortRef{scale_nodes_[i], "out"};
-                edge.target = UiGraphPortRef{scale_nodes_[i + width], "in"};
-                edge.route = UiGraphRouteStyle::Orthogonal;
-                edge.arrow = (mixed & 2) ? UiGraphArrowStyle::Open : UiGraphArrowStyle::Triangle;
-                scale_model_.AddEdge(edge);
-            }
+            UiGraphEdge edge;
+            edge.source = UiGraphPortRef{scale_nodes_[i], "out"};
+            edge.target = UiGraphPortRef{scale_nodes_[i + 1], "in"};
+            edge.route = (mixed & 1) ? UiGraphRouteStyle::Straight : UiGraphRouteStyle::Bezier;
+            // Direction is already obvious from output-square -> input-circle in
+            // this dense view. Arrowheads add 9,900 more paint primitives without
+            // adding useful scale information.
+            edge.arrow = UiGraphArrowStyle::None;
+            if((mixed & 31U) == 0)
+                edge.stroke = UiGraphStrokeStyle::Dashed;
+            scale_model_.AddEdge(edge);
         }
     }
 }
@@ -416,10 +415,15 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
         style.metrics.shadow.distance = DPI(7);
         style.metrics.shadow.offset_y = DPI(3);
         style.metrics.shadow.alpha = 62;
-        style.metrics.highlight.enabled = true;
-        style.metrics.highlight.thickness = DPI(1);
-        style.metrics.highlight.alpha = 95;
-        style.metrics.highlight.color = style.palette.frame[ST_HOT];
+        // The reference view demonstrates authored highlight chrome. In the 10k
+        // scale view the same outer rectangular overlay is visual noise and a
+        // separate paint pass, so keep the raised shadow but omit the highlight.
+        if(!scale_mode_) {
+            style.metrics.highlight.enabled = true;
+            style.metrics.highlight.thickness = DPI(1);
+            style.metrics.highlight.alpha = 95;
+            style.metrics.highlight.color = style.palette.frame[ST_HOT];
+        }
     }
     else if(preset == "dense") {
         style.metrics.content_margin = Rect(DPI(4), DPI(3), DPI(4), DPI(3));
@@ -438,10 +442,12 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
         style.metrics.shadow.offset_y = 0;
         style.metrics.shadow.alpha = 58;
         style.metrics.shadow.color = glow;
-        style.metrics.highlight.enabled = true;
-        style.metrics.highlight.thickness = DPI(2);
-        style.metrics.highlight.alpha = 120;
-        style.metrics.highlight.color = glow;
+        if(!scale_mode_) {
+            style.metrics.highlight.enabled = true;
+            style.metrics.highlight.thickness = DPI(2);
+            style.metrics.highlight.alpha = 120;
+            style.metrics.highlight.color = glow;
+        }
     }
 }
 
