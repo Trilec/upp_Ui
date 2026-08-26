@@ -137,6 +137,7 @@ protected:
     Rect interaction_inset_ = Rect(0, 0, 0, 0);
 
 	Size           user_min_size_ = Size(0, 0);
+    bool           min_size_is_explicit_ = false;
 	One<Animation> anim_;
 	Size           icon_size_ = Size(0, 0);
 	bool           icon_scale_to_content_ = false;

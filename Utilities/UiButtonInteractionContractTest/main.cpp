@@ -19,6 +19,7 @@ struct TestCtx {
 
 struct ProbeButton : UiButton {
     bool IsMouseOverProbe() const { return mouse_over_; }
+    Rect IconRectProbe() { Layout(); return layout_.support; }
 };
 
 void TestInteractionGeometry(TestCtx& t)
@@ -110,6 +111,63 @@ void TestIconSizingContract(TestCtx& t)
              "changing explicit icon dimensions preserves the requested non-square size");
 }
 
+void TestIconOnlyGeometry(TestCtx& t)
+{
+    UiButton text_button;
+    text_button.SetCustomStyle(UiButton::StyleDefault())
+               .SetText("OK");
+    const Size text_min = text_button.GetMinSize();
+    t.Expect(text_min.cx >= DPI(70) && text_min.cy >= DPI(24),
+             "ordinary text buttons retain the established UiButton minimum baseline");
+
+    ProbeButton icon_button;
+    icon_button.SetCustomStyle(UiButton::StyleDefault())
+               .SetText(String())
+               .SetIcon(ICON_DESIGN_WIDGETS_48())
+               .SetIconSize(DPI(18), DPI(18))
+               .SetIconScaleToContent(false);
+
+    const int natural_side = DPI(18) + 2 * DPI(6) + 2 * DPI(1);
+    const Size icon_min = icon_button.GetMinSize();
+    t.Expect(icon_min == Size(natural_side, natural_side),
+             "icon-only UiButton natural size uses requested icon plus compact icon-only padding");
+
+    icon_button.SetIconSide(UiAlign::BOTTOM)
+               .SetContentGap(DPI(40));
+    t.Expect(icon_button.GetMinSize() == Size(natural_side, natural_side),
+             "icon side and text/icon gap do not affect icon-only UiButton sizing");
+
+    icon_button.SetRect(0, 0, DPI(24), DPI(24));
+    t.Expect(icon_button.IconRectProbe().GetSize() == Size(DPI(18), DPI(18)),
+             "undersized UiButton yields icon-only padding before shrinking an explicit icon");
+
+    icon_button.SetRect(0, 0, DPI(18), DPI(18));
+    Size impossible = icon_button.IconRectProbe().GetSize();
+    t.Expect(impossible.cx < DPI(18) && impossible.cy < DPI(18),
+             "explicit icon shrinks only when the styled face itself cannot contain it");
+
+    icon_button.SetMinSize(Size(DPI(60), DPI(40)));
+    t.Expect(icon_button.GetMinSize().cx >= DPI(60) && icon_button.GetMinSize().cy >= DPI(40),
+             "caller-authored UiButton minimum still overrides compact icon-only natural sizing");
+
+    UiToolButton tool;
+    tool.SetIcon(ICON_DESIGN_WIDGETS_48())
+        .SetIconSize(DPI(8), DPI(8))
+        .SetIconScaleToContent(false);
+    Size tool_min = tool.GetMinSize();
+    t.Expect(tool_min.cx >= DPI(12) && tool_min.cy >= DPI(12),
+             "UiToolButton keeps its own established minimum-size contract");
+
+    UiLabel label;
+    label.SetCustomStyle(UiLabel::StyleDefault())
+         .SetText(String())
+         .SetIcon(ICON_DESIGN_WIDGETS_48())
+         .SetIconSize(DPI(18), DPI(18))
+         .SetIconScaleToContent(false);
+    t.Expect(label.GetMinSize() == Size(DPI(18), DPI(18)),
+             "icon-only UiLabel already reserves the requested icon without button padding");
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
@@ -117,6 +175,7 @@ CONSOLE_APP_MAIN
     TestCtx t;
     TestInteractionGeometry(t);
     TestIconSizingContract(t);
+    TestIconOnlyGeometry(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
 }

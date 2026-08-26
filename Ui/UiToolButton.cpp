@@ -77,6 +77,7 @@ const UiToolButton::Style& UiToolButton::StyleDefault()
 UiToolButton::UiToolButton()
 {
     user_min_size_ = Size(DPI(12), DPI(12));
+    min_size_is_explicit_ = true;
     ClickFocus(false);
     SyncThemeStyle();
     RebuildTextLinesFromStyle(GetEffectiveStyle());

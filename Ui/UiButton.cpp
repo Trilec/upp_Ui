@@ -4,6 +4,41 @@
 
 namespace Upp {
 
+namespace {
+
+Rect IconOnlyContentMargin(const Rect& authored)
+{
+    Rect m = UiNonNegativeThickness(authored);
+    const int cap = DPI(6);
+    m.left = min(m.left, cap);
+    m.top = min(m.top, cap);
+    m.right = min(m.right, cap);
+    m.bottom = min(m.bottom, cap);
+    return m;
+}
+
+void FitPaddingPair(int& first, int& second, int available)
+{
+    available = max(0, available);
+    int total = first + second;
+    if(total <= available)
+        return;
+
+    int remove = total - available;
+    int from_first = min(first, (remove + 1) / 2);
+    first -= from_first;
+    remove -= from_first;
+
+    int from_second = min(second, remove);
+    second -= from_second;
+    remove -= from_second;
+
+    if(remove > 0)
+        first = max(0, first - remove);
+}
+
+}
+
 Image UiButton::ResolveIconForState(StyledState st) const
 {
     const Image& assigned = assigned_icon_images_[st];
@@ -161,7 +196,28 @@ UiButton::Style UiButton::ResolveThemeStyle() const
 
 Rect UiButton::GetContentLayoutRect(const Rect& outer, const Style& style) const
 {
-    return UiStyledInnerRect(outer, style.metrics, style.skin);
+    const bool icon_only = HasResolvedIcon() && lines_.IsEmpty();
+    if(!icon_only)
+        return UiStyledInnerRect(outer, style.metrics, style.skin);
+
+    StyledMetrics metrics = style.metrics;
+    Rect margin = IconOnlyContentMargin(metrics.content_margin);
+
+    // Explicit icon sizing is a content contract. If the caller allocates a
+    // button below its natural size, yield icon-only padding before reducing
+    // the requested icon. The icon still clips once the styled face itself is
+    // genuinely smaller than the requested dimensions.
+    if(!icon_scale_to_content_) {
+        Size icon_sz = GetStableIconSize();
+        Rect face = UiStyledFaceRect(outer, metrics, style.skin);
+        FitPaddingPair(margin.left, margin.right,
+                       max(0, face.GetWidth() - icon_sz.cx));
+        FitPaddingPair(margin.top, margin.bottom,
+                       max(0, face.GetHeight() - icon_sz.cy));
+    }
+
+    metrics.content_margin = margin;
+    return UiStyledInnerRect(outer, metrics, style.skin);
 }
 
 void UiButton::InvalidateStyleCache()
@@ -315,7 +371,11 @@ Size UiButton::ComputeNaturalSize() const
                                           explicit_icon_size ? 0 : DPI(16),
                                           have_icon && have_text ? style.content_gap : 0);
 
-    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
+    StyledMetrics metrics = style.metrics;
+    if(have_icon && !have_text)
+        metrics.content_margin = IconOnlyContentMargin(metrics.content_margin);
+
+    return UiStyledOuterSizeFromContent(content, metrics, style.skin);
 }
 
 void UiButton::UpdateLayout(const Rect& content) const
@@ -601,10 +661,13 @@ Size UiButton::GetMinSize() const
     int w = natural.cx;
     int h = natural.cy;
 
-    if(user_min_size_.cx > 0)
-        w = max(w, user_min_size_.cx);
-    if(user_min_size_.cy > 0)
-        h = max(h, user_min_size_.cy);
+    const bool icon_only = HasResolvedIcon() && lines_.IsEmpty();
+    if(!icon_only || min_size_is_explicit_) {
+        if(user_min_size_.cx > 0)
+            w = max(w, user_min_size_.cx);
+        if(user_min_size_.cy > 0)
+            h = max(h, user_min_size_.cy);
+    }
 
     cached_minsize_ = Size(w, h);
     minsize_dirty_ = false;
@@ -614,6 +677,7 @@ Size UiButton::GetMinSize() const
 void UiButton::SetMinSize(Size sz)
 {
     user_min_size_ = sz;
+    min_size_is_explicit_ = true;
     minsize_dirty_ = true;
     RefreshLayout();
 }
