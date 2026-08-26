@@ -45,17 +45,18 @@ void BuildGrid(UiGraphModel& model, Vector<UiGraphNodeRef>& nodes)
             nodes.Add(model.AddNode(node));
         }
 
+    // Match the interactive 10k presentation fixture: one horizontal connector
+    // per row-neighbour and no redundant arrowhead. UiNodeGraphScaleTest keeps
+    // the separate 19,800-edge grid as the heavier generic stress contract.
     for(int y = 0; y < height; y++)
-        for(int x = 0; x < width; x++) {
+        for(int x = 0; x + 1 < width; x++) {
             int i = y * width + x;
-            if(x + 1 < width)
-                model.Connect(UiGraphPortRef{nodes[i], "out"},
-                              UiGraphPortRef{nodes[i + 1], "in"},
-                              UiGraphRouteStyle::Straight);
-            if(y + 1 < height)
-                model.Connect(UiGraphPortRef{nodes[i], "out"},
-                              UiGraphPortRef{nodes[i + width], "in"},
-                              UiGraphRouteStyle::Orthogonal);
+            UiGraphEdge edge;
+            edge.source = UiGraphPortRef{nodes[i], "out"};
+            edge.target = UiGraphPortRef{nodes[i + 1], "in"};
+            edge.route = UiGraphRouteStyle::Straight;
+            edge.arrow = UiGraphArrowStyle::None;
+            model.AddEdge(edge);
         }
 }
 
@@ -97,7 +98,7 @@ void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
              && graph.GetLastNodePaintUsecs() >= 0 && paint_us >= 0,
              Format("%s exposes non-negative preparation/edge/node/total timing", phase));
     t.Expect(graph.GetPreparedNodeCount() < 10000
-             && graph.GetPreparedEdgeCount() < 19800,
+             && graph.GetPreparedEdgeCount() < 9900,
              Format("%s remains viewport/LOD bounded below total graph size", phase));
 }
 
@@ -109,8 +110,8 @@ CONSOLE_APP_MAIN
     UiGraphModel model;
     Vector<UiGraphNodeRef> nodes;
     BuildGrid(model, nodes);
-    t.Expect(model.GetNodeCount() == 10000 && model.GetEdgeCount() == 19800,
-             "profile fixture contains 10,000 nodes and 19,800 connectors");
+    t.Expect(model.GetNodeCount() == 10000 && model.GetEdgeCount() == 9900,
+             "profile fixture contains 10,000 nodes and 9,900 visible row connectors");
 
     UiNodeGraph graph;
     graph.SetAutoFitOnFirstPaint(false);
