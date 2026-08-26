@@ -113,6 +113,15 @@ CONSOLE_APP_MAIN
     t.Expect(model.GetNodeCount() == 10000 && model.GetEdgeCount() == 9900,
              "profile fixture contains 10,000 nodes and 9,900 visible row connectors");
 
+    bool arrowless = true;
+    for(int i = 0; i < model.GetEdgeCount(); i++)
+        if(model.GetEdge(i).arrow != UiGraphArrowStyle::None) {
+            arrowless = false;
+            break;
+        }
+    t.Expect(arrowless,
+             "representative 10k pan fixture carries no redundant edge arrowheads");
+
     UiNodeGraph graph;
     graph.SetAutoFitOnFirstPaint(false);
     graph.SetRect(0, 0, 1200, 800);
