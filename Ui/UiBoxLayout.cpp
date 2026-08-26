@@ -308,8 +308,11 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
                 row_h = max(row_h, h);
             }
 
+            // A non-wrapping horizontal box owns exactly one cross-axis row.
+            // Never assign children outside that row merely because a child's
+            // preferred height is larger than the rectangle given to the box.
             if(wrap == UiBoxWrap::None)
-                row_h = max(row_h, inner_h);
+                row_h = inner_h;
 
             int cx = irc.left;
             for(int i = 0; i < n; i++) {
