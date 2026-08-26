@@ -245,6 +245,64 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
     }
 }
 
+Point ShapeBoundaryAnchor(const Vector<Pointf>& path, const Rect& fallback,
+                          UiGraphPortSide side, double axis)
+{
+    bool vertical_side = side == UiGraphPortSide::Left || side == UiGraphPortSide::Right;
+    bool choose_min = side == UiGraphPortSide::Left || side == UiGraphPortSide::Top;
+    double best = 0.0;
+    bool found = false;
+    auto consider = [&](double value) {
+        if(!found || (choose_min ? value < best : value > best))
+            best = value;
+        found = true;
+    };
+
+    for(int i = 0; i < path.GetCount(); i++) {
+        Pointf a = path[i];
+        Pointf b = path[(i + 1) % path.GetCount()];
+        if(vertical_side) {
+            if(abs(a.y - b.y) <= 1e-9) {
+                if(abs(axis - a.y) <= 0.75) {
+                    consider(a.x);
+                    consider(b.x);
+                }
+                continue;
+            }
+            if(axis < min(a.y, b.y) - 1e-9 || axis > max(a.y, b.y) + 1e-9)
+                continue;
+            double t = (axis - a.y) / (b.y - a.y);
+            if(t >= -1e-9 && t <= 1.0 + 1e-9)
+                consider(a.x + (b.x - a.x) * t);
+        }
+        else {
+            if(abs(a.x - b.x) <= 1e-9) {
+                if(abs(axis - a.x) <= 0.75) {
+                    consider(a.y);
+                    consider(b.y);
+                }
+                continue;
+            }
+            if(axis < min(a.x, b.x) - 1e-9 || axis > max(a.x, b.x) + 1e-9)
+                continue;
+            double t = (axis - a.x) / (b.x - a.x);
+            if(t >= -1e-9 && t <= 1.0 + 1e-9)
+                consider(a.y + (b.y - a.y) * t);
+        }
+    }
+
+    if(vertical_side) {
+        int y = fround(minmax(axis, (double)fallback.top, (double)fallback.bottom));
+        int x = found ? fround(best)
+                      : (side == UiGraphPortSide::Left ? fallback.left : fallback.right);
+        return Point(x, y);
+    }
+    int x = fround(minmax(axis, (double)fallback.left, (double)fallback.right));
+    int y = found ? fround(best)
+                  : (side == UiGraphPortSide::Top ? fallback.top : fallback.bottom);
+    return Point(x, y);
+}
+
 Vector<Pointf> InflatePath(const Vector<Pointf>& path, double amount)
 {
     if(path.IsEmpty() || amount <= 0.0)
@@ -1810,11 +1868,15 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
         int count = indexes.GetCount();
         if(count == 0) continue;
         bool vertical = si < 2;
-        double inset = max(5.0, style.port_spacing * zoom_ * 0.35);
+        UiGraphPortSide side = si == 0 ? UiGraphPortSide::Left
+                             : si == 1 ? UiGraphPortSide::Right
+                             : si == 2 ? UiGraphPortSide::Top
+                                       : UiGraphPortSide::Bottom;
+        double span = vertical ? out.surface.GetHeight() : out.surface.GetWidth();
+        double inset = count <= 1 ? 0.0
+                                  : min(span * 0.22, max(4.0, style.port_spacing * zoom_ * 0.30));
         double start = vertical ? out.surface.top + inset : out.surface.left + inset;
         double end = vertical ? out.surface.bottom - inset : out.surface.right - inset;
-        if(vertical && !out.compact && out.header.bottom < out.surface.bottom - inset)
-            start = max(start, (double)out.header.bottom + inset);
         if(end < start) {
             double centre = vertical ? (out.surface.top + out.surface.bottom) * 0.5
                                      : (out.surface.left + out.surface.right) * 0.5;
@@ -1824,11 +1886,7 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
         for(int n = 0; n < count; n++) {
             const UiGraphPort& port = node.ports[indexes[n]];
             double axis = count == 1 ? (start + end) * 0.5 : start + step * n;
-            Point anchor;
-            if(si == 0) anchor = Point(out.surface.left, fround(axis));
-            else if(si == 1) anchor = Point(out.surface.right, fround(axis));
-            else if(si == 2) anchor = Point(fround(axis), out.surface.top);
-            else anchor = Point(fround(axis), out.surface.bottom);
+            Point anchor = ShapeBoundaryAnchor(out.hit_path, out.surface, side, axis);
             out.anchors.Add(port.id, anchor);
             if(zoom_ >= lod_policy_.port_zoom) {
                 int hit = max(DPI(2), fround(style.port_hit_radius * max(0.35, zoom_)));
@@ -1868,23 +1926,50 @@ Vector<Pointf> UiNodeGraph::BuildBezierRoute(Pointf source, UiGraphPortSide sour
     Vector<Pointf> route;
     double distance = max(40.0, VectorLength(target - source));
     double handle = max(24.0, distance * minmax(tension, 0.05, 1.25));
-    Pointf c1 = source + SideVector(source_side) * handle;
-    Pointf c2 = target + SideVector(target_side) * handle;
+    samples = max(4, samples);
 
-    // A normal user sees one midpoint handle. For Bezier routes the middle
-    // waypoint means "make the cubic pass here at t=.5". Moving both tangent
-    // controls by 4/3 of the midpoint delta yields that exact result without
-    // exposing two expert-only tangent handles.
+    // The normal editor exposes one midpoint handle. With an authored midpoint,
+    // use two C1-continuous cubic halves instead of translating both endpoint
+    // controls by an arbitrary bias. This keeps the endpoint port tangents,
+    // passes exactly through the dragged point, and prevents large downward or
+    // sideways drags from making the old endpoint handles backtrack and flip.
     if(!waypoints.IsEmpty()) {
-        Pointf desired = waypoints[waypoints.GetCount() / 2];
-        Pointf baseline((source.x + target.x + 3.0 * c1.x + 3.0 * c2.x) / 8.0,
-                        (source.y + target.y + 3.0 * c1.y + 3.0 * c2.y) / 8.0);
-        Pointf bias = (desired - baseline) * (4.0 / 3.0);
-        c1 += bias;
-        c2 += bias;
+        Pointf middle = waypoints[waypoints.GetCount() / 2];
+        Pointf mid_dir = NormalizeVector(target - source);
+        if(VectorLength(mid_dir) <= 1e-9)
+            mid_dir = NormalizeVector(SideVector(source_side) - SideVector(target_side));
+        if(VectorLength(mid_dir) <= 1e-9)
+            mid_dir = Pointf(1, 0);
+
+        double a_len = max(1.0, VectorLength(middle - source));
+        double b_len = max(1.0, VectorLength(target - middle));
+        double a_handle = min(handle, max(6.0, a_len * 0.45));
+        double b_handle = min(handle, max(6.0, b_len * 0.45));
+        double mid_handle = min(max(8.0, distance * 0.18),
+                                max(8.0, min(a_len, b_len) * 0.40));
+
+        Pointf a1 = source + SideVector(source_side) * a_handle;
+        Pointf a2 = middle - mid_dir * mid_handle;
+        Pointf b1 = middle + mid_dir * mid_handle;
+        Pointf b2 = target + SideVector(target_side) * b_handle;
+
+        int first = max(2, samples / 2);
+        int second = max(2, samples - first);
+        for(int i = 0; i <= first; i++) {
+            double t = (double)i / first, u = 1.0 - t;
+            route.Add(Pointf(u*u*u*source.x + 3*u*u*t*a1.x + 3*u*t*t*a2.x + t*t*t*middle.x,
+                             u*u*u*source.y + 3*u*u*t*a1.y + 3*u*t*t*a2.y + t*t*t*middle.y));
+        }
+        for(int i = 1; i <= second; i++) {
+            double t = (double)i / second, u = 1.0 - t;
+            route.Add(Pointf(u*u*u*middle.x + 3*u*u*t*b1.x + 3*u*t*t*b2.x + t*t*t*target.x,
+                             u*u*u*middle.y + 3*u*u*t*b1.y + 3*u*t*t*b2.y + t*t*t*target.y));
+        }
+        return route;
     }
 
-    samples = max(4, samples);
+    Pointf c1 = source + SideVector(source_side) * handle;
+    Pointf c2 = target + SideVector(target_side) * handle;
     for(int i = 0; i <= samples; i++) {
         double t = (double)i / samples, u = 1.0 - t;
         route.Add(Pointf(u*u*u*source.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*target.x,
@@ -2040,7 +2125,9 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
                                          fround(waypoints[waypoints.GetCount() / 2].y));
             else
                 out.route_handle = out.label_point;
-            int hr = max(DPI(5), DPI(6));
+            // Keep the visible handle compact, but make the interaction target
+            // large enough to remain practical on short connectors.
+            int hr = DPI(8);
             out.route_handle_hit = RectC(out.route_handle.x - hr,
                                          out.route_handle.y - hr,
                                          hr * 2 + 1, hr * 2 + 1);
@@ -2631,14 +2718,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 last_simplified_edge_count_++;
             UiGraphVisualState state = GetEdgeVisualState(*edge);
             PaintEdge(ep, *edge, g, ResolveEdgeStyle(*edge, state), state);
-            if(!g.route_handle_hit.IsEmpty()) {
-                Color blue = Color(37, 99, 235);
-                int radius = max(DPI(4), g.route_handle_hit.GetWidth() / 2 - DPI(1));
-                Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
-                                radius * 2 + 1, radius * 2 + 1);
-                FillPath(ep, EllipsePath(rr, 20), Color(219, 234, 254));
-                StrokePath(ep, EllipsePath(rr, 20), max(1.0, (double)DPI(1)), blue, true);
-            }
         }
         PaintConnectionPreview(ep);
         ep.Finish();
@@ -2685,6 +2764,8 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         const NodeGeometry& g=node_geometry_[q];
         const UiGraphNode* node=model_->FindNode(g.ref); if(!node) continue;
         UiGraphVisualState state=GetNodeVisualState(*node); UiGraphNodeStyle style=ResolveNodeStyle(*node,state);
+        if(WhenPaintNodeContent && zoom_ >= lod_policy_.secondary_text_zoom && !g.micro && !g.content.IsEmpty())
+            WhenPaintNodeContent(w,*node,g.content,style,state);
         if(zoom_ >= lod_policy_.title_zoom)
             PaintNodeText(w,*node,g,style,state);
         if(WhenPaintNodeOverlay && zoom_ >= lod_policy_.secondary_text_zoom)
@@ -2692,14 +2773,41 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         bool handled=false;
         if(WhenPaintNodeForeground)
             WhenPaintNodeForeground(w,*node,g.surface,style,state,handled);
-        if(!handled && UsesRectangularStyledSurface(node->shape)) {
-            StyledMetrics metrics=ScaleNodeMetrics(style.metrics,zoom_); StyledSkin skin=ScaleNodeSkin(style.skin,zoom_);
-            if(node->shape==UiGraphNodeShape::Rectangle) metrics.radius=0;
-            else if(node->shape==UiGraphNodeShape::Capsule) metrics.radius=max(0,min(g.surface.GetWidth(),g.surface.GetHeight())/2);
-            else metrics.radius=max(0,fround(node->corner_radius*zoom_));
-            metrics.shadow.enabled = false;
-            UiPaintStyledForeground(w,g.rect,style.palette,metrics,skin,ToStyledState(state),HasFocus()&&!IsNodeSelected(node->ref));
+        // Graph control focus belongs to the canvas, not every individual node.
+        // The old default foreground call painted a second focus frame on every
+        // unselected rectangular/capsule node and was both visually wrong and a
+        // large avoidable per-node paint cost. Hosts still retain the explicit
+        // foreground hook above when they need custom interaction chrome.
+    }
+
+    // Route-edit handles are interaction chrome. Draw them after node bodies and
+    // text so short connectors cannot have their only grab handle hidden by a
+    // neighbouring node or port marker.
+    bool have_route_handles = false;
+    for(int q : paint_edges)
+        if(!edge_geometry_[q].route_handle_hit.IsEmpty()) {
+            have_route_handles = true;
+            break;
         }
+    if(have_route_handles) {
+        ImageBuffer handle_buffer(paint.GetSize());
+        BufferPainter hp(handle_buffer, MODE_ANTIALIASED);
+        hp.Clear(RGBAZero());
+        hp.Translate(-paint.left, -paint.top);
+        const Color blue = Color(37, 99, 235);
+        for(int q : paint_edges) {
+            const EdgeGeometry& g = edge_geometry_[q];
+            if(g.route_handle_hit.IsEmpty())
+                continue;
+            int radius = DPI(4);
+            Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
+                            radius * 2 + 1, radius * 2 + 1);
+            Vector<Pointf> circle = EllipsePath(rr, 20);
+            FillPath(hp, circle, Color(219, 234, 254));
+            StrokePath(hp, circle, max(1.0, (double)DPI(1)), blue, true);
+        }
+        hp.Finish();
+        w.DrawImage(paint.left, paint.top, handle_buffer);
     }
 
     bool have_preview = false;
