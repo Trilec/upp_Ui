@@ -14,6 +14,9 @@
       parallel node store.
     - Style editing is view/presentation state. Semantic topology remains solely
       in UiGraphModel.
+    - Image-rich reference nodes keep fixture Images in the demo and paint them
+      through UiNodeGraph's retained content hook; UiGraphModel stores no image
+      processing/domain state and no per-thumbnail child controls are allocated.
 */
 
 #include <Ui/Ui.h>
@@ -92,6 +95,7 @@ private:
 
     UiGraphModel scale_model_;
     Vector<UiGraphNodeRef> scale_nodes_;
+    VectorMap<UiGraphId, Image> reference_images_;
     VectorMap<String, UiGraphNodeStyle> custom_styles_;
     VectorMap<String, Value> face_recipes_;
 
