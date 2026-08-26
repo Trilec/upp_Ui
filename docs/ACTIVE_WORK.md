@@ -14,11 +14,54 @@ Detailed architecture/history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-26
 
-STATUS: **UIGRAPH PRESENTATION / IMAGE CONTENT / NODE-PAINT R4 IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. UIBUTTON ICON-ONLY SIZING IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
+STATUS: **UIGRAPH SCALE FIXTURE CLEANUP R5 + PRESENTATION / IMAGE CONTENT / NODE-PAINT R4 IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. UIBUTTON ICON-ONLY SIZING IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
 
 Authoritative branch: `main`.
 
-Do not claim the R4 Graph tranche or the UiButton icon-only sizing tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+Do not claim the R5/R4 Graph tranche or the UiButton icon-only sizing tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+
+### UIGRAPH 10K SCALE FIXTURE CLEANUP CHECKPOINT — 2026-08-26
+
+BASE: `831a7de7eab413ae31026821308d5c1dc75a3a56` — published R4 Graph presentation/body-cache checkpoint before the visual 10k fixture cleanup.
+
+TASK: `UIGRAPH-SCALE-CLEANUP-R5` — remove two scale-only sources of misleading visual work seen in Curt's 10k screenshots without weakening generic Graph rendering or the heavier 19,800-edge stress regression.
+
+TOUCHED:
+
+- `examples/UiGraphDemo/UiGraphDemoData.cpp`
+- `Utilities/UiNodeGraphPanProfileTest/main.cpp`
+- `docs/14_UIGRAPH_RENDER_LOD.md`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+RECOVERY BRANCH: `agent/uigraph-scale-cleanup-r5`.
+
+SOURCE CHECKPOINT BEFORE BOOKKEEPING: `757e3433e1e155bb950dca6ccef169fca32a9074` — code/profile source after the explicit arrowless profile assertion. Documentation follows on the same recovery branch. Final publication must refresh then-current `main` and report the actual remote SHA.
+
+VALIDATION / REVIEW:
+
+- Curt's screenshots showed a second connector leaving essentially every interior scale node. Source inspection confirmed this was not a Graph rendering bug: `EnsureScaleGraph()` deliberately created both a horizontal row edge and a vertical edge to the node below, yielding 19,800 edges in the interactive 10k demo.
+- the interactive scale fixture now creates only the row-neighbour connector (`100 * 99 = 9,900` visible edges). This removes the unnecessary vertical connector/route from every interior node while still keeping a dense retained 10k-node scene.
+- scale-demo connectors now use `UiGraphArrowStyle::None`. At this density the output-square -> input-circle port vocabulary already communicates direction, so 9,900 separate arrowhead primitives add cost/noise without useful scale information.
+- the separate `Utilities/UiNodeGraphScaleTest` remains unchanged at 10,000 nodes / 19,800 edges. It continues to validate four-edge interior adjacency, serialization/mutation behavior, spatial bounds and the heavier generic low-zoom renderer stress path. The R5 cleanup therefore does not weaken existing Graph scale coverage.
+- `Utilities/UiNodeGraphPanProfileTest` now deliberately matches the representative interactive scale view at 10,000 nodes / 9,900 horizontal connectors, no arrowheads. It retains the same mid (`0.50`) and overview (`0.20`) phase timing evidence and adds a deterministic assertion that every profile edge has `UiGraphArrowStyle::None`. Expected summary is now 10 checks / 0 failures.
+- the large pale outer rectangles in Curt's screenshots correlated exactly with scale nodes using the demo's `raised` and `glow` presets (examples inspected included 5200=`glow`, 5203=`raised`, 5204=`raised`). Those presets author a separate `StyledHighlight` outer rectangle in addition to their shadow/body.
+- scale mode now suppresses only that `StyledHighlight` overlay for `raised` / `glow`. Their authored face/frame/shadow presentation remains, and the Reference view still demonstrates the highlight feature. This removes one unnecessary scale-only paint layer rather than changing generic `UiNodeGraph` highlight semantics.
+- no production Graph model, serializer, connection API, route editing contract, node-shape implementation or generic LOD policy was changed by R5. The changes are confined to demo/profile fixture presentation plus documentation.
+- `docs/14_UIGRAPH_RENDER_LOD.md` now explicitly separates representative 9,900-edge pan evidence from the retained 19,800-edge stress test and records the scale-only highlight/arrow cleanup.
+- source diff review before bookkeeping showed only `UiGraphDemoData.cpp` and `UiNodeGraphPanProfileTest/main.cpp`; documentation adds only the two expected docs. Windows compile/run and `git diff --check` remain validator gates.
+
+NEXT ACTION:
+
+1. Refresh current `main`, verify it still descends from `831a7de...` or reconcile only non-conflicting advances, then publish R5 without force and fetch remote `main` again.
+2. Gary grabs latest `main`, reports the actual tested HEAD and runs `git diff --check`.
+3. Build/run `Utilities/UiNodeGraphPanProfileTest` Debug + Release; require `UINODEGRAPH_PAN_PROFILE_SUMMARY checks=10 failed=0` and copy both profile lines.
+4. Build/run `Utilities/UiNodeGraphScaleTest` Debug + Release; require its existing zero-failure summary and copy the 19,800-edge `UINODEGRAPH_LOW_ZOOM_PROFILE` lines as the heavier stress comparison.
+5. Build `examples/UiGraphDemo` Debug + Release. In Debug 10k mode confirm: one row-neighbour connection only, no arrowheads, no raised/glow outer rectangular highlight artifacts, ordinary shadows/shape variety retained, and panning at zoom 1.0/0.50/0.20 remains coherent.
+6. Continue the R4 presentation validation from the next checkpoint in the same Debug demo. Tiny obvious U++ compile/API corrections are allowed; substantive behavior changes return to the supervisor.
+
+---
 
 ### UIGRAPH PRESENTATION / IMAGE CONTENT / NODE-PAINT CHECKPOINT — 2026-08-26
 
@@ -59,10 +102,10 @@ VALIDATION / REVIEW:
 
 NEXT ACTION:
 
-1. Refresh and publish the reviewed recovery branch onto then-current `main` without force and without dropping unrelated concurrent changes; fetch remote `main` again and verify the actual published SHA.
+1. R5 supersedes the earlier R4-only publication/scale-profile instructions above; validate the then-current published main rather than the historical R4 source checkpoint.
 2. Gary grabs latest `main`, reports the actual tested HEAD and runs `git diff --check`.
 3. Build/run `Utilities/UiNodeGraphPresentationTest`, `Utilities/UiNodeGraphPanProfileTest`, `Utilities/UiNodeGraphScaleTest` and `Utilities/UiNodeGraphRouteEditTest` under CLANGx64 Debug and Release; require zero failures. Copy the `UINODEGRAPH_PAN_PROFILE` and `UINODEGRAPH_LOW_ZOOM_PROFILE` records rather than enforcing machine-speed thresholds.
-4. Build `examples/UiGraphDemo` Debug and Release. In Debug visually exercise the four thumbnails, shape-aware ports, selection/node drag, low-zoom media omission, short-edge handle, strongly moved Bezier midpoint and 0.20 overview panning.
+4. Build `examples/UiGraphDemo` Debug and Release. In Debug visually exercise the four thumbnails, shape-aware ports, selection/node drag, low-zoom media omission, short-edge handle, strongly moved Bezier midpoint and 0.20 overview panning, plus the R5 scale-fixture cleanup checks above.
 5. Gary may correct only a tiny obvious U++ compile/API issue and must report its exact diff. Anything architectural or behaviorally substantive returns to the supervisor.
 
 ---
@@ -143,20 +186,16 @@ VALIDATION / REVIEW:
 - Graph marquee frame/fill uses the Graph blue contract; spatial selection semantics are no modifier = replace, Shift = add, Ctrl = toggle, Alt = subtract;
 - spatial hash queries were re-read during final cleanup and already perform exact retained-world-bounds intersection after cell candidate lookup, so no redundant marquee false-positive filter was added;
 - non-rectangular shadow falloff uses the authored shadow curve with bounded LOD layer counts and a lower-right default offset;
-- `UiNodeGraph` now exposes geometry-preparation, edge-paint, node-paint and total-paint microseconds; `UiNodeGraphPanProfileTest` builds 10,000 nodes / 19,800 connectors and reports separate mid (`0.50`) and overview (`0.20`) pan profiles;
+- the original R3 `UiNodeGraphPanProfileTest` used 10,000 nodes / 19,800 connectors; R5 intentionally supersedes that representative pan fixture with 9,900 visible row connectors while `UiNodeGraphScaleTest` retains the 19,800-edge stress contract;
 - `UiNodeGraphRouteEditTest` contains 18 deterministic checks; final cleanup explicitly includes `<cmath>`, uses `std::sqrt`, and removes an unused local to avoid avoidable compiler portability/warning noise;
 - `UiNodeGraphSelectionModifierTest` contains 10 deterministic checks, including Ctrl marquee toggling only the two nodes inside the marquee while a third node sharing nearby spatial cells remains selected;
-- `UiNodeGraphPanProfileTest` contains 9 deterministic checks plus diagnostic profile output; timing values themselves are evidence, not fixed machine thresholds;
-- `docs/14_UIGRAPH_RENDER_LOD.md` now describes the implemented route-edit contract instead of the stale deferred-feature note;
-- no additional speculative 10k panning rewrite was added during cleanup: current user evidence says selection/multi-drag improved materially while whole-view pan remains the unresolved path, so the new phase timings must identify whether geometry preparation, edge paint or node paint dominates before another optimization;
+- R5 raises `UiNodeGraphPanProfileTest` from the original 9 checks to 10 checks by locking the arrowless representative fixture; timing values themselves are evidence, not fixed machine thresholds;
+- `docs/14_UIGRAPH_RENDER_LOD.md` now describes the implemented route-edit contract and the later R5 representative/stress scale distinction;
 - local Windows/U++ compilation and `git diff --check` are not available in the supervisor container; Gary must perform those gates on current `main`.
 
 NEXT ACTION:
 
-1. Gary grabs latest `main`, reports the actual tested HEAD, runs `git diff --check`, then builds/runs the three R3 focused tests plus the existing Graph/model regression set in CLANGx64 Debug and Release;
-2. Gary copies the `UINODEGRAPH_PAN_PROFILE` and existing low-zoom profile lines and identifies the dominant 10k pan phase from measured Windows evidence;
-3. Curt performs the `UiGraphDemo` visual/interaction check for capsule frame agreement, progressive font/icon LOD, blue marquee modifiers, midpoint route editing and dense panning;
-4. only after that evidence decide whether another 10k optimization tranche is needed and which phase it should target.
+1. Follow the current R5/R4 validation checkpoint above rather than this historical R3 handoff.
 
 ---
 
@@ -369,7 +408,7 @@ Important source checkpoints include:
 - `1adfcf17fbd46ef58b43c08241537fe221a15275` + `175899286305b2f98117cfb76c03f2c6bd1d5f72` — Tab rebuilt around PropertyEditor and code-editor setup corrected;
 - `2f350e54aade41a904032039722566d966669031` + `f019cc24a69771cc9f7b133a75908070a367fad6` — Slider/RangeSlider combined family + callback hardening;
 - `b5be9c34d2468f19f6dc31acc16bd66b762181da` + `7e4e198ae2ae0ddae5cb3ebebf2db7d7707118b3` — Dropdown rebuilt with model-authoritative Data page and Code modes;
-- `38e526eb070a459a6e1ec093ca1bd9b57db984e7` + `8c9267bceaea92f914ab657d04a389a3c8aeb2be` — Toggle rebuilt around PropertyEditor;
+- `38e526eb070a459a6e1ec093ca1bd9b57db984e7` + `8c9267bceaea92f914ab657d04a389a3c8aeb2be` — Toggle rebuilt with PropertyEditor;
 - `c152d47e190ea096bb372157f2f758d66c1533ae` + `e383a468a6a91e983b160559f3e1f2c2b52ba062` — RadioButton rebuilt and API/code-generation corrections applied;
 - `d6b432c9c6d8bde3ef581514db82b349e0de241b` — Code view added to CheckBox;
 - `9eed37895c6967b830d210e207e590b79e2752a9` — Button explicit icon-size/render-mode coverage;
