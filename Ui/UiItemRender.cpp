@@ -591,6 +591,20 @@ void UiItemRenderImage::Layout()
         media_ = RectC(content_.left, content_.top + (content_.GetHeight() - side) / 2, side, side);
         int left = min(content_.right, media_.right + style.content_gap);
         int right = content_.right;
+
+        // In horizontal image rows metadata is a right-side decoration, not an
+        // overlay. Reserve its lane before laying out duration/right text so the
+        // two never collide, and center the marker on the row cross axis.
+        if(style.show_metadata && data.has_metadata && left < right) {
+            int metadata_side = min(style.metadata_size, min(content_.GetWidth(), content_.GetHeight()));
+            metadata_side = min(metadata_side, max(0, right - left));
+            if(metadata_side > 0) {
+                metadata_ = RectC(right - metadata_side,
+                                  content_.top + (content_.GetHeight() - metadata_side) / 2,
+                                  metadata_side, metadata_side);
+                right = max(left, metadata_.left - style.metadata_gap);
+            }
+        }
         if(style.show_right_text && !data.right_text.IsEmpty()) {
             int rw = min(GetTextSize(data.right_text, right_font_).cx + DPI(4),
                          max(0, (right - left) / 2));
@@ -630,11 +644,11 @@ void UiItemRenderImage::Layout()
             top += style.text_gap;
             description_ = Rect(content_.left, top, content_.right, min(content_.bottom, top + description_h));
         }
-    }
 
-    if(style.show_metadata && data.has_metadata) {
-        int side = min(style.metadata_size, min(content_.GetWidth(), content_.GetHeight()));
-        metadata_ = RectC(content_.right - side, content_.top, side, side);
+        if(style.show_metadata && data.has_metadata) {
+            int metadata_side = min(style.metadata_size, min(content_.GetWidth(), content_.GetHeight()));
+            metadata_ = RectC(content_.right - metadata_side, content_.top, metadata_side, metadata_side);
+        }
     }
 }
 
