@@ -53,6 +53,8 @@
       without changing serialized Graph style/model contracts.
     - 2026-08: added request-first middle-handle edge route editing, compressed
       text/icon LOD thresholds and phase timing evidence for large-graph tuning.
+    - 2026-08: added retained node-content painting for lightweight media and
+      shape-aware port presentation without adding media semantics to the model.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -114,7 +116,11 @@ struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
     bool show_header_band = false;
     bool show_icon = true;
     bool show_description = true;
-    bool show_port_labels = true;
+    // Port direction is already communicated by marker shape (input circle,
+    // output square, bidirectional diamond). Labels remain available for hosts
+    // that need named ports, but are opt-in so compact nodes do not collide with
+    // their own content at ordinary 1:1 zoom.
+    bool show_port_labels = false;
     bool show_port_type = false;
 
     void Serialize(Stream& s);
@@ -359,6 +365,11 @@ public:
     Event<const UiGraphEdge&, UiGraphVisualState, UiGraphEdgeStyle&> WhenResolveEdgeStyle;
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
           UiGraphVisualState, bool&> WhenPaintNodeBackground;
+    // Retained custom content layer, painted after the node body/ports and before
+    // Graph-owned title/subtitle text. `Rect` is the already-computed shape-safe
+    // content region, so thumbnails/mini-charts need no child Ctrl and no model field.
+    Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
+          UiGraphVisualState> WhenPaintNodeContent;
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
           UiGraphVisualState, bool&> WhenPaintNodeForeground;
     Event<Draw&, const UiGraphNode&, const Rect&, UiGraphVisualState> WhenPaintNodeOverlay;
