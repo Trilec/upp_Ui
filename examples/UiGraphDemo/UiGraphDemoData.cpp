@@ -43,6 +43,32 @@ UiGraphNode GraphDemoReferenceNode(const String& title,
     return node;
 }
 
+String GraphDemoImagePath(const String& name)
+{
+    return NormalizePath(AppendFileName(GetFileFolder(__FILE__), "../../tests/Images/" + name));
+}
+
+Image GraphDemoLoadImage(const String& name)
+{
+    return StreamRaster::LoadFileAny(GraphDemoImagePath(name));
+}
+
+Rect GraphDemoAspectFit(const Image& image, Rect area)
+{
+    if(image.IsEmpty() || area.IsEmpty())
+        return RectC(0, 0, 0, 0);
+    Size source = image.GetSize();
+    if(source.cx <= 0 || source.cy <= 0)
+        return RectC(0, 0, 0, 0);
+    double scale = min((double)area.GetWidth() / source.cx,
+                       (double)area.GetHeight() / source.cy);
+    int width = max(1, fround(source.cx * scale));
+    int height = max(1, fround(source.cy * scale));
+    return RectC(area.left + (area.GetWidth() - width) / 2,
+                 area.top + (area.GetHeight() - height) / 2,
+                 width, height);
+}
+
 uint32 GraphDemoMix(uint32 value)
 {
     value ^= value >> 16;
@@ -116,6 +142,26 @@ void UiGraphDemo::BuildReferenceGraph()
 {
     UiGraphModel& model = graph_.Model();
     model.Clear();
+    reference_images_.Clear();
+
+    // Demo-owned retained content. UiGraphModel does not know about Images and
+    // no child Ctrl is allocated for thumbnails. Graph supplies the shape-safe
+    // content rectangle, while the demo decides image source, aspect fitting and
+    // an extra thumbnail LOD above the generic content hook cutoff.
+    graph_.WhenPaintNodeContent = [=](Draw& w, const UiGraphNode& node, const Rect& content,
+                                       const UiGraphNodeStyle&, UiGraphVisualState) {
+        if(scale_mode_ || graph_.GetZoom() < 0.55)
+            return;
+        int q = reference_images_.Find(node.ref.id);
+        if(q < 0 || reference_images_[q].IsEmpty() || content.IsEmpty())
+            return;
+        Rect area = content.Deflated(DPI(4));
+        int title_lane = min(area.GetHeight() / 3, DPI(26));
+        area.top = min(area.bottom, area.top + title_lane);
+        Rect target = GraphDemoAspectFit(reference_images_[q], area);
+        if(!target.IsEmpty())
+            w.DrawImage(target, reference_images_[q]);
+    };
 
     static const UiGraphNodeShape shapes[] = {
         UiGraphNodeShape::Rectangle,
@@ -198,6 +244,48 @@ void UiGraphDemo::BuildReferenceGraph()
     feedback.waypoints << Pointf(760, 470) << Pointf(6, 470) << Pointf(6, 52);
     feedback.title = "waypoints";
     model.AddEdge(feedback);
+
+    struct ImageFixture {
+        const char *title;
+        const char *file;
+        UiGraphNodeShape shape;
+        UiGraphNodeRole role;
+        const char *preset;
+    };
+    static const ImageFixture image_fixtures[] = {
+        { "Elephant",  "Elephant.png", UiGraphNodeShape::RoundedRectangle, UiGraphNodeRole::Standard, "soft" },
+        { "Film Noir", "FilmNoir.png", UiGraphNodeShape::Capsule,          UiGraphNodeRole::Subtle,   "flat" },
+        { "Sci-Fi",    "sifi.png",     UiGraphNodeShape::Hexagon,          UiGraphNodeRole::Accent,   "outline" },
+        { "Castle",    "Castle.png",   UiGraphNodeShape::Document,         UiGraphNodeRole::Alert,    "raised" },
+    };
+
+    Vector<UiGraphNodeRef> image_refs;
+    for(int i = 0; i < 4; i++) {
+        UiGraphNode node = GraphDemoReferenceNode(image_fixtures[i].title,
+                                                  "retained thumbnail",
+                                                  Pointf(30 + i * 205.0, 520),
+                                                  Sizef(180, 132),
+                                                  image_fixtures[i].shape,
+                                                  image_fixtures[i].role,
+                                                  image_fixtures[i].preset);
+        node.description.Clear();
+        UiGraphNodeRef ref = model.AddNode(node);
+        Image image = GraphDemoLoadImage(image_fixtures[i].file);
+        if(!image.IsEmpty())
+            reference_images_.Add(ref.id, image);
+        image_refs.Add(ref);
+    }
+
+    for(int i = 0; i + 1 < image_refs.GetCount(); i++) {
+        UiGraphEdge edge;
+        edge.source = UiGraphPortRef{image_refs[i], "out"};
+        edge.target = UiGraphPortRef{image_refs[i + 1], "in"};
+        edge.route = i == 0 ? UiGraphRouteStyle::Straight
+                   : i == 1 ? UiGraphRouteStyle::Bezier
+                            : UiGraphRouteStyle::Orthogonal;
+        edge.arrow = UiGraphArrowStyle::Triangle;
+        model.AddEdge(edge);
+    }
 
     embedded_action_.SetText("Run");
     embedded_action_.WhenAction = [=] {
