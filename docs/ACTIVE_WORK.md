@@ -14,11 +14,51 @@ Detailed architecture/history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-26
 
-STATUS: **UIGRAPH ROUTE EDITING + VISUAL LOD R3 IMPLEMENTATION COMPLETE — WINDOWS PLATFORM/PERFORMANCE/VISUAL VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
+STATUS: **UIBUTTON ICON-ONLY SIZING IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. UIGRAPH ROUTE EDITING + VISUAL LOD R3 IMPLEMENTATION COMPLETE — WINDOWS PLATFORM/PERFORMANCE/VISUAL VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
 
 Authoritative branch: `main`.
 
-Do not claim the R3 Graph tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+Do not claim the R3 Graph tranche or the UiButton icon-only sizing tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+
+### UIBUTTON ICON-ONLY SIZING CHECKPOINT — 2026-08-26
+
+BASE: `3ab8f173957b2b74aadede0c073b3ac5ace42f5a` — current `main` after the concurrent Graph-only advance. The Graph change touched only `Ui/UiGraph/UiNodeGraph.cpp/.h` and was preserved unchanged.
+
+TASK: `UIBUTTON-ICON-ONLY-R1` — make icon-only `UiButton` natural/layout sizing honor an explicit icon size without carrying full text-button margins or silently collapsing the icon while padding can still yield.
+
+TOUCHED:
+
+- `Ui/UiButton.h`
+- `Ui/UiButton.cpp`
+- `Ui/UiToolButton.cpp`
+- `Utilities/UiButtonInteractionContractTest/main.cpp`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+PUBLISHED SOURCE CHECKPOINT: `d52c96b5464e01ec584ee80c4579803efcb966d8` — reviewed source/test commit immediately before this bookkeeping commit. Validation must use this commit or a later non-conflicting descendant of `main`.
+
+VALIDATION / REVIEW:
+
+- Root cause was the `UiButton` content-layout/min-size contract, not icon rasterization: icon-only buttons reused the normal text-button `content_margin` (`14/8/14/8` by default), and the inherited 70x24 Button minimum then kept the control wide even when only an icon was present.
+- Icon-only Button geometry now caps authored content margins at `DPI(6)` per side for the compact presentation path. With the default one-pixel frame, `SetIconSize(18, 18)` therefore naturally resolves to approximately 32x32 at 100% DPI rather than a wide text-button footprint.
+- When an icon-only Button is forcibly allocated below its natural size, icon-only padding reduces first. An explicit/stable icon size is reduced only when the styled face itself is too small to contain it.
+- `icon_side` and `content_gap` remain irrelevant when there is no text; text-only and text+icon layout continue to use the existing normal Button margin/gap/side contract.
+- The built-in 70x24 UiButton minimum is treated as an implicit ordinary-button baseline and is skipped only for icon-only mode. A caller-authored `SetMinSize(...)` remains authoritative in icon-only mode.
+- `UiToolButton` deliberately keeps its own existing 12x12 minimum baseline; the derived constructor marks that baseline explicit so the UiButton icon-only exception cannot shrink ToolButton below its prior contract.
+- `UiLabel` was audited against the same scenario and does not need a production fix: its default content margin is already zero and its icon-only natural size already reserves the requested icon size. Regression coverage now locks that behavior without modifying `UiLabel` source.
+- `Utilities/UiButtonInteractionContractTest` adds deterministic coverage for ordinary Button baseline preservation, 18x18 icon-only natural sizing, gap/side irrelevance, padding-yields-first behavior, impossible undersizing, explicit minimum authority, ToolButton minimum preservation, and UiLabel icon-only natural sizing. Expected total is 25 checks / 0 failures.
+- The complete source/test diff was source-reviewed before publication. Local Windows/U++ compilation and `git diff --check` are unavailable in the supervisor environment and remain validator gates.
+
+NEXT ACTION:
+
+1. Gary fetches current `main`, reports the exact tested HEAD, confirms `d52c96b5464e01ec584ee80c4579803efcb966d8` is an ancestor, runs `git diff --check`, and confirms no later UiButton/UiToolButton/UiLabel conflict was introduced.
+2. Build/run `Utilities/UiButtonInteractionContractTest` under CLANGx64 Debug and Release; require `Checks: 25, Fails: 0` in both configurations.
+3. Build `UiButtonDemo` and `UiLabelDemo` under CLANGx64 Debug and Release with zero compile/link errors.
+4. Manual Debug smoke: a normal `UiButton` with no text and `SetIconSize(18,18)` should present a clearly visible 18x18 icon in a compact ~32x32 default button; changing icon side/gap must not alter icon-only geometry; ordinary text Buttons remain normal; icon-only `UiLabel` remains naturally icon-sized without Button padding.
+5. Stop and report any compile/runtime/test failure or any text-button/ToolButton/Label regression. Do not patch Designer/application code around a control defect.
+
+---
 
 ### UIGRAPH ROUTE / VISUAL LOD / 10K PROFILING CHECKPOINT — 2026-08-26
 
