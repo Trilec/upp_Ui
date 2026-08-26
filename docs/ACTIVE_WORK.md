@@ -14,11 +14,58 @@ Detailed architecture/history:
 
 ## CURRENT SUPERVISORY STATE — 2026-08-26
 
-STATUS: **UIBUTTON ICON-ONLY SIZING IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. UIGRAPH ROUTE EDITING + VISUAL LOD R3 IMPLEMENTATION COMPLETE — WINDOWS PLATFORM/PERFORMANCE/VISUAL VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
+STATUS: **UIGRAPH PRESENTATION / IMAGE CONTENT / NODE-PAINT R4 IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. UIBUTTON ICON-ONLY SIZING IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING. OTHER RECORDED UI ACCEPTANCE LINES REMAIN PENDING.**
 
 Authoritative branch: `main`.
 
-Do not claim the R3 Graph tranche or the UiButton icon-only sizing tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+Do not claim the R4 Graph tranche or the UiButton icon-only sizing tranche Windows-accepted until the then-current `main` is built and exercised on Windows/U++.
+
+### UIGRAPH PRESENTATION / IMAGE CONTENT / NODE-PAINT CHECKPOINT — 2026-08-26
+
+BASE: `7d5ac627b5ab0202c2754c0f5c5c130a9d4bb448` — current published `main` after the retained four-image UiGraphDemo proof and before the final overview body-cache/doc cleanup.
+
+TASK: `UIGRAPH-PRESENTATION-R4` — finish the Graph presentation tranche by removing duplicate node focus chrome, anchoring ports to actual silhouettes, stabilizing ordinary Bezier midpoint editing, proving retained image-rich nodes without model media semantics or per-image child controls, and reducing the confirmed small-rounded-node allocation cost at overview zoom.
+
+TOUCHED ACROSS THE R4 LINE:
+
+- `Ui/UiGraph/UiNodeGraph.h`
+- `Ui/UiGraph/UiNodeGraph.cpp`
+- `examples/UiGraphDemo/UiGraphDemo.h`
+- `examples/UiGraphDemo/UiGraphDemoData.cpp`
+- `Utilities/UiNodeGraphPresentationTest/UiNodeGraphPresentationTest.upp`
+- `Utilities/UiNodeGraphPresentationTest/main.cpp`
+- `docs/14_UIGRAPH_RENDER_LOD.md`
+- `docs/ACTIVE_WORK.md`
+
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.**
+
+SOURCE REVIEW CHECKPOINT: `3dbee800b94e0248443ed4de72d60fdbcc7a0841` on recovery branch `agent/uigraph-presentation-r4-finish` immediately before this bookkeeping commit. Publication must still refresh then-current `main`; the final published SHA may therefore be a later non-conflicting descendant.
+
+VALIDATION / REVIEW:
+
+- Graph-control focus no longer paints a second focus foreground around every unselected Rect/Round/Square/Capsule node. Built-in node body/selection has one frame authority, while the canvas retains Graph focus chrome and `WhenPaintNodeForeground` remains available for explicit host chrome.
+- default port labels are now opt-in because direction is already encoded by marker shape: input circle, output square, bidirectional diamond; named port data remains in `UiGraphModel` and can be displayed by style when needed.
+- port anchors are projected onto the retained node silhouette. A single Capsule side port is vertically centred; Triangle ports intersect the sloping edge; the same projection is used by other built-in shapes rather than attaching to a hidden rectangular bounds edge.
+- a selected/hot route handle keeps a compact visible dot but uses a larger ~16px-plus hit target and is painted after node bodies/text, so short connectors cannot have their only grab point hidden beneath a neighbouring node or port marker.
+- a Bezier edge with one authored midpoint now uses two C1-continuous cubic halves through that point. Endpoint port tangents are preserved and large downward/sideways midpoint drags do not use the prior translated-control scheme that could backtrack/flip.
+- `WhenPaintNodeContent` is a retained presentation hook between body/ports and Graph-owned title/subtitle text. It receives the shape-safe content rectangle and resolved style/state; no image/media field was added to `UiGraphNode` or `UiGraphModel` and no serialization/semantic authority changed.
+- `UiGraphDemo` owns and loads the published `tests/Images/Elephant.png`, `FilmNoir.png`, `sifi.png` and `Castle.png` fixtures, aspect-fits them into ordinary Graph nodes, reserves title space and omits thumbnails below approximately zoom `0.55`; no child `Ctrl` is allocated per thumbnail.
+- `Utilities/UiNodeGraphPresentationTest` uses the same four real fixtures and deterministically covers retained thumbnail paint, shape-safe targets, zero image child controls, selection, ordinary node drag, low-zoom thumbnail omission, Capsule/Triangle silhouette port anchoring, short-edge handle size, large-bias Bezier midpoint/tangent behavior and Graph timing evidence.
+- the final performance cleanup is intentionally narrow. `UiPaintFaceFrameDash` uses a temporary AA raster for rounded surfaces; after Graph LOD has already disabled effective shadows, simple rounded/capsule surfaces no larger than 48 screen px reuse an exact Graph-specific raster-cache entry rather than allocating another small `ImageBuffer` every frame. Active shadows, skins, image fills, dashed frames and larger nodes still use the canonical styled renderer unchanged; authored highlights remain their canonical layer.
+- the presentation test now paints the overview twice and requires a raster-cache hit to increase, proving the small rounded/capsule body reuse path without a machine-dependent speed threshold.
+- no Graph semantic authority, serialization, connection contract, request-first mutation contract or AgentFlow runtime state was added or changed by this tranche.
+- `docs/14_UIGRAPH_RENDER_LOD.md` now records retained custom content, shape-aware port markers, the stable Bezier midpoint construction, top-layer route handle behavior and the bounded overview body cache.
+- the complete recovery-branch diff was reviewed against base `7d5ac627...`; the final two performance/test commits initially changed only `UiNodeGraph.h` and five test lines before documentation was added. Windows/U++ compilation and `git diff --check` remain validator gates.
+
+NEXT ACTION:
+
+1. Refresh and publish the reviewed recovery branch onto then-current `main` without force and without dropping unrelated concurrent changes; fetch remote `main` again and verify the actual published SHA.
+2. Gary grabs latest `main`, reports the actual tested HEAD and runs `git diff --check`.
+3. Build/run `Utilities/UiNodeGraphPresentationTest`, `Utilities/UiNodeGraphPanProfileTest`, `Utilities/UiNodeGraphScaleTest` and `Utilities/UiNodeGraphRouteEditTest` under CLANGx64 Debug and Release; require zero failures. Copy the `UINODEGRAPH_PAN_PROFILE` and `UINODEGRAPH_LOW_ZOOM_PROFILE` records rather than enforcing machine-speed thresholds.
+4. Build `examples/UiGraphDemo` Debug and Release. In Debug visually exercise the four thumbnails, shape-aware ports, selection/node drag, low-zoom media omission, short-edge handle, strongly moved Bezier midpoint and 0.20 overview panning.
+5. Gary may correct only a tiny obvious U++ compile/API issue and must report its exact diff. Anything architectural or behaviorally substantive returns to the supervisor.
+
+---
 
 ### UIBUTTON ICON-ONLY SIZING CHECKPOINT — 2026-08-26
 
