@@ -39,6 +39,8 @@ Spatial hash queries are candidate queries, but returned nodes are filtered thro
 
 Prepared and dirty-paint spatial queries use a screen-space margin that shrinks with LOD instead of the former fixed 160-pixel margin. Low-detail edges also use fewer Bezier samples and reduced interaction/bounds inflation. The minimum-zoom overview may reduce non-selected connector representation while preserving semantic topology and selected/hot objects.
 
+The node body path also has an overview-specific allocation guard. The canonical Ui rounded face/frame helper intentionally uses an antialiased temporary raster for rounded surfaces. Once Graph LOD has already removed active shadows, small ordinary rounded/capsule nodes (up to 48 screen pixels on their longest axis) reuse an exact cached AA face/frame raster instead of allocating one temporary `ImageBuffer` per node per frame. This fast path is deliberately narrow: image fills, enabled skins, dashed frames, active shadows and larger nodes continue through the canonical styled renderer unchanged. Authored highlights remain a separate canonical layer.
+
 `UiNodeGraph` exposes read-only evidence for:
 
 - prepared node/edge counts;
@@ -68,9 +70,11 @@ U++ `Draw` child controls are rectangular while arbitrary path clipping is a `Pa
 
 Ellipse/circle, diamond, triangle, hexagon, capsule, cloud, document and database each reserve a useful interior. Capsule content stays clear of its semicircular ends; document content avoids the folded corner; attached controls disappear with secondary detail rather than surviving as tiny child windows.
 
-Capsule hit/paint geometry now uses a true semicircular-ended capsule path rather than a rounded-polygon approximation.
+Ports are positioned on the actual retained node silhouette rather than the hidden rectangular node bounds. A single left/right Capsule port is vertically centred, Triangle ports intersect the sloping side, and the same boundary projection applies to the other built-in paths. The default marker vocabulary is input circle, output square and bidirectional diamond. Port labels are therefore opt-in by default and remain available for hosts that require named endpoints.
 
-Selection has one frame authority for built-in shapes. A selected built-in node paints the normal body once with the semantic bright-blue selected frame at the same geometry as the body; Graph no longer paints a grey pressed body frame and then a second blue approximation over it. Custom shapes retain a path-overlay fallback because their body renderer is extension-owned.
+Capsule hit/paint geometry uses a true semicircular-ended capsule path rather than a rounded-polygon approximation.
+
+Selection has one frame authority for built-in shapes. A selected built-in node paints the normal body once with the semantic bright-blue selected frame at the same geometry as the body; Graph no longer paints a grey pressed body frame and then a second blue approximation over it. Graph-control focus belongs to the canvas, not to a second focus outline around every unselected node. Custom shapes retain a path-overlay fallback because their body renderer is extension-owned.
 
 Marquee chrome uses the Graph blue frame and a low-alpha light-blue wash. Spatial selection modifiers are explicit and deterministic:
 
@@ -79,11 +83,19 @@ Marquee chrome uses the Graph blue frame and a low-alpha light-blue wash. Spatia
 - Ctrl: toggle;
 - Alt: subtract.
 
+## Retained custom node content
+
+`WhenPaintNodeContent` is the lightweight retained presentation layer for thumbnails, mini-charts and similar view-owned material. It runs after the node body/ports and before Graph-owned title/subtitle text and receives the already-computed shape-safe content rectangle plus the resolved node style and visual state.
+
+This hook deliberately does not add media semantics to `UiGraphNode` or `UiGraphModel`. The host/demo owns loaded `Image` objects or other presentation resources and maps them to node identity externally. No child `Ctrl` is required per image. The generic hook follows the existing secondary-detail LOD gate; a host may impose a stricter media threshold when full thumbnail detail would be wasteful.
+
+`UiGraphDemo` proves the intended pattern with the published `tests/Images/Elephant.png`, `FilmNoir.png`, `sifi.png` and `Castle.png` fixtures. The demo owns all four `Image`s, aspect-fits them inside shape-safe node content, reserves a title lane, and omits thumbnails below zoom `0.55`. Its `UiGraphModel` still contains only ordinary Graph node/port/edge data.
+
 ## Shadows
 
 Non-rectangular shadow falloff derives from the authored `StyledShadow.curve` instead of a hand-linear opacity sequence. LOD reduces the bounded layer count (full/mid/low detail) and fades/disables shadows before overview detail. The default offset is lower-right rather than straight down.
 
-Rectangular/capsule styled shadows follow the same LOD fade/disable rule before `UiPaintStyledBackground`.
+Rectangular/capsule styled shadows follow the same LOD fade/disable rule before styled background painting. Only after a shadow becomes inactive can a small simple rounded/capsule surface enter the overview raster-cache path described above.
 
 ## Request-first connector route editing
 
@@ -93,10 +105,12 @@ A selected or hot non-custom connector exposes one ordinary midpoint handle abov
 
 The same simple gesture has route-specific presentation semantics:
 
-- Bezier: the middle waypoint is a curve bias and the cubic is adjusted to pass through it, avoiding a visible kink and avoiding expert tangent handles;
+- Bezier: the middle waypoint is a curve bias. Graph builds two C1-continuous cubic halves through that point, preserves the endpoint port tangents and avoids the backtracking/flip failure caused by translating both endpoint controls under large drags;
 - Straight: the midpoint becomes a bend waypoint;
 - Orthogonal: the midpoint becomes the preferred routing corridor;
 - Custom routes: no built-in midpoint editor is imposed because route authority belongs to the extension.
+
+The visible route handle remains compact, but its hit target is larger and the handle is drawn in the top interaction layer after node bodies/text so a short connector cannot hide its only grab point under a neighbouring node or port marker.
 
 External edge mutation/removal during an active route drag cancels the stale gesture instead of committing against changed authority.
 
@@ -118,6 +132,15 @@ Focused deterministic gates:
 - `Utilities/UiNodeGraphSelectionModifierTest`
   - Graph-blue marquee chrome;
   - replace/add/toggle/subtract point and marquee semantics.
+- `Utilities/UiNodeGraphPresentationTest`
+  - real Elephant/FilmNoir/sifi/Castle fixture loading;
+  - retained thumbnail painting without child controls or model media fields;
+  - shape-safe aspect-fit content and low-zoom thumbnail omission;
+  - Capsule/Triangle silhouette port anchoring;
+  - ordinary selection and node-drag behavior for image-rich nodes;
+  - practical short-edge route-handle hit geometry;
+  - stable large-bias Bezier midpoint/tangent behavior;
+  - repeated overview paint reuses the small rounded/capsule AA surface cache.
 - `Utilities/UiNodeGraphPanProfileTest`
   - 10,000-node / 19,800-edge fixture;
   - retained spatial-index reuse while panning;
@@ -126,4 +149,4 @@ Focused deterministic gates:
 - `Utilities/UiNodeGraphScaleTest`
   - existing 10,000-node spatial/prepared/paint bounds and low-zoom profile evidence.
 
-Windows interactive validation must still inspect capsule and other shape selection/body agreement, progressive font/icon LOD, marquee modifiers, midpoint route gestures, connection/node-drag regressions, and dense panning at the requested zooms. The new phase timings should be used to identify the next 10k bottleneck before another optimization is attempted.
+Windows interactive validation must still inspect the four retained thumbnails, shape-aware port placement, single-frame node selection, progressive text/media LOD, marquee modifiers, midpoint route gestures, connection/node-drag regressions, and dense panning at the requested zooms. The phase timings remain evidence for whether any further 10k optimization tranche is justified; they are not fixed pass/fail speed thresholds.
