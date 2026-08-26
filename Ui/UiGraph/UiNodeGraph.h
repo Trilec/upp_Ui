@@ -55,6 +55,8 @@
       text/icon LOD thresholds and phase timing evidence for large-graph tuning.
     - 2026-08: added retained node-content painting for lightweight media and
       shape-aware port presentation without adding media semantics to the model.
+    - 2026-08: cached exact small rounded/capsule surfaces once Graph LOD has
+      removed expensive shadow/skin detail, avoiding per-node AA buffers at overview.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -452,6 +454,84 @@ private:
         Connect,
         Marquee,
     };
+
+    // UiPaintFaceFrameDash allocates a temporary AA image for rounded surfaces.
+    // At overview zoom thousands of tiny ordinary nodes can otherwise repeat that
+    // allocation every frame after Graph LOD has already removed shadows/text.
+    // Keep the cache exact and deliberately tiny: special skins, image fills,
+    // dashed frames, active shadows and larger authored nodes retain the canonical
+    // Ui renderer unchanged.
+    static void UiPaintStyledBackground(Draw& w,
+                                        const Rect& outer,
+                                        const StyledPalette& palette,
+                                        const StyledMetrics& metrics,
+                                        const StyledSkin& skin,
+                                        StyledState st,
+                                        bool focus)
+    {
+        if(outer.IsEmpty())
+            return;
+
+        Rect surface = UiStyledSurfaceRect(outer, metrics);
+        const UiFill& face_fill = palette.face[st];
+        bool shadow_active = metrics.shadow.enabled && metrics.shadow.alpha > 0
+                          && UiResolveShadowExtentPx(metrics.shadow) > 0;
+        bool simple_face = !metrics.face_enabled || face_fill.IsNone() || face_fill.IsSolid();
+        bool simple_skin = !skin.enabled || IsNull(skin.base);
+        bool small_rounded = !surface.IsEmpty() && metrics.radius > 0
+                          && max(surface.GetWidth(), surface.GetHeight()) <= 48;
+
+        if(!shadow_active && !metrics.dashed && simple_face && simple_skin && small_rounded) {
+            Color face = metrics.face_enabled && face_fill.IsSolid() ? face_fill.color : Null;
+            int frame_width = metrics.frame_enabled ? max(0, metrics.frame_width) : 0;
+            Color frame = frame_width > 0 ? palette.frame[st] : Null;
+            Size sz = surface.GetSize();
+
+            UiRasterCachePolicy policy = UiRasterPolicyAA("aa/nodegraph-surface");
+            policy.allow_scale_from_bucket = false;
+            UiRasterCacheKeyBuilder kb("aa/nodegraph-surface");
+            kb.Add(sz).Add(metrics.radius).Add(face).Add(frame).Add(frame_width)
+              .Add(metrics.face_enabled).Add(metrics.frame_enabled);
+            Image cached = UiRasterCache::Get(kb.Build(), policy, [=] {
+                ImageBuffer ib(sz);
+                ib.SetKind(IMAGE_ALPHA);
+                Fill(~ib, RGBAZero(), ib.GetLength());
+
+                BufferPainter p(ib, MODE_ANTIALIASED);
+                double fw = frame_width > 0 ? (double)frame_width : 0.0;
+                double inset = fw > 0.0 ? max(0.5, fw * 0.5) : 0.5;
+                double width = max(1.0, sz.cx - 2.0 * inset);
+                double height = max(1.0, sz.cy - 2.0 * inset);
+                double radius = min<double>(metrics.radius, min(sz.cx, sz.cy) * 0.5);
+
+                p.Begin();
+                p.RoundedRectangle(inset, inset, width, height, radius);
+                if(!IsNull(face))
+                    p.Fill(face);
+                if(frame_width > 0 && !IsNull(frame))
+                    p.Stroke(fw, frame);
+                p.End();
+                return Image(ib);
+            });
+            UiDrawCachedRaster(w, surface, cached);
+
+            // Highlight is an independent styled layer. Reuse the canonical
+            // implementation only when it is actually authored; normal overview
+            // nodes therefore avoid all remaining background compositor work.
+            if(metrics.highlight.enabled && metrics.highlight.alpha > 0) {
+                StyledMetrics overlay = metrics;
+                overlay.face_enabled = false;
+                overlay.frame_enabled = false;
+                overlay.shadow.enabled = false;
+                StyledSkin no_skin;
+                no_skin.enabled = false;
+                Upp::UiPaintStyledBackground(w, outer, palette, overlay, no_skin, st, focus);
+            }
+            return;
+        }
+
+        Upp::UiPaintStyledBackground(w, outer, palette, metrics, skin, st, focus);
+    }
 
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
