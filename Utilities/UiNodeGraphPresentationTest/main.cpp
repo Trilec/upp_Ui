@@ -189,10 +189,15 @@ CONSOLE_APP_MAIN
 
     graph.SetZoom(0.20, Point(450, 130));
     content_paints = 0;
+    UiRasterCacheStats cache_before = UiRasterCache::GetStats();
     draw.DrawRect(0, 0, 900, 260, White());
     graph.Paint(draw);
     t.Expect(content_paints == 0,
              "retained thumbnail detail is omitted by existing low-zoom LOD");
+    graph.Paint(draw);
+    UiRasterCacheStats cache_after = UiRasterCache::GetStats();
+    t.Expect(cache_after.hits > cache_before.hits,
+             "repeated overview paint reuses cached small rounded/capsule node surfaces");
 
     graph.SetZoom(1.0, Point(450, 130));
     graph.CenterOnNode(scifi);
