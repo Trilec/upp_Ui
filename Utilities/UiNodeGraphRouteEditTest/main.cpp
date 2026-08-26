@@ -1,5 +1,7 @@
 #include <Ui/Ui.h>
 
+#include <cmath>
+
 using namespace Upp;
 
 namespace {
@@ -45,7 +47,7 @@ bool Near(Pointf a, Pointf b, double eps = 1.5)
 {
     double dx = a.x - b.x;
     double dy = a.y - b.y;
-    return sqrt(dx * dx + dy * dy) <= eps;
+    return std::sqrt(dx * dx + dy * dy) <= eps;
 }
 
 Point DragHandle(UiNodeGraph& graph, UiGraphEdgeRef edge, Point delta)
@@ -111,7 +113,7 @@ CONSOLE_APP_MAIN
     };
 
     graph.EnableInternalMutation(false);
-    Point intercepted_end = DragHandle(graph, edge, Point(0, 70));
+    DragHandle(graph, edge, Point(0, 70));
     const UiGraphEdge* after_intercept = model.FindEdge(edge);
     t.Expect(requests == 1 && captured_after.GetCount() == 1,
              "route drag emits one request-first before/after waypoint transaction");
