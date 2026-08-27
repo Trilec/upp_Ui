@@ -50,6 +50,37 @@ bool Near(Pointf a, Pointf b, double eps = 1.5)
     return std::sqrt(dx * dx + dy * dy) <= eps;
 }
 
+double SegmentDistance(Pointf p, Pointf a, Pointf b)
+{
+    Pointf ab = b - a;
+    double len2 = ab.x * ab.x + ab.y * ab.y;
+    if(len2 <= 1e-12)
+        return std::sqrt((p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y));
+    double t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2;
+    t = minmax(t, 0.0, 1.0);
+    Pointf q = a + ab * t;
+    return std::sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
+}
+
+bool RouteContainsPoint(const Vector<Pointf>& route, Pointf point, double eps = 1.5)
+{
+    for(int i = 1; i < route.GetCount(); i++)
+        if(SegmentDistance(point, route[i - 1], route[i]) <= eps)
+            return true;
+    return false;
+}
+
+bool MonotonicX(const Vector<Pointf>& route)
+{
+    if(route.GetCount() < 2)
+        return false;
+    double direction = route.Top().x >= route[0].x ? 1.0 : -1.0;
+    for(int i = 1; i < route.GetCount(); i++)
+        if((route[i].x - route[i - 1].x) * direction < -0.01)
+            return false;
+    return true;
+}
+
 Point DragHandle(UiNodeGraph& graph, UiGraphEdgeRef edge, Point delta)
 {
     Rect handle = graph.GetEdgeRouteHandleRect(edge);
@@ -66,6 +97,26 @@ Point DragHandle(UiNodeGraph& graph, UiGraphEdgeRef edge, Point delta)
 CONSOLE_APP_MAIN
 {
     TestCtx t;
+
+    UiGraphEdgeStyle stock_edge_style;
+    t.Expect(abs(stock_edge_style.orthogonal_lead) < 1e-9,
+             "stock orthogonal route does not impose a fixed endpoint lead");
+
+    Vector<Pointf> compact_route = UiNodeGraph::BuildOrthogonalRoute(
+        Pointf(0, 0), UiGraphPortSide::Right,
+        Pointf(24, 0), UiGraphPortSide::Left,
+        0.0, 0.0);
+    t.Expect(compact_route.GetCount() >= 2 && MonotonicX(compact_route),
+             "compact facing orthogonal endpoints do not backtrack or cross fixed stubs");
+
+    Vector<Pointf> corridor_waypoint;
+    corridor_waypoint.Add(Pointf(60, 50));
+    Vector<Pointf> corridor_route = UiNodeGraph::BuildOrthogonalRoute(
+        Pointf(0, 0), UiGraphPortSide::Right,
+        Pointf(120, 0), UiGraphPortSide::Left,
+        0.0, 0.0, corridor_waypoint);
+    t.Expect(RouteContainsPoint(corridor_route, corridor_waypoint[0]),
+             "canonical orthogonal midpoint lies on the corridor it controls");
 
     UiGraphModel model;
     UiGraphNodeRef a = model.AddNode(MakeNode("A", Pointf(80, 150)));
@@ -153,6 +204,33 @@ CONSOLE_APP_MAIN
     DragHandle(graph, edge, Point(-45, 60));
     t.Expect(model.GetEdge(edge).waypoints.GetCount() == 1,
              "dragging an Orthogonal midpoint stores its preferred corridor waypoint");
+
+    const UiGraphEdge& committed_orthogonal = model.GetEdge(edge);
+    Pointf source_anchor(model.GetNode(a).position.x + model.GetNode(a).size.cx,
+                         model.GetNode(a).position.y + model.GetNode(a).size.cy * 0.5);
+    Pointf target_anchor(model.GetNode(b).position.x,
+                         model.GetNode(b).position.y + model.GetNode(b).size.cy * 0.5);
+    Vector<Pointf> committed_route = UiNodeGraph::BuildOrthogonalRoute(
+        source_anchor, UiGraphPortSide::Right,
+        target_anchor, UiGraphPortSide::Left,
+        0.0, 0.0, committed_orthogonal.waypoints);
+    t.Expect(RouteContainsPoint(committed_route, committed_orthogonal.waypoints[0], 2.0),
+             "dragged Orthogonal midpoint is canonicalized onto the visible route");
+
+    UiGraphEdge robust_bezier = model.GetEdge(edge);
+    robust_bezier.route = UiGraphRouteStyle::Bezier;
+    robust_bezier.waypoints.Clear();
+    t.Expect(model.UpdateEdge(edge, robust_bezier),
+             "fixture returns the same edge to Bezier for endpoint-fold coverage");
+    graph.SelectEdge(edge);
+    DragHandle(graph, edge, Point(-700, 0));
+    const UiGraphEdge& clamped_bezier = model.GetEdge(edge);
+    double source_boundary = model.GetNode(a).position.x + model.GetNode(a).size.cx;
+    double target_boundary = model.GetNode(b).position.x;
+    t.Expect(clamped_bezier.waypoints.GetCount() == 1
+             && clamped_bezier.waypoints[0].x > source_boundary
+             && clamped_bezier.waypoints[0].x < target_boundary,
+             "extreme Bezier midpoint drag stays inside facing endpoint half-planes");
 
     graph.SetZoom(0.50, Point(490, 260));
     t.Expect(graph.GetEdgeRouteHandleRect(edge).IsEmpty(),

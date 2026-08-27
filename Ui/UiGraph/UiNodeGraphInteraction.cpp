@@ -363,6 +363,102 @@ void UiNodeGraph::CancelNodeDrag()
     Refresh();
 }
 
+Pointf UiNodeGraph::NormalizeRouteDragPoint(const UiGraphEdge& edge,
+                                            UiGraphRouteStyle route,
+                                            const UiGraphEdgeStyle& edge_style,
+                                            Pointf next,
+                                            Pointf previous) const
+{
+    UiGraphPortSide source_side = UiGraphPortSide::Right;
+    UiGraphPortSide target_side = UiGraphPortSide::Left;
+    Point source_px = GetPortAnchor(edge.source, &source_side);
+    Point target_px = GetPortAnchor(edge.target, &target_side);
+    Pointf source = ScreenToWorld(source_px);
+    Pointf target = ScreenToWorld(target_px);
+    double distance = std::sqrt((target.x - source.x) * (target.x - source.x)
+                              + (target.y - source.y) * (target.y - source.y));
+
+    if(route == UiGraphRouteStyle::Straight) {
+        double tolerance = max(2.0 / max(zoom_, 1e-9),
+                               min(8.0 / max(zoom_, 1e-9), distance * 0.04));
+        if(DistanceToSegment(next, source, target) <= tolerance) {
+            Pointf ab = target - source;
+            double len2 = ab.x * ab.x + ab.y * ab.y;
+            if(len2 > 1e-9) {
+                double t = ((next.x - source.x) * ab.x + (next.y - source.y) * ab.y) / len2;
+                t = minmax(t, 0.0, 1.0);
+                next = source + ab * t;
+            }
+        }
+        return next;
+    }
+
+    if(route == UiGraphRouteStyle::Bezier) {
+        // Keep the editable middle point inside the two useful endpoint
+        // half-planes whenever the ports face one another. This prevents a
+        // midpoint dragged behind a port from forcing the cubic to fold back
+        // through its own endpoint tangent.
+        Pointf source_dir = SideVector(source_side);
+        Pointf target_dir = SideVector(target_side);
+        auto dot = [](Pointf a, Pointf b) { return a.x * b.x + a.y * b.y; };
+        double margin = min(2.0 / max(zoom_, 1e-9), max(0.0, distance * 0.20));
+        if(dot(target - source, source_dir) > margin) {
+            double forward = dot(next - source, source_dir);
+            if(forward < margin)
+                next += source_dir * (margin - forward);
+        }
+        if(dot(source - target, target_dir) > margin) {
+            double forward = dot(next - target, target_dir);
+            if(forward < margin)
+                next += target_dir * (margin - forward);
+        }
+        return next;
+    }
+
+    if(route == UiGraphRouteStyle::Orthogonal) {
+        bool source_horizontal = source_side == UiGraphPortSide::Left ||
+                                 source_side == UiGraphPortSide::Right;
+        bool target_horizontal = target_side == UiGraphPortSide::Left ||
+                                 target_side == UiGraphPortSide::Right;
+        // The current one-handle orthogonal contract is a corridor editor for
+        // equal-orientation endpoints. Mixed orientation already has a unique
+        // elbow and does not gain a stable degree of freedom from one midpoint.
+        if(source_horizontal != target_horizontal)
+            return previous;
+
+        Pointf source_screen(source_px.x, source_px.y);
+        Pointf target_screen(target_px.x, target_px.y);
+        double lead = max(0.0, edge_style.orthogonal_lead * zoom_);
+        Pointf a = source_screen + SideVector(source_side) * lead;
+        Pointf b = target_screen + SideVector(target_side) * lead;
+        Pointf middle((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+        Point candidate_px = WorldToScreen(next);
+        Point previous_px = WorldToScreen(previous);
+        double dx = abs(candidate_px.x - middle.x);
+        double dy = abs(candidate_px.y - middle.y);
+        const double lock_epsilon = 1.5;
+        const double hysteresis = 6.0;
+        bool previous_x_control = abs(previous_px.y - middle.y) <= lock_epsilon;
+        bool previous_y_control = abs(previous_px.x - middle.x) <= lock_epsilon;
+        bool x_control;
+        if(previous_x_control && dx + hysteresis >= dy)
+            x_control = true;
+        else if(previous_y_control && dy + hysteresis >= dx)
+            x_control = false;
+        else
+            x_control = dx >= dy;
+
+        Point canonical = candidate_px;
+        if(x_control)
+            canonical.y = fround(middle.y);
+        else
+            canonical.x = fround(middle.x);
+        return ScreenToWorld(canonical);
+    }
+
+    return next;
+}
+
 void UiNodeGraph::BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge_ref)
 {
     const UiGraphEdge* edge = model_ ? model_->FindEdge(edge_ref) : nullptr;
@@ -376,6 +472,19 @@ void UiNodeGraph::BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge_ref)
     if(route == UiGraphRouteStyle::Custom)
         return;
 
+    if(route == UiGraphRouteStyle::Orthogonal) {
+        UiGraphPortSide source_side = UiGraphPortSide::Right;
+        UiGraphPortSide target_side = UiGraphPortSide::Left;
+        GetPortAnchor(edge->source, &source_side);
+        GetPortAnchor(edge->target, &target_side);
+        bool source_horizontal = source_side == UiGraphPortSide::Left ||
+                                 source_side == UiGraphPortSide::Right;
+        bool target_horizontal = target_side == UiGraphPortSide::Left ||
+                                 target_side == UiGraphPortSide::Right;
+        if(source_horizontal != target_horizontal)
+            return;
+    }
+
     interaction_ = InteractionMode::EdgeRouteDrag;
     route_edge_ = edge_ref;
     route_before_waypoints_ = clone(edge->waypoints);
@@ -386,6 +495,16 @@ void UiNodeGraph::BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge_ref)
     }
     else
         route_waypoint_index_ = route_preview_waypoints_.GetCount() / 2;
+
+    if(route_preview_waypoints_.GetCount() == 1) {
+        Pointf previous = route_preview_waypoints_[0];
+        route_preview_waypoints_[0] = NormalizeRouteDragPoint(*edge, route, style,
+                                                              previous, previous);
+        if(abs(previous.x - route_preview_waypoints_[0].x) > 1e-9 ||
+           abs(previous.y - route_preview_waypoints_[0].y) > 1e-9)
+            RebuildEdge(edge_ref);
+    }
+
     press_point_ = last_point_ = p;
     AcquireInteractionCapture();
 }
@@ -396,6 +515,12 @@ void UiNodeGraph::UpdateEdgeRouteDrag(Point p)
        route_waypoint_index_ < 0 || route_waypoint_index_ >= route_preview_waypoints_.GetCount())
         return;
 
+    const UiGraphEdge* edge = model_ ? model_->FindEdge(route_edge_) : nullptr;
+    if(!edge)
+        return;
+    UiGraphEdgeStyle edge_style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
+    UiGraphRouteStyle route = edge->route == UiGraphRouteStyle::Inherit ? edge_style.route : edge->route;
+
     Pointf next = ScreenToWorld(p);
     const Style& style = GetStyle();
     if(style.snap_to_grid && style.grid_size > 0) {
@@ -404,6 +529,8 @@ void UiNodeGraph::UpdateEdgeRouteDrag(Point p)
         next.y = std::round(next.y / grid) * grid;
     }
     Pointf old = route_preview_waypoints_[route_waypoint_index_];
+    if(route_preview_waypoints_.GetCount() == 1)
+        next = NormalizeRouteDragPoint(*edge, route, edge_style, next, old);
     last_point_ = p;
     if(abs(old.x - next.x) <= 1e-9 && abs(old.y - next.y) <= 1e-9)
         return;

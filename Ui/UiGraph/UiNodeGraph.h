@@ -137,7 +137,11 @@ struct UiGraphEdgeStyle : Moveable<UiGraphEdgeStyle> {
     UiGraphArrowStyle arrow = UiGraphArrowStyle::Triangle;
     Font label_font = StdFont();
     double bezier_tension = 0.42;
-    double orthogonal_lead = 32.0;
+    // Zero is the safe stock lead. The midpoint routing itself already leaves a
+    // port orthogonally; a fixed positive stub can cross its peer when compact
+    // nodes are close together. Hosts that need a deliberate stand-off can opt
+    // into a positive lead through their edge style.
+    double orthogonal_lead = 0.0;
     double orthogonal_radius = 8.0;
     double dash_length = 9.0;
     double dash_gap = 6.0;
@@ -392,7 +396,7 @@ public:
                                            const Vector<Pointf>& waypoints = Vector<Pointf>());
     static Vector<Pointf> BuildOrthogonalRoute(Pointf source, UiGraphPortSide source_side,
                                                Pointf target, UiGraphPortSide target_side,
-                                               double lead = 32.0,
+                                               double lead = 0.0,
                                                double corner_radius = 8.0,
                                                const Vector<Pointf>& waypoints = Vector<Pointf>());
 
@@ -632,6 +636,11 @@ private:
     void UpdateNodeDrag(Point p);
     void CommitNodeDrag();
     void CancelNodeDrag();
+    Pointf NormalizeRouteDragPoint(const UiGraphEdge& edge,
+                                   UiGraphRouteStyle route,
+                                   const UiGraphEdgeStyle& edge_style,
+                                   Pointf next,
+                                   Pointf previous) const;
     void BeginEdgeRouteDrag(Point p, UiGraphEdgeRef edge);
     void UpdateEdgeRouteDrag(Point p);
     void CommitEdgeRouteDrag();
