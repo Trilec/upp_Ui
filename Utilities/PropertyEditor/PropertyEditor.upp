@@ -8,6 +8,8 @@ uses
 file
 	PropertyValueEditors.h,
 	PropertyValueEditors.cpp,
+	PropertyWorkingRangeEditors.h,
+	PropertyWorkingRangeEditors.cpp,
 	PropertyV1Editors.cpp,
 	PropertySemanticEditorsInternal.h,
 	PropertySemanticEditors.cpp,
