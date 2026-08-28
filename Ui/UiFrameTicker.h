@@ -12,8 +12,8 @@ namespace Upp {
 //
 // Start() is intentionally idempotent while running. Stop()/Restart() bump a
 // generation so a stale callback cannot re-arm an obsolete run. The Pte/Ptr
-// guard also makes Tick_ safe if the owning control destroys this member from
-// inside the frame callback.
+// guards also make scheduling safe if the owning control destroys this member
+// before or from inside the frame callback.
 class UiFrameTicker : public Pte<UiFrameTicker> {
 public:
     UiFrameTicker() = default;
@@ -57,7 +57,11 @@ public:
 private:
     void Arm_(uint64 generation)
     {
-        timer_.KillSet(interval_ms_, callback1(this, &UiFrameTicker::Tick_, generation));
+        Ptr<UiFrameTicker> self = this;
+        timer_.KillSet(interval_ms_, [self, generation] {
+            if(self)
+                self->Tick_(generation);
+        });
     }
 
     void Tick_(uint64 generation)
@@ -76,11 +80,11 @@ private:
             Arm_(generation);
     }
 
-    TimeCallback      timer_;
-    Function<void()>  callback_;
-    int               interval_ms_ = 16;
-    uint64            generation_ = 0;
-    bool              running_ = false;
+    TimeCallback     timer_;
+    Function<void()> callback_;
+    int              interval_ms_ = 16;
+    uint64           generation_ = 0;
+    bool             running_ = false;
 };
 
 } // namespace Upp
