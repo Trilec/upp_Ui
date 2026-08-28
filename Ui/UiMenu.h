@@ -99,6 +99,7 @@ public:
     static const Style& StyleDefault();
 
     UiMenu();
+    virtual ~UiMenu();
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
@@ -269,7 +270,7 @@ private:
     One<UiItemRender> item_render_;
     bool custom_item_render_ = false;
 
-    static const int VERIFY_SESSION_CB = 0;
+    TimeCallback session_verify_tc_;
 
     bool menu_bar_mode_ = false;
     bool session_open_ = false;
