@@ -88,6 +88,8 @@ file
 	UiMaskEdit.cpp,
 	UiProgressBar.h,
 	UiProgressBar.cpp,
+	UiProgressRing.h,
+	UiProgressRing.cpp,
 	UiSlider.h,
 	UiSlider.cpp,
 	UiRangeSlider.h,

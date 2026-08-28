@@ -33,6 +33,7 @@
     - 2026-08: exposed the reusable UiGraphModel / UiNodeGraph subsystem.
     - 2026-08: added UiGallery and shared high-scale model-view geometry helpers.
     - 2026-08: added shared UiItemRender presentation infrastructure.
+    - 2026-08: added UiProgressRing as the circular progress companion.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -80,6 +81,7 @@
 #include <Ui/UiMultiEdit.h>
 #include <Ui/UiMaskEdit.h>
 #include <Ui/UiProgressBar.h>
+#include <Ui/UiProgressRing.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
 #include <Ui/UiRangeSliderEdit.h>
