@@ -53,6 +53,17 @@ repository, and it is intended to be copyable into another U++ project.
 - Use `Ptr<>` guards for callbacks that might outlive the call stack.
 - Stop timers and animations on hide/remove/destroy. Composite constructors need
   regression coverage for direct construction and destruction.
+- Do **not** use arbitrary integers with `Ctrl::SetTimeCallback()` /
+  `Ctrl::KillTimeCallback()`. Ctrl timer ids are internal byte-offset identifiers,
+  not application-defined handles; large or invented ids can assert in Debug and
+  can address invalid Ctrl state.
+- Prefer an owned `TimeCallback` member for delayed or one-shot work. Use
+  `KillSet()` when replacing a pending callback and `Kill()` during cancellation
+  or teardown.
+- Repeating custom frame clocks should own their timer state. In `Ui`, use
+  `UiFrameTicker` for one-callback-at-a-time animation/frame stepping instead of
+  repeatedly scheduling raw Ctrl timer ids. The shared `Animation` package is
+  preferred where its interpolation/lifecycle model already fits the control.
 
 ## Callbacks and `When...` conventions
 
