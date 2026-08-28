@@ -394,14 +394,15 @@ Pointf UiNodeGraph::NormalizeRouteDragPoint(const UiGraphEdge& edge,
     }
 
     if(route == UiGraphRouteStyle::Bezier) {
-        // Keep the editable middle point inside the two useful endpoint
-        // half-planes whenever the ports face one another. This prevents a
-        // midpoint dragged behind a port from forcing the cubic to fold back
-        // through its own endpoint tangent.
+        // The authored two-half cubic keeps minimum endpoint/midpoint controls.
+        // Reserve enough *screen-space* room for those controls before the
+        // waypoint reaches a facing port; otherwise the controls can cross and
+        // the visible curve briefly folds even though the waypoint itself is
+        // technically still between the endpoints.
         Pointf source_dir = SideVector(source_side);
         Pointf target_dir = SideVector(target_side);
         auto dot = [](Pointf a, Pointf b) { return a.x * b.x + a.y * b.y; };
-        double margin = min(2.0 / max(zoom_, 1e-9), max(0.0, distance * 0.20));
+        double margin = min(16.0 / max(zoom_, 1e-9), max(0.0, distance * 0.20));
         if(dot(target - source, source_dir) > margin) {
             double forward = dot(next - source, source_dir);
             if(forward < margin)
