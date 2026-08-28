@@ -423,31 +423,26 @@ void UiProgressBar::UpdateAnimation()
 
 void UiProgressBar::StartAnimation()
 {
-    if(animation_running_)
+    if(animation_ticker_.IsRunning())
         return;
-    animation_running_ = true;
     animation_start_ms_ = msecs();
-    SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
+    animation_ticker_.Start(16, THISBACK(AnimationStep));
 }
 
 void UiProgressBar::StopAnimation()
 {
-    if(!animation_running_)
-        return;
-    animation_running_ = false;
-    KillTimeCallback(ANIM_CB_ID);
+    animation_ticker_.Stop();
 }
 
 void UiProgressBar::AnimationStep()
 {
-    if(!animation_running_)
+    if(!animation_ticker_.IsRunning())
         return;
     if(!IsIndeterminate() || !IsShown() || !IsOpen()) {
         StopAnimation();
         return;
     }
     Refresh();
-    SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
 }
 
 }
