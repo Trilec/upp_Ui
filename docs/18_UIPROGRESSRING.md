@@ -48,8 +48,18 @@ arbitrary-ratio behaviour.
 The ring is a transparent control rendered into a bounded alpha `ImageBuffer`
 using anti-aliased `BufferPainter`, then composited over its parent. The buffer
 is only the centered square ring viewport, not the full rectangular allocation.
-Solid progress is a single stroked arc. Gradient progress uses bounded short arc
-segments with interpolated colour, capped at 96 segments.
+
+Both solid and gradient progress use one exact Painter arc path. Solid progress
+strokes that path directly. Gradient progress builds a small angular colour
+brush for the same viewport and uses Painter's image-brush stroke support, so
+colour follows the sweep continuously without dividing the geometry into short
+segments. Full-round caps use Painter's native `LINECAP_ROUND`; zero cap radius
+uses a butt cap. A full 100% sweep is painted as a closed circle so there is no
+start/end cap seam.
+
+The angular brush is generated only when gradient mode is active. This keeps the
+ordinary solid path minimal while avoiding the visible radial seams and cap
+artifacts produced by the retired segmented-gradient implementation.
 
 ## Validation
 
@@ -75,3 +85,7 @@ The demo exposes value/total, determinate/indeterminate behavior, opening
 animation, independent track/progress/text colours, progress gradient,
 thickness, cap radius, inset, font face/size/style, and allocated rectangle
 width/height through the production `PropertyEditor`.
+
+For rendering acceptance, explicitly compare solid and gradient modes at low,
+mid and high percentages. The progress body must remain a continuous smooth arc,
+with no visible segment spokes, radial wedges, holes, or detached cap shapes.

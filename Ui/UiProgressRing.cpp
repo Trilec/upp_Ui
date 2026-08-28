@@ -42,6 +42,47 @@ Pointf UiRingArcPoint(Pointf center, double radius, double angle)
                   center.y + sin(angle) * radius);
 }
 
+Image UiRingAngularGradientBrush(Size size, Pointf center,
+                                 double start_angle, double sweep_angle,
+                                 Color start, Color end)
+{
+    ImageBuffer ib(max(size.cx, 1), max(size.cy, 1));
+    const double tau = 2.0 * M_PI;
+    const double direction = sweep_angle < 0.0 ? -1.0 : 1.0;
+    const double sweep = min(std::fabs(sweep_angle), tau);
+
+    for(int y = 0; y < ib.GetHeight(); y++) {
+        RGBA *row = ib[y];
+        for(int x = 0; x < ib.GetWidth(); x++) {
+            double angle = std::atan2((y + 0.5) - center.y,
+                                      (x + 0.5) - center.x);
+            double phase = std::fmod(direction * (angle - start_angle), tau);
+            if(phase < 0.0)
+                phase += tau;
+
+            double q = 0.0;
+            if(sweep >= tau - 0.000001)
+                q = phase / tau;
+            else if(sweep > 0.000001) {
+                if(phase <= sweep)
+                    q = phase / sweep;
+                else {
+                    double distance_to_start = min(phase, tau - phase);
+                    double end_delta = std::fabs(phase - sweep);
+                    double distance_to_end = min(end_delta, tau - end_delta);
+                    q = distance_to_start <= distance_to_end ? 0.0 : 1.0;
+                }
+            }
+
+            Color c = Blend(start, end,
+                            (int)std::round(UiRingClamp01(q) * 255.0));
+            row[x] = c;
+            row[x].a = 255;
+        }
+    }
+    return ib;
+}
+
 } // namespace
 
 const UiProgressRing::Style& UiProgressRing::StyleDefault()
@@ -532,40 +573,54 @@ void UiProgressRing::PaintProgressArc(BufferPainter& p, const Pointf& center, do
     if(radius <= 0.0 || thickness <= 0 || std::fabs(sweep_angle) < 0.000001)
         return;
 
+    const double tau = 2.0 * M_PI;
     const bool use_gradient = gradient && start != end;
-    if(!use_gradient) {
-        Pointf first = UiRingArcPoint(center, radius, start_angle);
-        p.Begin();
-        p.Move(first).Arc(center, radius, start_angle, sweep_angle);
-        p.LineCap(LINECAP_BUTT).Stroke((double)thickness, start);
-        p.End();
-    }
-    else {
-        double arc_length = std::fabs(sweep_angle) * max(1.0, radius);
-        int segments = UiRingClampInt((int)std::ceil(arc_length / 3.0), 8, 96);
-        for(int i = 0; i < segments; i++) {
-            double q0 = (double)i / (double)segments;
-            double q1 = (double)(i + 1) / (double)segments;
-            double a0 = start_angle + sweep_angle * q0;
-            double a1 = start_angle + sweep_angle * q1;
-            double segment_sweep = a1 - a0;
-            double overlap = segment_sweep * 0.08;
-            Color c = Blend(start, end, (int)std::round(((q0 + q1) * 0.5) * 255.0));
-            Pointf first = UiRingArcPoint(center, radius, a0);
-            p.Begin();
-            p.Move(first).Arc(center, radius, a0, segment_sweep + overlap);
-            p.LineCap(LINECAP_BUTT).Stroke((double)thickness, c);
-            p.End();
-        }
+    Image gradient_brush;
+    if(use_gradient) {
+        Size brush_size(max(1, (int)std::round(center.x * 2.0)),
+                        max(1, (int)std::round(center.y * 2.0)));
+        gradient_brush = UiRingAngularGradientBrush(brush_size, center,
+                                                    start_angle, sweep_angle,
+                                                    start, end);
     }
 
-    if(cap_radius > 0) {
-        double cr = min((double)cap_radius, thickness / 2.0);
-        Pointf first = UiRingArcPoint(center, radius, start_angle);
+    auto StrokePath = [&] {
+        if(use_gradient)
+            p.Stroke((double)thickness, gradient_brush, Xform2D::Identity());
+        else
+            p.Stroke((double)thickness, start);
+    };
+
+    if(std::fabs(sweep_angle) >= tau - 0.000001) {
+        p.Begin();
+        p.Circle(center, radius);
+        StrokePath();
+        p.End();
+        return;
+    }
+
+    const double half_width = thickness / 2.0;
+    const bool native_round_cap = cap_radius > 0 && cap_radius >= half_width - 0.000001;
+    Pointf first = UiRingArcPoint(center, radius, start_angle);
+
+    p.Begin();
+    p.Move(first).Arc(center, radius, start_angle, sweep_angle);
+    p.LineCap(native_round_cap ? LINECAP_ROUND : LINECAP_BUTT);
+    StrokePath();
+    p.End();
+
+    if(cap_radius > 0 && !native_round_cap) {
+        double cr = min((double)cap_radius, half_width);
         Pointf last = UiRingArcPoint(center, radius, start_angle + sweep_angle);
         p.Begin();
-        p.Circle(first, cr).Fill(start);
-        p.Circle(last, cr).Fill(use_gradient ? end : start);
+        if(use_gradient) {
+            p.Circle(first, cr).Fill(gradient_brush, Xform2D::Identity());
+            p.Circle(last, cr).Fill(gradient_brush, Xform2D::Identity());
+        }
+        else {
+            p.Circle(first, cr).Fill(start);
+            p.Circle(last, cr).Fill(start);
+        }
         p.End();
     }
 }
