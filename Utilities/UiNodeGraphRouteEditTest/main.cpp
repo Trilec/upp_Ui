@@ -227,10 +227,16 @@ CONSOLE_APP_MAIN
     const UiGraphEdge& clamped_bezier = model.GetEdge(edge);
     double source_boundary = model.GetNode(a).position.x + model.GetNode(a).size.cx;
     double target_boundary = model.GetNode(b).position.x;
+    double route_y = model.GetNode(a).position.y + model.GetNode(a).size.cy * 0.5;
+    Vector<Pointf> extreme_bezier = UiNodeGraph::BuildBezierRoute(
+        Pointf(source_boundary, route_y), UiGraphPortSide::Right,
+        Pointf(target_boundary, route_y), UiGraphPortSide::Left,
+        0.42, 24, clamped_bezier.waypoints);
     t.Expect(clamped_bezier.waypoints.GetCount() == 1
-             && clamped_bezier.waypoints[0].x > source_boundary
-             && clamped_bezier.waypoints[0].x < target_boundary,
-             "extreme Bezier midpoint drag stays inside facing endpoint half-planes");
+             && clamped_bezier.waypoints[0].x >= source_boundary
+             && clamped_bezier.waypoints[0].x <= target_boundary
+             && MonotonicX(extreme_bezier),
+             "extreme Bezier midpoint drag does not fold or backtrack across facing endpoints");
 
     graph.SetZoom(0.50, Point(490, 260));
     t.Expect(graph.GetEdgeRouteHandleRect(edge).IsEmpty(),

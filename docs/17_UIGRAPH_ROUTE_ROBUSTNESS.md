@@ -16,17 +16,19 @@ The semantic contract is unchanged: `UiGraphModel` remains authoritative graph d
 
 ## Regression evidence
 
-`Utilities/UiNodeGraphRouteEditTest` now covers 23 deterministic checks, including:
+`Utilities/UiNodeGraphRouteEditTest` now covers 24 deterministic checks, including:
 
 - compact facing orthogonal endpoints do not backtrack;
 - a canonical orthogonal midpoint lies on its route;
 - request-first route editing remains intact;
 - committed orthogonal midpoint geometry remains on the visible corridor;
-- an extreme Bezier drag stays inside facing endpoint half-planes;
+- an extreme Bezier drag stays at or beyond the facing body planes and the generated route remains monotonic rather than folding/backtracking;
 - route-edit LOD and renderer timing instrumentation remain intact.
+
+The Bezier regression deliberately permits equality with the authored node body plane. The production clamp is based on the actual shape-aware port anchor plus a small screen-space stand-off; with framed nodes that valid port-forward position can coincide with the outer authored bounds. The visual invariant is therefore no endpoint fold/backtracking, not an arbitrary extra epsilon outside the node rectangle.
 
 Expected summary:
 
-`UINODEGRAPH_ROUTE_EDIT_SUMMARY checks=23 failed=0`
+`UINODEGRAPH_ROUTE_EDIT_SUMMARY checks=24 failed=0`
 
 Windows CLANGx64 Debug/Release validation is still required after publication.
