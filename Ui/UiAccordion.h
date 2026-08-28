@@ -33,11 +33,14 @@
         handle support, side placement, and custom drag glyphs.
       - 2026-04: stabilized section body measurement by preferring explicit
         content sizing over naive child GetMinSize() fallback where possible.
+      - 2026-08: moved section animation scheduling to UiFrameTicker so a
+        single owned frame source drives all concurrently animating sections.
   */
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiFrameTicker.h>
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiPanel.h>
 
@@ -282,7 +285,7 @@ private:
     Point drag_start_screen_   = Point(0, 0);
     StaticRect drag_marker_;
 
-    enum { ANIM_CB_ID = 1 };
+    UiFrameTicker animation_ticker_;
 };
 
 }
