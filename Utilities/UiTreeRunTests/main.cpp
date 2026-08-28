@@ -48,7 +48,8 @@ public:
 
     virtual ~UiTreeRunTestsWindow()
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
+        lazy_load_tc_.Kill();
     }
 
     virtual void Layout() override
@@ -108,8 +109,6 @@ private:
         UiCheckBox box;
     };
 
-    static const int RUN_CB_ID = 8201;
-
     void InitChecks()
     {
         static const char* names[] = {
@@ -152,7 +151,8 @@ private:
 
     void ResetHarness()
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
+        lazy_load_tc_.Kill();
         running_ = false;
         phase_ = PHASE_IDLE;
         op_count_ = 0;
@@ -190,7 +190,9 @@ private:
 
     void StopTests(const String& why)
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
+        lazy_load_tc_.Kill();
+        lazy_pending_.Clear();
         running_ = false;
         LogLine(why);
         SyncStatus();
@@ -200,7 +202,7 @@ private:
     {
         if(!running_)
             return;
-        SetTimeCallback(10, [=] { StepTests(); }, RUN_CB_ID);
+        run_tc_.KillSet(10, [=] { StepTests(); });
     }
 
     void StepTests()
@@ -454,7 +456,14 @@ private:
         if(!model_.IsValid(node) || lazy_pending_.Find(node.id) >= 0)
             return;
         lazy_pending_.FindAdd(node.id);
-        SetTimeCallback(40, [=] { FinishLazyLoad(node); }, 9000 + node.id);
+        lazy_load_tc_.KillSet(40, [=] {
+            Vector<int> pending;
+            pending.Reserve(lazy_pending_.GetCount());
+            for(int i = 0; i < lazy_pending_.GetCount(); i++)
+                pending.Add(lazy_pending_[i]);
+            for(int i = 0; i < pending.GetCount(); i++)
+                FinishLazyLoad(UiTreeNodeRef{pending[i]});
+        });
         LogLine(Format("Lazy request node=%d", node.id));
     }
 
@@ -780,6 +789,8 @@ private:
     UiButton reset_;
     UiMultiEdit log_;
     Array<CheckItem> checks_;
+    TimeCallback run_tc_;
+    TimeCallback lazy_load_tc_;
     std::mt19937 rng_{20260317u};
     bool running_ = false;
     Phase phase_ = PHASE_IDLE;
