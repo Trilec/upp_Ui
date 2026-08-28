@@ -164,7 +164,7 @@ public:
     bool     IsAnimationRunning() const { return animation_running_; }
 
 private:
-    enum { ANIM_CB_ID = 0x7052494E };
+    enum { ANIM_CB_ID = 1 };
     enum AnimationMode : byte {
         ANIM_NONE,
         ANIM_INTRO,
