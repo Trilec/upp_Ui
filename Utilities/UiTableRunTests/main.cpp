@@ -46,7 +46,7 @@ public:
 
     virtual ~UiTableRunTestsWindow()
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
     }
 
     virtual void Layout() override
@@ -103,8 +103,6 @@ private:
         UiCheckBox box;
     };
 
-    static const int RUN_CB_ID = 8231;
-
     void InitChecks()
     {
         static const char* names[] = {
@@ -131,7 +129,7 @@ private:
 
     void ResetHarness()
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
         running_ = false;
         phase_ = PHASE_IDLE;
         op_count_ = 0;
@@ -168,7 +166,7 @@ private:
 
     void StopTests(const String& why)
     {
-        KillTimeCallback(RUN_CB_ID);
+        run_tc_.Kill();
         running_ = false;
         LogLine(why);
         SyncStatus();
@@ -178,7 +176,7 @@ private:
     {
         if(!running_)
             return;
-        SetTimeCallback(10, [=] { StepTests(); }, RUN_CB_ID);
+        run_tc_.KillSet(10, [=] { StepTests(); });
     }
 
     void StepTests()
@@ -440,6 +438,7 @@ private:
     UiButton reset_;
     UiMultiEdit log_;
     Array<CheckItem> checks_;
+    TimeCallback run_tc_;
     std::mt19937 rng_{20260323u};
     bool running_ = false;
     Phase phase_ = PHASE_IDLE;
