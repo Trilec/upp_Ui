@@ -29,12 +29,15 @@
 
     Changelog
     - 2026-07: introduced as the runtime progress bar control.
+    - 2026-08: moved the indeterminate frame clock to owned UiFrameTicker
+      scheduling; Ctrl integer callback ids are not arbitrary identifiers.
 */
 
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiFrameTicker.h>
 
 namespace Upp {
 
@@ -143,11 +146,9 @@ public:
     virtual void State(int reason) override;
 
     Geometry GetGeometry(Size size) const;
-    bool IsAnimationRunning() const { return animation_running_; }
+    bool IsAnimationRunning() const { return animation_ticker_.IsRunning(); }
 
 private:
-    enum { ANIM_CB_ID = 0x70524F47 };
-
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
@@ -176,7 +177,7 @@ private:
     String custom_text_;
     bool has_custom_text_ = false;
 
-    bool animation_running_ = false;
+    UiFrameTicker animation_ticker_;
     dword animation_start_ms_ = 0;
 };
 
