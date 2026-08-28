@@ -326,6 +326,8 @@ void UiAccordion::OnStyleChanged()
     else
         BackPaint();
 
+    animation_ticker_.Stop();
+
     for(int i = 0; i < sections_.GetCount(); i++)
         ApplySectionStyle(sections_[i], i);
 
@@ -1016,7 +1018,7 @@ void UiAccordion::ReindexSections()
 
 void UiAccordion::StopAllAnimations()
 {
-    KillTimeCallback(ANIM_CB_ID);
+    animation_ticker_.Stop();
     for(int i = 0; i < sections_.GetCount(); i++) {
         Section& s = sections_[i];
         s.animating = false;
@@ -1060,12 +1062,11 @@ void UiAccordion::StartSectionAnimation(int i, bool opening)
     s.anim_start_ms = msecs();
     s.anim_ms = max(1, dur);
     s.animating = true;
-    SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
+    animation_ticker_.Start(16, THISBACK(AnimationStep));
 }
 
 void UiAccordion::AnimationStep()
 {
-    bool any = false;
     int now = msecs();
 
     for(int i = 0; i < sections_.GetCount(); i++) {
@@ -1073,17 +1074,16 @@ void UiAccordion::AnimationStep()
         if(!s.animating)
             continue;
 
-        any = true;
         int elapsed = now - s.anim_start_ms;
         int dur = max(1, s.anim_ms);
         if(elapsed >= dur) {
             s.current_body_cy = s.target_body_cy;
             s.animating = false;
-              if(!s.open && s.current_body_cy == 0) {
-                  s.content.Hide();
-                  s.body.Hide();
-              }
-              continue;
+            if(!s.open && s.current_body_cy == 0) {
+                s.content.Hide();
+                s.body.Hide();
+            }
+            continue;
         }
 
         int delta = s.target_body_cy - s.anim_from_cy;
@@ -1094,8 +1094,15 @@ void UiAccordion::AnimationStep()
 
     RefreshAccordionExtent(*this);
 
-    if(any)
-        SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
+    bool any = false;
+    for(int i = 0; i < sections_.GetCount(); i++) {
+        if(sections_[i].animating) {
+            any = true;
+            break;
+        }
+    }
+    if(!any)
+        animation_ticker_.Stop();
 }
 
 void UiAccordion::NormalizePolicyAfterBulkChange()
@@ -1157,8 +1164,10 @@ void UiAccordion::NormalizePolicyAfterBulkChange()
         any_anim = any_anim || s.animating;
     }
 
-    if(!any_anim)
-        KillTimeCallback(ANIM_CB_ID);
+    if(any_anim)
+        animation_ticker_.Start(16, THISBACK(AnimationStep));
+    else
+        animation_ticker_.Stop();
 }
 
 int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
@@ -1534,7 +1543,6 @@ void UiAccordion::PaintRuleLine(Draw& w, int x, int y, int cx, int thickness, Ui
 }
 
 }
-
 
 
 
