@@ -29,11 +29,16 @@
     - SetIndeterminate(true) enables the animated unknown-total state.
     - SetProgressGradient(start, end) enables an along-sweep progress gradient.
     - Percentage text is shown by default; SetText() replaces it.
+
+    Changelog
+    - 2026-08: moved intro/indeterminate frame scheduling to UiFrameTicker;
+      Ctrl integer callback ids are byte offsets, not arbitrary identifiers.
 */
 
 #include <CtrlCore/CtrlCore.h>
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
+#include <Ui/UiFrameTicker.h>
 
 namespace Upp {
 
@@ -161,10 +166,9 @@ public:
     virtual void State(int reason) override;
 
     Geometry GetGeometry(Size size) const;
-    bool     IsAnimationRunning() const { return animation_running_; }
+    bool     IsAnimationRunning() const { return animation_ticker_.IsRunning(); }
 
 private:
-    enum { ANIM_CB_ID = 1 };
     enum AnimationMode : byte {
         ANIM_NONE,
         ANIM_INTRO,
@@ -203,7 +207,7 @@ private:
     bool has_custom_text_ = false;
 
     bool intro_complete_ = false;
-    bool animation_running_ = false;
+    UiFrameTicker animation_ticker_;
     AnimationMode animation_mode_ = ANIM_NONE;
     dword animation_start_ms_ = 0;
 };
