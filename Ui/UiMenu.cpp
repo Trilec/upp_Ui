@@ -431,6 +431,11 @@ UiMenu::UiMenu()
     ConfigureDefaultItemRender();
 }
 
+UiMenu::~UiMenu()
+{
+    session_verify_tc_.Kill();
+}
+
 UiMenu::Style& UiMenu::StyleEdit()
 {
     if(!has_custom_style_) {
@@ -718,7 +723,7 @@ UiMenu& UiMenu::CloseMenu()
 
 void UiMenu::BeginSession()
 {
-    KillTimeCallback(VERIFY_SESSION_CB);
+    session_verify_tc_.Kill();
     session_verifying_ = false;
     if(!session_open_) {
         session_open_ = true;
@@ -728,7 +733,7 @@ void UiMenu::BeginSession()
 
 void UiMenu::EndSession(bool notify_close)
 {
-    KillTimeCallback(VERIFY_SESSION_CB);
+    session_verify_tc_.Kill();
     session_verifying_ = false;
     bool was_open = session_open_ || popup_levels_.GetCount() > 0;
     session_open_ = false;
@@ -743,8 +748,7 @@ void UiMenu::ScheduleSessionVerify()
     if(closing_all_ || session_switching_)
         return;
     session_verifying_ = true;
-    KillTimeCallback(VERIFY_SESSION_CB);
-    SetTimeCallback(0, [=] { VerifySessionState(); }, VERIFY_SESSION_CB);
+    session_verify_tc_.KillSet(0, THISBACK(VerifySessionState));
 }
 
 void UiMenu::VerifySessionState()
