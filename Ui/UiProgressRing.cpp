@@ -280,7 +280,7 @@ int UiProgressRing::GetPercent() const
 double UiProgressRing::GetDisplayRatio() const
 {
     double target = GetRatio();
-    if(animation_mode_ != ANIM_INTRO || !animation_running_)
+    if(animation_mode_ != ANIM_INTRO || !animation_ticker_.IsRunning())
         return target;
 
     int duration = max(1, GetEffectiveStyle().intro_duration_ms);
@@ -537,7 +537,7 @@ UiProgressRing::Geometry UiProgressRing::BuildGeometry(Size size) const
 
     if(g.indeterminate) {
         double phase = 0.0;
-        if(animation_mode_ == ANIM_INDETERMINATE && animation_running_) {
+        if(animation_mode_ == ANIM_INDETERMINATE && animation_ticker_.IsRunning()) {
             int duration = max(120, style.indeterminate_duration_ms);
             phase = std::fmod((double)(msecs() - animation_start_ms_) / (double)duration, 1.0);
         }
@@ -708,27 +708,24 @@ void UiProgressRing::UpdateAnimation()
 
 void UiProgressRing::StartAnimation(AnimationMode mode)
 {
-    if(animation_running_ && animation_mode_ == mode)
+    if(animation_ticker_.IsRunning() && animation_mode_ == mode)
         return;
 
     StopAnimation();
     animation_mode_ = mode;
-    animation_running_ = true;
     animation_start_ms_ = msecs();
-    SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
+    animation_ticker_.Start(16, THISBACK(AnimationStep));
 }
 
 void UiProgressRing::StopAnimation()
 {
-    if(animation_running_)
-        KillTimeCallback(ANIM_CB_ID);
-    animation_running_ = false;
+    animation_ticker_.Stop();
     animation_mode_ = ANIM_NONE;
 }
 
 void UiProgressRing::AnimationStep()
 {
-    if(!animation_running_)
+    if(!animation_ticker_.IsRunning())
         return;
     if(!IsShown() || !IsOpen()) {
         UpdateAnimation();
@@ -756,7 +753,6 @@ void UiProgressRing::AnimationStep()
     }
 
     Refresh();
-    SetTimeCallback(16, THISBACK(AnimationStep), ANIM_CB_ID);
 }
 
 } // namespace Upp
