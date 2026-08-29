@@ -1,0 +1,14 @@
+description "Visual direct cached and batched Ui rendering benchmark";
+
+uses
+	Core,
+	Draw,
+	Painter,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
