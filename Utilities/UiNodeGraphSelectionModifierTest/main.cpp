@@ -102,6 +102,38 @@ CONSOLE_APP_MAIN
     t.Expect(!graph.IsNodeSelected(n2) && !graph.IsNodeSelected(n3),
              "replace marquee does not retain stale additive selection state");
 
+    // Editable point gestures defer replace-selection until mouse-up so the same
+    // plain press can still become a group drag. A stationary release collapses
+    // to the clicked member; a real drag preserves the complete selection.
+    graph.SetEditable(true);
+    graph.SelectNode(n1, false);
+    graph.SelectNode(n2, true);
+    graph.LeftDown(p1, 0);
+    t.Expect(graph.GetSelectedNodes().GetCount() == 2
+             && graph.IsNodeSelected(n1) && graph.IsNodeSelected(n2),
+             "plain mouse-down on a selected member preserves the group for drag");
+    graph.LeftUp(p1, 0);
+    t.Expect(graph.GetSelectedNodes().GetCount() == 1 && graph.IsNodeSelected(n1),
+             "plain click-release on a selected member collapses to that node");
+
+    graph.SelectNode(n1, false);
+    graph.SelectNode(n2, true);
+    Pointf before1 = model.GetNode(n1).position;
+    Pointf before2 = model.GetNode(n2).position;
+    Point drag_to = p1 + Point(20, 12);
+    graph.LeftDown(p1, 0);
+    graph.MouseMove(drag_to, 0);
+    graph.LeftUp(drag_to, 0);
+    const UiGraphNode& moved1 = model.GetNode(n1);
+    const UiGraphNode& moved2 = model.GetNode(n2);
+    t.Expect(graph.GetSelectedNodes().GetCount() == 2
+             && graph.IsNodeSelected(n1) && graph.IsNodeSelected(n2)
+             && abs(moved1.position.x - (before1.x + 20.0)) < 1e-9
+             && abs(moved1.position.y - (before1.y + 12.0)) < 1e-9
+             && abs(moved2.position.x - (before2.x + 20.0)) < 1e-9
+             && abs(moved2.position.y - (before2.y + 12.0)) < 1e-9,
+             "plain group drag keeps selection and moves every selected node");
+
     Cout() << "\nUINODEGRAPH_SELECTION_MODIFIER_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);

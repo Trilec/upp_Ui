@@ -18,13 +18,62 @@ UiGraphPort GraphDemoPort(const String& id, const String& title,
     return port;
 }
 
+Font GraphDemoSans(int px, bool bold = false)
+{
+    Font f = SansSerifZ(DPI(px));
+    if(Font::FindFaceNameIndex("Inter") >= 0)
+        f.FaceName("Inter");
+    else if(Font::FindFaceNameIndex("Segoe UI") >= 0)
+        f.FaceName("Segoe UI");
+    if(bold)
+        f.Bold();
+    return f;
+}
+
+Font GraphDemoMono(int px, bool bold = false)
+{
+    Font f = MonospaceZ(DPI(px));
+    if(Font::FindFaceNameIndex("Fira Code") >= 0)
+        f.FaceName("Fira Code");
+    else if(Font::FindFaceNameIndex("Cascadia Code") >= 0)
+        f.FaceName("Cascadia Code");
+    else if(Font::FindFaceNameIndex("Consolas") >= 0)
+        f.FaceName("Consolas");
+    if(bold)
+        f.Bold();
+    return f;
+}
+
+String GraphDemoNodeTag(const UiGraphNode& node)
+{
+    if(!node.data.Is<ValueMap>())
+        return String();
+    ValueMap data = node.data;
+    int q = data.Find("tag");
+    return q >= 0 ? AsString(data.GetValue(q)) : String();
+}
+
+void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
+{
+    ValueMap data = node.data.Is<ValueMap>() ? ValueMap(node.data) : ValueMap();
+    if(tag.IsEmpty()) {
+        int q = data.Find("tag");
+        if(q >= 0)
+            data.Remove(q);
+    }
+    else
+        data.Set("tag", tag);
+    node.data = data;
+}
+
 UiGraphNode GraphDemoReferenceNode(const String& title,
                                    const String& subtitle,
                                    Pointf position,
                                    Sizef size,
                                    UiGraphNodeShape shape,
                                    UiGraphNodeRole role,
-                                   const String& preset)
+                                   const String& preset,
+                                   const String& tag = String())
 {
     UiGraphNode node;
     node.title = title;
@@ -36,6 +85,7 @@ UiGraphNode GraphDemoReferenceNode(const String& title,
     node.role = role;
     node.style_class = preset;
     node.corner_radius = 8.0;
+    GraphDemoSetNodeTag(node, tag);
     node.ports.Add(GraphDemoPort("in", "In", UiGraphPortDirection::Input,
                                  UiGraphDataType::Flow, UiGraphPortSide::Left));
     node.ports.Add(GraphDemoPort("out", "Out", UiGraphPortDirection::Output,
@@ -82,61 +132,119 @@ uint32 GraphDemoMix(uint32 value)
 void GraphDemoPastelPalette(const UiGraphNode& node, UiGraphNodeStyle& style)
 {
     bool dark = UiThemeDetail::ResolveEffectiveMode(UiTheme::GetContext().mode) == UiThemeMode::Dark;
-    Color face, frame, header;
+    Color face, frame, header, ink, muted;
 
     if(!dark) {
+        ink = Color(47, 54, 66);
+        muted = Color(91, 104, 123);
         switch(node.role) {
         case UiGraphNodeRole::Subtle:
-            face = Color(245, 248, 250); frame = Color(190, 201, 209); header = Color(236, 242, 245); break;
+            face = Color(249, 249, 247); frame = Color(83, 92, 108); header = Color(245, 246, 244); break;
         case UiGraphNodeRole::Accent:
-            face = Color(239, 246, 255); frame = Color(157, 184, 218); header = Color(228, 239, 253); break;
+            face = Color(244, 248, 253); frame = Color(118, 157, 210); header = Color(237, 244, 252); break;
         case UiGraphNodeRole::Alert:
-            face = Color(255, 244, 246); frame = Color(218, 171, 179); header = Color(252, 232, 236); break;
+            face = Color(255, 243, 236); frame = Color(239, 105, 61); header = Color(255, 237, 228); break;
         case UiGraphNodeRole::Standard:
         default:
-            face = Color(248, 250, 252); frame = Color(184, 196, 210); header = Color(239, 244, 248); break;
+            face = Color(249, 250, 251); frame = Color(78, 88, 105); header = Color(244, 246, 248); break;
         }
         style.palette.face[ST_NORMAL] = UiFill::Solid(face);
-        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 72));
-        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 28));
-        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(238, 241, 245), 112));
+        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, White(), 64));
+        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 22));
+        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(240, 242, 245), 116));
         style.palette.frame[ST_NORMAL] = frame;
-        style.palette.frame[ST_HOT] = Blend(frame, Color(91, 126, 168), 68);
-        style.palette.frame[ST_PRESSED] = Blend(frame, Color(70, 105, 150), 96);
-        style.palette.frame[ST_DISABLED] = Blend(frame, Color(218, 224, 231), 132);
+        style.palette.frame[ST_HOT] = Blend(frame, Color(80, 121, 176), 56);
+        style.palette.frame[ST_PRESSED] = Blend(frame, Color(47, 99, 171), 86);
+        style.palette.frame[ST_DISABLED] = Blend(frame, Color(221, 225, 231), 150);
         style.header_face[ST_NORMAL] = header;
-        style.header_face[ST_HOT] = Blend(header, White(), 56);
-        style.header_face[ST_PRESSED] = Blend(header, frame, 30);
-        style.header_face[ST_DISABLED] = Blend(header, face, 110);
+        style.header_face[ST_HOT] = Blend(header, White(), 48);
+        style.header_face[ST_PRESSED] = Blend(header, frame, 24);
+        style.header_face[ST_DISABLED] = Blend(header, face, 112);
+        for(int i = 0; i < 4; i++) {
+            style.title_ink[i] = i == ST_DISABLED ? Blend(ink, face, 150) : ink;
+            style.subtitle_ink[i] = i == ST_DISABLED ? Blend(muted, face, 160) : muted;
+            style.description_ink[i] = style.subtitle_ink[i];
+            style.port_label_ink[i] = muted;
+        }
     }
     else {
+        ink = Color(226, 230, 237);
+        muted = Color(157, 168, 186);
         switch(node.role) {
         case UiGraphNodeRole::Subtle:
-            face = Color(38, 45, 49); frame = Color(83, 100, 106); header = Color(45, 52, 56); break;
+            face = Color(38, 42, 47); frame = Color(103, 112, 128); header = Color(44, 48, 53); break;
         case UiGraphNodeRole::Accent:
-            face = Color(40, 50, 65); frame = Color(92, 122, 158); header = Color(46, 59, 78); break;
+            face = Color(38, 48, 63); frame = Color(101, 136, 184); header = Color(44, 56, 73); break;
         case UiGraphNodeRole::Alert:
-            face = Color(61, 44, 48); frame = Color(151, 101, 110); header = Color(73, 50, 55); break;
+            face = Color(66, 43, 35); frame = Color(222, 111, 76); header = Color(78, 48, 38); break;
         case UiGraphNodeRole::Standard:
         default:
-            face = Color(42, 47, 55); frame = Color(93, 104, 119); header = Color(49, 55, 64); break;
+            face = Color(39, 43, 50); frame = Color(107, 117, 135); header = Color(45, 50, 58); break;
         }
         style.palette.face[ST_NORMAL] = UiFill::Solid(face);
-        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, frame, 38));
-        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 62));
-        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(32, 35, 40), 104));
+        style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, frame, 34));
+        style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(face, frame, 56));
+        style.palette.face[ST_DISABLED] = UiFill::Solid(Blend(face, Color(30, 33, 38), 104));
         style.palette.frame[ST_NORMAL] = frame;
-        style.palette.frame[ST_HOT] = Blend(frame, Color(160, 178, 200), 48);
-        style.palette.frame[ST_PRESSED] = Blend(frame, Color(174, 192, 214), 72);
-        style.palette.frame[ST_DISABLED] = Blend(frame, Color(63, 70, 80), 116);
+        style.palette.frame[ST_HOT] = Blend(frame, Color(172, 188, 211), 42);
+        style.palette.frame[ST_PRESSED] = Blend(frame, Color(183, 199, 220), 64);
+        style.palette.frame[ST_DISABLED] = Blend(frame, Color(65, 71, 82), 116);
         style.header_face[ST_NORMAL] = header;
-        style.header_face[ST_HOT] = Blend(header, frame, 34);
-        style.header_face[ST_PRESSED] = Blend(header, frame, 52);
+        style.header_face[ST_HOT] = Blend(header, frame, 30);
+        style.header_face[ST_PRESSED] = Blend(header, frame, 46);
         style.header_face[ST_DISABLED] = Blend(header, face, 112);
+        for(int i = 0; i < 4; i++) {
+            style.title_ink[i] = i == ST_DISABLED ? Blend(ink, face, 145) : ink;
+            style.subtitle_ink[i] = i == ST_DISABLED ? Blend(muted, face, 150) : muted;
+            style.description_ink[i] = style.subtitle_ink[i];
+            style.port_label_ink[i] = muted;
+        }
     }
 }
 
 } // namespace
+
+void UiGraphDemo::FitAuthoredNodeSize(UiGraphNode& node) const
+{
+    Font title_font = GraphDemoSans(11, true);
+    Font subtitle_font = GraphDemoMono(9);
+    const String tag = GraphDemoNodeTag(node);
+    Font tag_font = GraphDemoMono(8, true);
+
+    int text_width = max(GetTextSize(node.title, title_font).cx,
+                         GetTextSize(node.subtitle, subtitle_font).cx);
+    if(!tag.IsEmpty())
+        text_width = max(text_width, GetTextSize(tag, tag_font).cx + DPI(12));
+    text_width += DPI(24);
+
+    double safe_w = 1.0;
+    double safe_h = 1.0;
+    switch(node.shape) {
+    case UiGraphNodeShape::Circle:
+    case UiGraphNodeShape::Ellipse: safe_w = safe_h = 0.68; break;
+    case UiGraphNodeShape::Diamond: safe_w = safe_h = 0.50; break;
+    case UiGraphNodeShape::Triangle: safe_w = 0.46; safe_h = 0.40; break;
+    case UiGraphNodeShape::Hexagon: safe_w = 0.72; safe_h = 0.82; break;
+    case UiGraphNodeShape::Capsule: safe_w = 0.70; safe_h = 0.92; break;
+    case UiGraphNodeShape::Cloud: safe_w = 0.64; safe_h = 0.56; break;
+    case UiGraphNodeShape::Database: safe_w = 0.82; safe_h = 0.64; break;
+    default: break;
+    }
+
+    int lines_height = title_font.GetHeight();
+    if(!node.subtitle.IsEmpty())
+        lines_height += DPI(2) + subtitle_font.GetHeight();
+    if(!tag.IsEmpty())
+        lines_height += DPI(12);
+    lines_height += DPI(18);
+
+    node.size.cx = max(node.size.cx, ceil(text_width / max(0.30, safe_w)));
+    node.size.cy = max(node.size.cy, ceil(lines_height / max(0.30, safe_h)));
+    if(node.shape == UiGraphNodeShape::Square || node.shape == UiGraphNodeShape::Circle) {
+        double side = max(node.size.cx, node.size.cy);
+        node.size = Sizef(side, side);
+    }
+}
 
 void UiGraphDemo::BuildReferenceGraph()
 {
@@ -144,20 +252,45 @@ void UiGraphDemo::BuildReferenceGraph()
     model.Clear();
     reference_images_.Clear();
 
-    // Demo-owned retained content. UiGraphModel does not know about Images and
-    // no child Ctrl is allocated for thumbnails. Graph supplies the shape-safe
-    // content rectangle; the demo reserves the same scaled title/subtitle lane
-    // before fitting the media so the thumbnail cannot climb into its metadata.
+    // Demo-owned retained content. Generic node.data supplies an optional
+    // presentation tag without adding a Graph-domain tag field. Thumbnails stay
+    // demo-owned and use the same shape-safe content hook; neither feature needs
+    // one child Ctrl per node.
     graph_.WhenPaintNodeContent = [=](Draw& w, const UiGraphNode& node, const Rect& content,
-                                       const UiGraphNodeStyle&, UiGraphVisualState) {
-        if(scale_mode_ || graph_.GetZoom() < 0.42)
+                                       const UiGraphNodeStyle& style, UiGraphVisualState state) {
+        if(scale_mode_ || content.IsEmpty())
+            return;
+
+        const double zoom = graph_.GetZoom();
+        int si = minmax((int)state, 0, 3);
+        String tag = GraphDemoNodeTag(node);
+        if(!tag.IsEmpty() && zoom >= 0.52) {
+            int tag_px = max(6, fround(DPI(8) * min(1.0, max(0.72, zoom))));
+            Font tag_font = GraphDemoMono(tag_px, true);
+            Size ts = GetTextSize(tag, tag_font);
+            Rect badge = RectC(content.left + DPI(3), content.top + DPI(3),
+                               ts.cx + DPI(12), ts.cy + DPI(5));
+            Color node_face = style.palette.face[si].IsSolid()
+                            ? style.palette.face[si].color : SColorPaper();
+            Color frame = style.palette.frame[si];
+            Color tag_face = Blend(node_face, frame, 18);
+            Color tag_ink = node.role == UiGraphNodeRole::Alert
+                          ? frame : style.subtitle_ink[si];
+            w.DrawRect(badge, tag_face);
+            DrawFrame(w, badge, frame);
+            w.DrawText(badge.left + DPI(6),
+                       badge.top + (badge.GetHeight() - tag_font.GetHeight()) / 2,
+                       tag, tag_font, tag_ink);
+        }
+
+        if(zoom < 0.42)
             return;
         int q = reference_images_.Find(node.ref.id);
-        if(q < 0 || reference_images_[q].IsEmpty() || content.IsEmpty())
+        if(q < 0 || reference_images_[q].IsEmpty())
             return;
         Rect area = content.Deflated(DPI(4));
         int title_lane = min(area.GetHeight() / 2,
-                             max(DPI(12), fround(DPI(50) * min(1.0, graph_.GetZoom()))));
+                             max(DPI(15), fround(DPI(44) * min(1.0, zoom))));
         area.top = min(area.bottom, area.top + title_lane);
         Rect target = GraphDemoAspectFit(reference_images_[q], area);
         if(!target.IsEmpty())
@@ -183,6 +316,11 @@ void UiGraphDemo::BuildReferenceGraph()
         "Ellipse", "Diamond", "Triangle", "Hex",
         "Capsule", "Cloud", "Document", "Database",
     };
+    static const char *tags[] = {
+        "ROOT", "CAT", "CAT", "CAT",
+        "TYPE", "TYPE", "TYPE", "TYPE",
+        "NODE", "NODE", "MEDIA", "DATA",
+    };
     static const char *presets[] = {
         "flat", "soft", "outline", "raised", "dense", "glow"
     };
@@ -193,23 +331,23 @@ void UiGraphDemo::BuildReferenceGraph()
     for(int i = 0; i < 12; i++) {
         int col = i % 4;
         int row = i / 4;
-        Sizef size;
-        if(row == 0)
-            size = Sizef(64, 44);
-        else if(row == 1)
-            size = Sizef(96, 64);
-        else
-            size = Sizef(148, 96);
+        Sizef size = row == 0 ? Sizef(104, 58)
+                   : row == 1 ? Sizef(120, 74)
+                              : Sizef(150, 96);
         if(shapes[i] == UiGraphNodeShape::Circle || shapes[i] == UiGraphNodeShape::Square)
             size = Sizef(max(size.cx, size.cy), max(size.cx, size.cy));
 
-        UiGraphNode node = GraphDemoReferenceNode(titles[i],
-                                                  row == 2 ? "rich node detail" : String(),
-                                                  Pointf(30 + col * 180.0, 30 + row * 145.0),
+        String subtitle = row == 0 ? "basic node"
+                        : row == 1 ? "shape-aware"
+                                   : "rich node detail";
+        UiGraphNode node = GraphDemoReferenceNode(titles[i], subtitle,
+                                                  Pointf(30 + col * 215.0, 30 + row * 165.0),
                                                   size,
                                                   shapes[i],
                                                   (UiGraphNodeRole)(i % 4),
-                                                  presets[i % preset_count]);
+                                                  presets[i % preset_count],
+                                                  tags[i]);
+        FitAuthoredNodeSize(node);
         if(row == 2) {
             node.icon = ICON_DESIGN_WIDGETS_48();
             node.icon_size = Size(18, 18);
@@ -242,7 +380,7 @@ void UiGraphDemo::BuildReferenceGraph()
     feedback.route = UiGraphRouteStyle::Orthogonal;
     feedback.stroke = UiGraphStrokeStyle::Dotted;
     feedback.arrow = UiGraphArrowStyle::Diamond;
-    feedback.waypoints << Pointf(760, 470) << Pointf(6, 470) << Pointf(6, 52);
+    feedback.waypoints << Pointf(890, 500) << Pointf(6, 500) << Pointf(6, 60);
     feedback.title = "waypoints";
     model.AddEdge(feedback);
 
@@ -264,12 +402,13 @@ void UiGraphDemo::BuildReferenceGraph()
     for(int i = 0; i < 4; i++) {
         UiGraphNode node = GraphDemoReferenceNode(image_fixtures[i].title,
                                                   "retained thumbnail",
-                                                  Pointf(30 + i * 205.0, 520),
-                                                  Sizef(180, 132),
+                                                  Pointf(30 + i * 215.0, 560),
+                                                  Sizef(190, 140),
                                                   image_fixtures[i].shape,
                                                   image_fixtures[i].role,
                                                   image_fixtures[i].preset);
         node.description.Clear();
+        FitAuthoredNodeSize(node);
         UiGraphNodeRef ref = model.AddNode(node);
         Image image = GraphDemoLoadImage(image_fixtures[i].file);
         if(!image.IsEmpty())
@@ -390,6 +529,12 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
         return;
 
     GraphDemoPastelPalette(node, style);
+    style.title_font = GraphDemoSans(11, true);
+    style.subtitle_font = GraphDemoMono(9);
+    style.description_font = GraphDemoMono(9);
+    style.port_font = GraphDemoMono(8);
+    style.header_height = DPI(46);
+    style.metrics.content_margin = Rect(DPI(8), DPI(7), DPI(8), DPI(7));
     // Reference child controls should follow Graph detail LOD instead of
     // disappearing at the older 0.65 hard threshold.
     style.content_cell_min_zoom = min(style.content_cell_min_zoom, 0.42);
@@ -399,39 +544,38 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
     if(preset == "soft") {
         style.metrics.shadow.enabled = true;
         style.metrics.shadow.distance = DPI(4);
-        style.metrics.shadow.alpha = 32;
-        style.metrics.shadow.offset_y = DPI(1);
+        style.metrics.shadow.alpha = 30;
+        style.metrics.shadow.offset_x = DPI(2);
+        style.metrics.shadow.offset_y = DPI(2);
         style.metrics.frame_width = max(1, style.metrics.frame_width);
     }
     else if(preset == "outline") {
         style.metrics.shadow.enabled = false;
         style.metrics.frame_enabled = true;
-        style.metrics.frame_width = DPI(2);
-        style.metrics.content_margin = Rect(DPI(5), DPI(4), DPI(5), DPI(4));
+        style.metrics.frame_width = DPI(1);
+        style.metrics.content_margin = Rect(DPI(6), DPI(5), DPI(6), DPI(5));
     }
     else if(preset == "flat") {
         style.metrics.shadow.enabled = false;
-        style.metrics.frame_width = 0;
+        style.metrics.frame_width = DPI(1);
         style.show_header_band = false;
     }
     else if(preset == "raised") {
         style.metrics.shadow.enabled = true;
-        style.metrics.shadow.distance = DPI(7);
-        style.metrics.shadow.offset_y = DPI(3);
-        style.metrics.shadow.alpha = 62;
-        // The reference view demonstrates authored highlight chrome. In the 10k
-        // scale view the same outer rectangular overlay is visual noise and a
-        // separate paint pass, so keep the raised shadow but omit the highlight.
+        style.metrics.shadow.distance = DPI(5);
+        style.metrics.shadow.offset_x = DPI(2);
+        style.metrics.shadow.offset_y = DPI(2);
+        style.metrics.shadow.alpha = 44;
         if(!scale_mode_) {
             style.metrics.highlight.enabled = true;
             style.metrics.highlight.thickness = DPI(1);
-            style.metrics.highlight.alpha = 95;
+            style.metrics.highlight.alpha = 70;
             style.metrics.highlight.color = style.palette.frame[ST_HOT];
         }
     }
     else if(preset == "dense") {
-        style.metrics.content_margin = Rect(DPI(4), DPI(3), DPI(4), DPI(3));
-        style.header_height = DPI(34);
+        style.metrics.content_margin = Rect(DPI(5), DPI(4), DPI(5), DPI(4));
+        style.header_height = DPI(38);
         style.port_radius = DPI(4);
         style.port_hit_radius = DPI(8);
         style.port_spacing = DPI(17);
@@ -441,15 +585,15 @@ void UiGraphDemo::ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& sty
     else if(preset == "glow") {
         Color glow = style.palette.frame[ST_HOT];
         style.metrics.shadow.enabled = true;
-        style.metrics.shadow.distance = DPI(9);
+        style.metrics.shadow.distance = DPI(7);
         style.metrics.shadow.offset_x = 0;
         style.metrics.shadow.offset_y = 0;
-        style.metrics.shadow.alpha = 58;
+        style.metrics.shadow.alpha = 46;
         style.metrics.shadow.color = glow;
         if(!scale_mode_) {
             style.metrics.highlight.enabled = true;
-            style.metrics.highlight.thickness = DPI(2);
-            style.metrics.highlight.alpha = 120;
+            style.metrics.highlight.thickness = DPI(1);
+            style.metrics.highlight.alpha = 88;
             style.metrics.highlight.color = glow;
         }
     }

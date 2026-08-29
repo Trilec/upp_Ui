@@ -17,9 +17,13 @@
     - Image-rich reference nodes keep fixture Images in the demo and paint them
       through UiNodeGraph's retained content hook; UiGraphModel stores no image
       processing/domain state and no per-thumbnail child controls are allocated.
+    - The code page is a design handoff surface: it emits every selected object,
+      authored custom-style overrides, typography, and optional demo tag metadata,
+      and can copy or save the generated snippet.
 */
 
 #include <Ui/Ui.h>
+#include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
 
@@ -47,6 +51,7 @@ private:
     void SetScaleMode(bool scale);
     void SelectReferenceStartNode();
     void AttachReferenceControls();
+    void FitAuthoredNodeSize(UiGraphNode& node) const;
 
     void ApplyDemoPreset(const UiGraphNode& node, UiGraphNodeStyle& style) const;
     UiGraphNodeStyle ResolvePresentedStyle(const UiGraphNode& node) const;
@@ -68,6 +73,7 @@ private:
     void ToggleTheme();
     void UpdateStatus();
     void UpdateGeneratedCode();
+    void SaveGeneratedCode();
 
     const UiGraphNode* SelectedNode() const;
     UiGraphNode* SelectedNode();
@@ -91,7 +97,7 @@ private:
     UiPanel pnl_inspector_page, pnl_style_page, pnl_code_page;
     PropertyEditor pe_inspector, pe_style;
     UiMultiEdit edit_generated_code;
-    UiToolButton btn_copy_code;
+    UiToolButton btn_copy_code, btn_save_code;
 
     PropertyEditorFactory pe_factory;
     PropertyEditorModel pe_model_node;

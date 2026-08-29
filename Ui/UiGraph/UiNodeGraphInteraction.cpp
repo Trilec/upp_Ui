@@ -901,6 +901,12 @@ void UiNodeGraph::LeftDown(Point p, dword flags)
             if(op == SelectionOperation::Replace) {
                 if(!IsNodeSelected(node))
                     SelectNode(node, false);
+                // When an already-selected member of a multi-selection is
+                // movable, preserve the group during mouse-down so a drag can
+                // move it as a unit. If no drag is possible there is no reason
+                // to defer the familiar desktop replace-selection behavior.
+                else if((!editable_ || !n->movable) && selected_nodes_.GetCount() > 1)
+                    SelectNode(node, false);
             }
             else if(op == SelectionOperation::Add) {
                 if(!IsNodeSelected(node))
@@ -938,8 +944,27 @@ void UiNodeGraph::LeftDown(Point p, dword flags)
 
 void UiNodeGraph::LeftUp(Point p, dword flags)
 {
-    if(interaction_ == InteractionMode::NodeDrag)
-        CommitNodeDrag();
+    if(interaction_ == InteractionMode::NodeDrag) {
+        // A plain click on one member of an existing multi-selection must
+        // collapse to that object, but mouse-down cannot do so because the same
+        // gesture might become a group drag. Resolve the distinction here: only
+        // an effectively stationary click replaces; any real drag keeps/moves
+        // the complete selected group.
+        UiGraphNodeRef clicked = pressed_node_;
+        int jitter = DPI(3);
+        int dx = p.x - press_point_.x;
+        int dy = p.y - press_point_.y;
+        bool click_only = dx * dx + dy * dy <= jitter * jitter;
+        bool replace = ResolveSelectionOperation(flags, multi_selection_) == SelectionOperation::Replace;
+        bool collapse = replace && click_only && clicked.IsValid()
+                     && selected_nodes_.GetCount() > 1;
+        if(collapse) {
+            CancelNodeDrag();
+            SelectNode(clicked, false);
+        }
+        else
+            CommitNodeDrag();
+    }
     else if(interaction_ == InteractionMode::EdgeRouteDrag) {
         UpdateEdgeRouteDrag(p);
         CommitEdgeRouteDrag();

@@ -115,12 +115,12 @@ String GraphDemoShapeName(UiGraphNodeShape shape)
     case UiGraphNodeShape::Diamond:          return "Diamond";
     case UiGraphNodeShape::Triangle:         return "Triangle";
     case UiGraphNodeShape::Hexagon:          return "Hexagon";
-    case UiGraphNodeShape::Capsule:          return "Capsule";
-    case UiGraphNodeShape::Cloud:            return "Cloud";
-    case UiGraphNodeShape::Document:         return "Document";
-    case UiGraphNodeShape::Database:         return "Database";
+    case UiGraphNodeShape::Capsule:           return "Capsule";
+    case UiGraphNodeShape::Cloud:             return "Cloud";
+    case UiGraphNodeShape::Document:          return "Document";
+    case UiGraphNodeShape::Database:          return "Database";
     case UiGraphNodeShape::RoundedRectangle:
-    default:                                 return "RoundedRectangle";
+    default:                                  return "RoundedRectangle";
     }
 }
 
@@ -254,6 +254,62 @@ String GraphDemoRoleCode(UiGraphNodeRole role)
     return "UiGraphNodeRole::" + GraphDemoRoleName(role);
 }
 
+String GraphDemoColorCode(Color c)
+{
+    if(IsNull(c))
+        return "Null";
+    return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
+}
+
+String GraphDemoNodeTag(const UiGraphNode& node)
+{
+    if(!node.data.Is<ValueMap>())
+        return String();
+    ValueMap data = node.data;
+    int q = data.Find("tag");
+    return q >= 0 ? AsString(data.GetValue(q)) : String();
+}
+
+void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
+{
+    ValueMap data = node.data.Is<ValueMap>() ? ValueMap(node.data) : ValueMap();
+    int q = data.Find("tag");
+    if(tag.IsEmpty()) {
+        if(q >= 0)
+            data.Remove(q);
+    }
+    else if(q >= 0)
+        data.SetValue(q, tag);
+    else
+        data.Add("tag", tag);
+    node.data = data;
+}
+
+String GraphDemoFillCode(const UiFill& fill, const Value *recipe)
+{
+    if(recipe && recipe->Is<ValueMap>()) {
+        ValueMap map = *recipe;
+        String mode = AsString(GraphDemoMapValue(map, "mode", "None"));
+        if(mode == "Solid")
+            return "UiFill::Solid(" + GraphDemoColorCode(Color(GraphDemoMapValue(map, "solid", White()))) + ")";
+        if(mode == "QuadGradient") {
+            Color tl(GraphDemoMapValue(map, "top_left", White()));
+            Color tr(GraphDemoMapValue(map, "top_right", tl));
+            Color bl(GraphDemoMapValue(map, "bottom_left", tl));
+            Color br(GraphDemoMapValue(map, "bottom_right", tr));
+            int tile = max(8, (int)GraphDemoMapValue(map, "tile_size", 32));
+            int blur = max(0, (int)GraphDemoMapValue(map, "blur", 0));
+            return Format("UiFill::ImageFill(MakeQuadGradientTile(%d, %s, %s, %s, %s, %d))",
+                          tile, GraphDemoColorCode(tl), GraphDemoColorCode(tr),
+                          GraphDemoColorCode(bl), GraphDemoColorCode(br), blur);
+        }
+        return "UiFill::None()";
+    }
+    if(fill.IsSolid())
+        return "UiFill::Solid(" + GraphDemoColorCode(fill.color) + ")";
+    return "UiFill::None()";
+}
+
 } // namespace
 
 UiGraphDemo::UiGraphDemo()
@@ -283,6 +339,14 @@ UiGraphDemo::UiGraphDemo()
         ApplyDemoPreset(node, style);
         if(state == UiGraphVisualState::Selected && node.ref == selected_node_)
             GraphDemoProjectState(style, style_preview_state_, ST_PRESSED);
+    };
+    graph_.WhenResolveEdgeStyle = [=](const UiGraphEdge&, UiGraphVisualState,
+                                      UiGraphEdgeStyle& style) {
+        // The reference is intended to read like a diagram rather than a wiring
+        // harness. Keep the authored edge semantics intact and only make the
+        // demo's default presentation slightly quieter.
+        for(double& width : style.width)
+            width *= 0.86;
     };
 
     SetScaleMode(false);
@@ -355,7 +419,9 @@ void UiGraphDemo::BuildRightRail()
     pnl_code_page.Add(edit_generated_code);
     edit_generated_code.HSizePos(DPI(6), DPI(6)).VSizePos(DPI(42), DPI(6));
     pnl_code_page.Add(btn_copy_code.RightPos(DPI(8), DPI(32)).TopPos(DPI(6), DPI(30)));
+    pnl_code_page.Add(btn_save_code.RightPos(DPI(46), DPI(32)).TopPos(DPI(6), DPI(30)));
     btn_copy_code.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
+    btn_save_code.SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(16), DPI(16)).Tip("Save generated C++");
     edit_generated_code.SetReadOnly();
 }
 
@@ -381,6 +447,7 @@ void UiGraphDemo::BuildNodeEditorModel()
                  .AddChoice("Outline", "Outline").AddChoice("Flat", "Flat")
                  .AddChoice("Raised", "Raised").AddChoice("Dense", "Dense")
                  .AddChoice("Glow", "Glow").AddChoice("Custom", "Custom");
+    pe_model_node.AddText("tag", "Tag", String(), "Presentation");
 
     pe_model_node.AddNumericDouble("x", "X", 0.0, -1000000.0, 1000000.0, 1.0, "Layout").SetUnit("world");
     pe_model_node.AddNumericDouble("y", "Y", 0.0, -1000000.0, 1000000.0, 1.0, "Layout").SetUnit("world");
@@ -395,7 +462,7 @@ void UiGraphDemo::BuildNodeEditorModel()
     pe_model_node.AddBoolean("collapsed", "Collapsed", false, "Behaviour");
 
     pe_model_node.SetGroupSubtitle("Identity", "authoritative UiGraphModel record");
-    pe_model_node.SetGroupSubtitle("Presentation", "shape, semantic role and reusable style token");
+    pe_model_node.SetGroupSubtitle("Presentation", "shape, role, style token and optional demo tag metadata");
     pe_model_node.SetGroupSubtitle("Layout", "world-space node geometry at authored 1:1 scale");
     pe_model_node.StructureChanged();
 }
@@ -458,9 +525,14 @@ void UiGraphDemo::BuildStyleEditorModel()
         pe_model_style.AddColor("header." + String(GraphDemoStateId(i)), labels[i], base.header_face[si], "Header");
     }
 
+    AddPropertyFont(pe_model_style, "font_title_face", "Title face", base.title_font.GetFaceName(), "Typography");
     pe_model_style.AddNumericInt("font_title", "Title height", max(1, base.title_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    AddPropertyFont(pe_model_style, "font_subtitle_face", "Subtitle face", base.subtitle_font.GetFaceName(), "Typography");
     pe_model_style.AddNumericInt("font_subtitle", "Subtitle height", max(1, base.subtitle_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    AddPropertyFont(pe_model_style, "font_description_face", "Description face", base.description_font.GetFaceName(), "Typography");
     pe_model_style.AddNumericInt("font_description", "Description height", max(1, base.description_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
+    AddPropertyFont(pe_model_style, "font_port_face", "Port face", base.port_font.GetFaceName(), "Typography");
+    pe_model_style.AddNumericInt("font_port", "Port height", max(1, base.port_font.GetHeight()), 6, 72, 1, "Typography").SetUnit("px");
 
     pe_model_style.AddNumericInt("margin_left", "Left", base.metrics.content_margin.left, 0, 64, 1, "Content Margin");
     pe_model_style.AddNumericInt("margin_top", "Top", base.metrics.content_margin.top, 0, 64, 1, "Content Margin");
@@ -495,6 +567,7 @@ void UiGraphDemo::BuildStyleEditorModel()
     pe_model_style.SetGroupSubtitle("Frame", "surface frame states and width");
     pe_model_style.SetGroupSubtitle("Ink", "title/text state colour");
     pe_model_style.SetGroupSubtitle("Header", "graph-specific header band colour");
+    pe_model_style.SetGroupSubtitle("Typography", "font families and authored 1:1 heights");
     pe_model_style.SetGroupSubtitle("Shadow", "canonical StyledMetrics shadow path");
     pe_model_style.SetGroupSubtitle("Ports", "painted port presentation, never child controls");
     pe_model_style.StructureChanged();
@@ -532,6 +605,7 @@ void UiGraphDemo::ConnectEvents()
     btn_style_mode.WhenAction = [=] { SelectPage(1); };
     btn_code_mode.WhenAction = [=] { SelectPage(2); };
     btn_copy_code.WhenAction = [=] { WriteClipboardText((String)edit_generated_code.GetData()); };
+    btn_save_code.WhenAction = [=] { SaveGeneratedCode(); };
 
     graph_.WhenSelection = [=] { SyncSelection(); };
     graph_.WhenViewport = [=] { UpdateStatus(); };
@@ -674,6 +748,7 @@ void UiGraphDemo::SyncNodeEditor()
             pe_model_node.SetValue("shape", GraphDemoShapeName(node->shape), false);
             pe_model_node.SetValue("role", GraphDemoRoleName(node->role), false);
             pe_model_node.SetValue("style_preset", GraphDemoPresetName(node->style_class), false);
+            pe_model_node.SetValue("tag", GraphDemoNodeTag(*node), false);
             pe_model_node.SetValue("x", node->position.x, false);
             pe_model_node.SetValue("y", node->position.y, false);
             pe_model_node.SetValue("width", node->size.cx, false);
@@ -724,9 +799,14 @@ void UiGraphDemo::SyncStyleEditor()
         }
         pe_model_style.SetValue("frame_enabled", style.metrics.frame_enabled, false);
         pe_model_style.SetValue("frame_width", style.metrics.frame_width, false);
+        pe_model_style.SetValue("font_title_face", style.title_font.GetFaceName(), false);
         pe_model_style.SetValue("font_title", max(1, style.title_font.GetHeight()), false);
+        pe_model_style.SetValue("font_subtitle_face", style.subtitle_font.GetFaceName(), false);
         pe_model_style.SetValue("font_subtitle", max(1, style.subtitle_font.GetHeight()), false);
+        pe_model_style.SetValue("font_description_face", style.description_font.GetFaceName(), false);
         pe_model_style.SetValue("font_description", max(1, style.description_font.GetHeight()), false);
+        pe_model_style.SetValue("font_port_face", style.port_font.GetFaceName(), false);
+        pe_model_style.SetValue("font_port", max(1, style.port_font.GetHeight()), false);
         pe_model_style.SetValue("margin_left", style.metrics.content_margin.left, false);
         pe_model_style.SetValue("margin_top", style.metrics.content_margin.top, false);
         pe_model_style.SetValue("margin_right", style.metrics.content_margin.right, false);
@@ -774,6 +854,7 @@ void UiGraphDemo::ApplyNodeProperty(const String& id, const Value& value)
             return;
         if(preset != "Custom") node.style_class = GraphDemoPresetClass(preset);
     }
+    else if(id == "tag") GraphDemoSetNodeTag(node, AsString(value));
     else if(id == "x") node.position.x = (double)value;
     else if(id == "y") node.position.y = (double)value;
     else if(id == "width") node.size.cx = max(24.0, (double)value);
@@ -785,6 +866,9 @@ void UiGraphDemo::ApplyNodeProperty(const String& id, const Value& value)
     else if(id == "movable") node.movable = (bool)value;
     else if(id == "collapsed") node.collapsed = (bool)value;
     else return;
+
+    if(id == "title" || id == "subtitle" || id == "tag" || id == "shape")
+        FitAuthoredNodeSize(node);
 
     graph_.Model().UpdateNode(selected_node_, node);
     UpdateStatus();
@@ -859,9 +943,14 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
 
     if(id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
     else if(id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(id == "font_title_face") style.title_font.FaceName(AsString(value));
     else if(id == "font_title") style.title_font.Height(max(6, (int)value));
+    else if(id == "font_subtitle_face") style.subtitle_font.FaceName(AsString(value));
     else if(id == "font_subtitle") style.subtitle_font.Height(max(6, (int)value));
+    else if(id == "font_description_face") style.description_font.FaceName(AsString(value));
     else if(id == "font_description") style.description_font.Height(max(6, (int)value));
+    else if(id == "font_port_face") style.port_font.FaceName(AsString(value));
+    else if(id == "font_port") style.port_font.Height(max(6, (int)value));
     else if(id == "margin_left") style.metrics.content_margin.left = max(0, (int)value);
     else if(id == "margin_top") style.metrics.content_margin.top = max(0, (int)value);
     else if(id == "margin_right") style.metrics.content_margin.right = max(0, (int)value);
@@ -1003,11 +1092,11 @@ void UiGraphDemo::ToggleTheme()
 void UiGraphDemo::UpdateStatus()
 {
     String mode = scale_mode_ ? "10k scale" : "Reference";
+    int selected_nodes = graph_.GetSelectedNodes().GetCount();
+    int selected_edges = graph_.GetSelectedEdges().GetCount();
     String selection;
-    if(selected_node_.IsValid())
-        selection = Format("  node=%lld", (long long)selected_node_.id);
-    else if(selected_edge_.IsValid())
-        selection = Format("  edge=%lld", (long long)selected_edge_.id);
+    if(selected_nodes || selected_edges)
+        selection = Format("  selected=%dn/%de", selected_nodes, selected_edges);
     lbl_status.SetText(Format("%s  nodes=%d  edges=%d  prepared=%d/%d  candidates=%d/%d  zoom=%.2f%s",
                               mode, graph_.Model().GetNodeCount(), graph_.Model().GetEdgeCount(),
                               graph_.GetPreparedNodeCount(), graph_.GetPreparedEdgeCount(),
@@ -1017,55 +1106,163 @@ void UiGraphDemo::UpdateStatus()
 
 void UiGraphDemo::UpdateGeneratedCode()
 {
-    const UiGraphNode* node = SelectedNode();
-    const UiGraphEdge* edge = SelectedEdge();
-    if(!node && !edge) {
-        edit_generated_code.SetData("// Select a node or connector to generate its UiGraphModel configuration.\n");
+    Vector<UiGraphNodeRef> node_refs = graph_.GetSelectedNodes();
+    Vector<UiGraphEdgeRef> edge_refs = graph_.GetSelectedEdges();
+    if(node_refs.IsEmpty() && edge_refs.IsEmpty()) {
+        edit_generated_code.SetData("// Select one or more nodes/connectors to generate their UiGraphModel configuration.\n");
         return;
     }
 
     String out;
-    if(edge && !node) {
-        out << "// Selected UiNodeGraph connector\n"
-               "UiGraphEdge edge;\n";
-        out << "edge.source = UiGraphPortRef{UiGraphNodeRef{" << edge->source.node.id << "}, "
+    out << "// UiNodeGraph selection handoff: " << node_refs.GetCount() << " node(s), "
+        << edge_refs.GetCount() << " connector(s).\n";
+
+    for(UiGraphNodeRef ref : node_refs) {
+        const UiGraphNode* node = graph_.Model().FindNode(ref);
+        if(!node)
+            continue;
+        String suffix = AsString((int64)node->ref.id);
+        String variable = "node_" + suffix;
+        String ref_variable = "node_ref_" + suffix;
+
+        out << "\n// Node " << node->ref.id << "\nUiGraphNode " << variable << ";\n";
+        out << variable << ".title = " << GraphDemoCppString(node->title) << ";\n";
+        if(!node->subtitle.IsEmpty()) out << variable << ".subtitle = " << GraphDemoCppString(node->subtitle) << ";\n";
+        if(!node->description.IsEmpty()) out << variable << ".description = " << GraphDemoCppString(node->description) << ";\n";
+        out << variable << ".position = Pointf(" << node->position.x << ", " << node->position.y << ");\n";
+        out << variable << ".size = Sizef(" << node->size.cx << ", " << node->size.cy << ");\n";
+        out << variable << ".shape = " << GraphDemoShapeCode(node->shape) << ";\n";
+        out << variable << ".role = " << GraphDemoRoleCode(node->role) << ";\n";
+        out << variable << ".corner_radius = " << node->corner_radius << ";\n";
+        out << variable << ".z_order = " << node->z_order << ";\n";
+        out << variable << ".enabled = " << (node->enabled ? "true" : "false") << ";\n";
+        out << variable << ".visible = " << (node->visible ? "true" : "false") << ";\n";
+        out << variable << ".selectable = " << (node->selectable ? "true" : "false") << ";\n";
+        out << variable << ".movable = " << (node->movable ? "true" : "false") << ";\n";
+        out << variable << ".collapsed = " << (node->collapsed ? "true" : "false") << ";\n";
+        if(!node->style_class.IsEmpty())
+            out << variable << ".style_class = " << GraphDemoCppString(node->style_class) << ";\n";
+        String tag = GraphDemoNodeTag(*node);
+        if(!tag.IsEmpty()) {
+            out << "ValueMap data_" << suffix << ";\n"
+                << "data_" << suffix << ".Set(\"tag\", " << GraphDemoCppString(tag) << ");\n"
+                << variable << ".data = data_" << suffix << ";\n";
+        }
+
+        for(int p = 0; p < node->ports.GetCount(); p++) {
+            const UiGraphPort& port = node->ports[p];
+            String pv = Format("port_%s_%d", suffix, p);
+            out << "{ UiGraphPort " << pv << ";\n";
+            out << "  " << pv << ".id = " << GraphDemoCppString(port.id) << ";\n";
+            if(!port.title.IsEmpty()) out << "  " << pv << ".title = " << GraphDemoCppString(port.title) << ";\n";
+            out << "  " << pv << ".type = UiGraphDataType(" << (int)port.type << ");\n";
+            out << "  " << pv << ".direction = UiGraphPortDirection(" << (int)port.direction << ");\n";
+            out << "  " << pv << ".side = UiGraphPortSide(" << (int)port.side << ");\n";
+            out << "  " << pv << ".multiplicity = UiGraphPortMultiplicity(" << (int)port.multiplicity << ");\n";
+            if(!IsNull(port.color)) out << "  " << pv << ".color = " << GraphDemoColorCode(port.color) << ";\n";
+            out << "  " << variable << ".ports.Add(" << pv << "); }\n";
+        }
+        out << "UiGraphNodeRef " << ref_variable << " = graph.Model().AddNode(" << variable << ");\n";
+
+        if(node->style_class.StartsWith("custom:")) {
+            UiGraphNodeStyle style = ResolvePresentedStyle(*node);
+            String sv = "style_" + suffix;
+            out << "\n// Complete Style-page projection for node " << node->ref.id << ".\n"
+                << "UiGraphNodeStyle " << sv << " = graph.GetStyle().node;\n";
+            for(int state = 0; state < 4; state++) {
+                int si = GraphDemoStyleIndex(state);
+                String state_id = GraphDemoStateId(state);
+                String key = GraphDemoRecipeKey(node->style_class, state_id);
+                int recipe_index = face_recipes_.Find(key);
+                const Value *recipe = recipe_index >= 0 ? &face_recipes_[recipe_index] : nullptr;
+                out << sv << ".palette.face[" << si << "] = "
+                    << GraphDemoFillCode(style.palette.face[si], recipe) << ";\n";
+                out << sv << ".palette.frame[" << si << "] = " << GraphDemoColorCode(style.palette.frame[si]) << ";\n";
+                out << sv << ".header_face[" << si << "] = " << GraphDemoColorCode(style.header_face[si]) << ";\n";
+                out << sv << ".title_ink[" << si << "] = " << GraphDemoColorCode(style.title_ink[si]) << ";\n";
+                out << sv << ".subtitle_ink[" << si << "] = " << GraphDemoColorCode(style.subtitle_ink[si]) << ";\n";
+                out << sv << ".description_ink[" << si << "] = " << GraphDemoColorCode(style.description_ink[si]) << ";\n";
+                out << sv << ".port_label_ink[" << si << "] = " << GraphDemoColorCode(style.port_label_ink[si]) << ";\n";
+            }
+            out << sv << ".metrics.frame_enabled = " << (style.metrics.frame_enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.frame_width = " << style.metrics.frame_width << ";\n";
+            out << sv << ".metrics.content_margin = Rect(" << style.metrics.content_margin.left << ", "
+                << style.metrics.content_margin.top << ", " << style.metrics.content_margin.right << ", "
+                << style.metrics.content_margin.bottom << ");\n";
+            out << sv << ".title_font.FaceName(" << GraphDemoCppString(style.title_font.GetFaceName()) << ");\n";
+            out << sv << ".title_font.Height(" << style.title_font.GetHeight() << ");\n";
+            out << sv << ".subtitle_font.FaceName(" << GraphDemoCppString(style.subtitle_font.GetFaceName()) << ");\n";
+            out << sv << ".subtitle_font.Height(" << style.subtitle_font.GetHeight() << ");\n";
+            out << sv << ".description_font.FaceName(" << GraphDemoCppString(style.description_font.GetFaceName()) << ");\n";
+            out << sv << ".description_font.Height(" << style.description_font.GetHeight() << ");\n";
+            out << sv << ".port_font.FaceName(" << GraphDemoCppString(style.port_font.GetFaceName()) << ");\n";
+            out << sv << ".port_font.Height(" << style.port_font.GetHeight() << ");\n";
+            out << sv << ".metrics.focus_enabled = " << (style.metrics.focus_enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.focus_margin = " << style.metrics.focus_margin << ";\n";
+            out << sv << ".metrics.focus_alpha = " << style.metrics.focus_alpha << ";\n";
+            out << sv << ".metrics.focus_color = " << GraphDemoColorCode(style.metrics.focus_color) << ";\n";
+            out << sv << ".metrics.shadow.enabled = " << (style.metrics.shadow.enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.shadow.distance = " << style.metrics.shadow.distance << ";\n";
+            out << sv << ".metrics.shadow.offset_x = " << style.metrics.shadow.offset_x << ";\n";
+            out << sv << ".metrics.shadow.offset_y = " << style.metrics.shadow.offset_y << ";\n";
+            out << sv << ".metrics.shadow.alpha = " << style.metrics.shadow.alpha << ";\n";
+            out << sv << ".metrics.shadow.color = " << GraphDemoColorCode(style.metrics.shadow.color) << ";\n";
+            out << sv << ".metrics.shadow.inset = " << (style.metrics.shadow.inset ? "true" : "false") << ";\n";
+            out << sv << ".metrics.highlight.enabled = " << (style.metrics.highlight.enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.highlight.thickness = " << style.metrics.highlight.thickness << ";\n";
+            out << sv << ".metrics.highlight.alpha = " << style.metrics.highlight.alpha << ";\n";
+            out << sv << ".metrics.highlight.color = " << GraphDemoColorCode(style.metrics.highlight.color) << ";\n";
+            out << sv << ".port_radius = " << style.port_radius << ";\n";
+            out << sv << ".port_hit_radius = " << style.port_hit_radius << ";\n";
+            out << sv << ".port_spacing = " << style.port_spacing << ";\n";
+            out << sv << ".show_port_labels = " << (style.show_port_labels ? "true" : "false") << ";\n";
+            out << sv << ".show_port_type = " << (style.show_port_type ? "true" : "false") << ";\n";
+            out << "graph.SetNodeStyleClass(" << GraphDemoCppString(node->style_class) << ", " << sv << ");\n";
+        }
+    }
+
+    for(UiGraphEdgeRef ref : edge_refs) {
+        const UiGraphEdge* edge = graph_.Model().FindEdge(ref);
+        if(!edge)
+            continue;
+        String suffix = AsString((int64)edge->ref.id);
+        String variable = "edge_" + suffix;
+        out << "\n// Connector " << edge->ref.id << "\nUiGraphEdge " << variable << ";\n";
+        out << variable << ".source = UiGraphPortRef{UiGraphNodeRef{" << edge->source.node.id << "}, "
             << GraphDemoCppString(edge->source.port_id) << "};\n";
-        out << "edge.target = UiGraphPortRef{UiGraphNodeRef{" << edge->target.node.id << "}, "
+        out << variable << ".target = UiGraphPortRef{UiGraphNodeRef{" << edge->target.node.id << "}, "
             << GraphDemoCppString(edge->target.port_id) << "};\n";
-        if(!edge->title.IsEmpty()) out << "edge.title = " << GraphDemoCppString(edge->title) << ";\n";
-        out << "edge.route = UiGraphRouteStyle::" << GraphDemoRouteName(edge->route) << ";\n";
-        out << "edge.stroke = UiGraphStrokeStyle::" << GraphDemoStrokeName(edge->stroke) << ";\n";
-        out << "edge.arrow = UiGraphArrowStyle::" << GraphDemoArrowName(edge->arrow) << ";\n";
-        out << "edge.directed = " << (edge->directed ? "true" : "false") << ";\n";
-        out << "UiGraphEdgeRef ref = graph.Model().AddEdge(edge);\n";
-        edit_generated_code.SetData(out);
-        return;
+        if(!edge->title.IsEmpty()) out << variable << ".title = " << GraphDemoCppString(edge->title) << ";\n";
+        out << variable << ".route = UiGraphRouteStyle::" << GraphDemoRouteName(edge->route) << ";\n";
+        out << variable << ".stroke = UiGraphStrokeStyle::" << GraphDemoStrokeName(edge->stroke) << ";\n";
+        out << variable << ".arrow = UiGraphArrowStyle::" << GraphDemoArrowName(edge->arrow) << ";\n";
+        out << variable << ".directed = " << (edge->directed ? "true" : "false") << ";\n";
+        out << variable << ".enabled = " << (edge->enabled ? "true" : "false") << ";\n";
+        out << variable << ".visible = " << (edge->visible ? "true" : "false") << ";\n";
+        out << variable << ".selectable = " << (edge->selectable ? "true" : "false") << ";\n";
+        for(const Pointf& waypoint : edge->waypoints)
+            out << variable << ".waypoints << Pointf(" << waypoint.x << ", " << waypoint.y << ");\n";
+        out << "UiGraphEdgeRef edge_ref_" << suffix << " = graph.Model().AddEdge(" << variable << ");\n";
     }
 
-    out << "// Selected UiNodeGraph node\n"
-           "UiGraphNode node;\n";
-    out << "node.title = " << GraphDemoCppString(node->title) << ";\n";
-    if(!node->subtitle.IsEmpty()) out << "node.subtitle = " << GraphDemoCppString(node->subtitle) << ";\n";
-    if(!node->description.IsEmpty()) out << "node.description = " << GraphDemoCppString(node->description) << ";\n";
-    out << "node.position = Pointf(" << node->position.x << ", " << node->position.y << ");\n";
-    out << "node.size = Sizef(" << node->size.cx << ", " << node->size.cy << ");\n";
-    out << "node.shape = " << GraphDemoShapeCode(node->shape) << ";\n";
-    out << "node.role = " << GraphDemoRoleCode(node->role) << ";\n";
-    out << "node.corner_radius = " << node->corner_radius << ";\n";
-    if(!node->style_class.IsEmpty()) out << "node.style_class = " << GraphDemoCppString(node->style_class) << ";\n";
-    out << "UiGraphNodeRef ref = graph.Model().AddNode(node);\n";
-
-    if(node->style_class.StartsWith("custom:")) {
-        UiGraphNodeStyle style = ResolvePresentedStyle(*node);
-        out << "\n// Local presentation style authored in the Style page.\n"
-               "UiGraphNodeStyle style = graph.GetStyle().node;\n";
-        out << "style.metrics.frame_width = " << style.metrics.frame_width << ";\n";
-        out << "style.metrics.shadow.enabled = " << (style.metrics.shadow.enabled ? "true" : "false") << ";\n";
-        out << "style.metrics.shadow.distance = " << style.metrics.shadow.distance << ";\n";
-        out << "style.metrics.shadow.alpha = " << style.metrics.shadow.alpha << ";\n";
-        out << "graph.SetNodeStyleClass(" << GraphDemoCppString(node->style_class) << ", style);\n";
-    }
     edit_generated_code.SetData(out);
+}
+
+void UiGraphDemo::SaveGeneratedCode()
+{
+    String code = AsString(edit_generated_code.GetData());
+    if(code.IsEmpty())
+        return;
+    UiOsFileDialog dlg;
+    dlg.SetMode(UiOsFileDialog::Mode::SaveFile)
+       .SetTitle("Save generated UiNodeGraph C++")
+       .SetSuggestedName("UiGraphSelection.cpp")
+       .SetDefaultExtension("cpp")
+       .AddFilter("C++ source", "*.cpp;*.cc;*.cxx")
+       .AddFilter("Text", "*.txt")
+       .AddFilter("All files", "*.*");
+    if(dlg.Execute(this))
+        SaveFile(dlg.GetPath(), code);
 }
 
 void UiGraphDemo::Layout()
