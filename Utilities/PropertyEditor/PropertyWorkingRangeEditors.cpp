@@ -386,7 +386,11 @@ public:
 
         edit_.SetPlaceholder(item.mixed ? "<mixed>" :
                              item.inherited ? "<inherited>" : "");
-        edit_.Min(legal_minimum_).Max(legal_maximum_).Step(step_).Precision(decimals_);
+        // PropertyEditorItem::decimals is a decimal-place display hint, while
+        // UiFloatEdit::Precision() is significant digits. Passing decimals_
+        // directly truncates values such as 900.5 to 9e2. Preserve authored
+        // double values here and keep decimals_ for the working-range display.
+        edit_.Min(legal_minimum_).Max(legal_maximum_).Step(step_).Precision(DBL_DIG);
         edit_.Enable(enabled_);
 
         if(working_valid_) {
