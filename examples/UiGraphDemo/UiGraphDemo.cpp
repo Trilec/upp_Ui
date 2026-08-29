@@ -278,10 +278,8 @@ void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
         if(q >= 0)
             data.Remove(q);
     }
-    else if(q >= 0)
-        data.SetValue(q, tag);
     else
-        data.Add("tag", tag);
+        data.Set("tag", tag);
     node.data = data;
 }
 
