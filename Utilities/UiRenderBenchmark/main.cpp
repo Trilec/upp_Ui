@@ -111,13 +111,12 @@ void PaintRoundedPath(Painter& p, const Rect& r, int radius,
 {
     if(r.IsEmpty())
         return;
-    double inset = 0.5;
-    double width = max(1.0, r.GetWidth() - 1.0);
-    double height = max(1.0, r.GetHeight() - 1.0);
-    double rad = min<double>(radius, min(r.GetWidth(), r.GetHeight()) * 0.5);
 
+    double rad = min<double>(radius, min(r.GetWidth(), r.GetHeight()) * 0.5);
     p.Begin();
-    p.RoundedRectangle(r.left + inset, r.top + inset, width, height, rad);
+    p.RoundedRectangle(r.left + 0.5, r.top + 0.5,
+                       max(1.0, r.GetWidth() - 1.0),
+                       max(1.0, r.GetHeight() - 1.0), rad);
     p.Fill(face);
     p.Stroke(1.0, frame);
     p.End();
@@ -131,7 +130,6 @@ Image MakeRoundedImage(Size sz, int radius, Color face = kFace, Color frame = kF
     ImageBuffer ib(sz);
     ib.SetKind(IMAGE_ALPHA);
     Fill(~ib, RGBAZero(), ib.GetLength());
-
     BufferPainter p(ib, MODE_ANTIALIASED);
     PaintRoundedPath(p, RectC(0, 0, sz.cx, sz.cy), radius, face, frame);
     p.Finish();
@@ -143,18 +141,18 @@ Image CachedRounded(Size sz, int radius, const char *tag,
 {
     UiRasterCachePolicy policy = UiRasterPolicyAA(tag);
     policy.allow_scale_from_bucket = false;
-    UiRasterCacheKeyBuilder kb(tag);
-    kb.Add(sz).Add(radius).Add(face).Add(frame).Add(1);
-    return UiRasterCache::Get(kb.Build(), policy,
+    UiRasterCacheKeyBuilder key(tag);
+    key.Add(sz).Add(radius).Add(face).Add(frame).Add(1);
+    return UiRasterCache::Get(key.Build(), policy,
                               [=] { return MakeRoundedImage(sz, radius, face, frame); });
 }
 
 void DrawCurrentRounded(Draw& w, const Vector<Rect>& rects, int radius)
 {
-    StyledPalette p = BenchPalette();
-    StyledMetrics m = BenchMetrics(radius);
+    StyledPalette palette = BenchPalette();
+    StyledMetrics metrics = BenchMetrics(radius);
     for(const Rect& r : rects)
-        UiPaintFaceFrameDash(w, r, p, m, ST_NORMAL);
+        UiPaintFaceFrameDash(w, r, palette, metrics, ST_NORMAL);
 }
 
 void DrawLocalRounded(Draw& w, const Vector<Rect>& rects, int radius)
@@ -166,7 +164,7 @@ void DrawLocalRounded(Draw& w, const Vector<Rect>& rects, int radius)
 }
 
 void DrawCachedRounded(Draw& w, const Vector<Rect>& rects, int radius,
-                       const char *tag = "bench-rounded")
+                       const char *tag)
 {
     for(const Rect& r : rects) {
         Image img = CachedRounded(r.GetSize(), radius, tag);
@@ -174,13 +172,12 @@ void DrawCachedRounded(Draw& w, const Vector<Rect>& rects, int radius,
     }
 }
 
-void DrawBatchedRounded(Draw& w, const Vector<Rect>& rects, int radius,
-                        Color face = kFace, Color frame = kFrame)
+void DrawBatchedRounded(Draw& w, const Vector<Rect>& rects, int radius)
 {
     Rect bounds = BoundsOf(rects);
     UiPaintRenderLayer(w, bounds, [&](Painter& p) {
         for(const Rect& r : rects)
-            PaintRoundedPath(p, r, radius, face, frame);
+            PaintRoundedPath(p, r, radius);
     });
 }
 
@@ -212,7 +209,8 @@ Vector<Rect> SliderThumbs(const Vector<Rect>& rects)
 void DrawSliderTracks(Draw& w, const Vector<Rect>& rects)
 {
     for(const Rect& r : rects) {
-        Rect track(r.left + 8, r.CenterPoint().y - 2, r.right - 8, r.CenterPoint().y + 2);
+        Rect track(r.left + 8, r.CenterPoint().y - 2,
+                   r.right - 8, r.CenterPoint().y + 2);
         w.DrawRect(track, kTrack);
         Rect active = track;
         active.right = r.left + r.GetWidth() * 2 / 3;
@@ -255,9 +253,9 @@ Image CachedRing(Size sz)
 {
     UiRasterCachePolicy policy = UiRasterPolicyAA("bench-ring");
     policy.allow_scale_from_bucket = false;
-    UiRasterCacheKeyBuilder kb("bench-ring");
-    kb.Add(sz).Add(kAccent).Add(kTrack);
-    return UiRasterCache::Get(kb.Build(), policy,
+    UiRasterCacheKeyBuilder key("bench-ring");
+    key.Add(sz).Add(kAccent).Add(kTrack);
+    return UiRasterCache::Get(key.Build(), policy,
                               [=] { return MakeRingImage(sz); });
 }
 
@@ -305,18 +303,21 @@ Image BenchSkin()
     return skin;
 }
 
+Image MakeNineSliceImage(Size sz)
+{
+    ImageDraw draw(sz.cx, sz.cy);
+    UiDraw9Slice(draw, Rect(sz), BenchSkin(), Rect(6, 6, 6, 6));
+    return draw;
+}
+
 Image CachedNineSlice(Size sz)
 {
     UiRasterCachePolicy policy = UiRasterPolicyAA("bench-nine-slice");
     policy.allow_scale_from_bucket = false;
-    UiRasterCacheKeyBuilder kb("bench-nine-slice");
-    kb.Add(sz);
-    return UiRasterCache::Get(kb.Build(), policy, [=] {
-        ImageDraw id(sz.cx, sz.cy);
-        id.DrawRect(Rect(sz), RGBAZero());
-        UiDraw9Slice(id, Rect(sz), BenchSkin(), Rect(6, 6, 6, 6));
-        return Image(id);
-    });
+    UiRasterCacheKeyBuilder key("bench-nine-slice");
+    key.Add(sz);
+    return UiRasterCache::Get(key.Build(), policy,
+                              [=] { return MakeNineSliceImage(sz); });
 }
 
 void DrawNineSliceDirect(Draw& w, const Vector<Rect>& rects)
@@ -349,6 +350,7 @@ Timing Measure(Size canvas, int rounds, PaintFn paint)
     Timing out;
     out.rounds = max(1, rounds);
     out.cold_us = Once();
+
     int64 total = 0;
     for(int i = 0; i < out.rounds; i++) {
         int64 elapsed = Once();
@@ -399,7 +401,8 @@ void RunOne(TestCtx& t, const char *scenario, const char *strategy,
 {
     Timing timing = Measure(canvas, RoundsFor(scene_count, single_dirty),
                             [&](Draw& w) { paint(w, paint_rects); });
-    Emit(t, scenario, strategy, scene_count, paint_rects.GetCount(), single_dirty, timing);
+    Emit(t, scenario, strategy, scene_count, paint_rects.GetCount(),
+         single_dirty, timing);
 }
 
 void RunSet(TestCtx& t, int scene_count, bool single_dirty)
@@ -421,9 +424,9 @@ void RunSet(TestCtx& t, int scene_count, bool single_dirty)
            [](Draw& w, const Vector<Rect>& r) { DrawCurrentRounded(w, r, 9); });
     RunOne(t, "rounded", "local_aa", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawLocalRounded(w, r, 9); });
-    UiRasterCacheClearTag("bench-rounded");
+    UiRasterCache::ClearTag("bench-rounded");
     RunOne(t, "rounded", "cached_aa", scene_count, rects, canvas, single_dirty,
-           [](Draw& w, const Vector<Rect>& r) { DrawCachedRounded(w, r, 9); });
+           [](Draw& w, const Vector<Rect>& r) { DrawCachedRounded(w, r, 9, "bench-rounded"); });
     RunOne(t, "rounded", "batched_aa", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawBatchedRounded(w, r, 9); });
 
@@ -437,7 +440,7 @@ void RunSet(TestCtx& t, int scene_count, bool single_dirty)
                DrawLocalRounded(w, r, 8);
                DrawButtonText(w, r);
            });
-    UiRasterCacheClearTag("bench-button");
+    UiRasterCache::ClearTag("bench-button");
     RunOne(t, "button", "cached_aa", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) {
                DrawCachedRounded(w, r, 8, "bench-button");
@@ -455,7 +458,7 @@ void RunSet(TestCtx& t, int scene_count, bool single_dirty)
                DrawSliderTracks(w, r);
                DrawCurrentRounded(w, thumbs, 9);
            });
-    UiRasterCacheClearTag("bench-slider-thumb");
+    UiRasterCache::ClearTag("bench-slider-thumb");
     RunOne(t, "slider", "cached_aa", scene_count, rects, canvas, single_dirty,
            [&](Draw& w, const Vector<Rect>& r) {
                DrawSliderTracks(w, r);
@@ -469,7 +472,7 @@ void RunSet(TestCtx& t, int scene_count, bool single_dirty)
 
     RunOne(t, "ring", "local_aa", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawLocalRings(w, r); });
-    UiRasterCacheClearTag("bench-ring");
+    UiRasterCache::ClearTag("bench-ring");
     RunOne(t, "ring", "cached_aa", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawCachedRings(w, r); });
     RunOne(t, "ring", "batched_aa", scene_count, rects, canvas, single_dirty,
@@ -477,7 +480,7 @@ void RunSet(TestCtx& t, int scene_count, bool single_dirty)
 
     RunOne(t, "nine_slice", "direct", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawNineSliceDirect(w, r); });
-    UiRasterCacheClearTag("bench-nine-slice");
+    UiRasterCache::ClearTag("bench-nine-slice");
     RunOne(t, "nine_slice", "cached", scene_count, rects, canvas, single_dirty,
            [](Draw& w, const Vector<Rect>& r) { DrawNineSliceCached(w, r); });
 }
