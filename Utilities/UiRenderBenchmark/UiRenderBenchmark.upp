@@ -1,0 +1,14 @@
+description "Ui software rendering strategy benchmark";
+
+uses
+	Core,
+	Draw,
+	Painter,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";
