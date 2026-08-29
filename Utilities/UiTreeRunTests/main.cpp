@@ -376,9 +376,7 @@ private:
     {
         if(!model_.IsValid(dnd_parent_a_)) {
             UiModelItem a("DnD Parent A");
-            a.group_header = true;
             UiModelItem b("DnD Parent B");
-            b.group_header = true;
             dnd_parent_a_ = model_.AddChild(model_.Root(), a);
             dnd_parent_b_ = model_.AddChild(model_.Root(), b);
             dnd_a1_ = model_.AddChild(dnd_parent_a_, UiModelItem("A1"));
@@ -421,7 +419,20 @@ private:
             return;
         }
 
-        UiTreeNodeRef first = model_.GetChild(root, 0);
+        UiTreeNodeRef first{-1};
+        Vector<int> nodes = CollectNodeIds(true);
+        for(int id : nodes) {
+            UiTreeNodeRef node{id};
+            const UiModelItem& item = model_.Get(node);
+            if(item.enabled && !item.group_header) {
+                first = node;
+                break;
+            }
+        }
+        if(!first.IsValid()) {
+            StopTests("Keyboard regression failed: no selectable node");
+            return;
+        }
         tree_.SetSelectionMode(UITREESEL_SINGLE);
         tree_.SelectNode(first);
 
