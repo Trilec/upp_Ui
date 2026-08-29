@@ -2592,16 +2592,38 @@ public:
     {
         UiThemeContext ctx = GetContext();
         UiTable::Style s = UiTable::StyleDefault();
-        UiThemeDetail::ApplyMode(s.palette, ctx.mode);
-        s.table_bg = s.palette.face[ST_NORMAL].IsSolid() ? s.palette.face[ST_NORMAL].color : SColorPaper();
-        s.header_bg = s.palette.face[ST_HOT].IsSolid() ? s.palette.face[ST_HOT].color : s.table_bg;
-        s.header_hot_bg = s.palette.face[ST_PRESSED].IsSolid() ? s.palette.face[ST_PRESSED].color : s.header_bg;
-        s.header_ink = s.palette.ink[ST_NORMAL];
-        s.cell_ink = s.palette.ink[ST_NORMAL];
-        s.muted_ink = s.palette.ink[ST_DISABLED];
-        s.grid_color = s.palette.frame[ST_NORMAL];
-        s.selection_border = s.palette.frame[ST_PRESSED];
-        s.selection_bg = s.palette.face[ST_PRESSED].IsSolid() ? s.palette.face[ST_PRESSED].color : s.table_bg;
+        const UiPanel::Style surface = ResolvePanel(UiPanelRole::Surface);
+        const UiPanel::Style subtle = ResolvePanel(UiPanelRole::Subtle);
+        const UiList::Style list = ResolveList();
+        const auto face = [](const StyledPalette& palette, int state,
+                             Color fallback) {
+            return palette.face[state].IsSolid() &&
+                   !IsNull(palette.face[state].color)
+                ? palette.face[state].color : fallback;
+        };
+        const auto color = [](Color value, Color fallback) {
+            return IsNull(value) ? fallback : value;
+        };
+        s.table_bg = face(surface.palette, ST_NORMAL, s.table_bg);
+        s.header_bg = face(subtle.palette, ST_NORMAL, s.table_bg);
+        s.header_hot_bg = face(subtle.palette, ST_HOT, s.header_bg);
+        s.row_header_bg = s.header_bg;
+        s.header_ink = color(surface.palette.ink[ST_NORMAL], s.header_ink);
+        s.cell_ink = color(surface.palette.ink[ST_NORMAL], s.cell_ink);
+        s.muted_ink = color(surface.palette.ink[ST_DISABLED], s.muted_ink);
+        s.grid_color = color(subtle.palette.frame[ST_NORMAL],
+                             color(surface.palette.frame[ST_NORMAL], s.grid_color));
+        s.alternate_row_bg = face(subtle.palette, ST_NORMAL, s.table_bg);
+        s.hover_bg = face(surface.palette, ST_HOT,
+                          face(subtle.palette, ST_HOT, s.table_bg));
+        s.read_only_bg = face(subtle.palette, ST_NORMAL, s.table_bg);
+        s.selection_bg = color(list.selected_face,
+                               face(surface.palette, ST_PRESSED, s.table_bg));
+        s.selection_border = color(list.selected_frame,
+                                   color(list.drag_marker, s.selection_border));
+        s.active_bg = s.selection_bg;
+        s.active_border = color(list.drag_marker, s.selection_border);
+        s.resize_guide = s.active_border;
         return s;
     }
     static UiDoc::Style ResolveDoc()
