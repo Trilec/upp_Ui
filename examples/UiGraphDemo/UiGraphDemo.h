@@ -29,6 +29,28 @@
 
 namespace Upp {
 
+inline String GraphDemoNodeTag(const UiGraphNode& node)
+{
+    if(!node.data.Is<ValueMap>())
+        return String();
+    ValueMap data = node.data;
+    int q = data.Find("tag");
+    return q >= 0 ? AsString(data.GetValue(q)) : String();
+}
+
+inline void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
+{
+    ValueMap data = node.data.Is<ValueMap>() ? ValueMap(node.data) : ValueMap();
+    if(tag.IsEmpty()) {
+        int q = data.Find("tag");
+        if(q >= 0)
+            data.Remove(q);
+    }
+    else
+        data.Set("tag", tag);
+    node.data = data;
+}
+
 class UiGraphDemo : public TopWindow {
 public:
     typedef UiGraphDemo CLASSNAME;

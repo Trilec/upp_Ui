@@ -45,6 +45,11 @@ static PropertyEditorStyle PeMakeStyle(Color background,
 PropertyEditorStyle PropertyEditorStyle::System()
 {
     UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Subtle);
+    // Subtle panels are transparent by design. PropertyEditor paints an
+    // opaque surface of its own, so do not fall back to the platform paper
+    // colour when the active UiTheme has no solid subtle face.
+    if(!panel.palette.face[ST_NORMAL].IsSolid())
+        panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
     UiLabel::Style label = UiTheme::ResolveLabel(UiRole::Standard);
     UiLabel::Style subtle = UiTheme::ResolveLabel(UiRole::Subtle);
 

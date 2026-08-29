@@ -44,28 +44,6 @@ Font GraphDemoMono(int px, bool bold = false)
     return f;
 }
 
-String GraphDemoNodeTag(const UiGraphNode& node)
-{
-    if(!node.data.Is<ValueMap>())
-        return String();
-    ValueMap data = node.data;
-    int q = data.Find("tag");
-    return q >= 0 ? AsString(data.GetValue(q)) : String();
-}
-
-void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
-{
-    ValueMap data = node.data.Is<ValueMap>() ? ValueMap(node.data) : ValueMap();
-    if(tag.IsEmpty()) {
-        int q = data.Find("tag");
-        if(q >= 0)
-            data.Remove(q);
-    }
-    else
-        data.Set("tag", tag);
-    node.data = data;
-}
-
 UiGraphNode GraphDemoReferenceNode(const String& title,
                                    const String& subtitle,
                                    Pointf position,

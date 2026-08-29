@@ -261,28 +261,6 @@ String GraphDemoColorCode(Color c)
     return Format("Color(%d, %d, %d)", c.GetR(), c.GetG(), c.GetB());
 }
 
-String GraphDemoNodeTag(const UiGraphNode& node)
-{
-    if(!node.data.Is<ValueMap>())
-        return String();
-    ValueMap data = node.data;
-    int q = data.Find("tag");
-    return q >= 0 ? AsString(data.GetValue(q)) : String();
-}
-
-void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
-{
-    ValueMap data = node.data.Is<ValueMap>() ? ValueMap(node.data) : ValueMap();
-    int q = data.Find("tag");
-    if(tag.IsEmpty()) {
-        if(q >= 0)
-            data.Remove(q);
-    }
-    else
-        data.Set("tag", tag);
-    node.data = data;
-}
-
 String GraphDemoFillCode(const UiFill& fill, const Value *recipe)
 {
     if(recipe && recipe->Is<ValueMap>()) {
