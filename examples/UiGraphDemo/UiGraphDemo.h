@@ -26,6 +26,7 @@
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Utilities/PropertyEditor/PropertyWorkingRangeEditors.h>
 
 namespace Upp {
 

@@ -295,6 +295,7 @@ UiGraphDemo::UiGraphDemo()
     SetRect(0, 0, DPI(1380), DPI(860));
 
     RegisterPropertyEditorV1Editors(pe_factory);
+    RegisterPropertyEditorWorkingRangeEditors(pe_factory);
 
     BuildHeader();
     BuildPreview();
@@ -417,8 +418,13 @@ void UiGraphDemo::BuildNodeEditorModel()
                  .AddChoice("Glow", "Glow").AddChoice("Custom", "Custom");
     pe_model_node.AddText("tag", "Tag", String(), "Presentation");
 
-    PropertyEditorItem& x = pe_model_node.AddDouble("x", "X", 0.0, "Layout");
-    x.SetUnit("world").SetHelp("Absolute X coordinate; Inspector edits are bounded to one viewport beyond the current view.");
+    PropertyEditorItem& x = pe_model_node.Add("x", "X", PropertyEditorKind::Custom, 0.0, "Layout");
+    x.custom_editor = PropertyEditorWorkingRangeDoubleId();
+    x.editor_variant = PropertyEditorWorkingRangeVariant(-1000.0, 1000.0);
+    x.step = 1.0;
+    x.decimals = 2;
+    x.inline_editor = true;
+    x.SetUnit("world").SetHelp("Absolute X coordinate; numeric entry and wheel use 1-world-unit steps, while the slider follows the current viewport working range.");
     x.normalize = [=](const Value& candidate) -> Value {
         double value = (double)candidate;
         Size size = graph_.GetSize();
@@ -432,8 +438,13 @@ void UiGraphDemo::BuildNodeEditorModel()
         return minmax(value, lo - span, hi + span);
     };
 
-    PropertyEditorItem& y = pe_model_node.AddDouble("y", "Y", 0.0, "Layout");
-    y.SetUnit("world").SetHelp("Absolute Y coordinate; Inspector edits are bounded to one viewport beyond the current view.");
+    PropertyEditorItem& y = pe_model_node.Add("y", "Y", PropertyEditorKind::Custom, 0.0, "Layout");
+    y.custom_editor = PropertyEditorWorkingRangeDoubleId();
+    y.editor_variant = PropertyEditorWorkingRangeVariant(-1000.0, 1000.0);
+    y.step = 1.0;
+    y.decimals = 2;
+    y.inline_editor = true;
+    y.SetUnit("world").SetHelp("Absolute Y coordinate; numeric entry and wheel use 1-world-unit steps, while the slider follows the current viewport working range.");
     y.normalize = [=](const Value& candidate) -> Value {
         double value = (double)candidate;
         Size size = graph_.GetSize();
@@ -459,7 +470,7 @@ void UiGraphDemo::BuildNodeEditorModel()
 
     pe_model_node.SetGroupSubtitle("Identity", "authoritative UiGraphModel record");
     pe_model_node.SetGroupSubtitle("Presentation", "shape, role, style token and optional demo tag metadata");
-    pe_model_node.SetGroupSubtitle("Layout", "world-space geometry; Inspector X/Y edits stay near the visible working area");
+    pe_model_node.SetGroupSubtitle("Layout", "world-space geometry; X/Y keep numeric, wheel and viewport-bounded slider editing");
     pe_model_node.StructureChanged();
 }
 
@@ -660,6 +671,7 @@ void UiGraphDemo::SetScaleMode(bool scale)
         return;
     }
 
+    const int64 switch_started = usecs();
     CommitStyleTransaction();
     scale_mode_ = scale;
     style_preview_state_ = ST_NORMAL;
@@ -685,6 +697,13 @@ void UiGraphDemo::SetScaleMode(bool scale)
     btn_reference.SetChecked(!scale);
     btn_scale.SetChecked(scale);
     SyncSelection();
+
+    RLOG(Format("UIGRAPH_DEMO_SWITCH_PROFILE mode=%s elapsed_us=%lld nodes=%d edges=%d prepared=%d/%d geometry_us=%lld",
+                scale ? "10k" : "reference",
+                (long long)(usecs() - switch_started),
+                graph_.Model().GetNodeCount(), graph_.Model().GetEdgeCount(),
+                graph_.GetPreparedNodeCount(), graph_.GetPreparedEdgeCount(),
+                (long long)graph_.GetLastGeometryPrepareUsecs()));
 }
 
 void UiGraphDemo::SelectReferenceStartNode()
@@ -755,6 +774,22 @@ void UiGraphDemo::SyncNodeEditor()
             pe_model_node.SetValue("selectable", node->selectable, false);
             pe_model_node.SetValue("movable", node->movable, false);
             pe_model_node.SetValue("collapsed", node->collapsed, false);
+
+            Size size = graph_.GetSize();
+            if(size.cx > 0 && size.cy > 0) {
+                Pointf a = graph_.ScreenToWorld(Point(0, 0));
+                Pointf b = graph_.ScreenToWorld(Point(size.cx, size.cy));
+                double xlo = min(a.x, b.x), xhi = max(a.x, b.x);
+                double ylo = min(a.y, b.y), yhi = max(a.y, b.y);
+                double xspan = max(1.0, xhi - xlo);
+                double yspan = max(1.0, yhi - ylo);
+                PropertyEditorItem *xi = pe_model_node.Find("x");
+                PropertyEditorItem *yi = pe_model_node.Find("y");
+                if(xi)
+                    xi->editor_variant = PropertyEditorWorkingRangeVariant(xlo - xspan, xhi + xspan);
+                if(yi)
+                    yi->editor_variant = PropertyEditorWorkingRangeVariant(ylo - yspan, yhi + yspan);
+            }
         }
         else
             pe_model_node.SetValue("id", Value(), false);
@@ -1011,6 +1046,8 @@ void UiGraphDemo::BeginStyleTransaction(const String&, const Value&)
 
 void UiGraphDemo::CommitStyleTransaction()
 {
+    if(!style_transaction_active_)
+        return;
     style_transaction_active_ = false;
     style_transaction_node_ = UiGraphNodeRef();
     style_transaction_original_class_.Clear();

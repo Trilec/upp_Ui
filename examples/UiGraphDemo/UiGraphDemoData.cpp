@@ -18,13 +18,42 @@ UiGraphPort GraphDemoPort(const String& id, const String& title,
     return port;
 }
 
+const String& GraphDemoSansFace()
+{
+    static String face;
+    static bool resolved = false;
+    if(!resolved) {
+        resolved = true;
+        if(Font::FindFaceNameIndex("Inter") >= 0)
+            face = "Inter";
+        else if(Font::FindFaceNameIndex("Segoe UI") >= 0)
+            face = "Segoe UI";
+    }
+    return face;
+}
+
+const String& GraphDemoMonoFace()
+{
+    static String face;
+    static bool resolved = false;
+    if(!resolved) {
+        resolved = true;
+        if(Font::FindFaceNameIndex("Fira Code") >= 0)
+            face = "Fira Code";
+        else if(Font::FindFaceNameIndex("Cascadia Code") >= 0)
+            face = "Cascadia Code";
+        else if(Font::FindFaceNameIndex("Consolas") >= 0)
+            face = "Consolas";
+    }
+    return face;
+}
+
 Font GraphDemoSans(int px, bool bold = false)
 {
     Font f = SansSerifZ(DPI(px));
-    if(Font::FindFaceNameIndex("Inter") >= 0)
-        f.FaceName("Inter");
-    else if(Font::FindFaceNameIndex("Segoe UI") >= 0)
-        f.FaceName("Segoe UI");
+    const String& face = GraphDemoSansFace();
+    if(!face.IsEmpty())
+        f.FaceName(face);
     if(bold)
         f.Bold();
     return f;
@@ -33,12 +62,9 @@ Font GraphDemoSans(int px, bool bold = false)
 Font GraphDemoMono(int px, bool bold = false)
 {
     Font f = MonospaceZ(DPI(px));
-    if(Font::FindFaceNameIndex("Fira Code") >= 0)
-        f.FaceName("Fira Code");
-    else if(Font::FindFaceNameIndex("Cascadia Code") >= 0)
-        f.FaceName("Cascadia Code");
-    else if(Font::FindFaceNameIndex("Consolas") >= 0)
-        f.FaceName("Consolas");
+    const String& face = GraphDemoMonoFace();
+    if(!face.IsEmpty())
+        f.FaceName(face);
     if(bold)
         f.Bold();
     return f;
