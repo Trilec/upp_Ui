@@ -74,6 +74,7 @@ static void TestGeometry(TestCtx& t)
     t.Section("Geometry");
 
     UiProgressRing ring;
+    t.Expect(ring.GetCapRoundness() == 100, "cap roundness defaults to fully rounded");
     ring.AnimateOnShow(false).Set(68, 100);
     UiProgressRing::Geometry g = ring.GetGeometry(Size(180, 100));
     t.Expect(g.square == RectC(40, 0, 100, 100), "non-square allocation centers a square ring viewport");
@@ -83,11 +84,20 @@ static void TestGeometry(TestCtx& t)
     t.Expect(g.radius > 0.0, "normal ring has positive path radius");
     t.Expect(g.text_rect.GetWidth() == g.text_rect.GetHeight(), "center text uses square inner geometry");
 
-    ring.SetThickness(12).SetCapRadius(50).SetRingInset(5);
+    ring.SetThickness(40).SetCapRoundness(100).SetRingInset(5);
     g = ring.GetGeometry(Size(120, 120));
-    t.Expect(g.thickness == 12, "geometry uses authored thickness");
-    t.Expect(g.cap_radius <= 6, "cap radius is safely limited by stroke thickness");
-    t.Expect(g.radius < 50.0, "thickness and inset reserve paint room inside bounds");
+    t.Expect(g.thickness == 40, "geometry uses authored thickness");
+    t.Expect(g.cap_roundness == 100, "full cap roundness is independent of stroke thickness");
+    t.Expect(g.radius < 40.0, "thickness and inset reserve paint room inside bounds");
+
+    ring.SetCapRoundness(50);
+    g = ring.GetGeometry(Size(120, 120));
+    t.Expect(g.cap_roundness == 50, "intermediate cap roundness is stored as a percentage");
+
+    ring.SetCapRoundness(-20);
+    t.Expect(ring.GetCapRoundness() == 0, "cap roundness clamps to zero");
+    ring.SetCapRoundness(140);
+    t.Expect(ring.GetCapRoundness() == 100, "cap roundness clamps to one hundred");
 
     UiProgressRing::Geometry tiny = ring.GetGeometry(Size(12, 8));
     t.Expect(tiny.square == RectC(2, 0, 8, 8), "tiny rectangular allocation still centers the square viewport");

@@ -28,11 +28,14 @@
     - Set(actual, total) updates determinate progress.
     - SetIndeterminate(true) enables the animated unknown-total state.
     - SetProgressGradient(start, end) enables an along-sweep progress gradient.
+    - SetCapRoundness(0..100) controls flat through fully rounded stroke ends.
     - Percentage text is shown by default; SetText() replaces it.
 
     Changelog
     - 2026-08: moved intro/indeterminate frame scheduling to UiFrameTicker;
       Ctrl integer callback ids are byte offsets, not arbitrary identifiers.
+    - 2026-08: replaced absolute cap radius with 0..100 percent cap roundness;
+      cap geometry now scales automatically with stroke thickness.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -58,7 +61,7 @@ public:
 
         Font font;
         int  thickness = DPI(7);
-        int  cap_radius = DPI(4);
+        int  cap_roundness = 100;
         int  ring_inset = DPI(2);
         int  min_text_height = DPI(7);
 
@@ -73,7 +76,7 @@ public:
             for(int i = 0; i < 4; i++)
                 s % gradient_end[i];
             s % gradient_enabled % font
-              % thickness % cap_radius % ring_inset % min_text_height
+              % thickness % cap_roundness % ring_inset % min_text_height
               % animate_on_show % intro_duration_ms
               % indeterminate_duration_ms % indeterminate_sweep_degrees;
         }
@@ -90,7 +93,7 @@ public:
         double  target_ratio = 0.0;
         double  display_ratio = 0.0;
         int     thickness = 0;
-        int     cap_radius = 0;
+        int     cap_roundness = 100;
         int     text_font_height = 0;
         bool    text_visible = false;
         bool    indeterminate = false;
@@ -142,8 +145,8 @@ public:
 
     UiProgressRing& SetThickness(int px);
     int             GetThickness() const { return max(1, GetEffectiveStyle().thickness); }
-    UiProgressRing& SetCapRadius(int px);
-    int             GetCapRadius() const { return max(0, GetEffectiveStyle().cap_radius); }
+    UiProgressRing& SetCapRoundness(int percent);
+    int             GetCapRoundness() const { return clamp(GetEffectiveStyle().cap_roundness, 0, 100); }
     UiProgressRing& SetRingInset(int px);
     int             GetRingInset() const { return max(0, GetEffectiveStyle().ring_inset); }
 
@@ -188,7 +191,7 @@ private:
 
     void PaintProgressArc(BufferPainter& p, const Pointf& center, double radius,
                           double start_angle, double sweep_angle, int thickness,
-                          int cap_radius, Color start, Color end, bool gradient) const;
+                          int cap_roundness, Color start, Color end, bool gradient) const;
 
     void UpdateAnimation();
     void StartAnimation(AnimationMode mode);

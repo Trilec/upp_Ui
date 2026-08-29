@@ -42,6 +42,51 @@ Pointf UiRingArcPoint(Pointf center, double radius, double angle)
                   center.y + sin(angle) * radius);
 }
 
+Pointf UiRingBasisPoint(const Pointf& origin,
+                        const Pointf& xaxis, double x,
+                        const Pointf& yaxis, double y)
+{
+    return Pointf(origin.x + xaxis.x * x + yaxis.x * y,
+                  origin.y + xaxis.y * x + yaxis.y * y);
+}
+
+void UiRingRoundedCapPath(Painter& p, const Pointf& endpoint, double angle,
+                          double sweep_direction, bool start_cap,
+                          double half_width, double roundness)
+{
+    double r = half_width * UiRingClamp01(roundness);
+    if(r <= 0.000001 || half_width <= 0.000001)
+        return;
+
+    Pointf forward(-sin(angle) * sweep_direction,
+                   cos(angle) * sweep_direction);
+    Pointf outward = start_cap ? Pointf(-forward.x, -forward.y) : forward;
+    Pointf normal(cos(angle), sin(angle));
+
+    // Interpolate the cap as rounded corners around a real end face. The
+    // corner radius grows from 0 to half the stroke width: at 0 the face is
+    // fully flat, at intermediate values a central flat face remains, and at
+    // 100 the two quarter circles meet as a true semicircle.
+    const double kappa = 0.5522847498307936;
+    const double face_half = half_width - r;
+
+    Pointf upper = UiRingBasisPoint(endpoint, outward, 0.0, normal, half_width);
+    Pointf upper_face = UiRingBasisPoint(endpoint, outward, r, normal, face_half);
+    Pointf lower_face = UiRingBasisPoint(endpoint, outward, r, normal, -face_half);
+    Pointf lower = UiRingBasisPoint(endpoint, outward, 0.0, normal, -half_width);
+
+    Pointf upper_c1 = UiRingBasisPoint(endpoint, outward, kappa * r, normal, half_width);
+    Pointf upper_c2 = UiRingBasisPoint(endpoint, outward, r, normal, face_half + kappa * r);
+    Pointf lower_c1 = UiRingBasisPoint(endpoint, outward, r, normal, -face_half - kappa * r);
+    Pointf lower_c2 = UiRingBasisPoint(endpoint, outward, kappa * r, normal, -half_width);
+
+    p.Move(upper)
+     .Cubic(upper_c1, upper_c2, upper_face)
+     .Line(lower_face)
+     .Cubic(lower_c1, lower_c2, lower)
+     .Close();
+}
+
 Image UiRingAngularGradientBrush(Size size, Pointf center,
                                  double start_angle, double sweep_angle,
                                  Color start, Color end)
@@ -114,7 +159,7 @@ const UiProgressRing::Style& UiProgressRing::StyleDefault()
         s.gradient_enabled = false;
         s.font = StdFontZ(14).Bold();
         s.thickness = DPI(7);
-        s.cap_radius = DPI(4);
+        s.cap_roundness = 100;
         s.ring_inset = DPI(2);
         s.min_text_height = DPI(7);
         s.animate_on_show = true;
@@ -180,7 +225,6 @@ UiProgressRing::Style UiProgressRing::ResolveThemeStyle() const
 
     if(context.preset == UiThemePreset::Compact) {
         s.thickness = DPI(5);
-        s.cap_radius = DPI(3);
         s.ring_inset = DPI(1);
     }
     return s;
@@ -395,9 +439,9 @@ UiProgressRing& UiProgressRing::SetThickness(int px)
     return *this;
 }
 
-UiProgressRing& UiProgressRing::SetCapRadius(int px)
+UiProgressRing& UiProgressRing::SetCapRoundness(int percent)
 {
-    StyleEdit().cap_radius = max(0, px);
+    StyleEdit().cap_roundness = UiRingClampInt(percent, 0, 100);
     OnStyleChanged();
     return *this;
 }
@@ -520,7 +564,7 @@ UiProgressRing::Geometry UiProgressRing::BuildGeometry(Size size) const
     g.target_ratio = GetRatio();
     g.display_ratio = GetDisplayRatio();
     g.thickness = max(1, style.thickness);
-    g.cap_radius = min(max(0, style.cap_radius), max(1, (g.thickness + 1) / 2));
+    g.cap_roundness = UiRingClampInt(style.cap_roundness, 0, 100);
 
     int side = max(0, min(size.cx, size.cy));
     int x = (size.cx - side) / 2;
@@ -568,7 +612,7 @@ UiProgressRing::Geometry UiProgressRing::GetGeometry(Size size) const
 
 void UiProgressRing::PaintProgressArc(BufferPainter& p, const Pointf& center, double radius,
                                       double start_angle, double sweep_angle, int thickness,
-                                      int cap_radius, Color start, Color end, bool gradient) const
+                                      int cap_roundness, Color start, Color end, bool gradient) const
 {
     if(radius <= 0.0 || thickness <= 0 || std::fabs(sweep_angle) < 0.000001)
         return;
@@ -599,8 +643,8 @@ void UiProgressRing::PaintProgressArc(BufferPainter& p, const Pointf& center, do
         return;
     }
 
-    const double half_width = thickness / 2.0;
-    const bool native_round_cap = cap_radius > 0 && cap_radius >= half_width - 0.000001;
+    int roundness = UiRingClampInt(cap_roundness, 0, 100);
+    const bool native_round_cap = roundness >= 100;
     Pointf first = UiRingArcPoint(center, radius, start_angle);
 
     p.Begin();
@@ -609,19 +653,25 @@ void UiProgressRing::PaintProgressArc(BufferPainter& p, const Pointf& center, do
     StrokePath();
     p.End();
 
-    if(cap_radius > 0 && !native_round_cap) {
-        double cr = min((double)cap_radius, half_width);
+    if(roundness > 0 && !native_round_cap) {
+        const double direction = sweep_angle < 0.0 ? -1.0 : 1.0;
+        const double half_width = thickness / 2.0;
+        const double q = roundness / 100.0;
         Pointf last = UiRingArcPoint(center, radius, start_angle + sweep_angle);
-        p.Begin();
-        if(use_gradient) {
-            p.Circle(first, cr).Fill(gradient_brush, Xform2D::Identity());
-            p.Circle(last, cr).Fill(gradient_brush, Xform2D::Identity());
-        }
-        else {
-            p.Circle(first, cr).Fill(start);
-            p.Circle(last, cr).Fill(start);
-        }
-        p.End();
+
+        auto FillCap = [&](const Pointf& endpoint, double angle, bool at_start) {
+            p.Begin();
+            UiRingRoundedCapPath(p, endpoint, angle, direction, at_start,
+                                 half_width, q);
+            if(use_gradient)
+                p.Fill(gradient_brush, Xform2D::Identity());
+            else
+                p.Fill(start);
+            p.End();
+        };
+
+        FillCap(first, start_angle, true);
+        FillCap(last, start_angle + sweep_angle, false);
     }
 }
 
@@ -646,7 +696,7 @@ void UiProgressRing::Paint(Draw& w)
     BufferPainter p(ib, MODE_ANTIALIASED);
     p.Circle(local_center, g.radius).Stroke((double)g.thickness, track);
     PaintProgressArc(p, local_center, g.radius, g.start_angle, g.sweep_angle,
-                     g.thickness, g.cap_radius, progress, gradient_end, style.gradient_enabled);
+                     g.thickness, g.cap_roundness, progress, gradient_end, style.gradient_enabled);
     w.DrawImage(g.square.left, g.square.top, ib);
 
     String text = ResolvePaintText();

@@ -59,7 +59,7 @@ private:
     {
         Add(tc_header);
         tc_header.SetTitle("UiProgressRing")
-                 .SetSubTitle("Circular progress with gradient sweep, independent track colour and responsive center text")
+                 .SetSubTitle("Circular progress with gradient sweep, proportional caps and responsive center text")
                  .ShowTitleLine(false)
                  .SetContentInset(DPI(8))
                  .SetContentCell(box_header_actions);
@@ -77,7 +77,7 @@ private:
         Add(pnl_preview);
         pnl_preview.Add(ring_preview);
         pnl_preview.Add(lbl_caption);
-        lbl_caption.SetText("The allocated rectangle may be non-square; the ring stays circular and centers itself.")
+        lbl_caption.SetText("Cap roundness is 0% flat to 100% fully round and always follows stroke thickness.")
                    .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
@@ -102,7 +102,7 @@ private:
         pe_model.AddColor("progress_end", "Progress end", Color(37, 99, 235), "Ring");
         pe_model.AddColor("text_color", "Text colour", Color(17, 24, 39), "Ring");
         pe_model.AddNumericInt("thickness", "Thickness", 8, 1, 48, 1, "Ring").SetUnit("px");
-        pe_model.AddNumericInt("cap_radius", "Cap radius", 4, 0, 24, 1, "Ring").SetUnit("px");
+        pe_model.AddNumericInt("cap_roundness", "Cap roundness", 100, 0, 100, 1, "Ring").SetUnit("%");
         pe_model.AddNumericInt("ring_inset", "Ring inset", 3, 0, 40, 1, "Ring").SetUnit("px");
 
         AddPropertyFont(pe_model, "font_face", "Font", StdFont().GetFaceName(), "Typography");
@@ -163,7 +163,7 @@ private:
         style.text_palette.ink[ST_DISABLED] = DisabledColor(text);
         style.gradient_enabled = (bool)ValueOf("gradient", true);
         style.thickness = max(1, (int)ValueOf("thickness", 8));
-        style.cap_radius = max(0, (int)ValueOf("cap_radius", 4));
+        style.cap_roundness = clamp((int)ValueOf("cap_roundness", 100), 0, 100);
         style.ring_inset = max(0, (int)ValueOf("ring_inset", 3));
         style.animate_on_show = (bool)ValueOf("animate_on_show", true);
         style.intro_duration_ms = max(1, (int)ValueOf("intro_duration", 600));
