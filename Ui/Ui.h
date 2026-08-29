@@ -34,6 +34,7 @@
     - 2026-08: added UiGallery and shared high-scale model-view geometry helpers.
     - 2026-08: added shared UiItemRender presentation infrastructure.
     - 2026-08: added UiProgressRing as the circular progress companion.
+    - 2026-08: added UiRenderLayer as the shared bounded batched-AA scene seam.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -41,6 +42,7 @@
 
 #include <Ui/UiStyle.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiRenderLayer.h>
 #include <Ui/UiAxis.h>
 #include <Ui/UiIndicatorBase.h>
 #include <Ui/UiTheme.h>
