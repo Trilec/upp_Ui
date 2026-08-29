@@ -38,6 +38,7 @@
 #include <Ui/UiDataModels.h>
 #include <Ui/UiItemRender.h>
 #include <Ui/UiModelView.h>
+#include <Ui/UiScrollBar.h>
 
 namespace Upp {
 
@@ -272,6 +273,25 @@ private:
         One<UiItemRender> render;
     };
 
+    class ThemeScrollBar : public UiScrollBar {
+    public:
+        ThemeScrollBar& Horz() { SetDirection(UiDirection::H); return *this; }
+        int Get() const { return GetPos(); }
+        ThemeScrollBar& Set(int pos) { SetPos(pos); return *this; }
+        int GetTotal() const { return GetMax(); }
+        ThemeScrollBar& SetPage(int page)
+        {
+            SetRange(GetMin(), max(GetMax(), GetMin() + max(0, page)), page);
+            return *this;
+        }
+        ThemeScrollBar& SetTotal(int total)
+        {
+            SetRange(GetMin(), total, GetPage());
+            return *this;
+        }
+        ThemeScrollBar& SetLine(int) { return *this; }
+    };
+
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
@@ -358,8 +378,8 @@ private:
     int last_render_layout_count_ = 0;
     mutable int last_paint_cell_count_ = 0;
 
-    HScrollBar hscroll_;
-    VScrollBar vscroll_;
+    ThemeScrollBar hscroll_;
+    ThemeScrollBar vscroll_;
     UiTablePos active_cell_;
     UiTablePos anchor_cell_;
     UiTableRange selection_;
