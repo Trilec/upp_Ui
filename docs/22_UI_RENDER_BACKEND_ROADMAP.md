@@ -79,13 +79,20 @@ needs before that API is committed.
 
 ## R9.3A — Rendering benchmark
 
-Status: **IMPLEMENTING / PUBLISHED IN RECOVERABLE CHECKPOINTS**
+Status: **PUBLISHED — WINDOWS VALIDATION / TIMING EVIDENCE PENDING**
 
-Package:
+Packages:
 
-`Utilities/UiRenderBenchmark`
+- `Utilities/UiRenderBenchmark` — deterministic console harness and timing output;
+- `examples/UiRenderBenchmarkDemo` — visual Current / Cached AA / Batched AA
+  comparison at 10 / 100 / 1000 objects with explicit offscreen timing action.
 
-The benchmark must measure the same representative visual workloads at:
+Published checkpoint before this documentation update:
+
+`9d02bd9a643208979309feab1129bc45847c96fe`
+`UIRENDER: add interactive rendering strategy comparison`
+
+The console benchmark measures representative visual workloads at:
 
 - 10 objects;
 - 100 objects;
@@ -116,6 +123,13 @@ Each scalable workload also has two invalidation cases:
 Timing evidence is informational, never a deterministic pass/fail threshold.
 Output records cold/first draw, warm average and peak time so Windows Debug and
 Release results can be compared without encoding machine-specific limits.
+
+The demo deliberately allocates no child control per rendered item. It is a
+visual rendering-strategy comparison, not a control-allocation benchmark.
+
+Do not start broad control migration from intuition alone. R9.3B/C is gated on
+actual Debug/Release benchmark output unless a correctness defect requires an
+independent fix.
 
 ## R9.3B — Shared render-context seam
 
@@ -212,19 +226,32 @@ BASE: `7f2bbbdcdd564ce0c2255c122ec473ff7dfa9799`
 
 TASK: R9.3A rendering benchmark, then evidence-driven shared render/Graph migration.
 
-TOUCHED / PUBLISHED BEFORE THIS DOC:
+TOUCHED / PUBLISHED IN THIS TRANCHE:
 
 - `Ui/UiRenderLayer.h`
 - `Ui/Ui.upp`
 - `Ui/Ui.h`
 - `docs/ACTIVE_WORK.md`
+- `docs/22_UI_RENDER_BACKEND_ROADMAP.md`
+- `Utilities/UiRenderBenchmark/UiRenderBenchmark.upp`
+- `Utilities/UiRenderBenchmark/main.cpp`
+- `examples/UiRenderBenchmarkDemo/UiRenderBenchmarkDemo.upp`
+- `examples/UiRenderBenchmarkDemo/main.cpp`
 
-STATUS: R9.3A implementation underway.
+STATUS: R9.3A source + visual demo published; Windows build/runtime timings pending.
 
-PUBLISHED: refresh current `main`; do not rely on this document's last SHA.
+PUBLISHED: `9d02bd9a643208979309feab1129bc45847c96fe` was the source/demo checkpoint.
+Always refresh current `main` because this documentation update advances it.
 
 VALIDATION: Windows CLANGx64 Debug + Release required for benchmark and Graph
 packages before performance conclusions are accepted.
 
-NEXT: build/run `Utilities/UiRenderBenchmark` at 10/100/1000, preserve exact
-`UI_RENDER_BENCH` lines, then use the measured crossover to implement R9.3C.
+NEXT:
+
+1. build/run `Utilities/UiRenderBenchmark` Debug + Release and preserve every
+   `UI_RENDER_BENCH` line plus summary;
+2. build/run `examples/UiRenderBenchmarkDemo`, visually compare Current/Cached/
+   Batched at 10/100/1000 and record Run timing output;
+3. use the measured crossover to choose the R9.3B shared render-context minimum;
+4. immediately apply the winning dense-scene path to R9.3C Graph and rerun the
+   existing Graph profiles against the R9.2 baseline.
