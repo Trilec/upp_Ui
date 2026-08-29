@@ -17,9 +17,11 @@
     - Image-rich reference nodes keep fixture Images in the demo and paint them
       through UiNodeGraph's retained content hook; UiGraphModel stores no image
       processing/domain state and no per-thumbnail child controls are allocated.
-    - The code page is a design handoff surface: it emits every selected object,
-      authored custom-style overrides, typography, and optional demo tag metadata,
-      and can copy or save the generated snippet.
+    - The code page is a lazy design handoff surface for the complete reference
+      graph. It is dirtied only by authored reference node/edge/style changes,
+      never by selection, pan, zoom, paint or scale-demo navigation.
+    - The diagnostics page is opt-in. It visualizes existing production timing
+      counters against a 60 Hz frame budget and retains only bounded peak state.
 */
 
 #include <Ui/Ui.h>
@@ -95,8 +97,16 @@ private:
     void SelectPage(int page);
     void ToggleTheme();
     void UpdateStatus();
+    void MarkGeneratedCodeDirty();
+    void EnsureGeneratedCode();
     void UpdateGeneratedCode();
     void SaveGeneratedCode();
+
+    void SetDiagnosticsEnabled(bool on);
+    void ResetDiagnostics();
+    void RefreshDiagnostics();
+    void RecordViewportDiagnostics();
+    void RecordSwitchDiagnostics(const String& label, int64 elapsed_us);
 
     const UiGraphNode* SelectedNode() const;
     UiGraphNode* SelectedNode();
@@ -115,12 +125,18 @@ private:
 
     UiPanel pnl_right_rail;
     UiBoxLayout box_right_tools { UiDirection::H };
-    UiToolButton btn_inspector_mode, btn_style_mode, btn_code_mode;
+    UiToolButton btn_inspector_mode, btn_style_mode, btn_code_mode, btn_diagnostics_mode;
     UiStack stk_right_pages;
-    UiPanel pnl_inspector_page, pnl_style_page, pnl_code_page;
+    UiPanel pnl_inspector_page, pnl_style_page, pnl_code_page, pnl_diagnostics_page;
     PropertyEditor pe_inspector, pe_style;
     UiMultiEdit edit_generated_code;
     UiToolButton btn_copy_code, btn_save_code;
+
+    UiButton btn_diag_enable, btn_diag_reset;
+    UiLabel lbl_diag_paint, lbl_diag_geometry, lbl_diag_edges, lbl_diag_nodes, lbl_diag_switch;
+    UiProgressBar bar_diag_paint, bar_diag_geometry, bar_diag_edges, bar_diag_nodes, bar_diag_switch;
+    UiMultiEdit edit_diagnostics;
+    UiFrameTicker diagnostics_ticker_;
 
     PropertyEditorFactory pe_factory;
     PropertyEditorModel pe_model_node;
@@ -143,6 +159,19 @@ private:
     bool scale_mode_ = false;
     bool syncing_editors_ = false;
     int style_preview_state_ = ST_NORMAL;
+
+    bool generated_code_dirty_ = true;
+    bool diagnostics_enabled_ = false;
+    int64 diag_peak_paint_us_ = 0;
+    int64 diag_peak_geometry_us_ = 0;
+    int64 diag_peak_edge_us_ = 0;
+    int64 diag_peak_node_us_ = 0;
+    int64 diag_last_switch_us_ = 0;
+    int64 diag_peak_switch_us_ = 0;
+    String diag_last_switch_label_ = "No mode switch yet";
+    String diag_last_interaction_ = "Idle";
+    double diag_previous_zoom_ = 1.0;
+    Pointf diag_previous_pan_ = Pointf(0, 0);
 
     bool style_transaction_active_ = false;
     UiGraphNodeRef style_transaction_node_;

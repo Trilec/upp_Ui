@@ -322,7 +322,8 @@ UiGraphDemo::UiGraphDemo()
     SelectPage(0);
     SelectReferenceStartNode();
     UpdateStatus();
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
+    RefreshDiagnostics();
 }
 
 void UiGraphDemo::BuildHeader()
@@ -374,15 +375,18 @@ void UiGraphDemo::BuildRightRail()
 
     btn_inspector_mode.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Selected graph object Inspector");
     btn_style_mode.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Selected node Style");
-    btn_code_mode.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Generated selected-object C++");
+    btn_code_mode.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Generated reference-design C++ snapshot");
+    btn_diagnostics_mode.SetIcon(ICON_DESIGN_WIDGETS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Live Graph timing diagnostics");
     box_right_tools.Add(btn_inspector_mode).Fixed(DPI(38));
     box_right_tools.Add(btn_style_mode).Fixed(DPI(38));
     box_right_tools.Add(btn_code_mode).Fixed(DPI(38));
+    box_right_tools.Add(btn_diagnostics_mode).Fixed(DPI(38));
     box_right_tools.AddSpacer(1).Expand(1);
 
     stk_right_pages.Add(pnl_inspector_page, "inspector");
     stk_right_pages.Add(pnl_style_page, "style");
     stk_right_pages.Add(pnl_code_page, "code");
+    stk_right_pages.Add(pnl_diagnostics_page, "diagnostics");
     pnl_inspector_page.Add(pe_inspector.SizePos());
     pnl_style_page.Add(pe_style.SizePos());
     pnl_code_page.Add(edit_generated_code);
@@ -392,6 +396,29 @@ void UiGraphDemo::BuildRightRail()
     btn_copy_code.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
     btn_save_code.SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(16), DPI(16)).Tip("Save generated C++");
     edit_generated_code.SetReadOnly();
+
+    btn_diag_enable.SetText("Live profiling").SetCheckable();
+    btn_diag_reset.SetText("Reset peaks");
+    pnl_diagnostics_page.Add(btn_diag_enable.LeftPos(DPI(8), DPI(124)).TopPos(DPI(6), DPI(30)));
+    pnl_diagnostics_page.Add(btn_diag_reset.LeftPos(DPI(140), DPI(100)).TopPos(DPI(6), DPI(30)));
+
+    lbl_diag_paint.SetText("Paint");
+    lbl_diag_geometry.SetText("Geometry prepare");
+    lbl_diag_edges.SetText("Edge paint");
+    lbl_diag_nodes.SetText("Node paint");
+    lbl_diag_switch.SetText("Model switch");
+    pnl_diagnostics_page.Add(lbl_diag_paint.HSizePos(DPI(8), DPI(8)).TopPos(DPI(44), DPI(18)));
+    pnl_diagnostics_page.Add(bar_diag_paint.HSizePos(DPI(8), DPI(8)).TopPos(DPI(62), DPI(20)));
+    pnl_diagnostics_page.Add(lbl_diag_geometry.HSizePos(DPI(8), DPI(8)).TopPos(DPI(88), DPI(18)));
+    pnl_diagnostics_page.Add(bar_diag_geometry.HSizePos(DPI(8), DPI(8)).TopPos(DPI(106), DPI(20)));
+    pnl_diagnostics_page.Add(lbl_diag_edges.HSizePos(DPI(8), DPI(8)).TopPos(DPI(132), DPI(18)));
+    pnl_diagnostics_page.Add(bar_diag_edges.HSizePos(DPI(8), DPI(8)).TopPos(DPI(150), DPI(20)));
+    pnl_diagnostics_page.Add(lbl_diag_nodes.HSizePos(DPI(8), DPI(8)).TopPos(DPI(176), DPI(18)));
+    pnl_diagnostics_page.Add(bar_diag_nodes.HSizePos(DPI(8), DPI(8)).TopPos(DPI(194), DPI(20)));
+    pnl_diagnostics_page.Add(lbl_diag_switch.HSizePos(DPI(8), DPI(8)).TopPos(DPI(220), DPI(18)));
+    pnl_diagnostics_page.Add(bar_diag_switch.HSizePos(DPI(8), DPI(8)).TopPos(DPI(238), DPI(20)));
+    pnl_diagnostics_page.Add(edit_diagnostics.HSizePos(DPI(8), DPI(8)).VSizePos(DPI(272), DPI(8)));
+    edit_diagnostics.SetReadOnly();
 }
 
 void UiGraphDemo::BuildNodeEditorModel()
@@ -611,11 +638,14 @@ void UiGraphDemo::ConnectEvents()
     btn_inspector_mode.WhenAction = [=] { SelectPage(0); };
     btn_style_mode.WhenAction = [=] { SelectPage(1); };
     btn_code_mode.WhenAction = [=] { SelectPage(2); };
-    btn_copy_code.WhenAction = [=] { WriteClipboardText((String)edit_generated_code.GetData()); };
+    btn_diagnostics_mode.WhenAction = [=] { SelectPage(3); };
+    btn_copy_code.WhenAction = [=] { EnsureGeneratedCode(); WriteClipboardText((String)edit_generated_code.GetData()); };
     btn_save_code.WhenAction = [=] { SaveGeneratedCode(); };
+    btn_diag_enable.WhenAction = [=] { SetDiagnosticsEnabled(btn_diag_enable.IsChecked()); };
+    btn_diag_reset.WhenAction = [=] { ResetDiagnostics(); };
 
     graph_.WhenSelection = [=] { SyncSelection(); };
-    graph_.WhenViewport = [=] { UpdateStatus(); };
+    graph_.WhenViewport = [=] { RecordViewportDiagnostics(); UpdateStatus(); };
 
     auto apply_inspector = [=](String id, Value value) {
         if(syncing_editors_)
@@ -671,8 +701,8 @@ void UiGraphDemo::SetScaleMode(bool scale)
         return;
     }
 
-    const int64 switch_started = usecs();
     CommitStyleTransaction();
+    const int64 switch_started = usecs();
     scale_mode_ = scale;
     style_preview_state_ = ST_NORMAL;
     selected_edge_ = UiGraphEdgeRef();
@@ -698,9 +728,11 @@ void UiGraphDemo::SetScaleMode(bool scale)
     btn_scale.SetChecked(scale);
     SyncSelection();
 
+    const int64 switch_elapsed = usecs() - switch_started;
+    RecordSwitchDiagnostics(scale ? "Reference -> 10k" : "10k -> Reference", switch_elapsed);
     RLOG(Format("UIGRAPH_DEMO_SWITCH_PROFILE mode=%s elapsed_us=%lld nodes=%d edges=%d prepared=%d/%d geometry_us=%lld",
                 scale ? "10k" : "reference",
-                (long long)(usecs() - switch_started),
+                (long long)switch_elapsed,
                 graph_.Model().GetNodeCount(), graph_.Model().GetEdgeCount(),
                 graph_.GetPreparedNodeCount(), graph_.GetPreparedEdgeCount(),
                 (long long)graph_.GetLastGeometryPrepareUsecs()));
@@ -725,7 +757,6 @@ void UiGraphDemo::SyncSelection()
     SyncNodeEditor();
     SyncStyleEditor();
     UpdateStatus();
-    UpdateGeneratedCode();
     graph_.Refresh();
 }
 
@@ -903,7 +934,7 @@ void UiGraphDemo::ApplyNodeProperty(const String& id, const Value& value)
 
     graph_.Model().UpdateNode(selected_node_, node);
     UpdateStatus();
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
     if(id == "role" || id == "style_preset") SyncStyleEditor();
 }
 
@@ -927,7 +958,7 @@ void UiGraphDemo::ApplyEdgeProperty(const String& id, const Value& value)
     graph_.Model().UpdateEdge(selected_edge_, edge);
     SyncNodeEditor();
     UpdateStatus();
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
 }
 
 String UiGraphDemo::EnsureCustomStyle(UiGraphNodeRef ref, const UiGraphNodeStyle& style)
@@ -1017,7 +1048,7 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
     pe_model_node.SetValue("style_preset", "Custom", false);
     if(pe_inspector.GetModel() == &pe_model_node)
         pe_inspector.RefreshValue("style_preset");
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
     UpdateStatus();
 }
 
@@ -1052,7 +1083,7 @@ void UiGraphDemo::CommitStyleTransaction()
     style_transaction_node_ = UiGraphNodeRef();
     style_transaction_original_class_.Clear();
     SyncNodeEditor();
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
 }
 
 void UiGraphDemo::CancelStyleTransaction(const String& id, const Value& value)
@@ -1094,16 +1125,21 @@ void UiGraphDemo::CancelStyleTransaction(const String& id, const Value& value)
     style_transaction_original_class_.Clear();
     SyncNodeEditor();
     SyncStyleEditor();
-    UpdateGeneratedCode();
+    MarkGeneratedCodeDirty();
 }
 
 void UiGraphDemo::SelectPage(int page)
 {
-    page = minmax(page, 0, 2);
+    page = minmax(page, 0, 3);
     stk_right_pages.SetActivePage(page);
     btn_inspector_mode.SetChecked(page == 0);
     btn_style_mode.SetChecked(page == 1);
     btn_code_mode.SetChecked(page == 2);
+    btn_diagnostics_mode.SetChecked(page == 3);
+    if(page == 2)
+        EnsureGeneratedCode();
+    if(page == 3)
+        RefreshDiagnostics();
 }
 
 void UiGraphDemo::ToggleTheme()
@@ -1119,6 +1155,7 @@ void UiGraphDemo::ToggleTheme()
                                                                : PropertyEditorPaletteMode::Light);
     SyncStyleEditor();
     UpdateStatus();
+    RefreshDiagnostics();
     Refresh();
 }
 
@@ -1137,21 +1174,43 @@ void UiGraphDemo::UpdateStatus()
                               graph_.GetZoom(), selection));
 }
 
+void UiGraphDemo::MarkGeneratedCodeDirty()
+{
+    if(!scale_mode_)
+        generated_code_dirty_ = true;
+}
+
+void UiGraphDemo::EnsureGeneratedCode()
+{
+    if(generated_code_dirty_ && !scale_mode_)
+        UpdateGeneratedCode();
+}
+
 void UiGraphDemo::UpdateGeneratedCode()
 {
-    Vector<UiGraphNodeRef> node_refs = graph_.GetSelectedNodes();
-    Vector<UiGraphEdgeRef> edge_refs = graph_.GetSelectedEdges();
+    if(scale_mode_)
+        return;
+
+    const UiGraphModel& model = graph_.Model();
+    Vector<UiGraphNodeRef> node_refs;
+    Vector<UiGraphEdgeRef> edge_refs;
+    for(int i = 0; i < model.GetNodeCount(); i++)
+        node_refs.Add(model.GetNodeRef(i));
+    for(int i = 0; i < model.GetEdgeCount(); i++)
+        edge_refs.Add(model.GetEdgeRef(i));
+
     if(node_refs.IsEmpty() && edge_refs.IsEmpty()) {
-        edit_generated_code.SetData("// Select one or more nodes/connectors to generate their UiGraphModel configuration.\n");
+        edit_generated_code.SetData("// Reference graph is empty.\n");
+        generated_code_dirty_ = false;
         return;
     }
 
     String out;
-    out << "// UiNodeGraph selection handoff: " << node_refs.GetCount() << " node(s), "
+    out << "// UiNodeGraph reference design handoff: " << node_refs.GetCount() << " node(s), "
         << edge_refs.GetCount() << " connector(s).\n";
 
     for(UiGraphNodeRef ref : node_refs) {
-        const UiGraphNode* node = graph_.Model().FindNode(ref);
+        const UiGraphNode* node = model.FindNode(ref);
         if(!node)
             continue;
         String suffix = AsString((int64)node->ref.id);
@@ -1255,7 +1314,7 @@ void UiGraphDemo::UpdateGeneratedCode()
     }
 
     for(UiGraphEdgeRef ref : edge_refs) {
-        const UiGraphEdge* edge = graph_.Model().FindEdge(ref);
+        const UiGraphEdge* edge = model.FindEdge(ref);
         if(!edge)
             continue;
         String suffix = AsString((int64)edge->ref.id);
@@ -1279,23 +1338,130 @@ void UiGraphDemo::UpdateGeneratedCode()
     }
 
     edit_generated_code.SetData(out);
+    generated_code_dirty_ = false;
 }
 
 void UiGraphDemo::SaveGeneratedCode()
 {
+    EnsureGeneratedCode();
     String code = AsString(edit_generated_code.GetData());
     if(code.IsEmpty())
         return;
     UiOsFileDialog dlg;
     dlg.SetMode(UiOsFileDialog::Mode::SaveFile)
        .SetTitle("Save generated UiNodeGraph C++")
-       .SetSuggestedName("UiGraphSelection.cpp")
+       .SetSuggestedName("UiGraphReference.cpp")
        .SetDefaultExtension("cpp")
        .AddFilter("C++ source", "*.cpp;*.cc;*.cxx")
        .AddFilter("Text", "*.txt")
        .AddFilter("All files", "*.*");
     if(dlg.Execute(this))
         SaveFile(dlg.GetPath(), code);
+}
+
+void UiGraphDemo::SetDiagnosticsEnabled(bool on)
+{
+    diagnostics_enabled_ = on;
+    btn_diag_enable.SetChecked(on);
+    if(on) {
+        diagnostics_ticker_.Start(200, [=] { RefreshDiagnostics(); });
+        RefreshDiagnostics();
+    }
+    else
+        diagnostics_ticker_.Stop();
+}
+
+void UiGraphDemo::ResetDiagnostics()
+{
+    diag_peak_paint_us_ = 0;
+    diag_peak_geometry_us_ = 0;
+    diag_peak_edge_us_ = 0;
+    diag_peak_node_us_ = 0;
+    diag_peak_switch_us_ = 0;
+    RefreshDiagnostics();
+}
+
+void UiGraphDemo::RecordViewportDiagnostics()
+{
+    const double zoom = graph_.GetZoom();
+    const Pointf pan = graph_.GetPan();
+    if(zoom != diag_previous_zoom_)
+        diag_last_interaction_ = "Zoom / mouse wheel";
+    else if(pan.x != diag_previous_pan_.x || pan.y != diag_previous_pan_.y)
+        diag_last_interaction_ = "Pan / scroll";
+    else
+        diag_last_interaction_ = "Viewport refresh";
+    diag_previous_zoom_ = zoom;
+    diag_previous_pan_ = pan;
+    if(diagnostics_enabled_)
+        RefreshDiagnostics();
+}
+
+void UiGraphDemo::RecordSwitchDiagnostics(const String& label, int64 elapsed_us)
+{
+    diag_last_switch_label_ = label;
+    diag_last_switch_us_ = max<int64>(0, elapsed_us);
+    diag_peak_switch_us_ = max(diag_peak_switch_us_, diag_last_switch_us_);
+    diag_last_interaction_ = label;
+    if(diagnostics_enabled_)
+        RefreshDiagnostics();
+}
+
+void UiGraphDemo::RefreshDiagnostics()
+{
+    const int frame_budget_us = 16667;
+    const int switch_budget_us = 250000;
+    const int64 paint = max<int64>(0, graph_.GetLastPaintUsecs());
+    const int64 geometry = max<int64>(0, graph_.GetLastGeometryPrepareUsecs());
+    const int64 edges = max<int64>(0, graph_.GetLastEdgePaintUsecs());
+    const int64 nodes = max<int64>(0, graph_.GetLastNodePaintUsecs());
+
+    diag_peak_paint_us_ = max(diag_peak_paint_us_, paint);
+    diag_peak_geometry_us_ = max(diag_peak_geometry_us_, geometry);
+    diag_peak_edge_us_ = max(diag_peak_edge_us_, edges);
+    diag_peak_node_us_ = max(diag_peak_node_us_, nodes);
+
+    auto set_frame_metric = [=](UiLabel& label, UiProgressBar& bar,
+                                const char *name, int64 current, int64 peak) {
+        label.SetText(Format("%s  %.3f ms   peak %.3f ms", name,
+                             current / 1000.0, peak / 1000.0));
+        bar.Set((int)min<int64>(current, frame_budget_us), frame_budget_us);
+        bar.SetText(Format("%.1f%% of 16.67 ms frame", current * 100.0 / frame_budget_us));
+    };
+
+    set_frame_metric(lbl_diag_paint, bar_diag_paint, "Paint", paint, diag_peak_paint_us_);
+    set_frame_metric(lbl_diag_geometry, bar_diag_geometry, "Geometry prepare", geometry, diag_peak_geometry_us_);
+    set_frame_metric(lbl_diag_edges, bar_diag_edges, "Edge paint", edges, diag_peak_edge_us_);
+    set_frame_metric(lbl_diag_nodes, bar_diag_nodes, "Node paint", nodes, diag_peak_node_us_);
+
+    lbl_diag_switch.SetText(Format("%s  %.3f ms   peak %.3f ms",
+                                   diag_last_switch_label_, diag_last_switch_us_ / 1000.0,
+                                   diag_peak_switch_us_ / 1000.0));
+    bar_diag_switch.Set((int)min<int64>(diag_last_switch_us_, switch_budget_us), switch_budget_us);
+    bar_diag_switch.SetText(Format("%.1f%% of 250 ms switch guide",
+                                   diag_last_switch_us_ * 100.0 / switch_budget_us));
+
+    String detail;
+    detail << "Interaction: " << diag_last_interaction_ << "\n\n";
+    detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d\n",
+                     graph_.GetLastNodeCandidateCount(), graph_.GetPreparedNodeCount(),
+                     graph_.GetLastPaintNodeVisitCount(), graph_.GetLastPaintedNodeCount());
+    detail << Format("Edges: candidates=%d prepared=%d visits=%d painted=%d simplified=%d hidden=%d\n",
+                     graph_.GetLastEdgeCandidateCount(), graph_.GetPreparedEdgeCount(),
+                     graph_.GetLastPaintEdgeVisitCount(), graph_.GetLastPaintedEdgeCount(),
+                     graph_.GetLastSimplifiedEdgeCount(), graph_.GetLastHiddenEdgeCount());
+    detail << Format("Spatial: build=%d update=%d geometry=%d\n",
+                     graph_.GetSpatialBuildSerial(), graph_.GetSpatialUpdateSerial(),
+                     graph_.GetGeometryBuildSerial());
+    detail << Format("Hit candidates: nodes=%d ports=%d edges=%d marquee=%d\n",
+                     graph_.GetLastNodeHitCandidateCount(), graph_.GetLastPortHitCandidateCount(),
+                     graph_.GetLastEdgeHitCandidateCount(), graph_.GetLastMarqueeCandidateCount());
+    detail << Format("Batch: flush=%d nodes=%d edges=%d  attached_ctrls=%d\n",
+                     graph_.GetBatchFlushSerial(), graph_.GetLastBatchNodeUpdateCount(),
+                     graph_.GetLastBatchEdgeUpdateCount(), graph_.GetAttachedNodeCtrlCount());
+    detail << "\nBars use the 16.67 ms / 60 Hz frame budget. Model switch uses a separate 250 ms guide.\n";
+    detail << "Deeper text/font timing stays off the hot path until these phase timings identify node paint as the bottleneck.\n";
+    edit_diagnostics.SetData(detail);
 }
 
 void UiGraphDemo::Layout()

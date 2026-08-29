@@ -68,10 +68,19 @@ Visual demo:
 
 Detailed contract: `docs/18_UIPROGRESSRING.md`
 
-### 3. UiGraph R9/R9.1 + PropertyEditor working ranges
+### 3. UiGraph R9/R9.1/R9.2 + PropertyEditor working ranges
 
 Recent published work includes Graph regression recovery plus PropertyEditor double working-range support.
 Latest repository HEAD at compaction is the PropertyEditor preservation fix listed above.
+
+R9.2 adds demo-only diagnostic and export hardening:
+- the fourth right-rail page is an opt-in live Diagnostics surface;
+- existing production Graph counters drive paint, geometry, edge, node and model-switch timing gauges;
+- Diagnostics sampling uses an owned `UiFrameTicker` and is off by default;
+- the Code page is a full reference-design export snapshot, not selected-object live state;
+- generated code is dirtied only by authored reference node/edge/style changes and regenerated lazily when Code/Copy/Save needs it;
+- selection, pan, zoom, paint and ordinary model-view refresh must not regenerate export text;
+- model-switch timing excludes pending editor commit/export work so the reported switch cost reflects the actual demo/model transition path.
 
 DO NOT REGRESS:
 - Graph Inspector X/Y must not return to million-unit scrub sliders.
@@ -80,7 +89,9 @@ DO NOT REGRESS:
 - wheel editing uses normal world-unit stepping;
 - application-authored Graph model coordinates remain unrestricted by the demo Inspector policy;
 - repeated Reference -> 10k -> Reference switching must remain responsive;
-- do not hide generic Graph renderer issues inside demo-only coordinate policy.
+- do not hide generic Graph renderer issues inside demo-only coordinate policy;
+- do not put generated-code work back on selection, viewport or paint paths;
+- do not make deep profiler instrumentation unconditional in the Graph hot path.
 
 Relevant validation packages:
 - `Utilities/PropertyEditorWorkingRangeTest`
