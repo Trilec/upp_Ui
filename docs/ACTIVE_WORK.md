@@ -10,8 +10,8 @@ Authoritative branch: `main`
 
 Last compacted from remote HEAD:
 
-`4a4ae14691e2497eae1cd6521dc418fa354c2277`
-`UIGRAPH: add live diagnostics and lazy design export`
+`e855f201a6a3dba5ff4aa96e7360d96347288543`
+`UIRENDER: checkpoint benchmark publication`
 
 That SHA is only the starting checkpoint. Always fetch current `main` again before acting.
 
@@ -110,13 +110,15 @@ Relevant validation packages:
 
 Detailed current Graph contract: `docs/21_UIGRAPH_EXTREME_COORDINATE_HARDENING.md`
 
-### 4. ACTIVE — UiGraph R9.3/R10/R11 unified render + visual tranche
+### 4. ACTIVE — Ui render backend + UiGraph R9.3/R10/R11
 
-BASE: `4a4ae14691e2497eae1cd6521dc418fa354c2277`
+BASE: `7f2bbbdcdd564ce0c2255c122ec473ff7dfa9799`
 
 OBJECTIVE:
-- remove the per-node rounded-AA hot path and move dense Graph drawing onto a shared `UiDraw` batched AA layer suitable for later accelerated backend substitution;
+- remove the per-node rounded-AA hot path and move dense Graph drawing onto a shared bounded AA layer suitable for later accelerated backend substitution;
 - keep ordinary controls on direct `Draw` when that is cheaper and keep small AA controls on small shared/cached primitives rather than forcing every Ctrl through a full-window buffer;
+- preserve dirty-region rendering: a small control change repaints only its affected rectangle, while dense scene controls can batch the dirty scene region;
+- establish benchmark evidence at 10 / 100 / 1000 objects before broad control migration;
 - replace Graph line grid with a subtle hierarchical 20-world-unit dot grid whose levels cross-fade by powers of five in screen space;
 - make the stock Graph visual baseline flat/subtle/shadowless;
 - simplify redundant silhouettes: Rectangle owns arbitrary aspect ratio + corner radius including square/pill forms, Ellipse owns arbitrary aspect ratio including circles; genuinely distinct silhouettes remain separate;
@@ -127,14 +129,29 @@ OBJECTIVE:
 - extend diagnostics with aggregate node surface/details/content timings to prove the hot-path improvement.
 
 ARCHITECTURE:
-- shared `UiDraw` rendering primitive, not a Graph-only rendering subsystem;
+- `UiRenderLayer` is the first shared software seam, not a Graph-only subsystem and not yet a frozen Vulkan API;
+- future controls should describe rendering through a small backend-neutral vocabulary while the software backend chooses direct Draw, cached raster or bounded Painter layer;
 - retained Graph geometry remains backend-neutral and suitable for future OpenGL/Vulkan consumption;
 - no child Ctrl per node/port/row;
 - no semantic runtime/agent state added to `UiGraphModel`; edge activity remains transient view state;
 - rich shadow/skin/image rendering remains an explicit fallback, not the ordinary high-scale path;
 - `Paint()` remains render-only.
 
-STATUS: ACTIVE — implementation in progress; publish coherent checkpoints and validate each published HEAD before declaring acceptance.
+R9.3A PUBLISHED:
+- `Utilities/UiRenderBenchmark` compares current/direct, local AA, cached AA and batched AA paths at 10/100/1000 objects;
+- full-scene and one-dirty-object cases are measured without machine-dependent pass/fail thresholds;
+- workloads include flat/rounded/button-like/slider/ring/9-slice rendering;
+- `examples/UiRenderBenchmarkDemo` provides a visual Current/Cached/Batched comparison at 10/100/1000 plus explicit timing action;
+- Windows CLANGx64 Debug + Release benchmark output is still required before choosing the broader R9.3B render-context minimum and Graph R9.3C hot-path implementation.
+
+STATUS: ACTIVE — R9.3A source published; benchmark evidence pending. Do not guess the crossover.
+
+Detailed tranche tracker: `docs/22_UI_RENDER_BACKEND_ROADMAP.md`
+
+Current render validation packages:
+- `Utilities/UiRenderBenchmark`
+- `examples/UiRenderBenchmarkDemo`
+- then rerun the Graph packages listed in section 3 after R9.3C is implemented.
 
 ### 5. Recent theme fallback correction
 
@@ -159,6 +176,7 @@ Minimum recovery validation after a crash or uncertain checkout:
 6. Run only focused packages relevant to the active defect/change and preserve timing/profile output.
 
 For current Graph/PropertyEditor work, use the packages listed in section 3 and retain timing/profile output as evidence rather than imposing machine-dependent speed thresholds.
+For the active render tranche, run `Utilities/UiRenderBenchmark` first and preserve every `UI_RENDER_BENCH` line before deciding the R9.3B/C implementation path.
 
 ## CONTINUATION RULE
 
