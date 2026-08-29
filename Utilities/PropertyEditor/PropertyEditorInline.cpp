@@ -228,7 +228,21 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
 
     BeginTransaction(property_id);
     String error;
-    if(model_->Commit(property_id, value, &error)) {
+
+    // Inline editors can be in a modal action stack (colour/fill/font pickers).
+    // PropertyEditorModel::Commit emits WhenValueChanged synchronously. Without
+    // this guard ModelValueChanged() immediately reconfigures the very editor
+    // whose WhenCommit callback is still unwinding, and modal inline editors can
+    // be left in a stale/non-reopenable state until the PropertyEditor is rebuilt.
+    // Suppress only this redundant same-property refresh; the canonical editor
+    // value is refreshed explicitly below after Commit returns.
+    applying_editor_preview_ = true;
+    inline_preview_property_id_ = property_id;
+    const bool committed = model_->Commit(property_id, value, &error);
+    inline_preview_property_id_.Clear();
+    applying_editor_preview_ = false;
+
+    if(committed) {
         syncing_editor_ = true;
         editor->Configure(*item);
         editor->SetEditorValue(item->value, item->mixed);

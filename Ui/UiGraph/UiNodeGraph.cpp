@@ -136,7 +136,8 @@ Vector<Pointf> EllipsePath(const Rect& r, int samples = 40)
     samples = max(12, samples);
     for(int i = 0; i < samples; i++) {
         double a = 2.0 * 3.14159265358979323846 * i / samples;
-        out.Add(Pointf(cx + std::cos(a) * rx, cy + std::sin(a) * ry));
+        out.Add(Pointf(cx + std::cos(a) * rx,
+                       cy + std::sin(a) * ry));
     }
     return out;
 }
@@ -599,8 +600,8 @@ UiNodeGraph::Style ResolveNodeGraphTheme(const UiThemeContext& context)
     }
 
     bool dark = UiThemeDetail::ResolveEffectiveMode(ctx.mode) == UiThemeMode::Dark;
-    s.grid_minor = dark ? Color(43, 43, 43) : Color(226, 232, 240);
-    s.grid_major = dark ? Color(58, 58, 58) : Color(203, 213, 225);
+    s.grid_minor = dark ? Color(43, 43, 43) : Color(233, 237, 243);
+    s.grid_major = dark ? Color(58, 58, 58) : Color(208, 218, 229);
     s.edge.label_background = standard.face;
     // Graph selection is interaction chrome, not a Standard-role accent.
     // Keep it recognisably blue in every theme; the fill remains deliberately light.
@@ -2481,43 +2482,56 @@ void UiNodeGraph::PaintGrid(Draw& w, const Rect& outer) const
     if(!style.show_grid || style.grid_size <= 0)
         return;
 
-    double spacing = style.grid_size * zoom_;
-    int major_every = max(1, style.major_grid_every);
-    double major_spacing = spacing * major_every;
-    double minor_factor = SmoothUnit(zoom_, 0.28, 0.48);
-    double major_factor = SmoothUnit(zoom_, 0.20, 0.40);
-    if(major_factor <= 0.01 || major_spacing < 3.0)
+    const int hierarchy = max(2, style.major_grid_every);
+    const double base_spacing = style.grid_size * zoom_;
+    if(base_spacing <= 0.0)
         return;
 
     Color paper = ResolveFace(style.canvas_palette.face[ST_NORMAL], SColorPaper());
-    Color minor = BlendGraphColor(paper, style.grid_minor, minor_factor);
-    Color major = BlendGraphColor(paper, style.grid_major, major_factor);
+    // The grid is orientation chrome rather than authored content. Keep the
+    // default hierarchy quieter than node frames while preserving custom hue.
+    Color minor_base = BlendGraphColor(paper, style.grid_minor, 0.80);
+    Color major_base = BlendGraphColor(paper, style.grid_major, 0.90);
 
-    // Once the minor grid is visually gone, stop iterating over its lines as
-    // well. The remaining major grid keeps orientation without overview noise.
-    if(minor_factor <= 0.04) {
-        double ox = std::fmod(pan_.x, major_spacing);
-        double oy = std::fmod(pan_.y, major_spacing);
-        if(ox < 0) ox += major_spacing;
-        if(oy < 0) oy += major_spacing;
-        for(double x = outer.left + ox; x < outer.right; x += major_spacing)
-            w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, major);
-        for(double y = outer.top + oy; y < outer.bottom; y += major_spacing)
-            w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, major);
+    auto draw_level = [&](double step, Color color) {
+        if(step < 3.0 || IsNull(color))
+            return;
+        double ox = std::fmod(pan_.x, step);
+        double oy = std::fmod(pan_.y, step);
+        if(ox < 0) ox += step;
+        if(oy < 0) oy += step;
+        for(double x = outer.left + ox; x < outer.right; x += step)
+            w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, color);
+        for(double y = outer.top + oy; y < outer.bottom; y += step)
+            w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, color);
+    };
+
+    // Promote every Nth grid line into the next hierarchy whenever the current
+    // screen spacing becomes too dense. The previous level fades rather than
+    // popping off, while the next (N*N) level becomes the stable visual anchor.
+    // This repeats for hosts that permit zoom levels below the demo minimum.
+    int active_level = 0;
+    double active_spacing = base_spacing;
+    while(active_spacing < 8.0 && active_level < 8) {
+        active_spacing *= hierarchy;
+        active_level++;
     }
-    else if(spacing >= 3.0) {
-        double ox = std::fmod(pan_.x, spacing), oy = std::fmod(pan_.y, spacing);
-        if(ox < 0) ox += spacing; if(oy < 0) oy += spacing;
-        int column = fround((outer.left - pan_.x) / spacing);
-        for(double x = outer.left + ox; x < outer.right; x += spacing, column++) {
-            bool is_major = ((column % major_every) + major_every) % major_every == 0;
-            w.DrawLine(fround(x), outer.top, fround(x), outer.bottom, 1, is_major ? major : minor);
-        }
-        int row = fround((outer.top - pan_.y) / spacing);
-        for(double y = outer.top + oy; y < outer.bottom; y += spacing, row++) {
-            bool is_major = ((row % major_every) + major_every) % major_every == 0;
-            w.DrawLine(outer.left, fround(y), outer.right, fround(y), 1, is_major ? major : minor);
-        }
+
+    if(active_level == 0) {
+        draw_level(base_spacing, minor_base);
+        draw_level(base_spacing * hierarchy, major_base);
+    }
+    else {
+        double finer_spacing = active_spacing / hierarchy;
+        double finer_factor = SmoothUnit(finer_spacing, 3.0, 8.0);
+        if(finer_factor > 0.02)
+            draw_level(finer_spacing, BlendGraphColor(paper, minor_base, finer_factor));
+
+        double active_factor = SmoothUnit(active_spacing, 8.0, 22.0);
+        double active_strength = 0.70 + 0.30 * active_factor;
+        draw_level(active_spacing,
+                   BlendGraphColor(paper, major_base, active_strength));
+        draw_level(active_spacing * hierarchy, major_base);
     }
 
     if(style.show_origin) {
