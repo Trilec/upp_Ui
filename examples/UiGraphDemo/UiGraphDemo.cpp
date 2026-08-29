@@ -340,14 +340,6 @@ UiGraphDemo::UiGraphDemo()
         if(state == UiGraphVisualState::Selected && node.ref == selected_node_)
             GraphDemoProjectState(style, style_preview_state_, ST_PRESSED);
     };
-    graph_.WhenResolveEdgeStyle = [=](const UiGraphEdge&, UiGraphVisualState,
-                                      UiGraphEdgeStyle& style) {
-        // The reference is intended to read like a diagram rather than a wiring
-        // harness. Keep the authored edge semantics intact and only make the
-        // demo's default presentation slightly quieter.
-        for(double& width : style.width)
-            width *= 0.86;
-    };
 
     SetScaleMode(false);
     SelectPage(0);
@@ -449,8 +441,36 @@ void UiGraphDemo::BuildNodeEditorModel()
                  .AddChoice("Glow", "Glow").AddChoice("Custom", "Custom");
     pe_model_node.AddText("tag", "Tag", String(), "Presentation");
 
-    pe_model_node.AddNumericDouble("x", "X", 0.0, -1000000.0, 1000000.0, 1.0, "Layout").SetUnit("world");
-    pe_model_node.AddNumericDouble("y", "Y", 0.0, -1000000.0, 1000000.0, 1.0, "Layout").SetUnit("world");
+    PropertyEditorItem& x = pe_model_node.AddDouble("x", "X", 0.0, "Layout");
+    x.SetUnit("world").SetHelp("Absolute X coordinate; Inspector edits are bounded to one viewport beyond the current view.");
+    x.normalize = [=](const Value& candidate) -> Value {
+        double value = (double)candidate;
+        Size size = graph_.GetSize();
+        if(size.cx <= 0 || size.cy <= 0)
+            return value;
+        Pointf a = graph_.ScreenToWorld(Point(0, 0));
+        Pointf b = graph_.ScreenToWorld(Point(size.cx, size.cy));
+        double lo = min(a.x, b.x);
+        double hi = max(a.x, b.x);
+        double span = max(1.0, hi - lo);
+        return minmax(value, lo - span, hi + span);
+    };
+
+    PropertyEditorItem& y = pe_model_node.AddDouble("y", "Y", 0.0, "Layout");
+    y.SetUnit("world").SetHelp("Absolute Y coordinate; Inspector edits are bounded to one viewport beyond the current view.");
+    y.normalize = [=](const Value& candidate) -> Value {
+        double value = (double)candidate;
+        Size size = graph_.GetSize();
+        if(size.cx <= 0 || size.cy <= 0)
+            return value;
+        Pointf a = graph_.ScreenToWorld(Point(0, 0));
+        Pointf b = graph_.ScreenToWorld(Point(size.cx, size.cy));
+        double lo = min(a.y, b.y);
+        double hi = max(a.y, b.y);
+        double span = max(1.0, hi - lo);
+        return minmax(value, lo - span, hi + span);
+    };
+
     pe_model_node.AddNumericDouble("width", "Width", 64.0, 24.0, 2000.0, 1.0, "Layout").SetUnit("world");
     pe_model_node.AddNumericDouble("height", "Height", 44.0, 24.0, 2000.0, 1.0, "Layout").SetUnit("world");
     pe_model_node.AddNumericDouble("corner_radius", "Corner radius", 8.0, 0.0, 128.0, 1.0, "Layout").SetUnit("world");
@@ -463,7 +483,7 @@ void UiGraphDemo::BuildNodeEditorModel()
 
     pe_model_node.SetGroupSubtitle("Identity", "authoritative UiGraphModel record");
     pe_model_node.SetGroupSubtitle("Presentation", "shape, role, style token and optional demo tag metadata");
-    pe_model_node.SetGroupSubtitle("Layout", "world-space node geometry at authored 1:1 scale");
+    pe_model_node.SetGroupSubtitle("Layout", "world-space geometry; Inspector X/Y edits stay near the visible working area");
     pe_model_node.StructureChanged();
 }
 
