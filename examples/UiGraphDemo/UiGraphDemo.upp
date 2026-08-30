@@ -11,6 +11,7 @@ uses
 file
 	UiGraphDemo.h,
 	UiGraphDemo.cpp,
+	UiGraphDemoRuntime.cpp,
 	UiGraphDemoData.cpp,
 	main.cpp;
 
