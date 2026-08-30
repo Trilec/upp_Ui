@@ -1,4 +1,5 @@
 #include <Ui/UiGraph/UiNodeGraph.h>
+#include <Ui/Ui.h>
 
 // Preserve the validated R9.2/R9.3B implementation in this translation unit,
 // but keep the three paint stages under legacy names. R9.3C can therefore
