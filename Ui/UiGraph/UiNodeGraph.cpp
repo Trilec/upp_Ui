@@ -27,14 +27,16 @@ bool IsStockGraphShadow(const StyledShadow& shadow)
         && shadow.color == Color(15, 23, 42);
 }
 
-void ApplyR93CNodePresentation(const UiGraphNode& node, UiGraphNodeStyle& style)
+bool ApplyR93CNodePresentation(const UiGraphNode& node, UiGraphNodeStyle& style)
 {
     // The old stock Graph style enabled a soft drop shadow on every node. Keep
     // shadows fully supported for explicit presets/styles, but make the stock
     // unclassified node flat. Matching the complete old shadow recipe avoids
     // silently disabling a deliberately authored custom shadow.
-    if(node.style_class.IsEmpty() && IsStockGraphShadow(style.metrics.shadow))
+    bool suppressed = node.style_class.IsEmpty() && IsStockGraphShadow(style.metrics.shadow);
+    if(suppressed)
         style.metrics.shadow.enabled = false;
+    return suppressed;
 }
 
 } // namespace
@@ -220,15 +222,17 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     // resolvers therefore ran three or more times for the same node/frame.
     Vector<UiGraphVisualState> node_states;
     Vector<UiGraphNodeStyle> node_styles;
+    Vector<byte> stock_shadow_suppressed;
     node_states.Reserve(paint_nodes.GetCount());
     node_styles.Reserve(paint_nodes.GetCount());
+    stock_shadow_suppressed.Reserve(paint_nodes.GetCount());
     for(int q : paint_nodes) {
         const UiGraphNode* node = model_->FindNode(node_geometry_[q].ref);
         UiGraphVisualState state = node ? GetNodeVisualState(*node) : UiGraphVisualState::Normal;
         node_states.Add(state);
         UiGraphNodeStyle style = node ? ResolveNodeStyle(*node, state) : GetEffectiveStyle().node;
-        if(node)
-            ApplyR93CNodePresentation(*node, style);
+        bool suppressed = node ? ApplyR93CNodePresentation(*node, style) : false;
+        stock_shadow_suppressed.Add(suppressed ? 1 : 0);
         node_styles.Add(pick(style));
     }
 
@@ -255,6 +259,45 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         double port_floor = max(0.12, lod_policy_.port_zoom - 0.04);
         double port_full = max(port_floor + 0.08, lod_policy_.port_zoom + 0.16);
         return SmoothUnit(zoom_, port_floor, port_full) > 0.01 && !geometry.anchors.IsEmpty();
+    };
+
+    auto paint_surface = [&](Draw& draw, const UiGraphNode& node, const NodeGeometry& g,
+                             const UiGraphNodeStyle& style, UiGraphVisualState state,
+                             bool stock_shadow_was_suppressed) {
+        if(!stock_shadow_was_suppressed || !UsesRectangularStyledSurface(node.shape)) {
+            PaintNodeSurface(draw, node, g, style, state);
+            return;
+        }
+
+        bool handled = false;
+        if(WhenPaintNodeBackground)
+            WhenPaintNodeBackground(draw, node, g.rect, style, state, handled);
+        if(handled)
+            return;
+
+        StyledPalette palette = style.palette;
+        StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
+        StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
+        metrics.shadow.enabled = false;
+        if(node.shape == UiGraphNodeShape::Rectangle)
+            metrics.radius = 0;
+        else if(node.shape == UiGraphNodeShape::Capsule)
+            metrics.radius = max(0, min(g.surface.GetWidth(), g.surface.GetHeight()) / 2);
+        else
+            metrics.radius = max(0, fround(node.corner_radius * zoom_));
+        if(state == UiGraphVisualState::Selected) {
+            metrics.frame_enabled = true;
+            metrics.frame_width = max(metrics.frame_width,
+                                      max(DPI(2), DPI(fround(lod_policy_.selection_outline_width))));
+            palette.frame[ST_PRESSED] = SelectedFrameColor(style);
+        }
+
+        // g.surface is the face rectangle already retained from the old styled
+        // geometry (including its former shadow reservation). Painting the flat
+        // body into that rect removes the shadow without moving the face or its
+        // shape-boundary port anchors.
+        UiPaintStyledBackground(draw, g.surface, palette, metrics, skin,
+                                ToStyledState(state), false);
     };
 
     int64 edge_started = usecs();
@@ -310,7 +353,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(!node)
             continue;
         last_painted_node_count_++;
-        PaintNodeSurface(w, *node, g, node_styles[i], node_states[i]);
+        paint_surface(w, *node, g, node_styles[i], node_states[i], stock_shadow_suppressed[i] != 0);
     }
     last_node_surface_paint_usecs_ = max<int64>(0, usecs() - surface_started);
 
@@ -342,9 +385,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
     int64 content_started = usecs();
     double content_floor = max(0.24, lod_policy_.secondary_text_zoom - 0.08);
-    // At overview scale text becomes visual noise before it becomes useful. The
-    // retained geometry may still contain title rects, but do not pay DrawText
-    // costs until the authored title is large enough to read comfortably.
     double text_floor = max(0.24, lod_policy_.title_zoom - 0.04);
     for(int i = 0; i < paint_nodes.GetCount(); i++) {
         const NodeGeometry& g = node_geometry_[paint_nodes[i]];
