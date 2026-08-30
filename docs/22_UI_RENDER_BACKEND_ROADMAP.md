@@ -2,18 +2,18 @@
 
 ## Purpose
 
-This is the durable progress tracker for the current rendering tranche. The goal is a fast,
-backend-neutral `upp_Ui` rendering architecture that can later gain an OpenGL/Vulkan backend
-without rewriting control semantics, layout, retained geometry, or invalidation rules.
+Durable progress tracker for the current rendering tranche. The goal is a fast, backend-neutral
+`upp_Ui` rendering architecture that can later gain OpenGL/Vulkan without rewriting control
+semantics, layout, retained geometry, or invalidation rules.
 
-Remote `main` is authoritative. Refresh it before every implementation/publish step.
+Remote `main` is authoritative. Refresh before implementation/publication.
 
 ## Architectural rule
 
-The target is **not** “all controls use BufferPainter”. R9.3A measured that directly and rejected
-it as the default software strategy.
+The target is **not** “all controls use BufferPainter”. R9.3A measured and rejected that as the
+default software strategy.
 
-The intended backend-neutral drawing vocabulary remains small and general:
+The intended backend-neutral vocabulary remains small and general:
 
 - solid/stroked rectangle and rounded rectangle;
 - ellipse/circle;
@@ -23,54 +23,49 @@ The intended backend-neutral drawing vocabulary remains small and general:
 - image/tinted image;
 - 9-slice image;
 - gradient;
-- clip;
-- transform;
-- opacity/layer.
+- clip/transform/opacity/layer.
 
-The software backend is deliberately hybrid:
+Software rendering is deliberately hybrid:
 
 - direct `Draw` for cheap flat rectangles, text, lines, images and similar primitives;
 - shared cached rasters for repeatable AA geometry and expensive composed imagery;
 - bounded `BufferPainter` layers only for scene work where many unique vector primitives share a
-  dirty region and measurement shows the layer is worthwhile;
-- rich skin/shadow/image rendering remains supported, but is not forced onto every hot path.
+  dirty region and measurement shows that layer is worthwhile;
+- rich skin/shadow/image rendering remains supported but is not forced onto every hot path.
 
-Dirty-region ownership is unchanged. A slider thumb change must not repaint a whole window. A
-Graph pan may repaint most of the Graph control because the visible scene itself changed.
+Dirty-region ownership is preserved. A slider thumb does not repaint a whole window. A Graph pan
+may repaint most of the Graph control because its visible scene changed.
 
 ## Starting point
 
-The tranche started from:
+Tranche base:
 
 `7f2bbbdcdd564ce0c2255c122ec473ff7dfa9799`
 `UI: expose shared render layer`
 
-Prior Graph profiling had already established:
+Pre-tranche Graph evidence:
 
-- core large -> small model binding is fast (~140–160 us Release);
-- remaining Reference <-> 10k demo delay is above core model switching;
+- core large -> small model binding ~140–160 us Release;
+- Reference <-> 10k demo delay was above core model switching;
 - ordinary Reference Node Paint was over frame budget;
 - 10k Node Paint dominated total paint;
-- the ordinary rounded node path ultimately reached `UiPaintFaceFrameDash`, which allocated a new
-  AA `ImageBuffer` for each rounded surface.
+- ordinary rounded surfaces reached an AA `ImageBuffer` allocation path per surface.
 
-## Current shared seams
+## Shared seams
 
 ### `UiRenderLayer`
 
-`Ui/UiRenderLayer.h` owns a bounded `ImageBuffer` + `BufferPainter`, translates the painter into
-caller screen coordinates, executes prepared drawing, and composites once.
-
-It is a useful scene seam but **not** the default software renderer and is **not** yet frozen as the
-future Vulkan API.
+Bounded software `ImageBuffer` + `BufferPainter` scene layer. Useful for unique vector batches, but
+**not** the default software renderer and **not** frozen as the eventual Vulkan API.
 
 ### `UiRasterCache`
 
-The existing shared raster cache is now the preferred software path for repeated AA surfaces when
-a stable cache key can describe the visual result. The existing global memory budget and size
-limits continue to bound cache growth.
+Preferred software path for repeatable AA/composed surfaces when a stable key describes the visual
+result. Existing global memory budget and size limits bound growth.
 
-## R9.3A — Rendering benchmark
+---
+
+## R9.3A — rendering benchmark
 
 Status: **ACCEPTED — WINDOWS DEBUG + RELEASE PASS**
 
@@ -87,8 +82,7 @@ Validation:
 
 - Debug: `UI_RENDER_BENCH_SUMMARY checks=108 failed=0`
 - Release: `UI_RENDER_BENCH_SUMMARY checks=108 failed=0`
-- cache evidence: `entries=5 bytes=52368 hits=25985 misses=30 evictions=0 skipped=0`
-- demo built/runs and mode/count switching remained responsive.
+- cache: `entries=5 bytes=52368 hits=25985 misses=30 evictions=0 skipped=0`
 
 ### Key Release evidence — full redraw average
 
@@ -105,118 +99,177 @@ Validation:
 | slider-like | cached AA | **319 us** | **3,245 us** | **32,597 us** |
 | ring | local AA | 7,837 us | 79,194 us | 806,436 us |
 | ring | cached AA | **265 us** | **2,609 us** | **28,878 us** |
-| ring | batched AA | 1,464 us | 5,531 us | 55,241 us |
 | 9-slice | direct composition | 36,779 us | 368,362 us | 3,704,326 us |
 | 9-slice | cached composed | **130 us** | **1,287 us** | **14,229 us** |
 
-### Dirty-one evidence
+Dirty-one evidence proved a bounded Painter layer remains bounded but is much slower than cache or
+direct rendering for one changed object (~3.8–4.2 ms versus tens of microseconds).
 
-The bounded Painter layer behaved correctly: one dirty object stayed roughly constant regardless
-of logical scene size. It was nevertheless much slower than cache/direct rendering:
+### R9.3A decision
 
-- rounded: cached ~63.6 us vs batched ~3,799 us;
-- button: cached ~127 us vs batched ~3,852 us;
-- slider: cached ~80 us vs batched ~4,177 us;
-- ring: cached ~63 us vs batched ~3,829 us.
+1. Flat/simple primitive -> direct `Draw`.
+2. Repeatable rounded AA -> shared exact raster cache.
+3. Single dirty object -> direct/cache, not a large layer.
+4. Stable ring/arc -> strong cache candidate.
+5. Stable final 9-slice composition -> strong cache candidate.
+6. Dense Graph -> hybrid; do not invent a second renderer without evidence.
 
-### R9.3A decisions
-
-1. **Flat/simple primitive:** direct `Draw` wins and remains the default.
-2. **Repeated rounded AA:** exact shared raster cache wins at 10, 100 and 1000; there is no useful
-   crossover where the bounded layer becomes the preferred primary path.
-3. **Single dirty control/object:** direct/cache wins decisively; never substitute a full scene
-   layer merely for architectural uniformity.
-4. **Ring/arc:** cache strongly preferred for stable presentation.
-5. **9-slice:** caching the fully composed result can be dramatically cheaper than re-composing
-   nine source regions each paint.
-6. **Graph:** use a hybrid strategy — direct flat primitives plus cached repeatable rounded
-   surfaces; reserve the Painter layer for unique scene vectors where later evidence supports it.
+---
 
 ## R9.3B — shared styled-surface cache routing
 
-Status: **SOURCE PUBLISHED — WINDOWS VALIDATION PENDING**
+Status: **ACCEPTED — WINDOWS DEBUG + RELEASE PASS**
 
-Current source checkpoint:
+Implementation checkpoints culminated in:
 
-`a4ae8caa0a3e76fe07d3ef082b3a5c31cb7779f4`
-`UIRENDER: test styled-surface cache routing`
+`9a906b09bb88815e451e5c3d728b4eef24a067b6`
+`UIRENDER: record benchmark decision and cache checkpoint`
 
 Implementation:
 
-- `Ui/UiDraw.h` is now a small rendering-policy facade.
-- `Ui/UiDrawBase.h` preserves the complete pre-facade implementation byte-for-byte as the
-  fallback implementation; it is not a second style system.
-- `Ui/Ui.upp` includes the preserved base header.
-- common solid rounded `UiPaintFaceFrameDash` surfaces use an exact-size shared raster cache;
-- flat surfaces stay on the established direct Draw path;
-- dashed and image-filled surfaces stay on the established implementation;
-- skins retain the established implementation;
-- cached shadows retain their established composition and cache;
+- `Ui/UiDraw.h` is the rendering-policy facade;
+- `Ui/UiDrawBase.h` preserves the complete established implementation as fallback;
+- common solid rounded styled surfaces use the shared exact raster cache;
+- flat surfaces stay direct;
+- dashed/image/skin special cases retain established fallbacks;
+- cached shadow composition remains supported;
 - dirty-region behavior is unchanged.
 
-Focused structural package:
+Focused package:
 
 `Utilities/UiStyledSurfaceCacheTest`
 
-It asserts:
+Windows validation at `9a906b09...`:
 
-- first rounded solid surface creates one raster entry/miss;
-- an identical repeat hits without rerasterising;
-- flat surface produces no cache traffic;
-- dashed rounded surface retains fallback behavior;
-- different presentation creates a distinct key;
-- shadowed rounded surfaces retain cached shadow + cached body reuse.
+- Debug + Release: `UI_STYLED_SURFACE_CACHE_SUMMARY checks=11 failed=0`
+- Debug + Release render benchmark: `UI_RENDER_BENCH_SUMMARY checks=108 failed=0`
+- cache traffic: `entries=8 bytes=79200 hits=41591 misses=33`
+
+### R9.3B Release before/after
+
+| Row | R9.3A n=10 | R9.3B n=10 | R9.3A n=100 | R9.3B n=100 | R9.3A n=1000 | R9.3B n=1000 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| rounded/current_styled | 8,050 | **271** | 77,427 | **3,494** | 765,398 | **37,228** |
+| button/current_styled | 7,771 | **467** | 75,914 | **4,885** | 778,223 | **65,287** |
+| slider/current_styled | 8,279 | **341** | 73,216 | **3,697** | 819,277 | **44,437** |
+
+`local_aa` remained ~800–900 us/item, proving the shared cache rather than machine variance caused
+the change. Flat/direct had no material regression.
+
+### Real Graph effect
+
+The shared cache helped, but only modestly because node body rasterisation was only one part of
+Graph Node Paint:
+
+| Metric | R9.2 | R9.3B | Change |
+| --- | ---: | ---: | ---: |
+| PanProfile overview Node Paint Release | 204,842 us | **189,993 us** | ~7% lower |
+| ScaleTest low-zoom paint Release | 229,477 us | **199,430 us** | ~13% lower |
+| ScaleTest low-zoom paint Debug | 534,436 us | **510,998 us** | ~4% lower |
+| PanProfile mid Node Paint Release | 40,667 us | 40,140 us | ~1% lower |
+
+Conclusion: shared cache solved the generic rounded-surface pathology. Remaining Graph cost belongs
+to Graph presentation/content work. Do **not** respond by adding another renderer.
+
+### Historical publication note
+
+`0704a4a...` was an incomplete contents-write intermediate while introducing the facade; it was
+immediately completed by normal fast-forward commits. It is not a valid checkpoint. No force update
+was used and concurrent theme work was preserved.
+
+---
+
+## R9.3C — Graph render-policy / visual cleanup
+
+Status: **SOURCE PUBLISHED — WINDOWS BUILD/PERFORMANCE VALIDATION REQUIRED**
+
+Current R9.3C source checkpoint:
+
+`4ac9296bb6e6c75487011ce903dd9e1447d35b7e`
+`UIGRAPH-R9.3C: keep flat stock faces aligned to retained geometry`
+
+Parent source checkpoint:
+
+`782c9b5787f777a76974a7e35a63403f51166150`
+`UIGRAPH-R9.3C: isolate clean render policy and paint phases`
+
+### Implementation
+
+The validated R9.2/R9.3B Graph implementation is preserved as:
+
+`Ui/UiGraph/UiNodeGraphBase.inc`
+
+The active `UiNodeGraph.cpp` compiles that dependency slice with legacy names and replaces only:
+
+- `Paint()`;
+- `PaintGraphGeometry()`;
+- `PaintNodeDetails()`.
+
+This is intentionally a recoverable render-policy experiment, not a spatial/model rewrite.
+
+Current R9.3C behavior:
+
+- node and edge presentation styles are resolved once per painted object/frame and reused across
+  surface/details/content passes;
+- new aggregate read-only timings:
+  - node surface paint;
+  - node details/ports paint;
+  - node content/text paint;
+- the AA node-details viewport buffer is skipped when the current visible scene contains only
+  rectangular nodes with no visible header-band/port detail that requires it;
+- stock unclassified nodes suppress the old exact default soft-shadow recipe;
+- explicit/custom/preset shadow styles remain supported;
+- shadowless rectangular stock faces paint into the already-retained face rectangle, preserving
+  the previous body/port-anchor geometry;
+- stock port visual radius is 4 DPI while the independent hit radius remains 10 DPI;
+- all stock ports use a small hollow circular ring; direction remains topology/hit semantics;
+- inactive port colour is subdued, while hover/connection validation can strengthen/tint it;
+- stock edges are thinner and default to a smaller open arrow rather than a filled triangle;
+- crossed grid lines are replaced by direct 1-pixel dots;
+- authored base spacing remains 20 world units;
+- hierarchy promotes every fifth level (20 -> 100 -> 500 -> 2500... world units);
+- finer dots fade by screen spacing and a retained hierarchy stays around useful navigation scale;
+- low-zoom text work is skipped before it becomes visually useful, while retained geometry remains
+  available for interaction/LOD.
 
 ### Publication recovery note
 
-A contents-write sequencing error briefly advanced `main` to
-`0704a4a1f59cb5d4be58ecdfb1d267f9a8aa6547` with only the facade file. That commit is an
-intermediate historical commit, **not a valid checkpoint**. It was immediately completed by the
-normal fast-forward `73284a6...`, then the focused test by `a4ae8caa...`. No force update was used
-and the concurrent theme commit `337d299...` was preserved.
+During staging, a one-byte `Ui/UiGraph/THIS_SHOULD_NOT_EXIST.tmp` placeholder was accidentally
+created on `main` at `52b6063...` and immediately removed by the normal fast-forward
+`a1bd606...`. Final tree content returned to the exact pre-placeholder tree before R9.3C was
+published. Neither commit is a valid implementation checkpoint; no force update was used.
 
-## R9.3C — Graph hot-path + visual baseline
+### R9.3C validation gate
 
-Status: **NEXT AFTER R9.3B WINDOWS/PROFILE EVIDENCE**
+Before changing Graph architecture further, Windows CLANGx64 Debug + Release must establish:
 
-The first R9.3C validation question is now very narrow: does routing the existing ordinary Graph
-rounded surface through the shared cache materially collapse Node Paint on the real Reference and
-10k views?
+1. `Ui` and all focused Graph packages compile with the preserved `.inc` slice.
+2. Existing deterministic Graph tests remain zero-failure.
+3. New surface/details/content counters are coherent and sum to the dominant part of Node Paint.
+4. Dot grid has no line-grid remnants, moire/popping, or excessive prominence at 1.0 / 0.5 / 0.2.
+5. Hollow ports remain centered on the node silhouette and the 10-DPI hit target remains practical.
+6. Stock shadow removal does not move the face/ports; explicit shadow presets still draw.
+7. Edge route interaction remains unchanged despite quieter visible width/arrow styling.
+8. Compare R9.3C Node Paint with R9.3B (~190 ms overview Release / ~40 ms mid Release) and identify
+   whether surface, details, or content is now dominant.
 
-If yes, retain that shared solution and proceed with the visual cleanup. If not, use Diagnostics to
-find the next dominant Graph phase instead of adding speculative renderer complexity.
+Do not start a new GPU/software renderer if these numbers remain high. Use the new aggregate phases
+to choose the next bounded optimization.
 
-Planned visual/performance changes after that gate:
+---
 
-- stock Graph node baseline flat/subtle/shadowless; Layered or explicit styles may still opt into
-  shadows;
-- hierarchical dot grid instead of crossed line grid:
-  - base spacing 20 world units;
-  - every fifth level promotes to 100, 500, 2500...;
-  - screen-space cross-fade prevents popping/dense noise;
-- small hollow circular port visuals with larger independent hit areas;
-- clean thin low-contrast connectors;
-- aggregate node surface/details/content diagnostic timings only where needed;
-- remove redundant demo PropertyEditor synchronization from model changes and refresh only the
-  visible editor where possible;
-- keep rich skin/image/custom shape fallback separate from the ordinary high-scale path.
+## R10 — Graph structural cleanup
 
-Before/after Graph evidence must retain the R9.2 profile outputs rather than relying on subjective
-responsiveness alone.
+Status: **PENDING R9.3C PERFORMANCE/VISUAL ACCEPTANCE**
 
-## R10 — Graph visual / structural cleanup
-
-Status: **PENDING R9.3 PERFORMANCE ACCEPTANCE**
-
-Remove redundant silhouette aliases rather than preserving compatibility that no production caller
-needs:
+Remove redundant silhouette aliases:
 
 - Rectangle owns arbitrary width/height + corner radius, including square, rounded rectangle and
   capsule/pill forms;
 - Ellipse owns arbitrary width/height, including circles;
 - distinct silhouettes remain: Diamond, Triangle, Hexagon, Cloud, Document, Database, Custom.
 
-Separate silhouette from internal composition. Expected small built-in policy family:
+Separate silhouette from internal composition. Expected built-in policy family:
 
 - Auto;
 - Compact;
@@ -224,59 +277,54 @@ Separate silhouette from internal composition. Expected small built-in policy fa
 - PortRows;
 - Custom.
 
-`PortRows` uses existing ordered `UiGraphPort`s and retained row geometry; arbitrary app body rows
+`PortRows` uses existing ordered `UiGraphPort`s and retained row geometry. Arbitrary app body rows
 remain generic app-owned data/presentation. No child Ctrl per row.
 
 ## R11 — transient edge activity
 
 Status: **PENDING STATIC RENDER PERFORMANCE**
 
-Add generic runtime flow presentation without putting agent/runtime semantics into `UiGraphModel`:
-
-- Pulse: one marker travels along a retained route;
-- Flow: one or a very small bounded set loops while active;
+- Pulse: one small marker travels along a retained route;
+- Flow: one/small bounded set loops while active;
 - one owned `UiFrameTicker` for all active edges;
-- dirty repaint bounded to old/new marker damage where practical.
+- dirty repaint bounded to old/new marker damage where practical;
+- no agent/runtime semantics added to `UiGraphModel`.
 
 ## R12 — evidence-driven adoption by other controls
 
-Status: **PENDING R9.3 SHARED-SURFACE ACCEPTANCE**
+Status: **PENDING R9.3C ACCEPTANCE**
 
-Candidate review order based on R9.3A:
-
-1. `UiProgressRing` — strong cache evidence for stable ring presentation; dynamic value/gradient
-   keying must be designed carefully rather than caching blindly.
-2. `UiSlider` — already a hybrid design; benchmark supports retaining direct track + cached AA
-   details rather than moving the whole control into a layer.
-3. Button/Panel/Label/Edit family — shared styled-surface facade may provide the useful benefit
-   automatically; keep direct text and other cheap primitives.
-4. 9-slice users — evaluate caching the final composed result when dimensions/presentation are
-   stable, because R9.3A showed a very large win.
-5. later scene controls (Timeline/Charts/etc.) consume the same direct/cache/layer policy rather
-   than inventing their own buffering architecture.
+1. `UiProgressRing`: strong cache evidence for stable presentation; dynamic value/gradient keying
+   requires care.
+2. `UiSlider`: benchmark supports retaining the current direct-track + cached-AA-detail hybrid.
+3. Button/Panel/Label/Edit: shared styled-surface facade may provide benefits automatically; keep
+   direct text and cheap primitives.
+4. Stable 9-slice users: evaluate caching final composed output.
+5. Timeline/Charts/dense controls: use the same direct/cache/layer policy rather than inventing a
+   second buffering architecture.
 
 ## Recovery log
 
 BASE: `7f2bbbdcdd564ce0c2255c122ec473ff7dfa9799`
 
-TASK: evidence-driven shared rendering, then Graph hot-path/visual cleanup.
+TASK: evidence-driven shared rendering, then Graph render-policy/visual cleanup.
 
-LATEST VERIFIED SOURCE CHECKPOINT WHEN WRITTEN:
-`a4ae8caa0a3e76fe07d3ef082b3a5c31cb7779f4`
+LATEST SOURCE CHECKPOINT WHEN WRITTEN:
+`4ac9296bb6e6c75487011ce903dd9e1447d35b7e`
 
 STATUS:
-- R9.3A benchmark accepted Debug + Release at `e7c5007...`;
-- R9.3B shared styled-surface cache source + deterministic test published;
-- R9.3B Windows build/test and real Graph before/after profile still required;
-- R9.3C visual/Graph-specific changes intentionally wait for that evidence.
+- R9.3A accepted Debug + Release;
+- R9.3B accepted Debug + Release and generic cache pathology closed;
+- R9.3C source published; Windows compile/profile/visual validation pending;
+- demo PropertyEditor synchronization cleanup is still pending after the R9.3C production build
+  checkpoint is proven;
+- R10/R11 intentionally wait for R9.3C evidence.
 
 NEXT:
 
-1. Build `Ui`, `Utilities/UiStyledSurfaceCacheTest`, `Utilities/UiRenderBenchmark`, and Graph
-   validation packages Debug + Release.
-2. Run the cache test and preserve its exact summary/stats.
-3. Rerun the render benchmark: `current_styled` rounded/button/slider paths should now show the
-   shared facade effect while explicit `local_aa` remains the uncached control.
-4. Capture real Graph Reference + 10k Node Paint before/after evidence.
-5. If the shared cache materially closes the node-body bottleneck, proceed directly to R9.3C dot
-   grid/shadowless baseline/hollow ports/diagnostic cleanup.
+1. Build `Ui`, `UiGraphDemo`, and focused Graph tests Debug + Release from current remote `main`.
+2. Preserve existing profile lines and capture new node surface/details/content timing evidence.
+3. Visually check dot-grid hierarchy, hollow ports, shadowless stock nodes and quieter edges.
+4. If source is sound, apply the remaining demo-only selection/editor synchronization cleanup and
+   expose the new aggregate phases in Diagnostics.
+5. Then decide the next bounded Graph optimization from the measured dominant phase, not intuition.
