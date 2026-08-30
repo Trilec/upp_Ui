@@ -4,5 +4,7 @@ using namespace Upp;
 
 GUI_APP_MAIN
 {
-    UiGraphDemo().Run();
+    UiGraphDemo demo;
+    InstallUiGraphDemoRuntime(demo);
+    demo.Run();
 }
