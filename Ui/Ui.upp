@@ -11,6 +11,7 @@ uses
 file
 	UiStyle.h,
 	UiDraw.h,
+	UiDrawBase.h,
 	UiRenderLayer.h,
 	UiFrameTicker.h,
 	UiAxis.h,
