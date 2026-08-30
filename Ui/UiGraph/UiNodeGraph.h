@@ -57,6 +57,9 @@
       shape-aware port presentation without adding media semantics to the model.
     - 2026-08: cached exact small rounded/capsule surfaces once Graph LOD has
       removed expensive shadow/skin detail, avoiding per-node AA buffers at overview.
+    - 2026-08: added R9.3C aggregate surface/details/content paint evidence and
+      preserved legacy paint stages behind a focused render-policy wrapper so
+      dot-grid/port/LOD experiments remain isolated and recoverable.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -101,7 +104,7 @@ struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
     int title_subtitle_gap = DPI(2);
     int subtitle_description_gap = DPI(4);
     int icon_text_gap = DPI(8);
-    int port_radius = DPI(5);
+    int port_radius = DPI(4);
     int port_hit_radius = DPI(10);
     int port_label_gap = DPI(7);
     int port_spacing = DPI(24);
@@ -118,10 +121,9 @@ struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
     bool show_header_band = false;
     bool show_icon = true;
     bool show_description = true;
-    // Port direction is already communicated by marker shape (input circle,
-    // output square, bidirectional diamond). Labels remain available for hosts
-    // that need named ports, but are opt-in so compact nodes do not collide with
-    // their own content at ordinary 1:1 zoom.
+    // Port direction belongs to topology/hit testing, not the stock marker
+    // silhouette. The default visual is one small hollow circular ring for all
+    // directions, with a larger independent hit radius. Labels remain opt-in.
     bool show_port_labels = false;
     bool show_port_type = false;
 
@@ -131,10 +133,10 @@ struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
 struct UiGraphEdgeStyle : Moveable<UiGraphEdgeStyle> {
     Color color[4];
     Color label_ink[4];
-    double width[4] = { 2.0, 2.5, 3.0, 1.5 };
+    double width[4] = { 1.25, 1.5, 2.0, 1.0 };
     UiGraphRouteStyle route = UiGraphRouteStyle::Bezier;
     UiLineStyle line_style = SOLID;
-    UiGraphArrowStyle arrow = UiGraphArrowStyle::Triangle;
+    UiGraphArrowStyle arrow = UiGraphArrowStyle::Open;
     Font label_font = StdFont();
     double bezier_tension = 0.42;
     // Zero is the safe stock lead. The midpoint routing itself already leaves a
@@ -145,7 +147,7 @@ struct UiGraphEdgeStyle : Moveable<UiGraphEdgeStyle> {
     double orthogonal_radius = 8.0;
     double dash_length = 9.0;
     double dash_gap = 6.0;
-    double arrow_size = 9.0;
+    double arrow_size = 7.0;
     double interaction_width = 10.0;
     bool draw_label_background = true;
     Color label_background = Color(255, 255, 255);
@@ -330,6 +332,9 @@ public:
     int64 GetLastGeometryPrepareUsecs() const { return last_geometry_prepare_usecs_; }
     int64 GetLastEdgePaintUsecs() const { return last_edge_paint_usecs_; }
     int64 GetLastNodePaintUsecs() const { return last_node_paint_usecs_; }
+    int64 GetLastNodeSurfacePaintUsecs() const { return last_node_surface_paint_usecs_; }
+    int64 GetLastNodeDetailsPaintUsecs() const { return last_node_details_paint_usecs_; }
+    int64 GetLastNodeContentPaintUsecs() const { return last_node_content_paint_usecs_; }
     int GetLastNodeHitCandidateCount() const { return last_node_hit_candidate_count_; }
     int GetLastPortHitCandidateCount() const { return last_port_hit_candidate_count_; }
     int GetLastEdgeHitCandidateCount() const { return last_edge_hit_candidate_count_; }
@@ -622,6 +627,15 @@ private:
     void PaintConnectionPreview(Painter& p);
     void PaintMarquee(Draw& w) const;
 
+    // Preserved R9.2/R9.3B implementations compiled from UiNodeGraphBase.inc.
+    // The active R9.3C wrapper replaces only these three stages; keeping the
+    // legacy versions callable makes the experiment easy to validate/revert.
+    void PaintLegacy(Draw& w);
+    void PaintGraphGeometryLegacy(Draw& w);
+    void PaintNodeDetailsLegacy(Painter& p, const UiGraphNode& node,
+                                const NodeGeometry& geometry, const UiGraphNodeStyle& style,
+                                UiGraphVisualState state);
+
     static UiGraphPortSide ResolvePortSide(const UiGraphPort& port);
     static Pointf SideVector(UiGraphPortSide side);
     static Vector<Pointf> SimplifyRoute(const Vector<Pointf>& route);
@@ -713,6 +727,9 @@ private:
     int64 last_geometry_prepare_usecs_ = 0;
     int64 last_edge_paint_usecs_ = 0;
     int64 last_node_paint_usecs_ = 0;
+    int64 last_node_surface_paint_usecs_ = 0;
+    int64 last_node_details_paint_usecs_ = 0;
+    int64 last_node_content_paint_usecs_ = 0;
     mutable int last_node_hit_candidate_count_ = 0;
     mutable int last_port_hit_candidate_count_ = 0;
     mutable int last_edge_hit_candidate_count_ = 0;

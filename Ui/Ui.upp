@@ -31,6 +31,7 @@ file
 	UiGraph/UiGraphModel.cpp,
 	UiGraph/UiNodeGraph.h,
 	UiGraph/UiNodeGraph.cpp,
+	UiGraph/UiNodeGraphBase.inc,
 	UiGraph/UiNodeGraphSpatial.cpp,
 	UiGraph/UiNodeGraphInteraction.cpp,
 	UiLayoutCursor.h,
