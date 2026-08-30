@@ -268,8 +268,14 @@ void UiCheckBox::Paint(Draw& w)
             }
             else if(!IsNull(style.checked_icon))
                 UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.checked_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
-            else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
-                UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(2), 0, DPI(3), DPI(2), DPI(3));
+            else {
+                const Image mark = ICON_DESIGN_CHECK_SMALL_48();
+                if(!IsNull(mark))
+                    UiPaintStyledIcon(w, ind.Deflated(DPI(3)), mark, true, true,
+                                      UiIconRenderMode::MonoTint, mk, st != ST_DISABLED);
+                else
+                    UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(2), 0, DPI(3), DPI(2), DPI(3));
+            }
         }
     }
     else {
@@ -293,8 +299,14 @@ void UiCheckBox::Paint(Draw& w)
             }
             else if(!IsNull(style.checked_icon))
                 UiPaintStyledIcon(w, ind.Deflated(DPI(2)), style.checked_icon, true, true, style.marker_render_mode, mk, st != ST_DISABLED);
-            else if(!UiPaintCenteredScaledImage(w, ind, ICON_DESIGN_CHECK_SMALL_48(), DPI(3), DPI(3)))
-                UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(3), 0, DPI(4), DPI(3), DPI(4));
+            else {
+                const Image mark = ICON_DESIGN_CHECK_SMALL_48();
+                if(!IsNull(mark))
+                    UiPaintStyledIcon(w, ind.Deflated(DPI(3)), mark, true, true,
+                                      UiIconRenderMode::MonoTint, mk, st != ST_DISABLED);
+                else
+                    UiPaintIndicatorCheckStroke(w, ind, mk, t, DPI(3), 0, DPI(4), DPI(3), DPI(4));
+            }
         }
     }
 

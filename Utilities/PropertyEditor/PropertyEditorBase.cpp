@@ -171,6 +171,12 @@ One<PropertyValueEditor> PropertyEditor::CreateEditor(
 
 void PropertyEditor::SetStyle(const PropertyEditorStyle& style)
 {
+    // Inline editors may own local styles resolved from UiTheme at creation
+    // time. Recreate them whenever the PropertyEditor palette changes so a
+    // Light/Dark transition cannot leave a stale checkbox/dropdown embedded in
+    // an otherwise updated PropertyEditor surface.
+    ClearInlineEditors();
+    DeactivateEditor();
     style_ = style;
     RebuildRows();
 }

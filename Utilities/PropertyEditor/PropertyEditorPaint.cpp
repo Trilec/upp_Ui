@@ -1,4 +1,5 @@
 #include "PropertyEditor.h"
+#include <Ui/UiDraw.h>
 #include <Ui/UiIcons.h>
 
 namespace Upp {
@@ -137,8 +138,13 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
                            reset.top + (reset.GetHeight() - size) / 2,
                            reset.left + (reset.GetWidth() - size) / 2 + size,
                            reset.top + (reset.GetHeight() - size) / 2 + size);
-            if(size > 0)
-                w.DrawImage(icon_rect, icon);
+            if(size > 0) {
+                const Color marker_ink = item.inherited ? style_.inherited_ink
+                                                        : style_.value_ink;
+                UiPaintStyledIcon(w, icon_rect, icon, true, true,
+                                  UiIconRenderMode::MonoTint, marker_ink,
+                                  item.enabled);
+            }
         }
     }
 
@@ -152,8 +158,13 @@ void PropertyEditor::DrawPropertyRow(Draw& w, int display_index,
                        override.top + (override.GetHeight() - size) / 2,
                        override.left + (override.GetWidth() - size) / 2 + size,
                        override.top + (override.GetHeight() - size) / 2 + size);
-        if(size > 0)
-            w.DrawImage(icon_rect, icon);
+        if(size > 0) {
+            const Color marker_ink = item.override_active ? style_.value_ink
+                                                          : style_.inherited_ink;
+            UiPaintStyledIcon(w, icon_rect, icon, true, true,
+                              UiIconRenderMode::MonoTint, marker_ink,
+                              item.enabled);
+        }
     }
 
     if(!item.validation_error.IsEmpty()) {
