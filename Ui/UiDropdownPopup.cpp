@@ -463,7 +463,10 @@ void UiDropdown::PopupWindow::Deactivate()
 {
     if(GetScreenRect().Contains(GetMousePos()))
         return;
-    if(owner)
+    // A close initiated by the owner clears popup_open_ before TopWindow::Close
+    // can deactivate this popup. Do not turn that internal close into a
+    // click-suppression request for the next owner click.
+    if(owner && owner->popup_open_)
         owner->suppress_next_open_ = owner->GetScreenRect().Contains(GetMousePos());
     if(owner && !owner->popup_pinned_)
         owner->ClosePopupInternal(false);
