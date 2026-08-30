@@ -124,7 +124,10 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             view_us = usecs() - stage;
         }
         else {
-            d.graph_.SetAutoFitOnFirstPaint(true);
+            // Scale mode already disabled first-paint auto-fit. Keep it disabled
+            // until the small internal model is bound, then fit that model once
+            // explicitly below. Re-enabling it here would RefreshLayout() while
+            // the 10k model is still active and redundantly fit/prepare that scene.
             int64 stage = usecs();
             d.graph_.UseInternalModel();
             bind_us = usecs() - stage;
