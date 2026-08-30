@@ -323,6 +323,7 @@ UiTitleCard& UiTitleCard::SetCardLine(UiSpan ex, int thickness, UiLineStyle styl
     st.card_line_style = style;
     st.card_line_color_enabled = !IsNull(c);
     st.card_line_color = c;
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -331,6 +332,7 @@ UiTitleCard& UiTitleCard::SetCardLineSide(UiAlign side)
 {
     if(side == UiAlign::TOP || side == UiAlign::BOTTOM || side == UiAlign::LEFT || side == UiAlign::RIGHT) {
         StyleEdit().card_line_side = side;
+        RefreshLayout();
         Refresh();
     }
     return *this;
@@ -356,6 +358,7 @@ UiTitleCard& UiTitleCard::ShowTitleLine(bool on)
 UiTitleCard& UiTitleCard::ShowCardLine(bool on)
 {
     StyleEdit().card_line = on;
+    RefreshLayout();
     Refresh();
     return *this;
 }
@@ -987,7 +990,7 @@ void UiTitleCard::Paint(Draw& w)
 
         if(style.media_tint_mono) {
             Color media_ink = UiResolveIconColor(style.palette, st);
-        UiPaintStyledIcon(w, draw_r, media_, true, true, UiIconRenderMode::MonoTint, media_ink, IsEnabled());
+            UiPaintStyledIcon(w, draw_r, media_, true, true, UiIconRenderMode::MonoTint, media_ink, IsEnabled());
         }
         else {
             w.DrawImage(draw_r.left, draw_r.top, draw_r.GetWidth(), draw_r.GetHeight(), media_);
