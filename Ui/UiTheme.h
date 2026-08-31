@@ -49,35 +49,35 @@ public:
 
     static UiToolButton::Style ResolveToolButton(UiRole role)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(role));
     }
     static UiToolButton::Style ResolveToolButton(
         UiToolButtonRole role = UiToolButtonRole::Standard)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(role));
     }
     static UiToolButton::Style ResolveToolButton(const UiThemeContext& ctx,
                                                  UiRole role)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(ctx, role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(ctx, role));
     }
     static UiToolButton::Style ResolveToolButton(
         const UiThemeContext& ctx,
         UiToolButtonRole role = UiToolButtonRole::Standard)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(ctx, role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(ctx, role));
     }
     static UiToolButton::Style ResolveToolButton(
         UiThemePreset preset, UiThemeMode mode,
         UiToolButtonRole role = UiToolButtonRole::Standard)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(preset, mode, role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(preset, mode, role));
     }
     static UiToolButton::Style ResolveToolButton(UiThemePreset preset,
                                                  UiThemeMode mode,
                                                  UiRole role)
     {
-        return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveToolButton(preset, mode, role));
+        return UiThemeStructureContract::ToolButtonPreserved(UiThemeRaw::ResolveToolButton(preset, mode, role));
     }
 
     static UiToggle::Style ResolveToggle(UiRole role)
