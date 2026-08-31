@@ -1,9 +1,17 @@
 /*
-    Regression coverage: activating a leaf row used to destroy the PopupLevel
-    that was executing LeftDown (ActivateItem -> EndSession ->
-    CloseLevelsFrom -> SetCount), and the code after the call then wrote into
-    the freed object ("writes to freed blocks detected" on the next popup
-    open). Four full open/submenu/activate cycles must complete cleanly.
+    Regression coverage for UiMenu popup lifecycle:
+
+    1. Activating a leaf row used to destroy the PopupLevel that was executing
+       LeftDown (ActivateItem -> EndSession -> CloseLevelsFrom -> SetCount),
+       and the code after the call then wrote into the freed object ("writes
+       to freed blocks detected" on the next popup open). Four full
+       open/submenu/activate cycles must complete cleanly.
+
+    2. Menubar-mode reopen: real LeftDown on a bar item, row activation, then
+       reopening the same item must work repeatedly. PopupLevel objects are
+       now detached (not freed) during CloseLevelsFrom and destroyed at the
+       next safe teardown point, so stale references during the close/reopen
+       window stay on valid closed controls.
 */
 
 #include <Ui/Ui.h>
@@ -64,6 +72,33 @@ public:
             action_count++;
             last_action = item.text;
         };
+    }
+};
+
+class MenuBarWindow : public TopWindow {
+public:
+    UiMenu menu;
+    int action_count = 0;
+    String last_action;
+
+    MenuBarWindow()
+    {
+        Title("UiMenu menubar reopen test");
+        SetRect(140, 140, 520, 320);
+        UiMenuModel& model = menu.Model();
+        UiMenuNodeRef root = model.Root();
+        UiMenuNodeRef scene = model.AddChild(root, UiMenuItem("Scene"));
+        model.AddChild(scene, UiMenuItem("Reset"));
+        model.AddChild(scene, UiMenuItem("Pause / Resume"));
+        UiMenuNodeRef anim = model.AddChild(root, UiMenuItem("Animation"));
+        model.AddChild(anim, UiMenuItem("Orbit"));
+        model.AddChild(anim, UiMenuItem("Flow"));
+        menu.SetMenuBarMode();
+        menu.WhenAction = [=](UiMenuNodeRef, const UiMenuItem& item) {
+            action_count++;
+            last_action = item.text;
+        };
+        Add(menu.HSizePos(12, 12).TopPos(12, 34));
     }
 };
 
@@ -129,6 +164,36 @@ GUI_APP_MAIN
     }
 
     win.Close();
+
+    // Menubar reopen path: LeftDown on the bar item, row activation, reopen.
+    MenuBarWindow bar;
+    bar.Open();
+    Ctrl::ProcessEvents();
+    t.Expect(bar.IsOpen() && bar.menu.IsMenuBarMode(), "menubar host opens in menubar mode");
+
+    int menubar_actions = 0;
+    for(int cycle = 1; cycle <= 4 && t.fails == 0; cycle++) {
+        bar.menu.LeftDown(Point(28, 17), 0);
+        Ctrl::ProcessEvents();
+        t.Expect(bar.menu.IsMenuOpen(), Format("menubar cycle %d: bar item opens the popup", cycle));
+        if(!bar.menu.IsMenuOpen())
+            break;
+
+        Ctrl *popup = FindOwnedTops(bar).GetCount() ? FindOwnedTops(bar)[0] : nullptr;
+        t.Expect(popup != nullptr, Format("menubar cycle %d: popup window present", cycle));
+        if(!popup)
+            break;
+
+        Rect pr = popup->GetRect();
+        popup->LeftDown(Point(pr.GetWidth() / 2, 20), 0);
+        Ctrl::ProcessEvents();
+        menubar_actions++;
+        t.Expect(!bar.menu.IsMenuOpen() && bar.action_count == menubar_actions
+                 && bar.last_action == "Reset",
+                 Format("menubar cycle %d: row activation closes and fires Reset", cycle));
+    }
+
+    bar.Close();
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     SetExitCode(t.fails ? 1 : 0);
 }

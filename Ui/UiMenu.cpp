@@ -438,6 +438,7 @@ UiMenu::UiMenu()
 UiMenu::~UiMenu()
 {
     session_verify_tc_.Kill();
+    DestroyDyingLevels();
 }
 
 UiMenu::Style& UiMenu::StyleEdit()
@@ -791,17 +792,30 @@ void UiMenu::AfterPopupOpen(PopupLevel& popup)
     popup.Sync();
 }
 
+void UiMenu::DestroyDyingLevels()
+{
+	for(PopupLevel *p : dying_levels_)
+		delete p;
+	dying_levels_.Clear();
+}
+
 void UiMenu::CloseLevelsFrom(int level, bool clear_root_state)
 {
-    if(level < 0)
-        level = 0;
-    if(level >= popup_levels_.GetCount())
-        return;
-    closing_all_ = true;
-    for(int i = popup_levels_.GetCount() - 1; i >= level; i--)
-        popup_levels_[i].Close();
-    popup_levels_.SetCount(level);
-    closing_all_ = false;
+	if(level < 0)
+		level = 0;
+	if(level >= popup_levels_.GetCount())
+		return;
+	closing_all_ = true;
+	for(int i = popup_levels_.GetCount() - 1; i >= level; i--)
+		popup_levels_[i].Close();
+	// Destroy the window synchronously above, but defer object destruction:
+	// in-flight stack frames (LeftDown/ActivateItem/AfterPopupOpen across
+	// event pumps) may still hold PopupLevel references, and a stray
+	// Refresh()/GetHWND() on a freed level crashes. Detached levels stay
+	// valid (closed) until the next safe teardown point.
+	for(int i = popup_levels_.GetCount() - 1; i >= level; i--)
+		dying_levels_.Add(popup_levels_.Detach(i));
+	closing_all_ = false;
     if(level == 0 && clear_root_state) {
         hot_top_index_ = -1;
         active_top_index_ = -1;
@@ -813,6 +827,7 @@ void UiMenu::CloseLevelsFrom(int level, bool clear_root_state)
 
 void UiMenu::OpenRootPopup(Point screen_pt)
 {
+    DestroyDyingLevels();
     SyncModel();
     if(!model_ || model_->GetChildCount(model_->Root()) == 0)
         return;
@@ -846,6 +861,7 @@ void UiMenu::OpenRootPopup(Point screen_pt)
 
 void UiMenu::OpenMenuBarPopup(int index)
 {
+    DestroyDyingLevels();
     if(!menu_bar_mode_ || !model_)
         return;
     UiMenuNodeRef node = GetChildNode(model_->Root(), index);
@@ -891,6 +907,7 @@ void UiMenu::OpenMenuBarPopup(int index)
 
 void UiMenu::OpenSubMenu(int level_index, int index)
 {
+    DestroyDyingLevels();
     if(level_index < 0 || level_index >= popup_levels_.GetCount())
         return;
     PopupLevel& level = popup_levels_[level_index];

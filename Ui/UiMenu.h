@@ -233,6 +233,7 @@ private:
     void SuppressTopHoverUntilMouseMoves();
     void AfterPopupOpen(PopupLevel& popup);
     void CloseLevelsFrom(int level, bool clear_root_state = true);
+    void DestroyDyingLevels();
     void OpenRootPopup(Point screen_pt);
     void OpenMenuBarPopup(int index);
     void OpenSubMenu(int level, int index);
@@ -287,6 +288,7 @@ private:
     bool closing_all_ = false;
 
     Array<PopupLevel> popup_levels_;
+    Vector<PopupLevel *> dying_levels_;
 };
 
 }
