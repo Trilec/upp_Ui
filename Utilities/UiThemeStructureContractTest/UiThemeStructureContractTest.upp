@@ -1,0 +1,11 @@
+description "Ui theme structure ownership regression test";
+
+uses
+	Core,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "CONSOLE";
