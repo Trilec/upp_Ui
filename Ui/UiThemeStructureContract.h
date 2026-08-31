@@ -61,6 +61,10 @@ inline void Preserve(UiDropdown::Style& s)
 
 inline void Preserve(UiTab::Style& s, UiTabVisual visual)
 {
+    // Minimal/Pill role tuning historically forced the Underline family after
+    // the caller had already selected a visual. Reapply the requested visual
+    // recipe so geometry and paint-mode flags agree with s.visual as well.
+    s = UiThemeDetail::ApplyTabVisual(s, visual);
     s.visual = visual;
 }
 
