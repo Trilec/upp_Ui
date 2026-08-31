@@ -3,9 +3,12 @@
 
     Theme resolvers may change visual vocabulary (palette, font, radius, paint
     metrics), but must not change authored structural choices. These helpers
-    restore the control defaults for structural fields after a theme recipe is
-    resolved. Callers that need a non-default structural choice apply it as
-    control configuration after resolving the theme.
+    restore control defaults for structure after a theme recipe is resolved.
+    A caller that needs a non-default structural choice applies it as control
+    configuration after resolving the theme.
+
+    This header is included by UiTheme.h after the concrete control style
+    types are available; it intentionally does not include UiTheme.h itself.
 */
 #ifndef _Ui_UiThemeStructureContract_h_
 #define _Ui_UiThemeStructureContract_h_
@@ -65,12 +68,19 @@ inline void Preserve(UiTitleCard::Style& s)
 {
     const UiTitleCard::Style& d = UiTitleCard::StyleDefault();
     s.text_align_h = d.text_align_h;
+    s.text_align_v = d.text_align_v;
     s.media_side = d.media_side;
+    s.media_align_h = d.media_align_h;
+    s.media_align_v = d.media_align_v;
+    s.media_auto_fit = d.media_auto_fit;
+
     s.title_line = d.title_line;
     s.title_line_length = d.title_line_length;
     s.title_line_thickness = d.title_line_thickness;
     s.title_line_style = d.title_line_style;
-    s.title_line_color = d.title_line_color;
+    s.title_line_gap_above = d.title_line_gap_above;
+    s.title_line_gap_below = d.title_line_gap_below;
+
     s.card_line = d.card_line;
     s.card_line_side = d.card_line_side;
     s.card_line_length = d.card_line_length;
@@ -78,7 +88,6 @@ inline void Preserve(UiTitleCard::Style& s)
     s.card_line_style = d.card_line_style;
     s.card_line_gap = d.card_line_gap;
     s.card_line_color_enabled = d.card_line_color_enabled;
-    s.card_line_color = d.card_line_color;
 }
 
 inline void Preserve(UiList::Style& s)
@@ -86,6 +95,19 @@ inline void Preserve(UiList::Style& s)
     const UiList::Style& d = UiList::StyleDefault();
     s.show_row_separator = d.show_row_separator;
     s.right_text_as_badge = d.right_text_as_badge;
+}
+
+template <class T>
+inline T Preserved(T s)
+{
+    Preserve(s);
+    return s;
+}
+
+inline UiTab::Style Preserved(UiTab::Style s, UiTabVisual visual)
+{
+    Preserve(s, visual);
+    return s;
 }
 
 }
