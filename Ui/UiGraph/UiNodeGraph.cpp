@@ -1,17 +1,28 @@
+#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/UiGraph/UiNodeGraph.h>
+#undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/Ui.h>
 
 // Preserve the validated R9.2/R9.3B implementation in this translation unit,
 // but keep the three paint stages under legacy names. R9.3C can therefore
 // replace only the visual/render-policy layer without rewriting spatial/model/
 // interaction code or losing the previous implementation as a recovery path.
-#define Paint              PaintLegacy
-#define PaintGraphGeometry PaintGraphGeometryLegacy
-#define PaintNodeDetails   PaintNodeDetailsLegacy
+//
+// R10A also keeps the retained implementation source-compatible with its old
+// enum spelling. Public/application code does not see those aliases. Mapping
+// old Rectangle to its historical wire-0 name here is important: canonical
+// Rectangle now has a distinct wire value and owns corner_radius semantics.
+#define Rectangle                    LegacyRectangle
+#define UsesRectangularStyledSurface UsesRectangularStyledSurfaceLegacy
+#define Paint                         PaintLegacy
+#define PaintGraphGeometry            PaintGraphGeometryLegacy
+#define PaintNodeDetails              PaintNodeDetailsLegacy
 #include "UiNodeGraphBase.inc"
 #undef PaintNodeDetails
 #undef PaintGraphGeometry
 #undef Paint
+#undef UsesRectangularStyledSurface
+#undef Rectangle
 
 namespace Upp {
 namespace {
@@ -38,6 +49,26 @@ bool ApplyR93CNodePresentation(const UiGraphNode& node, UiGraphNodeStyle& style)
     if(suppressed)
         style.metrics.shadow.enabled = false;
     return suppressed;
+}
+
+bool UsesRectangularStyledSurface(UiGraphNodeShape shape)
+{
+    const byte wire = (byte)shape;
+    return shape == UiGraphNodeShape::Rectangle
+        || wire == 0   // historical flat Rectangle
+        || wire == 1   // historical RoundedRectangle
+        || wire == 2   // historical Square
+        || wire == 8;  // historical Capsule
+}
+
+int ResolveGraphRectangleRadius(const UiGraphNode& node, const Rect& surface, double zoom)
+{
+    const byte wire = (byte)node.shape;
+    if(wire == 0)
+        return 0;
+    if(wire == 8)
+        return max(0, min(surface.GetWidth(), surface.GetHeight()) / 2);
+    return max(0, fround(node.corner_radius * zoom));
 }
 
 } // namespace
@@ -265,7 +296,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     auto paint_surface = [&](Draw& draw, const UiGraphNode& node, const NodeGeometry& g,
                              const UiGraphNodeStyle& style, UiGraphVisualState state,
                              bool stock_shadow_was_suppressed) {
-        if(!stock_shadow_was_suppressed || !UsesRectangularStyledSurface(node.shape)) {
+        const bool canonical_rectangle = node.shape == UiGraphNodeShape::Rectangle;
+        if(!canonical_rectangle &&
+           (!stock_shadow_was_suppressed || !UsesRectangularStyledSurface(node.shape))) {
             PaintNodeSurface(draw, node, g, style, state);
             return;
         }
@@ -279,13 +312,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         StyledPalette palette = style.palette;
         StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
         StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
-        metrics.shadow.enabled = false;
-        if(node.shape == UiGraphNodeShape::Rectangle)
-            metrics.radius = 0;
-        else if(node.shape == UiGraphNodeShape::Capsule)
-            metrics.radius = max(0, min(g.surface.GetWidth(), g.surface.GetHeight()) / 2);
-        else
-            metrics.radius = max(0, fround(node.corner_radius * zoom_));
+        if(stock_shadow_was_suppressed)
+            metrics.shadow.enabled = false;
+        metrics.radius = ResolveGraphRectangleRadius(node, g.surface, zoom_);
         if(state == UiGraphVisualState::Selected) {
             metrics.frame_enabled = true;
             metrics.frame_width = max(metrics.frame_width,
@@ -293,11 +322,11 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             palette.frame[ST_PRESSED] = SelectedFrameColor(style);
         }
 
-        // g.surface is the face rectangle already retained from the old styled
-        // geometry (including its former shadow reservation). Painting the flat
-        // body into that rect removes the shadow without moving the face or its
-        // shape-boundary port anchors.
-        UiPaintStyledBackground(draw, g.surface, palette, metrics, skin,
+        // Stock R9.3C nodes keep the retained face rectangle after their old
+        // default shadow is suppressed. Explicit authored shadows still use the
+        // canonical outer geometry and established Ui background compositor.
+        Rect target = stock_shadow_was_suppressed ? g.surface : g.rect;
+        UiPaintStyledBackground(draw, target, palette, metrics, skin,
                                 ToStyledState(state), false);
     };
 

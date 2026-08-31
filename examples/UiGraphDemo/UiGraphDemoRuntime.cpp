@@ -4,6 +4,81 @@ namespace Upp {
 
 void InstallUiGraphDemoRuntime(UiGraphDemo& d)
 {
+    auto normalize_model_shapes = [](UiGraphModel& model, bool reference_fixture) {
+        bool changed = false;
+        for(int i = 0; i < model.GetNodeCount(); i++) {
+            UiGraphNode* node = model.FindNode(model.GetNodeRef(i));
+            if(!node)
+                continue;
+
+            UiGraphNodeShape old_shape = node->shape;
+            Sizef old_size = node->size;
+            double old_radius = node->corner_radius;
+
+            switch(old_shape) {
+            case UiGraphNodeShape::RoundedRectangle:
+                node->shape = UiGraphNodeShape::Rectangle;
+                break;
+            case UiGraphNodeShape::Square: {
+                node->shape = UiGraphNodeShape::Rectangle;
+                double side = max(node->size.cx, node->size.cy);
+                node->size = Sizef(side, side);
+                break;
+            }
+            case UiGraphNodeShape::Circle: {
+                node->shape = UiGraphNodeShape::Ellipse;
+                double side = max(node->size.cx, node->size.cy);
+                node->size = Sizef(side, side);
+                break;
+            }
+            case UiGraphNodeShape::Capsule:
+                node->shape = UiGraphNodeShape::Rectangle;
+                node->corner_radius = max(node->corner_radius,
+                                          min(node->size.cx, node->size.cy) * 0.5);
+                break;
+            default:
+                break;
+            }
+
+            // Old demo source used Rectangle for the explicitly flat variant;
+            // the old renderer ignored corner_radius for it. Canonical Rectangle
+            // owns radius, so preserve that authored intent while translating the
+            // historical fixture source.
+            if(old_shape == UiGraphNodeShape::Rectangle
+               && (!reference_fixture || node->title == "Rect"))
+                node->corner_radius = 0.0;
+
+            if(node->shape != old_shape || node->size != old_size
+               || node->corner_radius != old_radius)
+                changed = true;
+        }
+        return changed;
+    };
+
+    // Keep historical enum names out of the user-facing Inspector immediately.
+    // Custom remains a callback/API silhouette rather than a demo drop-down
+    // choice because this reference does not install a custom-shape editor.
+    if(PropertyEditorItem *shape = d.pe_model_node.Find("shape")) {
+        shape->choices.Clear();
+        static const char *canonical_shapes[] = {
+            "Rectangle", "Ellipse", "Diamond", "Triangle",
+            "Hexagon", "Cloud", "Document", "Database"
+        };
+        for(const char *name : canonical_shapes)
+            shape->AddChoice(name, name);
+        shape->default_value = String("Rectangle");
+        d.pe_model_node.StructureChanged();
+    }
+
+    if(normalize_model_shapes(d.graph_.Model(), true)) {
+        // Direct fixture normalization happens once after construction. Rebuild
+        // spatial/retained geometry once instead of emitting a model callback for
+        // every reference node.
+        d.graph_.OnStyleChanged();
+        d.MarkGeneratedCodeDirty();
+    }
+    d.SyncNodeEditor();
+
     auto refresh_diagnostics = [&d] {
         d.RefreshDiagnostics();
         String detail = AsString(d.edit_diagnostics.GetData());
@@ -82,7 +157,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         refresh_diagnostics();
     };
 
-    auto switch_mode = [&d, sync_selection, refresh_diagnostics](bool scale) {
+    auto switch_mode = [&d, sync_selection, refresh_diagnostics, normalize_model_shapes](bool scale) {
         if(scale == d.scale_mode_ && d.graph_.Model().GetNodeCount() > 0) {
             d.btn_reference.SetChecked(!scale);
             d.btn_scale.SetChecked(scale);
@@ -108,6 +183,13 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             d.graph_.SetAutoFitOnFirstPaint(false);
             int64 stage = usecs();
             d.EnsureScaleGraph();
+            // The 10k fixture is built from the historical source vocabulary,
+            // then normalized exactly once before its first bind. Later switches
+            // retain the R9.3D/E fast path without an O(10k) conversion pass.
+            if(!d.scale_shapes_normalized_) {
+                normalize_model_shapes(d.scale_model_, false);
+                d.scale_shapes_normalized_ = true;
+            }
             ensure_us = usecs() - stage;
 
             stage = usecs();

@@ -43,8 +43,8 @@ void BuildLargeModel(UiGraphModel& model, Vector<UiGraphNodeRef>& refs)
             node.title = Format("N%d", y * width + x);
             node.position = Pointf(x * 92.0, y * 72.0);
             node.size = Sizef(64, 44);
-            node.shape = (x + y) & 1 ? UiGraphNodeShape::RoundedRectangle
-                                      : UiGraphNodeShape::Rectangle;
+            node.shape = UiGraphNodeShape::Rectangle;
+            node.corner_radius = (x + y) & 1 ? 8.0 : 0.0;
             node.ports.Add(ProfilePort("in", UiGraphPortDirection::Input));
             node.ports.Add(ProfilePort("out", UiGraphPortDirection::Output));
             refs.Add(model.AddNode(node));
@@ -72,7 +72,8 @@ void BuildSmallModel(UiGraphModel& model, int count, const String& prefix)
         node.title = Format("%s%d", prefix, i);
         node.position = Pointf((i % 4) * 210.0, (i / 4) * 150.0);
         node.size = Sizef(120, 72);
-        node.shape = UiGraphNodeShape::RoundedRectangle;
+        node.shape = UiGraphNodeShape::Rectangle;
+        node.corner_radius = 8.0;
         node.ports.Add(ProfilePort("in", UiGraphPortDirection::Input));
         node.ports.Add(ProfilePort("out", UiGraphPortDirection::Output));
         refs.Add(model.AddNode(node));

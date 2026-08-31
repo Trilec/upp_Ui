@@ -39,6 +39,9 @@
       complete graph edge count.
     - 2026-08: made the authored 1:1 node default a compact representation;
       richer graph nodes remain free to provide any larger explicit size.
+    - 2026-08: canonicalized authored node silhouettes so Rectangle owns
+      arbitrary corner radius and Ellipse owns circles; historical shape names
+      remain available only to internal migration/demo translation units.
 */
 
 #include <Core/Core.h>
@@ -123,20 +126,31 @@ enum class UiGraphPortMultiplicity : byte {
     Multiple,
 };
 
+// Authored/public silhouettes. Rectangle intentionally uses a new wire value so
+// historical wire 0 (flat Rectangle) can still be distinguished while loading
+// old graphs. The serializer remains byte-compatible and preserves unknown old
+// enum bytes; UiNodeGraph interprets those bytes through its private migration
+// view. Applications should author only the canonical names below.
 enum class UiGraphNodeShape : byte {
-    Rectangle = 0,
-    RoundedRectangle,
-    Square,
-    Circle,
-    Ellipse,
-    Diamond,
-    Triangle,
-    Hexagon,
-    Capsule,
-    Cloud,
-    Document,
-    Database,
-    Custom,
+    Rectangle = 13,
+    Ellipse = 4,
+    Diamond = 5,
+    Triangle = 6,
+    Hexagon = 7,
+    Cloud = 9,
+    Document = 10,
+    Database = 11,
+    Custom = 12,
+
+#ifdef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
+    // Internal source/stream migration names. Never expose these in application
+    // inspectors, generated code, or new authored models.
+    LegacyRectangle = 0,
+    RoundedRectangle = 1,
+    Square = 2,
+    Circle = 3,
+    Capsule = 8,
+#endif
 };
 
 // Presentation-only role. It does not imply execution priority, failure state,
@@ -227,7 +241,7 @@ struct UiGraphNode : Moveable<UiGraphNode> {
     String subtitle;
     String description;
     String style_class;
-    UiGraphNodeShape shape = UiGraphNodeShape::RoundedRectangle;
+    UiGraphNodeShape shape = UiGraphNodeShape::Rectangle;
     UiGraphNodeRole role = UiGraphNodeRole::Standard;
     String custom_shape;
     Image icon;

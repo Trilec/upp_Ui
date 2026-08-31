@@ -25,7 +25,13 @@
       counters against a 60 Hz frame budget and retains only bounded peak state.
 */
 
+// The fixture source still names the pre-R10 aliases so the demo can prove the
+// migration path. InstallUiGraphDemoRuntime canonicalizes both retained models
+// before they are presented. Normal Ui/application includes never enable these
+// historical names.
+#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/Ui.h>
+#undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
@@ -163,6 +169,7 @@ private:
     UiGraphNodeRef selected_node_;
     UiGraphEdgeRef selected_edge_;
     bool scale_mode_ = false;
+    bool scale_shapes_normalized_ = false;
     bool syncing_editors_ = false;
     int style_preview_state_ = ST_NORMAL;
 
