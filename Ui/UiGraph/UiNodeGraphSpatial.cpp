@@ -1,4 +1,8 @@
+// Spatial hit-testing keeps the historical Square/Circle wire bytes valid for
+// old graphs; use the migration names the same way UiNodeGraph.cpp does.
+#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/UiGraph/UiNodeGraph.h>
+#undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 
 #include <cmath>
 
