@@ -341,8 +341,12 @@ void UiMenu::PopupLevel::LeftDown(Point p, dword)
     }
     if(owner_->HasSubMenu(node))
         owner_->OpenSubMenu(level_, row);
-    else
+    else {
         owner_->ActivateItem(node);
+        // ActivateItem ends the session and destroys every PopupLevel,
+        // including this one; do not touch members after it returns.
+        return;
+    }
     pressed_index_ = -1;
     Refresh();
 }
