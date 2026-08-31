@@ -1,10 +1,10 @@
 /*
     UiTheme public facade
 
-    The historical resolver implementation remains in UiThemeLegacy.h. It is
-    compiled as UiThemeRaw; this facade preserves the public UiTheme API while
-    enforcing one ownership boundary: a theme may style a control, but it may
-    not create/remove/move structural elements or change their authored mode.
+    The resolver implementation lives in UiThemeResolverImpl.h and is compiled
+    as UiThemeRaw. This facade preserves the public UiTheme API while enforcing
+    one ownership boundary: a theme may style a control, but it may not create,
+    remove, move or change structural elements or their authored mode.
 
     Non-default structural choices are applied by the control/designer after
     theme resolution. This keeps theme changes visual and predictable.
@@ -14,7 +14,7 @@
 
 #define UiTheme UiThemeRaw
 #define UiThemeDefaults UiThemeRawDefaults
-#include <Ui/UiThemeLegacy.h>
+#include <Ui/UiThemeResolverImpl.h>
 #undef UiThemeDefaults
 #undef UiTheme
 
