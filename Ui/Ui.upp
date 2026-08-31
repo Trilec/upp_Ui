@@ -20,6 +20,8 @@ file
 	UiIndicatorBase.cpp,
 	UiIndicatorSupport.h,
 	UiTheme.h,
+	UiThemeLegacy.h,
+	UiThemeStructureContract.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
 	UiItemRender.h,
