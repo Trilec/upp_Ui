@@ -24,7 +24,10 @@ inline void Preserve(UiButton::Style& s)
     s.icon_side = d.icon_side;
 }
 
-inline void Preserve(UiToolButton::Style& s)
+// UiToolButton::Style is an alias of UiButton::Style, so this cannot be an
+// overload of Preserve(UiButton::Style&). Keep a separately named helper so
+// ToolButton's centered defaults are not replaced by normal Button defaults.
+inline void PreserveToolButton(UiToolButton::Style& s)
 {
     const UiToolButton::Style& d = UiToolButton::StyleDefault();
     s.align_h = d.align_h;
@@ -105,6 +108,12 @@ template <class T>
 inline T Preserved(T s)
 {
     Preserve(s);
+    return s;
+}
+
+inline UiToolButton::Style ToolButtonPreserved(UiToolButton::Style s)
+{
+    PreserveToolButton(s);
     return s;
 }
 
