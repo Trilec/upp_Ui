@@ -1,5 +1,6 @@
 #include <Ui/UiGraph/UiNodeGraph.h>
 #include <Ui/Ui.h>
+#include <Ui/UiRenderLayer.h>
 
 // Preserve the validated R9.2/R9.3B implementation in this translation unit,
 // but keep the three paint stages under legacy names. R9.3C can therefore
@@ -330,23 +331,27 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
     int64 edge_started = usecs();
     if(!paint_edges.IsEmpty() || interaction_ == InteractionMode::Connect) {
-        ImageBuffer edge_buffer(paint.GetSize());
-        BufferPainter ep(edge_buffer, MODE_ANTIALIASED);
-        ep.Clear(RGBAZero());
-        ep.Translate(-paint.left, -paint.top);
-        for(int i = 0; i < paint_edges.GetCount(); i++) {
-            const EdgeGeometry& g = edge_geometry_[paint_edges[i]];
-            const UiGraphEdge* edge = model_->FindEdge(g.ref);
-            if(!edge)
-                continue;
-            last_painted_edge_count_++;
-            if(g.simplified)
-                last_simplified_edge_count_++;
-            PaintEdge(ep, *edge, g, edge_styles[i], edge_states[i]);
-        }
-        PaintConnectionPreview(ep);
-        ep.Finish();
-        w.DrawImage(paint.left, paint.top, edge_buffer);
+        Rect edge_layer;
+        for(int q : paint_edges)
+            edge_layer |= edge_geometry_[q].bounds & paint;
+        // Connection preview is transient and may extend beyond prepared edge
+        // bounds. Keep the old full dirty-rect fallback only for that gesture.
+        if(interaction_ == InteractionMode::Connect)
+            edge_layer = paint;
+        UiPaintRenderLayer(w, edge_layer, [&](Painter& ep) {
+            for(int i = 0; i < paint_edges.GetCount(); i++) {
+                const EdgeGeometry& g = edge_geometry_[paint_edges[i]];
+                const UiGraphEdge* edge = model_->FindEdge(g.ref);
+                if(!edge)
+                    continue;
+                last_painted_edge_count_++;
+                if(g.simplified)
+                    last_simplified_edge_count_++;
+                PaintEdge(ep, *edge, g, edge_styles[i], edge_states[i]);
+            }
+            if(interaction_ == InteractionMode::Connect)
+                PaintConnectionPreview(ep);
+        });
     }
 
     if(zoom_ >= lod_policy_.edge_label_zoom)
@@ -386,28 +391,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_node_surface_paint_usecs_ = max<int64>(0, usecs() - surface_started);
 
     int64 details_started = usecs();
-    bool have_details = false;
+    // Details are local to a node. The old path allocated/cleared one viewport-
+    // sized AA surface merely to draw a handful of ports and irregular node
+    // outlines. Paint each required node into its retained local damage bounds
+    // instead; at overview the existing LOD still skips the phase entirely.
     for(int i = 0; i < paint_nodes.GetCount(); i++) {
-        const UiGraphNode* node = model_->FindNode(node_geometry_[paint_nodes[i]].ref);
-        if(node && needs_node_details(*node, node_styles[i], node_geometry_[paint_nodes[i]])) {
-            have_details = true;
-            break;
-        }
-    }
-    if(have_details) {
-        ImageBuffer node_buffer(paint.GetSize());
-        BufferPainter np(node_buffer, MODE_ANTIALIASED);
-        np.Clear(RGBAZero());
-        np.Translate(-paint.left, -paint.top);
-        for(int i = 0; i < paint_nodes.GetCount(); i++) {
-            const NodeGeometry& g = node_geometry_[paint_nodes[i]];
-            const UiGraphNode* node = model_->FindNode(g.ref);
-            if(!node || !needs_node_details(*node, node_styles[i], g))
-                continue;
+        const NodeGeometry& g = node_geometry_[paint_nodes[i]];
+        const UiGraphNode* node = model_->FindNode(g.ref);
+        if(!node || !needs_node_details(*node, node_styles[i], g))
+            continue;
+        Rect target = g.paint_bounds.Inflated(DPI(2)) & paint;
+        UiPaintRenderLayer(w, target, [&](Painter& np) {
             PaintNodeDetails(np, *node, g, node_styles[i], node_states[i]);
-        }
-        np.Finish();
-        w.DrawImage(paint.left, paint.top, node_buffer);
+        });
     }
     last_node_details_paint_usecs_ = max<int64>(0, usecs() - details_started);
 
@@ -434,83 +430,65 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     }
     last_node_content_paint_usecs_ = max<int64>(0, usecs() - content_started);
 
-    bool have_route_handles = false;
+    Rect handle_layer;
     for(int q : paint_edges)
-        if(!edge_geometry_[q].route_handle_hit.IsEmpty()) {
-            have_route_handles = true;
-            break;
-        }
-    if(have_route_handles) {
-        ImageBuffer handle_buffer(paint.GetSize());
-        BufferPainter hp(handle_buffer, MODE_ANTIALIASED);
-        hp.Clear(RGBAZero());
-        hp.Translate(-paint.left, -paint.top);
+        if(!edge_geometry_[q].route_handle_hit.IsEmpty())
+            handle_layer |= edge_geometry_[q].route_handle_hit.Inflated(DPI(2)) & paint;
+    if(!handle_layer.IsEmpty()) {
         const Color blue = Color(37, 99, 235);
-        for(int q : paint_edges) {
-            const EdgeGeometry& g = edge_geometry_[q];
-            if(g.route_handle_hit.IsEmpty())
-                continue;
-            int radius = DPI(4);
-            Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
-                            radius * 2 + 1, radius * 2 + 1);
-            Vector<Pointf> circle = EllipsePath(rr, 20);
-            FillPath(hp, circle, Color(219, 234, 254));
-            StrokePath(hp, circle, max(1.0, (double)DPI(1)), blue, true);
-        }
-        hp.Finish();
-        w.DrawImage(paint.left, paint.top, handle_buffer);
+        UiPaintRenderLayer(w, handle_layer, [&](Painter& hp) {
+            for(int q : paint_edges) {
+                const EdgeGeometry& g = edge_geometry_[q];
+                if(g.route_handle_hit.IsEmpty())
+                    continue;
+                int radius = DPI(4);
+                Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
+                                radius * 2 + 1, radius * 2 + 1);
+                Vector<Pointf> circle = EllipsePath(rr, 20);
+                FillPath(hp, circle, Color(219, 234, 254));
+                StrokePath(hp, circle, max(1.0, (double)DPI(1)), blue, true);
+            }
+        });
     }
 
-    bool have_preview = false;
+    Rect preview_layer;
     for(int q : paint_nodes)
         if(marquee_preview_nodes_.Find(node_geometry_[q].ref.id) >= 0
-           && !IsNodeSelected(node_geometry_[q].ref)) {
-            have_preview = true;
-            break;
-        }
-    if(have_preview) {
-        ImageBuffer preview_buffer(paint.GetSize());
-        BufferPainter pp(preview_buffer, MODE_ANTIALIASED);
-        pp.Clear(RGBAZero());
-        pp.Translate(-paint.left, -paint.top);
+           && !IsNodeSelected(node_geometry_[q].ref))
+            preview_layer |= node_geometry_[q].paint_bounds & paint;
+    if(!preview_layer.IsEmpty()) {
         const Color selection = GetEffectiveStyle().selection_box_frame;
         RGBA wash = PremultipliedRGBA(selection, 18);
-        for(int q : paint_nodes) {
-            const NodeGeometry& g = node_geometry_[q];
-            if(marquee_preview_nodes_.Find(g.ref.id) >= 0 && !IsNodeSelected(g.ref)
-               && !g.hit_path.IsEmpty()) {
-                FillPath(pp, g.hit_path, wash);
-                StrokePath(pp, g.hit_path, 1.0, selection, true);
+        UiPaintRenderLayer(w, preview_layer, [&](Painter& pp) {
+            for(int q : paint_nodes) {
+                const NodeGeometry& g = node_geometry_[q];
+                if(marquee_preview_nodes_.Find(g.ref.id) >= 0 && !IsNodeSelected(g.ref)
+                   && !g.hit_path.IsEmpty()) {
+                    FillPath(pp, g.hit_path, wash);
+                    StrokePath(pp, g.hit_path, 1.0, selection, true);
+                }
             }
-        }
-        pp.Finish();
-        w.DrawImage(paint.left, paint.top, preview_buffer);
+        });
     }
 
-    bool have_custom_selected = false;
+    Rect custom_selection_layer;
     for(int q : paint_nodes) {
         const UiGraphNode* node = model_->FindNode(node_geometry_[q].ref);
-        if(node && node->shape == UiGraphNodeShape::Custom && IsNodeSelected(node->ref)) {
-            have_custom_selected = true;
-            break;
-        }
+        if(node && node->shape == UiGraphNodeShape::Custom && IsNodeSelected(node->ref))
+            custom_selection_layer |= node_geometry_[q].paint_bounds & paint;
     }
-    if(have_custom_selected) {
-        ImageBuffer selection_buffer(paint.GetSize());
-        BufferPainter sp(selection_buffer, MODE_ANTIALIASED);
-        sp.Clear(RGBAZero());
-        sp.Translate(-paint.left, -paint.top);
+    if(!custom_selection_layer.IsEmpty()) {
         double stroke_width = max(2.0, (double)DPI(fround(lod_policy_.selection_outline_width)));
-        for(int i = 0; i < paint_nodes.GetCount(); i++) {
-            const NodeGeometry& g = node_geometry_[paint_nodes[i]];
-            const UiGraphNode* node = model_->FindNode(g.ref);
-            if(!node || node->shape != UiGraphNodeShape::Custom || !IsNodeSelected(g.ref)
-               || g.hit_path.IsEmpty())
-                continue;
-            StrokePath(sp, g.hit_path, stroke_width, SelectedFrameColor(node_styles[i]), true);
-        }
-        sp.Finish();
-        w.DrawImage(paint.left, paint.top, selection_buffer);
+        UiPaintRenderLayer(w, custom_selection_layer, [&](Painter& sp) {
+            for(int i = 0; i < paint_nodes.GetCount(); i++) {
+                const NodeGeometry& g = node_geometry_[paint_nodes[i]];
+                const UiGraphNode* node = model_->FindNode(g.ref);
+                if(!node || node->shape != UiGraphNodeShape::Custom || !IsNodeSelected(g.ref)
+                   || g.hit_path.IsEmpty())
+                    continue;
+                StrokePath(sp, g.hit_path, stroke_width, SelectedFrameColor(node_styles[i]), true);
+            }
+        });
     }
 
     last_node_paint_usecs_ = max<int64>(0, usecs() - node_started);
@@ -524,27 +502,43 @@ void UiNodeGraph::Paint(Draw& w)
     UiPaintStyledBackground(w, outer, style.canvas_palette, style.canvas_metrics,
                             style.canvas_skin, ST_NORMAL, HasFocus());
 
-    // R9.3C hierarchical dot grid. Authored spacing remains grid_size (20 world
-    // units by default). A stable hierarchy retains every fifth dot as zoom
-    // compresses; the finer level fades in screen space rather than popping.
+    // R9.3C hierarchical dot grid, now emitted as one sparse alpha raster for the
+    // current dirty rectangle. This preserves the same world-space hierarchy and
+    // fade without issuing thousands of individual DrawRect calls per frame.
     if(style.show_grid && style.grid_size > 0) {
+        Rect grid_paint = w.GetPaintRect() & outer;
         const int hierarchy = max(2, style.major_grid_every);
         const double base_spacing = style.grid_size * zoom_;
-        if(base_spacing > 0.0) {
+        if(!grid_paint.IsEmpty() && base_spacing > 0.0) {
             Color paper = ResolveFace(style.canvas_palette.face[ST_NORMAL], SColorPaper());
             Color minor = BlendGraphColor(paper, style.grid_minor, 0.45);
             Color major = BlendGraphColor(paper, style.grid_major, 0.58);
 
-            auto draw_dots = [&](double step, Color color) {
+            ImageBuffer grid(grid_paint.GetSize());
+            grid.SetKind(IMAGE_ALPHA);
+            Fill(~grid, RGBAZero(), grid.GetLength());
+            RGBA *pixels = ~grid;
+            const int stride = grid_paint.GetWidth();
+
+            auto raster_dots = [&](double step, Color color) {
                 if(step < 4.0 || IsNull(color))
                     return;
                 double ox = std::fmod(pan_.x, step);
                 double oy = std::fmod(pan_.y, step);
                 if(ox < 0) ox += step;
                 if(oy < 0) oy += step;
-                for(double y = outer.top + oy; y < outer.bottom; y += step)
-                    for(double x = outer.left + ox; x < outer.right; x += step)
-                        w.DrawRect(fround(x), fround(y), 1, 1, color);
+                RGBA dot = PremultipliedRGBA(color, 255);
+                for(double y = outer.top + oy; y < outer.bottom; y += step) {
+                    int py = fround(y);
+                    if(py < grid_paint.top || py >= grid_paint.bottom)
+                        continue;
+                    int row = (py - grid_paint.top) * stride;
+                    for(double x = outer.left + ox; x < outer.right; x += step) {
+                        int px = fround(x);
+                        if(px >= grid_paint.left && px < grid_paint.right)
+                            pixels[row + px - grid_paint.left] = dot;
+                    }
+                }
             };
 
             int level = 0;
@@ -555,16 +549,17 @@ void UiNodeGraph::Paint(Draw& w)
             }
 
             if(level == 0) {
-                draw_dots(anchor_spacing, minor);
-                draw_dots(anchor_spacing * hierarchy, major);
+                raster_dots(anchor_spacing, minor);
+                raster_dots(anchor_spacing * hierarchy, major);
             }
             else {
                 double finer_spacing = anchor_spacing / hierarchy;
                 double finer_factor = SmoothUnit(finer_spacing, 8.0, 18.0);
                 if(finer_factor > 0.02)
-                    draw_dots(finer_spacing, BlendGraphColor(paper, minor, finer_factor));
-                draw_dots(anchor_spacing, major);
+                    raster_dots(finer_spacing, BlendGraphColor(paper, minor, finer_factor));
+                raster_dots(anchor_spacing, major);
             }
+            w.DrawImage(grid_paint.left, grid_paint.top, grid);
         }
 
         if(style.show_origin) {

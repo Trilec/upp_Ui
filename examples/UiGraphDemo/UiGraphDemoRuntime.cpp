@@ -79,7 +79,13 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     }
     d.SyncNodeEditor();
 
+    // Diagnostics are deliberately observer-only. Graph interaction completes
+    // and stores its own counters first; this sampler copies those counters into
+    // controls later on the diagnostics ticker. No text/progress update is
+    // allowed from WhenViewport or from the measured switch stages themselves.
     auto refresh_diagnostics = [&d] {
+        if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
+            return;
         d.RefreshDiagnostics();
         String detail = AsString(d.edit_diagnostics.GetData());
         detail << Format("\nNode phases: surface=%.3f ms  details/ports=%.3f ms  content/text=%.3f ms  total=%.3f ms\n",
@@ -89,6 +95,8 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
                          d.graph_.GetLastNodePaintUsecs() / 1000.0);
         d.edit_diagnostics.SetData(detail);
     };
+
+    d.diagnostics_ticker_.Stop();
 
     auto sync_selection = [&d] {
         if(d.syncing_editors_)
@@ -106,11 +114,12 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             d.SyncStyleEditor();
 
         d.UpdateStatus();
-        d.graph_.Refresh();
+        // Production selection already refreshed its exact damage. Do not turn
+        // a right-rail synchronization into an additional full Graph repaint.
     };
 
     d.graph_.WhenSelection = sync_selection;
-    d.graph_.WhenViewport = [&d, refresh_diagnostics] {
+    d.graph_.WhenViewport = [&d] {
         if(d.syncing_editors_)
             return;
         const double zoom = d.graph_.GetZoom();
@@ -123,19 +132,23 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             d.diag_last_interaction_ = "Viewport refresh";
         d.diag_previous_zoom_ = zoom;
         d.diag_previous_pan_ = pan;
-        d.UpdateStatus();
-        if(d.diagnostics_enabled_)
-            refresh_diagnostics();
+        // Deliberately no diagnostics formatting, text update, progress update
+        // or diagnostics repaint here. The diagnostics page samples later.
     };
 
     auto select_page = [&d, refresh_diagnostics](int page) {
+        // A hidden diagnostics page performs zero periodic sampling even when the
+        // Live profiling toggle remains checked. Returning to the page resumes.
+        d.diagnostics_ticker_.Stop();
         d.SelectPage(page);
         if(page == 0)
             d.SyncNodeEditor();
         else if(page == 1)
             d.SyncStyleEditor();
-        else if(page == 3)
+        else if(page == 3 && d.diagnostics_enabled_) {
+            d.diagnostics_ticker_.Start(200, refresh_diagnostics);
             refresh_diagnostics();
+        }
     };
     d.btn_inspector_mode.WhenAction = [select_page] { select_page(0); };
     d.btn_style_mode.WhenAction = [select_page] { select_page(1); };
@@ -145,19 +158,20 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     d.btn_diag_enable.WhenAction = [&d, refresh_diagnostics] {
         const bool on = d.btn_diag_enable.IsChecked();
         d.diagnostics_enabled_ = on;
-        if(on) {
+        d.diagnostics_ticker_.Stop();
+        if(on && d.stk_right_pages.GetActivePage() == 3) {
             d.diagnostics_ticker_.Start(200, refresh_diagnostics);
             refresh_diagnostics();
         }
-        else
-            d.diagnostics_ticker_.Stop();
+        // When off, no ticker/sampling remains active. The visible controls keep
+        // the last captured snapshot so it is obvious profiling has stopped.
     };
     d.btn_diag_reset.WhenAction = [&d, refresh_diagnostics] {
         d.ResetDiagnostics();
         refresh_diagnostics();
     };
 
-    auto switch_mode = [&d, sync_selection, refresh_diagnostics, normalize_model_shapes](bool scale) {
+    auto switch_mode = [&d, sync_selection, normalize_model_shapes](bool scale) {
         if(scale == d.scale_mode_ && d.graph_.Model().GetNodeCount() > 0) {
             d.btn_reference.SetChecked(!scale);
             d.btn_scale.SetChecked(scale);
@@ -233,9 +247,12 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         sync_us = usecs() - stage;
 
         const int64 elapsed = usecs() - switch_started;
-        d.RecordSwitchDiagnostics(scale ? "Reference -> 10k" : "10k -> Reference", elapsed);
-        if(d.diagnostics_enabled_)
-            refresh_diagnostics();
+        // Store switch evidence only. The diagnostics ticker may render it later
+        // after the interaction has completed; it is never part of total_us.
+        d.diag_last_switch_label_ = scale ? "Reference -> 10k" : "10k -> Reference";
+        d.diag_last_switch_us_ = max<int64>(0, elapsed);
+        d.diag_peak_switch_us_ = max(d.diag_peak_switch_us_, d.diag_last_switch_us_);
+        d.diag_last_interaction_ = d.diag_last_switch_label_;
 
         RLOG(Format("UIGRAPH_DEMO_SWITCH_STAGE mode=%s ensure_us=%lld bind_us=%lld attach_us=%lld view_us=%lld final_sync_us=%lld total_us=%lld",
                     scale ? "10k" : "reference",
