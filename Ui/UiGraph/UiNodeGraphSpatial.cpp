@@ -1,8 +1,8 @@
 // Spatial hit-testing keeps the historical Square/Circle wire bytes valid for
-// old graphs; use the migration names the same way UiNodeGraph.cpp does.
-#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
+// old graphs; compare wire bytes directly because the canonical enum hides
+// those names behind UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES and shared blitz
+// units make define/undef ordering unreliable.
 #include <Ui/UiGraph/UiNodeGraph.h>
-#undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 
 #include <cmath>
 
@@ -26,7 +26,8 @@ Pointf PortAnchorWorld(const UiGraphNode& node, UiGraphPortSide side)
 {
     Pointf pos = node.position;
     Sizef size = node.size;
-    if(node.shape == UiGraphNodeShape::Square || node.shape == UiGraphNodeShape::Circle) {
+    int shape_wire = (int)node.shape;
+    if(shape_wire == 2 || shape_wire == 3) { // historical Square / Circle
         double extent = max(size.cx, size.cy);
         size = Sizef(extent, extent);
     }
@@ -126,7 +127,8 @@ UiNodeGraph::WorldRect UiNodeGraph::GetNodeWorldBounds(const UiGraphNode& node) 
 {
     Pointf pos = node.position;
     Sizef size = node.size;
-    if(node.shape == UiGraphNodeShape::Square || node.shape == UiGraphNodeShape::Circle) {
+    int shape_wire = (int)node.shape;
+    if(shape_wire == 2 || shape_wire == 3) { // historical Square / Circle
         double side = max(size.cx, size.cy);
         size = Sizef(side, side);
     }
