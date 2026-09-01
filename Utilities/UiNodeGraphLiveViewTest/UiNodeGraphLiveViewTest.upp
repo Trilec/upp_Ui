@@ -1,0 +1,12 @@
+description "UiNodeGraph retained live pan/wheel camera invariants";
+
+uses
+	Core,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";

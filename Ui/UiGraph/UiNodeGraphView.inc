@@ -17,7 +17,7 @@ struct GraphViewState {
     Pointf exact_pan;
     Size exact_size;
     GraphViewBounds coverage;
-    bool zoom_approximate = false;
+    bool approximate_zoom = false;
 };
 
 Array<GraphViewState>& GraphViewStates()
@@ -83,8 +83,9 @@ bool GraphViewCrosses(double from, double to, double threshold)
 
 bool GraphViewLodCompatible(const UiNodeGraph::LodPolicy& lod, double exact_zoom, double next_zoom)
 {
-    const double title_floor = max(0.16, lod.title_zoom - 0.16);
-    const double secondary_floor = max(title_floor, lod.secondary_text_zoom - 0.12);
+    const double title_floor = max(0.24, lod.title_zoom - 0.04);
+    const double content_floor = max(0.24, lod.secondary_text_zoom - 0.08);
+    const double port_floor = max(0.12, lod.port_zoom - 0.04);
     const double thresholds[] = {
         lod.edge_hide_zoom,
         lod.minimal_edge_zoom,
@@ -94,9 +95,10 @@ bool GraphViewLodCompatible(const UiNodeGraph::LodPolicy& lod, double exact_zoom
         lod.shadow_zoom,
         lod.icon_zoom,
         title_floor,
-        secondary_floor,
+        content_floor,
         lod.title_zoom,
         lod.secondary_text_zoom,
+        port_floor,
         lod.port_zoom,
         lod.port_label_zoom,
         lod.route_edit_zoom,
@@ -115,19 +117,19 @@ void ProjectPreparedGraphGeometry(NodeMap& nodes, EdgeMap& edges,
 {
     const double scale = new_zoom / max(old_zoom, 1e-9);
 
-    auto pointf = [&](Pointf p) {
+    auto project_pointf = [&](Pointf p) {
         return Pointf((p.x - old_pan.x) * scale + new_pan.x,
                       (p.y - old_pan.y) * scale + new_pan.y);
     };
-    auto point = [&](Point p) {
-        Pointf q = pointf(Pointf(p.x, p.y));
+    auto project_point = [&](Point p) {
+        Pointf q = project_pointf(Pointf(p.x, p.y));
         return Point(fround(q.x), fround(q.y));
     };
-    auto rect = [&](Rect r) {
+    auto project_rect = [&](Rect r) {
         if(r.IsEmpty())
             return RectC(0, 0, 0, 0);
-        Pointf a = pointf(Pointf(r.left, r.top));
-        Pointf b = pointf(Pointf(r.right, r.bottom));
+        Pointf a = project_pointf(Pointf(r.left, r.top));
+        Pointf b = project_pointf(Pointf(r.right, r.bottom));
         int l = fround(min(a.x, b.x));
         int t = fround(min(a.y, b.y));
         int rr = fround(max(a.x, b.x));
@@ -137,196 +139,119 @@ void ProjectPreparedGraphGeometry(NodeMap& nodes, EdgeMap& edges,
 
     for(int i = 0; i < nodes.GetCount(); i++) {
         auto& g = nodes[i];
-        g.rect = rect(g.rect);
-        g.surface = rect(g.surface);
-        g.content = rect(g.content);
-        g.paint_bounds = rect(g.paint_bounds);
-        g.header = rect(g.header);
-        g.icon = rect(g.icon);
-        g.title = rect(g.title);
-        g.subtitle = rect(g.subtitle);
-        g.description = rect(g.description);
-        g.control = rect(g.control);
-        for(Pointf& p : g.hit_path)
-            p = pointf(p);
+        g.rect = project_rect(g.rect);
+        g.surface = project_rect(g.surface);
+        g.content = project_rect(g.content);
+        g.paint_bounds = project_rect(g.paint_bounds);
+        g.header = project_rect(g.header);
+        g.icon = project_rect(g.icon);
+        g.title = project_rect(g.title);
+        g.subtitle = project_rect(g.subtitle);
+        g.description = project_rect(g.description);
+        g.control = project_rect(g.control);
+        for(Pointf& q : g.hit_path)
+            q = project_pointf(q);
         for(int q = 0; q < g.anchors.GetCount(); q++)
-            g.anchors[q] = point(g.anchors[q]);
+            g.anchors[q] = project_point(g.anchors[q]);
         for(int q = 0; q < g.port_hits.GetCount(); q++)
-            g.port_hits[q] = rect(g.port_hits[q]);
+            g.port_hits[q] = project_rect(g.port_hits[q]);
         for(int q = 0; q < g.port_labels.GetCount(); q++)
-            g.port_labels[q] = rect(g.port_labels[q]);
+            g.port_labels[q] = project_rect(g.port_labels[q]);
         g.compact = g.rect.GetWidth() < 120 || g.rect.GetHeight() < 72;
         g.micro = g.rect.GetWidth() < 38 || g.rect.GetHeight() < 26;
     }
 
     for(int i = 0; i < edges.GetCount(); i++) {
         auto& g = edges[i];
-        for(Point& p : g.points)
-            p = point(p);
-        g.bounds = rect(g.bounds);
-        g.label_point = point(g.label_point);
-        g.route_handle = point(g.route_handle);
-        g.route_handle_hit = rect(g.route_handle_hit);
+        for(Point& q : g.points)
+            q = project_point(q);
+        g.bounds = project_rect(g.bounds);
+        g.label_point = project_point(g.label_point);
+        g.route_handle = project_point(g.route_handle);
+        g.route_handle_hit = project_rect(g.route_handle_hit);
     }
 }
 
 } // namespace
 
-void UiNodeGraph::InvalidateGeometry()
+bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom)
 {
-    // Middle-button pan changes only the camera. Preserve the already-prepared
-    // scene long enough for PrepareGeometry() below to translate it. Every other
-    // caller retains the canonical invalidation semantics.
-    if(interaction_ == InteractionMode::Pan && !geometry_dirty_)
-        return;
-    InvalidateGeometryLegacy();
-}
-
-void UiNodeGraph::PrepareGeometry()
-{
-    if(interaction_ != InteractionMode::Pan) {
-        PrepareGeometryLegacy();
-        return;
-    }
-
     GraphViewState& state = GraphViewStateFor(this);
-    auto sync_exact = [&] {
-        if(state.exact_serial == geometry_build_serial_)
-            return;
+
+    auto cancel_approximation = [&] {
+        state.settle.Kill();
+        state.approximate_zoom = false;
+    };
+    auto sync_exact_state = [&] {
         state.settle.Kill();
         state.exact_serial = geometry_build_serial_;
         state.exact_zoom = geometry_zoom_;
         state.exact_pan = geometry_pan_;
         state.exact_size = geometry_size_;
+        // RebuildGeometry already prepares candidates using the Graph paint-query
+        // margin. Keep that expanded exact footprint as reusable camera coverage.
         state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                               GraphViewPaintMargin(lod_policy_, geometry_zoom_));
-        state.zoom_approximate = false;
+        state.approximate_zoom = false;
     };
 
-    if(geometry_dirty_ || !model_ || model_revision_ != model_->GetRevision()
-       || geometry_size_ != GetSize()) {
-        PrepareGeometryLegacy();
-        sync_exact();
-        return;
+    if(!model_ || batch_update_depth_ > 0 || geometry_dirty_
+       || model_revision_ != model_->GetRevision() || geometry_size_ != GetSize()) {
+        cancel_approximation();
+        return false;
     }
 
-    sync_exact();
-    GraphViewBounds needed = GraphViewWorldBounds(zoom_, pan_, GetSize(),
-                                                  GraphViewPaintMargin(lod_policy_, zoom_));
+    if(state.exact_serial != geometry_build_serial_)
+        sync_exact_state();
+
+    // The prepared exact scene already includes overscan. Require only the new
+    // visible viewport to remain inside it; demanding another full query margin
+    // here would consume the overscan twice and force an exact rebuild on every
+    // small pan in a partially prepared large graph.
+    GraphViewBounds needed = GraphViewWorldBounds(next_zoom, next_pan, GetSize(), 0.0);
     const bool full_scene = node_geometry_.GetCount() == model_->GetNodeCount()
                          && edge_geometry_.GetCount() == model_->GetEdgeCount();
     if(!full_scene && !GraphViewContains(state.coverage, needed)) {
-        InvalidateGeometryLegacy();
-        PrepareGeometryLegacy();
-        sync_exact();
-        return;
+        cancel_approximation();
+        return false;
     }
 
-    if(geometry_pan_ != pan_ || abs(geometry_zoom_ - zoom_) > 1e-12) {
-        ProjectPreparedGraphGeometry(node_geometry_, edge_geometry_,
-                                     geometry_zoom_, geometry_pan_, zoom_, pan_);
-        geometry_zoom_ = zoom_;
-        geometry_pan_ = pan_;
-        geometry_size_ = GetSize();
-        geometry_dirty_ = false;
-        last_geometry_prepare_usecs_ = 0;
-    }
-
-    if(state.zoom_approximate) {
-        Ptr<UiNodeGraph> weak = this;
-        const int serial = geometry_build_serial_;
-        state.settle.KillSet(140, [weak, serial] {
-            if(!weak)
-                return;
-            UiNodeGraph *graph = ~weak;
-            GraphViewState& current = GraphViewStateFor(graph);
-            if(!current.zoom_approximate || graph->geometry_build_serial_ != serial)
-                return;
-            graph->InvalidateGeometryLegacy();
-            graph->PrepareGeometryLegacy();
-            graph->UpdateAttachedCtrls();
-            graph->Refresh();
-            current.exact_serial = -1;
-            current.zoom_approximate = false;
-            graph->WhenViewport();
-        });
-    }
-}
-
-UiNodeGraph& UiNodeGraph::SetZoom(double next_zoom, Point anchor)
-{
-    // Programmatic zoom with the default centre anchor keeps the established
-    // synchronous/exact contract used by tests, Fit/1:1 and host code. A real
-    // pointer anchor is the wheel-zoom path and may reuse prepared geometry.
-    if(anchor.x < 0 || anchor.y < 0)
-        return SetZoomLegacy(next_zoom, anchor);
-
-    const Style& style = GetEffectiveStyle();
-    next_zoom = minmax(next_zoom, max(0.01, style.min_zoom), max(style.min_zoom, style.max_zoom));
-    if(abs(next_zoom - zoom_) < 1e-9)
-        return *this;
-
-    if(!model_ || batch_update_depth_ > 0 || geometry_dirty_
-       || model_revision_ != model_->GetRevision() || geometry_size_ != GetSize())
-        return SetZoomLegacy(next_zoom, anchor);
-
-    GraphViewState& state = GraphViewStateFor(this);
-    if(state.exact_serial != geometry_build_serial_) {
-        state.settle.Kill();
-        state.exact_serial = geometry_build_serial_;
-        state.exact_zoom = geometry_zoom_;
-        state.exact_pan = geometry_pan_;
-        state.exact_size = geometry_size_;
-        state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
-                                              GraphViewPaintMargin(lod_policy_, geometry_zoom_));
-        state.zoom_approximate = false;
-    }
-
-    Pointf world = ScreenToWorld(anchor);
-    Pointf next_pan(anchor.x - world.x * next_zoom,
-                    anchor.y - world.y * next_zoom);
-    GraphViewBounds needed = GraphViewWorldBounds(next_zoom, next_pan, GetSize(),
-                                                  GraphViewPaintMargin(lod_policy_, next_zoom));
-    const bool full_scene = node_geometry_.GetCount() == model_->GetNodeCount()
-                         && edge_geometry_.GetCount() == model_->GetEdgeCount();
-    bool compatible = full_scene || GraphViewContains(state.coverage, needed);
-    compatible = compatible && GraphViewLodCompatible(lod_policy_, state.exact_zoom, next_zoom);
-
-    const double cumulative = next_zoom / max(state.exact_zoom, 1e-9);
-    compatible = compatible && cumulative >= 0.65 && cumulative <= 1.55;
-
-    if(compatible) {
-        const double step_scale = next_zoom / max(geometry_zoom_, 1e-9);
-        for(int i = 0; i < node_geometry_.GetCount() && compatible; i++) {
-            const NodeGeometry& g = node_geometry_[i];
-            int w = max(1, fround(g.rect.GetWidth() * step_scale));
-            int h = max(1, fround(g.rect.GetHeight() * step_scale));
-            bool compact = w < 120 || h < 72;
-            bool micro = w < 38 || h < 26;
-            if(compact != g.compact || micro != g.micro)
-                compatible = false;
+    if(approximate_zoom) {
+        if(!GraphViewLodCompatible(lod_policy_, state.exact_zoom, next_zoom)) {
+            cancel_approximation();
+            return false;
         }
-    }
 
-    if(compatible)
+        const double cumulative = next_zoom / max(state.exact_zoom, 1e-9);
+        if(cumulative < 0.65 || cumulative > 1.55) {
+            cancel_approximation();
+            return false;
+        }
+
+        const double step_scale = next_zoom / max(geometry_zoom_, 1e-9);
+        for(int i = 0; i < node_geometry_.GetCount(); i++) {
+            const NodeGeometry& g = node_geometry_[i];
+            int width = max(1, fround(g.rect.GetWidth() * step_scale));
+            int height = max(1, fround(g.rect.GetHeight() * step_scale));
+            bool compact = width < 120 || height < 72;
+            bool micro = width < 38 || height < 26;
+            if(compact != g.compact || micro != g.micro) {
+                cancel_approximation();
+                return false;
+            }
+        }
+
         for(int i = 0; i < node_ctrls_.GetCount(); i++) {
             const UiGraphNode* node = model_->FindNode(UiGraphNodeRef{node_ctrls_.GetKey(i)});
             if(!node)
                 continue;
             UiGraphNodeStyle node_style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
             double threshold = max(node_style.content_cell_min_zoom, lod_policy_.secondary_text_zoom);
-            if(GraphViewCrosses(geometry_zoom_, next_zoom, threshold)) {
-                compatible = false;
-                break;
+            if(GraphViewCrosses(state.exact_zoom, next_zoom, threshold)) {
+                cancel_approximation();
+                return false;
             }
         }
-
-    if(!compatible) {
-        state.settle.Kill();
-        state.zoom_approximate = false;
-        UiNodeGraph& out = SetZoomLegacy(next_zoom, anchor);
-        state.exact_serial = -1;
-        return out;
     }
 
     ProjectPreparedGraphGeometry(node_geometry_, edge_geometry_,
@@ -338,30 +263,133 @@ UiNodeGraph& UiNodeGraph::SetZoom(double next_zoom, Point anchor)
     geometry_size_ = GetSize();
     geometry_dirty_ = false;
     last_geometry_prepare_usecs_ = 0;
-    state.zoom_approximate = true;
 
     UpdateAttachedCtrls();
     Refresh();
     WhenViewport();
 
-    Ptr<UiNodeGraph> weak = this;
-    const int serial = geometry_build_serial_;
-    state.settle.KillSet(140, [weak, serial] {
-        if(!weak)
-            return;
-        UiNodeGraph *graph = ~weak;
-        GraphViewState& current = GraphViewStateFor(graph);
-        if(!current.zoom_approximate || graph->geometry_build_serial_ != serial)
-            return;
-        graph->InvalidateGeometryLegacy();
-        graph->PrepareGeometryLegacy();
-        graph->UpdateAttachedCtrls();
-        graph->Refresh();
-        current.exact_serial = -1;
-        current.zoom_approximate = false;
-        graph->WhenViewport();
-    });
-    return *this;
+    if(approximate_zoom) {
+        state.approximate_zoom = true;
+        Ptr<UiNodeGraph> weak = this;
+        const int serial = geometry_build_serial_;
+        state.settle.KillSet(140, [weak, serial] {
+            if(!weak)
+                return;
+            UiNodeGraph *graph = ~weak;
+            GraphViewState& current = GraphViewStateFor(graph);
+            if(!current.approximate_zoom || current.exact_serial != serial
+               || graph->geometry_build_serial_ != serial) {
+                current.approximate_zoom = false;
+                return;
+            }
+            graph->SettleLiveViewProjection();
+        });
+    }
+    return true;
+}
+
+void UiNodeGraph::SettleLiveViewProjection()
+{
+    GraphViewState& state = GraphViewStateFor(this);
+    state.settle.Kill();
+    if(!state.approximate_zoom)
+        return;
+    if(state.exact_serial != geometry_build_serial_) {
+        state.approximate_zoom = false;
+        return;
+    }
+
+    InvalidateGeometry();
+    PrepareGeometry();
+    UpdateAttachedCtrls();
+    Refresh();
+
+    state.exact_serial = geometry_build_serial_;
+    state.exact_zoom = geometry_zoom_;
+    state.exact_pan = geometry_pan_;
+    state.exact_size = geometry_size_;
+    state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
+                                          GraphViewPaintMargin(lod_policy_, geometry_zoom_));
+    state.approximate_zoom = false;
+    WhenViewport();
+}
+
+void UiNodeGraph::UpdatePan(Point p)
+{
+    if(interaction_ != InteractionMode::Pan)
+        return;
+
+    Pointf next_pan = pan_at_press_ + Pointf(p.x - press_point_.x, p.y - press_point_.y);
+    last_point_ = p;
+    if(abs(next_pan.x - pan_.x) <= 1e-9 && abs(next_pan.y - pan_.y) <= 1e-9)
+        return;
+
+    if(ProjectLiveView(zoom_, next_pan, false))
+        return;
+
+    pan_ = next_pan;
+    InvalidateGeometry();
+    PrepareGeometry();
+    UpdateAttachedCtrls();
+    Refresh();
+    WhenViewport();
+}
+
+void UiNodeGraph::MouseMove(Point p, dword)
+{
+    if(interaction_ == InteractionMode::NodeDrag) {
+        UpdateNodeDrag(p);
+        return;
+    }
+    if(interaction_ == InteractionMode::EdgeRouteDrag) {
+        UpdateEdgeRouteDrag(p);
+        return;
+    }
+    if(interaction_ == InteractionMode::Connect) {
+        UpdateConnection(p);
+        return;
+    }
+    if(interaction_ == InteractionMode::Pan) {
+        UpdatePan(p);
+        return;
+    }
+    if(interaction_ == InteractionMode::Marquee) {
+        UpdateMarquee(p);
+        return;
+    }
+
+    UiGraphPortRef port = HitTestPortSpatial(p);
+    UiGraphNodeRef node = HitTestNodeSpatial(p);
+    UiGraphEdgeRef edge = node.IsValid() ? UiGraphEdgeRef() : HitTestEdgeSpatial(p);
+    if(port != hot_port_ || node != hot_node_ || edge != hot_edge_) {
+        hot_port_ = port;
+        hot_node_ = node;
+        hot_edge_ = edge;
+        InvalidateGeometry();
+        PrepareGeometry();
+        UpdateAttachedCtrls();
+        Refresh();
+    }
+}
+
+void UiNodeGraph::MouseWheel(Point p, int zdelta, dword)
+{
+    const Style& style = GetEffectiveStyle();
+    double steps = (double)zdelta / 120.0;
+    double next_zoom = zoom_ * std::pow(style.zoom_step, steps);
+    next_zoom = minmax(next_zoom, max(0.01, style.min_zoom), max(style.min_zoom, style.max_zoom));
+    if(abs(next_zoom - zoom_) < 1e-9)
+        return;
+
+    Pointf world = ScreenToWorld(p);
+    Pointf next_pan(p.x - world.x * next_zoom,
+                    p.y - world.y * next_zoom);
+    if(ProjectLiveView(next_zoom, next_pan, true))
+        return;
+
+    // Crossing an LOD/coverage boundary falls back to the established exact
+    // programmatic path. Public SetZoom semantics are therefore unchanged.
+    SetZoom(next_zoom, p);
 }
 
 } // namespace Upp

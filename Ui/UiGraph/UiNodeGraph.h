@@ -60,6 +60,8 @@
     - 2026-08: added R9.3C aggregate surface/details/content paint evidence and
       preserved legacy paint stages behind a focused render-policy wrapper so
       dot-grid/port/LOD experiments remain isolated and recoverable.
+    - 2026-09: added a private live-camera projection seam for wheel zoom and
+      middle-pan while preserving synchronous public SetZoom/SetPan semantics.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -672,6 +674,16 @@ private:
     void DeleteSelection();
     void NotifySelection();
     void ClampZoom();
+
+    // Recovery names compiled from the byte-for-byte retained interaction source.
+    void UpdatePanLegacy(Point p);
+    void MouseMoveLegacy(Point p, dword flags);
+    void MouseWheelLegacy(Point p, int zdelta, dword keyflags);
+
+    // Live camera fast path. It only services actual wheel/middle-pan interaction;
+    // public SetZoom/SetPan remain synchronous and exact.
+    bool ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom);
+    void SettleLiveViewProjection();
 
 private:
     Style style_;

@@ -37,6 +37,8 @@ file
 	UiGraph/UiNodeGraphRender.inc,
 	UiGraph/UiNodeGraphSpatial.cpp,
 	UiGraph/UiNodeGraphInteraction.cpp,
+	UiGraph/UiNodeGraphInteractionBase.inc,
+	UiGraph/UiNodeGraphView.inc,
 	UiLayoutCursor.h,
 	UiMeasure.h,
 	UiMeasure.cpp,

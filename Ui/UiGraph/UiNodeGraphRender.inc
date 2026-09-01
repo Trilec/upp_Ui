@@ -237,13 +237,15 @@ bool PaintCachedShapeBody(Draw& w, const UiGraphNode& node, const Rect& surface,
     if(image_size.cx <= 0 || image_size.cy <= 0)
         return true;
 
+    const UiGraphNodeShape shape = node.shape;
+    const Size surface_size = surface.GetSize();
     int radius_px = max(0, fround(node.corner_radius * zoom));
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/nodegraph-shape");
     policy.allow_scale_from_bucket = false;
     policy.max_axis = 512;
     policy.max_single_image_bytes = 1024 * 1024;
     UiRasterCacheKeyBuilder kb("aa/nodegraph-shape");
-    kb.Add((int)(byte)node.shape).Add(image_size).Add(surface.GetSize())
+    kb.Add((int)(byte)shape).Add(image_size).Add(surface_size)
       .Add(radius_px).Add(face).Add(frame).Add(frame_width);
 
     Image cached = UiRasterCache::Get(kb.Build(), policy, [=] {
@@ -252,10 +254,10 @@ bool PaintCachedShapeBody(Draw& w, const UiGraphNode& node, const Rect& surface,
         Fill(~ib, RGBAZero(), ib.GetLength());
         BufferPainter p(ib, MODE_ANTIALIASED);
         UiGraphNode local_node;
-        local_node.shape = node.shape;
-        local_node.size = Sizef(surface.GetWidth(), surface.GetHeight());
+        local_node.shape = shape;
+        local_node.size = Sizef(surface_size.cx, surface_size.cy);
         local_node.corner_radius = radius_px;
-        Rect local_surface = RectC(pad, pad, surface.GetWidth(), surface.GetHeight());
+        Rect local_surface = RectC(pad, pad, surface_size.cx, surface_size.cy);
         Vector<Pointf> path = NodeShapePath(local_node, local_surface);
         FillPath(p, path, face);
         if(!IsNull(frame) && frame_width > 0)
@@ -270,8 +272,9 @@ bool PaintCachedShapeBody(Draw& w, const UiGraphNode& node, const Rect& surface,
 Image GetGraphGridTile(int minor_step, int major_step, bool draw_minor,
                        Color minor, Color major)
 {
-    major_step = max(1, major_step);
-    minor_step = max(1, min(minor_step, major_step));
+    minor_step = max(1, minor_step);
+    int hierarchy = max(1, fround((double)max(minor_step, major_step) / minor_step));
+    major_step = minor_step * hierarchy;
     int repeats = max(1, min(8, 512 / major_step));
     int tile_size = major_step * repeats;
     UiRasterCachePolicy policy = UiRasterPolicyAA("grid/nodegraph-dots");
@@ -622,38 +625,48 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                                               metrics, zoom_, lod_policy_.selection_outline_width);
         bool custom = node->shape == UiGraphNodeShape::Custom;
         if(!body_done && (custom || !UsesRectangularStyledSurface(node->shape))) {
-            Rect target = g.paint_bounds.Inflated(DPI(2)) & paint;
+            int fallback_pad = DPI(2);
+            const StyledShadow& shadow = metrics.shadow;
+            if(shadow.enabled && !shadow.inset && shadow.alpha > 0 && shadow.distance > 0) {
+                int extent = max(0, shadow.distance);
+                int offset = max(abs(shadow.offset_x), abs(shadow.offset_y));
+                fallback_pad = max(fallback_pad, extent + offset + DPI(3));
+            }
+            if(state == UiGraphVisualState::Selected)
+                fallback_pad = max(fallback_pad,
+                                   DPI(fround(lod_policy_.selection_outline_width)) + DPI(3));
+            Rect target = g.paint_bounds.Inflated(fallback_pad) & paint;
             UiPaintRenderLayer(w, target, [&](Painter& np) {
                 bool custom_body = custom && WhenPaintCustomShape
                                 && WhenPaintCustomShape(np, *node, g.surface, style, state);
                 if(!custom_body && !UsesRectangularStyledSurface(node->shape)
                    && !g.hit_path.IsEmpty()) {
-                    const StyledShadow& shadow = metrics.shadow;
+                    const StyledShadow& local_shadow = metrics.shadow;
                     double shadow_detail = ShadowDetailFactor();
-                    if(!g.micro && shadow_detail > 0.01 && shadow.enabled && !shadow.inset
-                       && shadow.alpha > 0 && shadow.distance > 0) {
-                        int layers = shadow.mode == SHADOW_HARD ? 1
+                    if(!g.micro && shadow_detail > 0.01 && local_shadow.enabled && !local_shadow.inset
+                       && local_shadow.alpha > 0 && local_shadow.distance > 0) {
+                        int layers = local_shadow.mode == SHADOW_HARD ? 1
                                    : shadow_detail >= 0.72 ? 5
                                    : shadow_detail >= 0.36 ? 3 : 1;
                         int outer_target = 0;
                         for(int layer = layers; layer >= 1; --layer) {
                             double t = ((double)layer - 0.5) / max(1, layers);
-                            double spread = shadow.mode == SHADOW_HARD ? 0.0
-                                          : shadow.distance * (double)layer / layers;
-                            double curve_alpha = shadow.mode == SHADOW_HARD
-                                               ? 1.0 : 1.0 - UiShadowCurveEval(shadow.curve, t);
-                            int target_alpha = clamp(fround(shadow.alpha * shadow_detail * curve_alpha), 0, 255);
-                            int layer_alpha = shadow.mode == SHADOW_HARD
-                                            ? clamp(fround(shadow.alpha * shadow_detail), 0, 255)
+                            double spread = local_shadow.mode == SHADOW_HARD ? 0.0
+                                          : local_shadow.distance * (double)layer / layers;
+                            double curve_alpha = local_shadow.mode == SHADOW_HARD
+                                               ? 1.0 : 1.0 - UiShadowCurveEval(local_shadow.curve, t);
+                            int target_alpha = clamp(fround(local_shadow.alpha * shadow_detail * curve_alpha), 0, 255);
+                            int layer_alpha = local_shadow.mode == SHADOW_HARD
+                                            ? clamp(fround(local_shadow.alpha * shadow_detail), 0, 255)
                                             : max(0, target_alpha - outer_target);
                             outer_target = target_alpha;
                             if(layer_alpha <= 0)
                                 continue;
                             Vector<Pointf> shape = InflatePath(g.hit_path, spread);
-                            Pointf off(shadow.offset_x, shadow.offset_y);
+                            Pointf off(local_shadow.offset_x, local_shadow.offset_y);
                             for(Pointf& q : shape)
                                 q += off;
-                            FillPath(np, shape, PremultipliedRGBA(shadow.color, layer_alpha));
+                            FillPath(np, shape, PremultipliedRGBA(local_shadow.color, layer_alpha));
                         }
                     }
                     FillPath(np, g.hit_path, ResolveFace(style.palette.face[si], White()));
@@ -819,14 +832,16 @@ void UiNodeGraph::Paint(Draw& w)
                 level++;
             }
             double minor_spacing = level == 0 ? base_spacing : anchor_spacing / hierarchy;
-            double major_spacing = level == 0 ? base_spacing * hierarchy : anchor_spacing;
             double minor_factor = level == 0 ? 1.0 : SmoothUnit(minor_spacing, 8.0, 18.0);
             bool draw_minor = minor_factor > 0.02;
             if(level > 0)
                 minor = BlendGraphColor(paper, minor, minor_factor);
 
-            int major_step = max(1, fround(major_spacing));
-            int minor_step = max(1, fround((double)major_step / hierarchy));
+            // Quantize the fine spacing once and derive the major spacing from
+            // that exact integer period. This keeps every cached tile perfectly
+            // periodic even at fractional zoom (no 1-2 px seam/drift between tiles).
+            int minor_step = max(1, fround(minor_spacing));
+            int major_step = minor_step * hierarchy;
             Image tile = GetGraphGridTile(minor_step, major_step, draw_minor, minor, major);
             Size ts = tile.GetSize();
             if(ts.cx > 0 && ts.cy > 0) {

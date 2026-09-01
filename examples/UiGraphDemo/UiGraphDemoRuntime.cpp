@@ -134,7 +134,10 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
 
     d.graph_.WhenSelection = sync_selection;
     d.graph_.WhenViewport = [&d, schedule_diagnostics] {
-        if(d.syncing_editors_)
+        // Profiling OFF or Diagnostics hidden means literally no observer work:
+        // no comparisons, strings, counters copied, timers armed or controls touched.
+        if(d.syncing_editors_ || !d.diagnostics_enabled_
+           || d.stk_right_pages.GetActivePage() != 3)
             return;
         const double zoom = d.graph_.GetZoom();
         const Pointf pan = d.graph_.GetPan();

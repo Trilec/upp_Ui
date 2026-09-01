@@ -68,15 +68,18 @@ void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
     int spatial_before = graph.GetSpatialBuildSerial();
     int geometry_before = graph.GetGeometryBuildSerial();
 
+    // One ordinary mouse-move-sized pan stays inside the retained query overscan.
+    // The live camera must translate prepared screen geometry rather than rebuild it.
+    const Point moved(612, 408);
     graph.MiddleDown(Point(600, 400), 0);
-    graph.MouseMove(Point(664, 438), 0);
+    graph.MouseMove(moved, 0);
     int64 geometry_us = graph.GetLastGeometryPrepareUsecs();
     int geometry_after_move = graph.GetGeometryBuildSerial();
 
     int64 started = usecs();
     graph.Paint(draw);
     int64 paint_us = usecs() - started;
-    graph.MiddleUp(Point(664, 438), 0);
+    graph.MiddleUp(moved, 0);
 
     Cout() << "UINODEGRAPH_PAN_PROFILE"
            << " phase=" << phase
@@ -92,11 +95,11 @@ void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
 
     t.Expect(graph.GetSpatialBuildSerial() == spatial_before,
              Format("%s pan reuses the retained world spatial index", phase));
-    t.Expect(geometry_after_move == geometry_before + 1,
-             Format("%s pan prepares viewport geometry once for the moved view", phase));
-    t.Expect(geometry_us >= 0 && graph.GetLastEdgePaintUsecs() >= 0
+    t.Expect(geometry_after_move == geometry_before,
+             Format("%s live pan reuses prepared geometry inside retained coverage", phase));
+    t.Expect(geometry_us == 0 && graph.GetLastEdgePaintUsecs() >= 0
              && graph.GetLastNodePaintUsecs() >= 0 && paint_us >= 0,
-             Format("%s exposes non-negative preparation/edge/node/total timing", phase));
+             Format("%s exposes zero live-pan geometry preparation and valid paint timing", phase));
     t.Expect(graph.GetPreparedNodeCount() < 10000
              && graph.GetPreparedEdgeCount() < 9900,
              Format("%s remains viewport/LOD bounded below total graph size", phase));
