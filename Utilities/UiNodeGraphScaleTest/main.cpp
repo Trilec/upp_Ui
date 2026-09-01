@@ -1,3 +1,4 @@
+#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/Ui.h>
 
 using namespace Upp;
