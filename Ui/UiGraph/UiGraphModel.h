@@ -40,8 +40,8 @@
     - 2026-08: made the authored 1:1 node default a compact representation;
       richer graph nodes remain free to provide any larger explicit size.
     - 2026-08: canonicalized authored node silhouettes so Rectangle owns
-      arbitrary corner radius and Ellipse owns circles; historical shape names
-      remain available only to internal migration/demo translation units.
+      arbitrary corner radius and Ellipse owns circles. Historical spellings are
+      retained only as migration/source-compatibility values, not authored API.
 */
 
 #include <Core/Core.h>
@@ -126,11 +126,14 @@ enum class UiGraphPortMultiplicity : byte {
     Multiple,
 };
 
-// Authored/public silhouettes. Rectangle intentionally uses a new wire value so
-// historical wire 0 (flat Rectangle) can still be distinguished while loading
-// old graphs. The serializer remains byte-compatible and preserves unknown old
-// enum bytes; UiNodeGraph interprets those bytes through its private migration
-// view. Applications should author only the canonical names below.
+// Canonical authored silhouettes. Rectangle intentionally uses a new wire value
+// so historical wire 0 (flat Rectangle) remains distinguishable when old graphs
+// are loaded. Surviving silhouettes retain their established wire values.
+//
+// The five entries after Custom are migration/source-compatibility values only.
+// Do not expose them in inspectors or generated code and do not use them for new
+// models. They remain in this one ODR-stable enum definition while the retained
+// R9 recovery source and old serialized graphs are still supported.
 enum class UiGraphNodeShape : byte {
     Rectangle = 13,
     Ellipse = 4,
@@ -142,15 +145,11 @@ enum class UiGraphNodeShape : byte {
     Database = 11,
     Custom = 12,
 
-#ifdef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
-    // Internal source/stream migration names. Never expose these in application
-    // inspectors, generated code, or new authored models.
     LegacyRectangle = 0,
     RoundedRectangle = 1,
     Square = 2,
     Circle = 3,
     Capsule = 8,
-#endif
 };
 
 // Presentation-only role. It does not imply execution priority, failure state,

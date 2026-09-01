@@ -1,6 +1,4 @@
-#define UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/UiGraph/UiNodeGraph.h>
-#undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/Ui.h>
 
 // Preserve the validated R9.2/R9.3B implementation in this translation unit,
@@ -8,10 +6,10 @@
 // replace only the visual/render-policy layer without rewriting spatial/model/
 // interaction code or losing the previous implementation as a recovery path.
 //
-// R10A also keeps the retained implementation source-compatible with its old
-// enum spelling. Public/application code does not see those aliases. Mapping
-// old Rectangle to its historical wire-0 name here is important: canonical
-// Rectangle now has a distinct wire value and owns corner_radius semantics.
+// R10A keeps the retained implementation source-compatible with its historical
+// enum vocabulary while canonical authored code uses Rectangle/Ellipse. Mapping
+// old Rectangle to wire-0 LegacyRectangle here is important: canonical Rectangle
+// has a distinct wire value and owns corner_radius semantics.
 #define Rectangle                    LegacyRectangle
 #define UsesRectangularStyledSurface UsesRectangularStyledSurfaceLegacy
 #define Paint                         PaintLegacy
