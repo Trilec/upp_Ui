@@ -81,8 +81,8 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
 
     // Diagnostics are deliberately observer-only. Graph interaction completes
     // and stores its own counters first; this sampler copies those counters into
-    // controls later on the diagnostics ticker. No text/progress update is
-    // allowed from WhenViewport or from the measured switch stages themselves.
+    // controls later. No text/progress update is allowed from the measured
+    // zoom/pan/switch path itself.
     auto refresh_diagnostics = [&d] {
         if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
             return;
@@ -97,6 +97,20 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     };
 
     d.diagnostics_ticker_.Stop();
+
+    // Debounced post-interaction sampling: each viewport/switch event merely
+    // restarts this timer. Continuous wheel/pan input therefore causes no
+    // diagnostics formatting or control repaint. After 200 ms of quiet, one
+    // snapshot is rendered, then the ticker stops again.
+    auto schedule_diagnostics = [&d, refresh_diagnostics] {
+        d.diagnostics_ticker_.Stop();
+        if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
+            return;
+        d.diagnostics_ticker_.Start(200, [&d, refresh_diagnostics] {
+            d.diagnostics_ticker_.Stop();
+            refresh_diagnostics();
+        });
+    };
 
     auto sync_selection = [&d] {
         if(d.syncing_editors_)
@@ -119,7 +133,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     };
 
     d.graph_.WhenSelection = sync_selection;
-    d.graph_.WhenViewport = [&d] {
+    d.graph_.WhenViewport = [&d, schedule_diagnostics] {
         if(d.syncing_editors_)
             return;
         const double zoom = d.graph_.GetZoom();
@@ -132,23 +146,20 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             d.diag_last_interaction_ = "Viewport refresh";
         d.diag_previous_zoom_ = zoom;
         d.diag_previous_pan_ = pan;
-        // Deliberately no diagnostics formatting, text update, progress update
-        // or diagnostics repaint here. The diagnostics page samples later.
+        // Only arm/rearm the post-interaction sampler. The Graph's measured
+        // counters and Paint run before any diagnostics controls are rewritten.
+        schedule_diagnostics();
     };
 
     auto select_page = [&d, refresh_diagnostics](int page) {
-        // A hidden diagnostics page performs zero periodic sampling even when the
-        // Live profiling toggle remains checked. Returning to the page resumes.
         d.diagnostics_ticker_.Stop();
         d.SelectPage(page);
         if(page == 0)
             d.SyncNodeEditor();
         else if(page == 1)
             d.SyncStyleEditor();
-        else if(page == 3 && d.diagnostics_enabled_) {
-            d.diagnostics_ticker_.Start(200, refresh_diagnostics);
+        else if(page == 3 && d.diagnostics_enabled_)
             refresh_diagnostics();
-        }
     };
     d.btn_inspector_mode.WhenAction = [select_page] { select_page(0); };
     d.btn_style_mode.WhenAction = [select_page] { select_page(1); };
@@ -159,19 +170,17 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         const bool on = d.btn_diag_enable.IsChecked();
         d.diagnostics_enabled_ = on;
         d.diagnostics_ticker_.Stop();
-        if(on && d.stk_right_pages.GetActivePage() == 3) {
-            d.diagnostics_ticker_.Start(200, refresh_diagnostics);
+        if(on && d.stk_right_pages.GetActivePage() == 3)
             refresh_diagnostics();
-        }
-        // When off, no ticker/sampling remains active. The visible controls keep
-        // the last captured snapshot so it is obvious profiling has stopped.
+        // When off, no pending sampler remains. The visible controls deliberately
+        // retain the last snapshot so the user can see that values are frozen.
     };
     d.btn_diag_reset.WhenAction = [&d, refresh_diagnostics] {
         d.ResetDiagnostics();
         refresh_diagnostics();
     };
 
-    auto switch_mode = [&d, sync_selection, normalize_model_shapes](bool scale) {
+    auto switch_mode = [&d, sync_selection, schedule_diagnostics, normalize_model_shapes](bool scale) {
         if(scale == d.scale_mode_ && d.graph_.Model().GetNodeCount() > 0) {
             d.btn_reference.SetChecked(!scale);
             d.btn_scale.SetChecked(scale);
@@ -247,8 +256,8 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         sync_us = usecs() - stage;
 
         const int64 elapsed = usecs() - switch_started;
-        // Store switch evidence only. The diagnostics ticker may render it later
-        // after the interaction has completed; it is never part of total_us.
+        // Store switch evidence only. The diagnostics UI is sampled later after
+        // elapsed_us is final, so it can never be part of this measurement.
         d.diag_last_switch_label_ = scale ? "Reference -> 10k" : "10k -> Reference";
         d.diag_last_switch_us_ = max<int64>(0, elapsed);
         d.diag_peak_switch_us_ = max(d.diag_peak_switch_us_, d.diag_last_switch_us_);
@@ -263,6 +272,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
                     d.graph_.Model().GetNodeCount(), d.graph_.Model().GetEdgeCount(),
                     d.graph_.GetPreparedNodeCount(), d.graph_.GetPreparedEdgeCount(),
                     (long long)d.graph_.GetLastGeometryPrepareUsecs()));
+        schedule_diagnostics();
     };
 
     d.btn_reference.WhenAction = [switch_mode] { switch_mode(false); };
