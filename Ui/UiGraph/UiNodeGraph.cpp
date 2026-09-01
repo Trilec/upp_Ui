@@ -11,6 +11,14 @@
 // enum vocabulary while canonical authored code uses Rectangle/Ellipse. Mapping
 // old Rectangle to wire-0 LegacyRectangle here is important: canonical Rectangle
 // has a distinct wire value and owns corner_radius semantics.
+//
+// The retained implementation historically called RefreshLayout() after view,
+// model and style methods that had already synchronously rebuilt geometry and
+// attached controls. Layout() then invalidated that fresh geometry and rebuilt it
+// again. Keep layout scheduling only for the one case that genuinely requires a
+// later Layout pass: pending first-paint auto-fit. Natural host resize Layout
+// callbacks are unaffected by this source-level compatibility shim.
+#define RefreshLayout() do { if(auto_fit_first_paint_ && !first_paint_done_) Ctrl::RefreshLayout(); } while(0)
 #define Rectangle                    LegacyRectangle
 #define UsesRectangularStyledSurface UsesRectangularStyledSurfaceLegacy
 #define Paint                         PaintLegacy
@@ -22,6 +30,7 @@
 #undef Paint
 #undef UsesRectangularStyledSurface
 #undef Rectangle
+#undef RefreshLayout
 
 namespace Upp {
 namespace {
