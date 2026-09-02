@@ -300,7 +300,8 @@ void UiGraphModel::IndexScopeEdge(const UiGraphEdge& edge)
     int q = scope_edges_.Find(source_scope.id);
     if(q < 0) {
         Vector<UiGraphEdgeRef> empty;
-        q = scope_edges_.Add(source_scope.id, pick(empty));
+        scope_edges_.Add(source_scope.id, pick(empty));
+        q = scope_edges_.GetCount() - 1;
     }
     if(FindIndex(scope_edges_[q], edge.ref) < 0)
         scope_edges_[q].Add(edge.ref);
@@ -376,7 +377,8 @@ void UiGraphModel::AssignNodeScope(UiGraphNodeRef node, UiGraphScopeRef scope)
     int s = scope_nodes_.Find(scope.id);
     if(s < 0) {
         Vector<UiGraphNodeRef> empty;
-        s = scope_nodes_.Add(scope.id, pick(empty));
+        scope_nodes_.Add(scope.id, pick(empty));
+        s = scope_nodes_.GetCount() - 1;
     }
     if(FindIndex(scope_nodes_[s], node) < 0)
         scope_nodes_[s].Add(node);
@@ -401,7 +403,8 @@ void UiGraphModel::IndexBackdrop(const UiGraphBackdrop& backdrop)
     int q = scope_backdrops_.Find(backdrop.scope.id);
     if(q < 0) {
         Vector<UiGraphBackdropRef> empty;
-        q = scope_backdrops_.Add(backdrop.scope.id, pick(empty));
+        scope_backdrops_.Add(backdrop.scope.id, pick(empty));
+        q = scope_backdrops_.GetCount() - 1;
     }
     if(FindIndex(scope_backdrops_[q], backdrop.ref) < 0)
         scope_backdrops_[q].Add(backdrop.ref);
@@ -440,7 +443,8 @@ void UiGraphModel::RebuildHierarchyIndex()
         int s = scope_nodes_.Find(scope.id);
         if(s < 0) {
             Vector<UiGraphNodeRef> empty;
-            s = scope_nodes_.Add(scope.id, pick(empty));
+            scope_nodes_.Add(scope.id, pick(empty));
+            s = scope_nodes_.GetCount() - 1;
         }
         scope_nodes_[s].Add(node.ref);
     }
