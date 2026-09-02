@@ -7,10 +7,8 @@ This is a recovery checkpoint, not project history.
 
 Task: **UiNodeGraph interactive-frame performance closure + R10A Windows acceptance**.
 
-Acceptance candidate is the current `main` HEAD containing commit message:
-`UIGRAPH: complete retained live-camera performance closure`
-
-Do not use the earlier TEMP staging commits as test checkpoints.
+Acceptance candidate is the current `main` HEAD containing the patterned-edge forward-progress correction and regression package.
+Do not use earlier TEMP/noop staging commits or the hung `c2b65522...` checkpoint as acceptance targets.
 
 ## VERIFIED BASE
 
@@ -43,15 +41,24 @@ Live camera architecture:
 - crossing LOD/coverage/safety thresholds falls back immediately to exact preparation;
 - world spatial index remains authoritative and unchanged.
 
+Runtime blocker found at `c2b65522...`:
+- UiGraphDemo startup pegged one CPU in Debug + Release while all deterministic tests passed;
+- root cause was the new direct dashed/dotted polyline loop: binary rounding could reduce `step` below the ULP of both `phase` and `pos`, leaving the while loop with no forward progress;
+- Reference startup exercises this exact path through a dashed edge with an open arrow;
+- active render TU now uses a progress-safe phase remainder at sub-pixel epsilon;
+- `Utilities/UiNodeGraphPatternedPaintTest` paints dashed/open and dotted/none edges at multiple zooms and must return promptly.
+
 Recovery layout:
 - `UiNodeGraphInteractionBase.inc` = byte-for-byte retained pre-closure interaction implementation;
 - `UiNodeGraphInteraction.cpp` = small macro recovery wrapper;
 - `UiNodeGraphView.inc` = active live-camera policy only;
-- `UiNodeGraphRender.inc` = active software paint policy.
+- `UiNodeGraphRender.inc` = active software paint policy;
+- `UiNodeGraph.cpp` contains the scoped direct-pattern forward-progress shim until the render-policy recovery slice is collapsed.
 
 Focused tests:
-- `Utilities/UiNodeGraphLiveViewTest` (new live mouse vs programmatic exact contract);
-- `Utilities/UiNodeGraphPanProfileTest` now requires no geometry rebuild for a small real pan inside retained coverage.
+- `Utilities/UiNodeGraphLiveViewTest` (live mouse vs programmatic exact contract);
+- `Utilities/UiNodeGraphPanProfileTest` requires no geometry rebuild for a small real pan inside retained coverage;
+- `Utilities/UiNodeGraphPatternedPaintTest` guards GUI-startup patterned-edge forward progress.
 
 `UiDraw` audit result: **no architectural rewrite required**. Existing facade already matches benchmark policy and preserves fallback/dirty ownership.
 
@@ -60,6 +67,7 @@ Focused tests:
 Build/run CLANGx64 Debug + Release:
 - Ui
 - UiStyledSurfaceCacheTest
+- UiNodeGraphPatternedPaintTest
 - UiNodeGraphLiveViewTest
 - UiNodeGraphCanonicalShapeTest
 - UiGraphTest
@@ -74,6 +82,8 @@ Build/run CLANGx64 Debug + Release:
 - UiGraphDemo
 
 Critical evidence:
+- UiGraphDemo launches and remains responsive in Debug + Release;
+- patterned paint test completes with zero failures;
 - all deterministic tests zero-failure;
 - live pan geometry serial unchanged inside retained coverage and `geometry_us=0`;
 - live wheel does not rebuild every notch; exact settle occurs after gesture quiet;
