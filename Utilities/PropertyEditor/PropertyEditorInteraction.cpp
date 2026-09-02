@@ -408,10 +408,6 @@ void PropertyEditor::LeftDown(Point p, dword)
         ToggleOverride(row);
         return;
     }
-    if(item.overrideable && !item.override_active) {
-        ToggleOverride(row);
-        return;
-    }
     if(item.resettable && !item.overrideable && GetResetRect(row).Contains(p)) {
         ResetSelected();
         return;

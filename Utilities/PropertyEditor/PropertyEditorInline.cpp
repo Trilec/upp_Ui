@@ -250,6 +250,9 @@ void PropertyEditor::ApplyInlineEditorCommit(const String& property_id,
         dispatching_editor_callback_ = true;
         WhenCommit(property_id, item->value);
         dispatching_editor_callback_ = false;
+        item = model_->Find(property_id);
+        if(item && item->overrideable && !item->override_active)
+            WhenOverride(property_id, true);
         EndTransaction();
     }
     else {
