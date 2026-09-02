@@ -33,4 +33,36 @@
 #undef Rectangle
 #undef RefreshLayout
 
+namespace Upp {
+namespace UiNodeGraphRenderMath {
+
+// Direct dashed/dotted drawing advances a floating phase to exact pattern
+// boundaries. Binary rounding can otherwise leave the remaining step smaller
+// than the ULP of both phase and segment position, producing a non-progressing
+// while loop. Keep the active render include on a remainder function that nudges
+// positive phase values by a sub-pixel epsilon. This is far below raster precision
+// but guarantees forward progress at dash boundaries. Negative grid phases retain
+// normal fmod semantics because the grid code deliberately normalizes them later.
+inline double fmod(double value, double period)
+{
+    if(!(period > 0.0) || !std::isfinite(value) || !std::isfinite(period))
+        return 0.0;
+    double r = std::fmod(value, period);
+    if(r <= 0.0)
+        return r;
+    const double eps = max(1e-9, fabs(period) * 1e-12);
+    if(r <= eps || period - r <= eps)
+        return 0.0;
+    r += eps;
+    return r < period ? r : 0.0;
+}
+
+} // namespace UiNodeGraphRenderMath
+} // namespace Upp
+
+// UiNodeGraphRender.inc currently uses std::fmod only for direct dash phase and
+// cached-grid phase. Redirect those local calls to the progress-safe remainder
+// above without changing the rest of the translation unit or public API.
+#define std UiNodeGraphRenderMath
 #include "UiNodeGraphRender.inc"
+#undef std
