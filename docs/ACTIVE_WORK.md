@@ -45,7 +45,7 @@ Runtime blocker found at `c2b65522...`:
 - UiGraphDemo startup pegged one CPU in Debug + Release while all deterministic tests passed;
 - root cause was the new direct dashed/dotted polyline loop: binary rounding could reduce `step` below the ULP of both `phase` and `pos`, leaving the while loop with no forward progress;
 - Reference startup exercises this exact path through a dashed edge with an open arrow;
-- active render TU now uses a progress-safe phase remainder at sub-pixel epsilon;
+- active render TU now detects repeated identical phase/period calls inside one execution burst and snaps the third call to cycle start, guaranteeing forward progress while leaving ordinary remainder math and paired grid X/Y phase calls unchanged;
 - `Utilities/UiNodeGraphPatternedPaintTest` paints dashed/open and dotted/none edges at multiple zooms and must return promptly.
 
 Recovery layout:
