@@ -35,6 +35,7 @@
     - 2026-08: added shared UiItemRender presentation infrastructure.
     - 2026-08: added UiProgressRing as the circular progress companion.
     - 2026-08: added UiRenderLayer as the shared bounded batched-AA scene seam.
+    - 2026-09: added UiRingChart as the proportional multi-value ring control.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -84,6 +85,7 @@
 #include <Ui/UiMaskEdit.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiProgressRing.h>
+#include <Ui/UiRingChart.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
 #include <Ui/UiRangeSliderEdit.h>

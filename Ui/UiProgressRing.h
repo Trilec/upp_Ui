@@ -27,6 +27,7 @@
     Usage
     - Set(actual, total) updates determinate progress.
     - SetIndeterminate(true) enables the animated unknown-total state.
+    - SetRole(...) follows the standard Ui semantic role vocabulary.
     - SetProgressGradient(start, end) enables an along-sweep progress gradient.
     - SetCapRoundness(0..100) controls flat through fully rounded stroke ends.
     - Percentage text is shown by default; SetText() replaces it.
@@ -36,6 +37,8 @@
       Ctrl integer callback ids are byte offsets, not arbitrary identifiers.
     - 2026-08: replaced absolute cap radius with 0..100 percent cap roundness;
       cap geometry now scales automatically with stroke thickness.
+    - 2026-09: added semantic UiRole theme resolution and shared UiRingDraw;
+      stable determinate ring rasters now use the shared exact UiRasterCache.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -45,7 +48,7 @@
 
 namespace Upp {
 
-class BufferPainter;
+enum class UiRole : byte;
 
 class UiProgressRing : public Ctrl {
 public:
@@ -109,6 +112,9 @@ public:
     bool            HasCustomStyle() const { return has_custom_style_; }
     const Style&    GetStyle() const { return GetEffectiveStyle(); }
     const Style&    GetCustomStyle() const { return style_; }
+
+    UiProgressRing& SetRole(UiRole role);
+    UiRole          GetRole() const { return role_; }
 
     UiProgressRing& Set(int actual, int total);
     UiProgressRing& Set(int actual) { return Set(actual, total_); }
@@ -188,10 +194,8 @@ private:
     String   ResolvePaintText() const;
     Geometry BuildGeometry(Size size) const;
     Font     ResolveTextFont(const String& text, const Rect& text_rect, bool& visible) const;
-
-    void PaintProgressArc(BufferPainter& p, const Pointf& center, double radius,
-                          double start_angle, double sweep_angle, int thickness,
-                          int cap_roundness, Color start, Color end, bool gradient) const;
+    Image    RenderRingRaster(const Geometry& g, bool gradient,
+                              Color track, Color progress, Color gradient_end) const;
 
     void UpdateAnimation();
     void StartAnimation(AnimationMode mode);
@@ -202,6 +206,7 @@ private:
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
     bool has_custom_style_ = false;
+    UiRole role_;
 
     int actual_ = 0;
     int total_ = 100;

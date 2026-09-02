@@ -1,11 +1,11 @@
 #include <Ui/UiProgressRing.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiTheme.h>
-#include <Painter/Painter.h>
+#include <Ui/UiRingDraw.h>
+#include <Ui/UiDraw.h>
 #include <cmath>
 
 namespace Upp {
-
 namespace {
 
 int UiRingClampInt(int v, int lo, int hi)
@@ -34,98 +34,6 @@ Color UiRingInkColor(const StyledPalette& palette, StyledState state, Color fall
 {
     Color c = palette.ink[state];
     return IsNull(c) ? fallback : c;
-}
-
-Pointf UiRingArcPoint(Pointf center, double radius, double angle)
-{
-    return Pointf(center.x + cos(angle) * radius,
-                  center.y + sin(angle) * radius);
-}
-
-Pointf UiRingBasisPoint(const Pointf& origin,
-                        const Pointf& xaxis, double x,
-                        const Pointf& yaxis, double y)
-{
-    return Pointf(origin.x + xaxis.x * x + yaxis.x * y,
-                  origin.y + xaxis.y * x + yaxis.y * y);
-}
-
-void UiRingRoundedCapPath(Painter& p, const Pointf& endpoint, double angle,
-                          double sweep_direction, bool start_cap,
-                          double half_width, double roundness)
-{
-    double r = half_width * UiRingClamp01(roundness);
-    if(r <= 0.000001 || half_width <= 0.000001)
-        return;
-
-    Pointf forward(-sin(angle) * sweep_direction,
-                   cos(angle) * sweep_direction);
-    Pointf outward = start_cap ? Pointf(-forward.x, -forward.y) : forward;
-    Pointf normal(cos(angle), sin(angle));
-
-    // Interpolate the cap as rounded corners around a real end face. The
-    // corner radius grows from 0 to half the stroke width: at 0 the face is
-    // fully flat, at intermediate values a central flat face remains, and at
-    // 100 the two quarter circles meet as a true semicircle.
-    const double kappa = 0.5522847498307936;
-    const double face_half = half_width - r;
-
-    Pointf upper = UiRingBasisPoint(endpoint, outward, 0.0, normal, half_width);
-    Pointf upper_face = UiRingBasisPoint(endpoint, outward, r, normal, face_half);
-    Pointf lower_face = UiRingBasisPoint(endpoint, outward, r, normal, -face_half);
-    Pointf lower = UiRingBasisPoint(endpoint, outward, 0.0, normal, -half_width);
-
-    Pointf upper_c1 = UiRingBasisPoint(endpoint, outward, kappa * r, normal, half_width);
-    Pointf upper_c2 = UiRingBasisPoint(endpoint, outward, r, normal, face_half + kappa * r);
-    Pointf lower_c1 = UiRingBasisPoint(endpoint, outward, r, normal, -face_half - kappa * r);
-    Pointf lower_c2 = UiRingBasisPoint(endpoint, outward, kappa * r, normal, -half_width);
-
-    p.Move(upper)
-     .Cubic(upper_c1, upper_c2, upper_face)
-     .Line(lower_face)
-     .Cubic(lower_c1, lower_c2, lower)
-     .Close();
-}
-
-Image UiRingAngularGradientBrush(Size size, Pointf center,
-                                 double start_angle, double sweep_angle,
-                                 Color start, Color end)
-{
-    ImageBuffer ib(max(size.cx, 1), max(size.cy, 1));
-    const double tau = 2.0 * M_PI;
-    const double direction = sweep_angle < 0.0 ? -1.0 : 1.0;
-    const double sweep = min(std::fabs(sweep_angle), tau);
-
-    for(int y = 0; y < ib.GetHeight(); y++) {
-        RGBA *row = ib[y];
-        for(int x = 0; x < ib.GetWidth(); x++) {
-            double angle = std::atan2((y + 0.5) - center.y,
-                                      (x + 0.5) - center.x);
-            double phase = std::fmod(direction * (angle - start_angle), tau);
-            if(phase < 0.0)
-                phase += tau;
-
-            double q = 0.0;
-            if(sweep >= tau - 0.000001)
-                q = phase / tau;
-            else if(sweep > 0.000001) {
-                if(phase <= sweep)
-                    q = phase / sweep;
-                else {
-                    double distance_to_start = min(phase, tau - phase);
-                    double end_delta = std::fabs(phase - sweep);
-                    double distance_to_end = min(end_delta, tau - end_delta);
-                    q = distance_to_start <= distance_to_end ? 0.0 : 1.0;
-                }
-            }
-
-            Color c = Blend(start, end,
-                            (int)std::round(UiRingClamp01(q) * 255.0));
-            row[x] = c;
-            row[x].a = 255;
-        }
-    }
-    return ib;
 }
 
 } // namespace
@@ -172,6 +80,7 @@ const UiProgressRing::Style& UiProgressRing::StyleDefault()
 }
 
 UiProgressRing::UiProgressRing()
+    : role_(UiRole::Standard)
 {
     Transparent();
     NoWantFocus();
@@ -201,7 +110,7 @@ UiProgressRing::Style& UiProgressRing::StyleEdit()
 UiProgressRing::Style UiProgressRing::ResolveThemeStyle() const
 {
     Style s = StyleDefault();
-    UiProgressBar::Style bar = UiTheme::ResolveProgressBar();
+    UiProgressBar::Style bar = UiTheme::ResolveProgressBar(role_);
 
     for(int st = 0; st < 4; st++) {
         Color track = UiRingFaceColor(bar.track_palette, (StyledState)st,
@@ -210,7 +119,7 @@ UiProgressRing::Style UiProgressRing::ResolveThemeStyle() const
                                          UiRingFaceColor(s.progress_palette, (StyledState)st, Color(59, 130, 246)));
         s.track_palette.face[st] = UiFill::Solid(track);
         s.progress_palette.face[st] = UiFill::Solid(progress);
-        s.gradient_end[st] = progress;
+        s.gradient_end[st] = st == ST_DISABLED ? progress : DkColor(progress, 16);
     }
 
     UiThemeContext context = UiTheme::GetContext();
@@ -269,6 +178,21 @@ UiProgressRing& UiProgressRing::ClearCustomStyle()
     style_ = StyleDefault();
     InvalidateStyleCache();
     OnStyleChanged();
+    return *this;
+}
+
+UiProgressRing& UiProgressRing::SetRole(UiRole role)
+{
+    if(!UiIsValid(role))
+        role = UiRole::Standard;
+    if(role_ == role)
+        return *this;
+
+    role_ = role;
+    if(!has_custom_style_) {
+        InvalidateStyleCache();
+        OnStyleChanged();
+    }
     return *this;
 }
 
@@ -610,69 +534,15 @@ UiProgressRing::Geometry UiProgressRing::GetGeometry(Size size) const
     return BuildGeometry(size);
 }
 
-void UiProgressRing::PaintProgressArc(BufferPainter& p, const Pointf& center, double radius,
-                                      double start_angle, double sweep_angle, int thickness,
-                                      int cap_roundness, Color start, Color end, bool gradient) const
+Image UiProgressRing::RenderRingRaster(const Geometry& g, bool gradient,
+                                       Color track, Color progress, Color gradient_end) const
 {
-    if(radius <= 0.0 || thickness <= 0 || std::fabs(sweep_angle) < 0.000001)
-        return;
-
-    const double tau = 2.0 * M_PI;
-    const bool use_gradient = gradient && start != end;
-    Image gradient_brush;
-    if(use_gradient) {
-        Size brush_size(max(1, (int)std::round(center.x * 2.0)),
-                        max(1, (int)std::round(center.y * 2.0)));
-        gradient_brush = UiRingAngularGradientBrush(brush_size, center,
-                                                    start_angle, sweep_angle,
-                                                    start, end);
-    }
-
-    auto StrokePath = [&] {
-        if(use_gradient)
-            p.Stroke((double)thickness, gradient_brush, Xform2D::Identity());
-        else
-            p.Stroke((double)thickness, start);
-    };
-
-    if(std::fabs(sweep_angle) >= tau - 0.000001) {
-        p.Begin();
-        p.Circle(center, radius);
-        StrokePath();
-        p.End();
-        return;
-    }
-
-    int roundness = UiRingClampInt(cap_roundness, 0, 100);
-    const bool native_round_cap = roundness >= 100;
-    Pointf first = UiRingArcPoint(center, radius, start_angle);
-
-    p.Begin();
-    p.Move(first).Arc(center, radius, start_angle, sweep_angle);
-    p.LineCap(native_round_cap ? LINECAP_ROUND : LINECAP_BUTT);
-    StrokePath();
-    p.End();
-
-    if(roundness > 0 && !native_round_cap) {
-        const double direction = sweep_angle < 0.0 ? -1.0 : 1.0;
-        const double half_width = thickness / 2.0;
-        const double q = roundness / 100.0;
-        Pointf last = UiRingArcPoint(center, radius, start_angle + sweep_angle);
-
-        auto FillCap = [&](const Pointf& endpoint, double angle, bool at_start) {
-            p.Begin();
-            UiRingRoundedCapPath(p, endpoint, angle, direction, at_start,
-                                 half_width, q);
-            if(use_gradient)
-                p.Fill(gradient_brush, Xform2D::Identity());
-            else
-                p.Fill(start);
-            p.End();
-        };
-
-        FillCap(first, start_angle, true);
-        FillCap(last, start_angle + sweep_angle, false);
-    }
+    Size raster_size = g.square.GetSize();
+    return UiRenderProgressRingRaster(raster_size, g.radius,
+                                      g.start_angle, g.sweep_angle,
+                                      g.thickness, g.cap_roundness,
+                                      track, progress, gradient_end,
+                                      gradient);
 }
 
 void UiProgressRing::Paint(Draw& w)
@@ -686,18 +556,33 @@ void UiProgressRing::Paint(Draw& w)
     Color track = UiRingFaceColor(style.track_palette, state, Color(229, 231, 235));
     Color progress = UiRingFaceColor(style.progress_palette, state, Color(59, 130, 246));
     Color gradient_end = IsNull(style.gradient_end[state]) ? progress : style.gradient_end[state];
+    const bool gradient_enabled = style.gradient_enabled;
 
-    Size raster_size = g.square.GetSize();
-    ImageBuffer ib(raster_size);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
+    Image ring;
+    const bool stable_determinate = !g.indeterminate
+        && !(animation_mode_ == ANIM_INTRO && animation_ticker_.IsRunning());
 
-    Pointf local_center(g.center.x - g.square.left, g.center.y - g.square.top);
-    BufferPainter p(ib, MODE_ANTIALIASED);
-    p.Circle(local_center, g.radius).Stroke((double)g.thickness, track);
-    PaintProgressArc(p, local_center, g.radius, g.start_angle, g.sweep_angle,
-                     g.thickness, g.cap_roundness, progress, gradient_end, style.gradient_enabled);
-    w.DrawImage(g.square.left, g.square.top, ib);
+    if(stable_determinate) {
+        UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-progress-ring");
+        policy.allow_scale_from_bucket = false;
+        UiRasterCacheKeyBuilder key("aa/ui-progress-ring");
+        key.Add(g.square.GetSize())
+           .Add(actual_)
+           .Add(total_)
+           .Add(g.thickness)
+           .Add(g.cap_roundness)
+           .Add(max(0, style.ring_inset))
+           .Add(track)
+           .Add(progress)
+           .Add(gradient_end)
+           .Add(style.gradient_enabled);
+        ring = UiRasterCache::Get(key.Build(), policy,
+                                  [=] { return RenderRingRaster(g, gradient_enabled, track, progress, gradient_end); });
+    }
+    else
+        ring = RenderRingRaster(g, gradient_enabled, track, progress, gradient_end);
+
+    w.DrawImage(g.square.left, g.square.top, ring);
 
     String text = ResolvePaintText();
     if(g.text_visible && !text.IsEmpty()) {

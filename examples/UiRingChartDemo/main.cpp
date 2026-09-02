@@ -49,13 +49,13 @@ Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
     return f.IsSolid() && !IsNull(f.color) ? f.color : fallback;
 }
 
-class UiProgressRingDemo : public TopWindow {
+class UiRingChartDemo : public TopWindow {
 public:
-    typedef UiProgressRingDemo CLASSNAME;
+    typedef UiRingChartDemo CLASSNAME;
 
-    UiProgressRingDemo()
+    UiRingChartDemo()
     {
-        Title("UiProgressRing Demo");
+        Title("UiRingChart Demo");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(1220), DPI(780));
 
@@ -64,7 +64,7 @@ public:
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
 
-        RegisterPropertyEditorV1Editors(pe_factory_);
+        RegisterPropertyEditorV1Editors(factory_);
         BuildHeader();
         BuildPreview();
         BuildRightRail();
@@ -81,25 +81,24 @@ public:
         Rect r = GetSize();
         r.Deflate(DPI(12));
         header_.SetRect(r.left, r.top, r.GetWidth(), DPI(68));
-
         int top = r.top + DPI(80);
         int body_h = max(0, r.bottom - top);
-        int rail_w = min(DPI(390), max(DPI(330), r.GetWidth() / 3));
+        int rail_w = min(DPI(400), max(DPI(340), r.GetWidth() / 3));
         int gap = DPI(12);
         int preview_w = max(0, r.GetWidth() - rail_w - gap);
-        preview_panel_.SetRect(r.left, top, preview_w, body_h);
-        right_panel_.SetRect(r.left + preview_w + gap, top, rail_w, body_h);
+        preview_.SetRect(r.left, top, preview_w, body_h);
+        right_.SetRect(r.left + preview_w + gap, top, rail_w, body_h);
 
-        Size ps = preview_panel_.GetSize();
-        int caption_h = DPI(40);
+        Size ps = preview_.GetSize();
+        int caption_h = DPI(42);
         int area_h = max(0, ps.cy - caption_h);
-        int rw = min(max(DPI(32), (int)InspectorValue("width", 220)), max(0, ps.cx - DPI(28)));
-        int rh = min(max(DPI(32), (int)InspectorValue("height", 220)), max(0, area_h - DPI(28)));
-        ring_.SetRect(max(0, (ps.cx - rw) / 2), max(0, (area_h - rh) / 2), rw, rh);
+        int rw = min(max(DPI(48), (int)InspectorValue("width", 260)), max(0, ps.cx - DPI(28)));
+        int rh = min(max(DPI(48), (int)InspectorValue("height", 260)), max(0, area_h - DPI(28)));
+        chart_.SetRect(max(0, (ps.cx - rw) / 2), max(0, (area_h - rh) / 2), rw, rh);
         caption_.SetRect(0, max(0, ps.cy - caption_h), ps.cx, caption_h);
 
-        Size rs = right_panel_.GetSize();
-        right_tools_.SetRect(DPI(4), DPI(4), max(0, rs.cx - DPI(8)), DPI(36));
+        Size rs = right_.GetSize();
+        tools_.SetRect(DPI(4), DPI(4), max(0, rs.cx - DPI(8)), DPI(36));
         pages_.SetRect(DPI(4), DPI(44), max(0, rs.cx - DPI(8)), max(0, rs.cy - DPI(48)));
     }
 
@@ -107,18 +106,16 @@ private:
     void BuildHeader()
     {
         Add(header_);
-        header_.SetTitle("UiProgressRing")
-               .SetSubTitle("One progress value, semantic theme roles, exact cached ring rendering")
+        header_.SetTitle("UiRingChart")
+               .SetSubTitle("Several proportional values on the shared exact ring renderer")
                .ShowTitleLine(false)
                .SetContentInset(DPI(8))
                .SetContentCell(header_actions_);
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
-        replay_.SetText("Replay");
         theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark theme");
         help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("About this demo");
         exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
-        header_actions_.Add(replay_).Fixed(DPI(78));
         header_actions_.Add(theme_).Fixed(DPI(34));
         header_actions_.Add(help_).Fixed(DPI(34));
         header_actions_.Add(exit_).Fixed(DPI(34));
@@ -126,26 +123,26 @@ private:
 
     void BuildPreview()
     {
-        Add(preview_panel_);
-        preview_panel_.Add(ring_);
-        preview_panel_.Add(caption_);
-        caption_.SetText("Theme inherited until an override is explicitly activated. Cap roundness 0-100% always follows thickness.")
+        Add(preview_);
+        preview_.Add(chart_);
+        preview_.Add(caption_);
+        caption_.SetText("UiRingChart is composition, not progress: values normalize to their sum unless a larger explicit total leaves remainder track.")
                 .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
     void BuildRightRail()
     {
-        Add(right_panel_);
-        right_panel_.Add(right_tools_);
-        right_panel_.Add(pages_);
-        right_tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2), 0, DPI(2), 0)).SetAlignItems(UiCrossAlign::Center);
+        Add(right_);
+        right_.Add(tools_);
+        right_.Add(pages_);
+        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2), 0, DPI(2), 0)).SetAlignItems(UiCrossAlign::Center);
         inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Inspector");
         overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Theme Overrides");
         code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip("Generated C++");
-        right_tools_.Add(inspector_mode_).Fixed(DPI(38));
-        right_tools_.Add(overrides_mode_).Fixed(DPI(38));
-        right_tools_.Add(code_mode_).Fixed(DPI(38));
-        right_tools_.AddSpacer(1).Expand(1);
+        tools_.Add(inspector_mode_).Fixed(DPI(38));
+        tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38));
+        tools_.AddSpacer(1).Expand(1);
 
         pages_.Add(inspector_page_, "inspector");
         pages_.Add(overrides_page_, "overrides");
@@ -154,69 +151,58 @@ private:
         overrides_page_.Add(overrides_.SizePos());
         code_page_.Add(code_);
         code_.HSizePos(DPI(6), DPI(6)).VSizePos(DPI(42), DPI(6));
-        code_page_.Add(copy_code_.RightPos(DPI(8), DPI(32)).TopPos(DPI(6), DPI(30)));
+        code_page_.Add(copy_.RightPos(DPI(8), DPI(32)).TopPos(DPI(6), DPI(30)));
         code_.SetReadOnly();
-        copy_code_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
+        copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
     }
 
     void BuildInspector()
     {
-        inspector_model_.AddNumericInt("value", "Value", 68, 0, 1000, 1, "Progress");
-        inspector_model_.AddNumericInt("total", "Total", 100, 1, 1000, 1, "Progress");
-        inspector_model_.AddBoolean("indeterminate", "Indeterminate", false, "Progress");
-        inspector_model_.AddBoolean("show_percent", "Show percentage", true, "Progress");
-        inspector_model_.AddBoolean("custom_text", "Use custom text", false, "Progress");
-        inspector_model_.AddText("text", "Center text", "68%", "Progress");
+        inspector_model_.AddNumericDouble("v0", "Design", 22.0, 0.0, 10000.0, 1.0, "Segments");
+        inspector_model_.AddNumericDouble("v1", "Development", 46.0, 0.0, 10000.0, 1.0, "Segments");
+        inspector_model_.AddNumericDouble("v2", "Testing", 18.0, 0.0, 10000.0, 1.0, "Segments");
+        inspector_model_.AddNumericDouble("v3", "Delivery", 14.0, 0.0, 10000.0, 1.0, "Segments");
+        inspector_model_.AddBoolean("explicit_total", "Use explicit total", false, "Data");
+        inspector_model_.AddNumericDouble("total", "Total", 120.0, 0.01, 10000.0, 1.0, "Data");
+        inspector_model_.AddText("center_text", "Center text", "Project", "Content");
         inspector_model_.AddChoice("role", "Role", "Standard", "Theme")
                         .AddChoice("Standard", "Standard").AddChoice("Subtle", "Subtle")
                         .AddChoice("Accent", "Accent").AddChoice("Alert", "Alert");
-        inspector_model_.AddNumericInt("width", "Preview width", 220, 32, 560, 1, "Layout").SetUnit("px");
-        inspector_model_.AddNumericInt("height", "Preview height", 220, 32, 560, 1, "Layout").SetUnit("px");
+        inspector_model_.AddNumericInt("width", "Preview width", 260, 48, 560, 1, "Layout").SetUnit("px");
+        inspector_model_.AddNumericInt("height", "Preview height", 260, 48, 560, 1, "Layout").SetUnit("px");
         inspector_model_.AddBoolean("enabled", "Enabled", true, "Behaviour");
-        inspector_model_.SetGroupSubtitle("Progress", "one semantic progress value and center readout");
-        inspector_model_.SetGroupSubtitle("Theme", "semantic role before local overrides");
+        inspector_model_.SetGroupSubtitle("Segments", "ordered proportional values; zero values remain authored but are not painted");
+        inspector_model_.SetGroupSubtitle("Data", "automatic normalization or a larger explicit remainder total");
         inspector_model_.StructureChanged();
     }
 
     void BuildOverrides()
     {
-        UiProgressRing probe;
-        UiProgressRing::Style base = probe.GetStyle();
-
-        MarkOverride(override_model_.AddColor("progress.normal", "Normal", FaceColor(base.progress_palette, ST_NORMAL, Color(59,130,246)), "Progress"));
-        MarkOverride(override_model_.AddColor("progress.disabled", "Disabled", FaceColor(base.progress_palette, ST_DISABLED, Color(148,163,184)), "Progress"));
-        MarkOverride(override_model_.AddBoolean("gradient.enabled", "Enabled", base.gradient_enabled, "Progress/Gradient"));
-        MarkOverride(override_model_.AddColor("gradient.normal", "Normal end", base.gradient_end[ST_NORMAL], "Progress/Gradient"));
-        MarkOverride(override_model_.AddColor("gradient.disabled", "Disabled end", base.gradient_end[ST_DISABLED], "Progress/Gradient"));
-
+        UiRingChart probe;
+        UiRingChart::Style base = probe.GetStyle();
         MarkOverride(override_model_.AddColor("track.normal", "Normal", FaceColor(base.track_palette, ST_NORMAL, Color(229,231,235)), "Track"));
         MarkOverride(override_model_.AddColor("track.disabled", "Disabled", FaceColor(base.track_palette, ST_DISABLED, Color(241,245,249)), "Track"));
         MarkOverride(override_model_.AddColor("text.normal", "Normal", base.text_palette.ink[ST_NORMAL], "Text Ink"));
         MarkOverride(override_model_.AddColor("text.disabled", "Disabled", base.text_palette.ink[ST_DISABLED], "Text Ink"));
-
-        MarkOverride(override_model_.AddNumericInt("thickness", "Thickness", base.thickness, 1, 64, 1, "Geometry").SetUnit("px"));
+        for(int i = 0; i < 6; i++)
+            MarkOverride(override_model_.AddColor("series." + AsString(i), Format("Series %d", i + 1), base.series[i], "Series"));
+        MarkOverride(override_model_.AddNumericInt("thickness", "Thickness", base.thickness, 1, 80, 1, "Geometry").SetUnit("px"));
         MarkOverride(override_model_.AddNumericInt("cap_roundness", "Cap roundness", base.cap_roundness, 0, 100, 1, "Geometry").SetUnit("%"));
+        MarkOverride(override_model_.AddNumericInt("segment_gap", "Segment gap", base.segment_gap, 0, 40, 1, "Geometry").SetUnit("px"));
         MarkOverride(override_model_.AddNumericInt("ring_inset", "Ring inset", base.ring_inset, 0, 48, 1, "Geometry").SetUnit("px"));
-
         MarkOverride(AddPropertyFont(override_model_, "font_face", "Font", base.font.GetFaceName(), "Typography"));
         MarkOverride(override_model_.AddNumericInt("font_height", "Font size", max(1, base.font.GetHeight()), 6, 96, 1, "Typography").SetUnit("px"));
         MarkOverride(override_model_.AddBoolean("font_bold", "Bold", base.font.IsBold(), "Typography"));
         MarkOverride(override_model_.AddBoolean("font_italic", "Italic", base.font.IsItalic(), "Typography"));
-
-        MarkOverride(override_model_.AddBoolean("animate_on_show", "Animate on show", base.animate_on_show, "Motion"));
-        MarkOverride(override_model_.AddNumericInt("intro_duration", "Intro duration", base.intro_duration_ms, 120, 3000, 10, "Motion").SetUnit("ms"));
-        MarkOverride(override_model_.AddNumericInt("indeterminate_duration", "Indeterminate duration", base.indeterminate_duration_ms, 240, 4000, 10, "Motion").SetUnit("ms"));
-
-        override_model_.SetGroupSubtitle("Progress", "progress stroke and optional along-sweep gradient");
-        override_model_.SetGroupSubtitle("Track", "unused circular track");
-        override_model_.SetGroupSubtitle("Geometry", "ring-specific stroke geometry");
+        override_model_.SetGroupSubtitle("Series", "theme palette unless a segment supplies its own explicit colour");
+        override_model_.SetGroupSubtitle("Geometry", "shared exact ring stroke geometry");
         override_model_.StructureChanged();
     }
 
     void ConfigureEditors()
     {
-        inspector_.SetFactory(&pe_factory_);
-        overrides_.SetFactory(&pe_factory_);
+        inspector_.SetFactory(&factory_);
+        overrides_.SetFactory(&factory_);
         inspector_.SetModel(&inspector_model_);
         overrides_.SetModel(&override_model_);
         inspector_.SetLabelRatio(46);
@@ -240,13 +226,12 @@ private:
         inspector_mode_.WhenAction = [=] { SelectPage(0); };
         overrides_mode_.WhenAction = [=] { SelectPage(1); };
         code_mode_.WhenAction = [=] { SelectPage(2); };
-        replay_.WhenAction = [=] { ring_.RestartIntroAnimation(); };
         theme_.WhenAction = [=] { ToggleTheme(); };
         help_.WhenAction = [=] {
-            PromptOK("UiProgressRing reference demo\n\nInspector authors the one-value progress contract. Theme Overrides are inherited until explicitly activated. Code is regenerated from the same state.");
+            PromptOK("UiRingChart reference demo\n\nUiRingChart represents several proportional values. UiProgressRing remains the separate one-value progress control. Theme overrides stay inherited until activated.");
         };
         exit_.WhenAction = [=] { Break(); };
-        copy_code_.WhenAction = [=] { WriteClipboardText(generated_); };
+        copy_.WhenAction = [=] { WriteClipboardText(generated_); };
     }
 
     Value InspectorValue(const String& id, const Value& fallback = Value()) const
@@ -287,109 +272,98 @@ private:
         ApplyProjection();
     }
 
-    bool ApplyOverrides(UiProgressRing::Style& style) const
+    bool ApplyOverrides(UiRingChart::Style& style) const
     {
         bool any = false;
+        auto FaceOverride = [&](const char *id, StyledPalette& p, StyledState st) {
+            if(OverrideActive(id)) { p.face[st] = UiFill::Solid(Color(OverrideValue(id))); any = true; }
+        };
         auto ColorOverride = [&](const char *id, Color& target) {
             if(OverrideActive(id)) { target = Color(OverrideValue(id)); any = true; }
         };
-        auto FaceOverride = [&](const char *id, StyledPalette& palette, StyledState st) {
-            if(OverrideActive(id)) { palette.face[st] = UiFill::Solid(Color(OverrideValue(id))); any = true; }
-        };
-
-        FaceOverride("progress.normal", style.progress_palette, ST_NORMAL);
-        FaceOverride("progress.disabled", style.progress_palette, ST_DISABLED);
-        if(OverrideActive("gradient.enabled")) { style.gradient_enabled = (bool)OverrideValue("gradient.enabled"); any = true; }
-        ColorOverride("gradient.normal", style.gradient_end[ST_NORMAL]);
-        ColorOverride("gradient.disabled", style.gradient_end[ST_DISABLED]);
         FaceOverride("track.normal", style.track_palette, ST_NORMAL);
         FaceOverride("track.disabled", style.track_palette, ST_DISABLED);
         ColorOverride("text.normal", style.text_palette.ink[ST_NORMAL]);
         ColorOverride("text.disabled", style.text_palette.ink[ST_DISABLED]);
-
+        for(int i = 0; i < 6; i++) {
+            String id = "series." + AsString(i);
+            if(OverrideActive(id)) { style.series[i] = Color(OverrideValue(id)); any = true; }
+        }
         if(OverrideActive("thickness")) { style.thickness = max(1, (int)OverrideValue("thickness")); any = true; }
         if(OverrideActive("cap_roundness")) { style.cap_roundness = clamp((int)OverrideValue("cap_roundness"), 0, 100); any = true; }
+        if(OverrideActive("segment_gap")) { style.segment_gap = max(0, (int)OverrideValue("segment_gap")); any = true; }
         if(OverrideActive("ring_inset")) { style.ring_inset = max(0, (int)OverrideValue("ring_inset")); any = true; }
         if(OverrideActive("font_face")) { style.font.FaceName(AsString(OverrideValue("font_face"))); any = true; }
         if(OverrideActive("font_height")) { style.font.Height(max(1, (int)OverrideValue("font_height"))); any = true; }
         if(OverrideActive("font_bold")) { style.font.Bold((bool)OverrideValue("font_bold")); any = true; }
         if(OverrideActive("font_italic")) { style.font.Italic((bool)OverrideValue("font_italic")); any = true; }
-        if(OverrideActive("animate_on_show")) { style.animate_on_show = (bool)OverrideValue("animate_on_show"); any = true; }
-        if(OverrideActive("intro_duration")) { style.intro_duration_ms = max(1, (int)OverrideValue("intro_duration")); any = true; }
-        if(OverrideActive("indeterminate_duration")) { style.indeterminate_duration_ms = max(120, (int)OverrideValue("indeterminate_duration")); any = true; }
         return any;
     }
 
     void ApplyProjection()
     {
-        UiRole role = ParseRole(AsString(InspectorValue("role", "Standard")));
-        ring_.ClearCustomStyle();
-        ring_.SetRole(role);
-        UiProgressRing::Style style = ring_.GetStyle();
+        chart_.ClearCustomStyle();
+        chart_.SetRole(ParseRole(AsString(InspectorValue("role", "Standard"))));
+        UiRingChart::Style style = chart_.GetStyle();
         if(ApplyOverrides(style))
-            ring_.SetCustomStyle(style);
+            chart_.SetCustomStyle(style);
 
-        ring_.Enable((bool)InspectorValue("enabled", true));
-        if((bool)InspectorValue("custom_text", false))
-            ring_.SetText(AsString(InspectorValue("text", String())));
-        else {
-            ring_.ClearText();
-            ring_.Percent((bool)InspectorValue("show_percent", true));
-        }
-
-        if((bool)InspectorValue("indeterminate", false))
-            ring_.SetIndeterminate(true);
+        chart_.ClearSegments();
+        chart_.AddSegment((double)InspectorValue("v0", 22.0), "Design")
+              .AddSegment((double)InspectorValue("v1", 46.0), "Development")
+              .AddSegment((double)InspectorValue("v2", 18.0), "Testing")
+              .AddSegment((double)InspectorValue("v3", 14.0), "Delivery");
+        if((bool)InspectorValue("explicit_total", false))
+            chart_.SetTotal((double)InspectorValue("total", 120.0));
         else
-            ring_.Set((int)InspectorValue("value", 68), max(1, (int)InspectorValue("total", 100)));
-
-        UpdateGeneratedCode();
+            chart_.ClearTotal();
+        chart_.SetCenterText(AsString(InspectorValue("center_text", String())));
+        chart_.Enable((bool)InspectorValue("enabled", true));
+        UpdateCode();
         RefreshLayout();
         Refresh();
     }
 
-    void UpdateGeneratedCode()
+    void UpdateCode()
     {
         String role = AsString(InspectorValue("role", "Standard"));
         String out;
-        out << "UiProgressRing ring;\n"
-            << "ring.SetRole(UiRole::" << role << ");\n";
-        if((bool)InspectorValue("indeterminate", false))
-            out << "ring.SetIndeterminate(true);\n";
-        else
-            out << Format("ring.Set(%d, %d);\n", (int)InspectorValue("value", 68), max(1, (int)InspectorValue("total", 100)));
-        if((bool)InspectorValue("custom_text", false))
-            out << "ring.SetText(" << CppString(AsString(InspectorValue("text", String()))) << ");\n";
-        else if(!(bool)InspectorValue("show_percent", true))
-            out << "ring.NoPercent();\n";
+        out << "UiRingChart chart;\n"
+            << "chart.SetRole(UiRole::" << role << ")\n"
+            << Format("     .AddSegment(%.3f, \"Design\")\n", (double)InspectorValue("v0", 22.0))
+            << Format("     .AddSegment(%.3f, \"Development\")\n", (double)InspectorValue("v1", 46.0))
+            << Format("     .AddSegment(%.3f, \"Testing\")\n", (double)InspectorValue("v2", 18.0))
+            << Format("     .AddSegment(%.3f, \"Delivery\");\n", (double)InspectorValue("v3", 14.0));
+        if((bool)InspectorValue("explicit_total", false))
+            out << Format("chart.SetTotal(%.3f);\n", (double)InspectorValue("total", 120.0));
+        String center = AsString(InspectorValue("center_text", String()));
+        if(!center.IsEmpty()) out << "chart.SetCenterText(" << CppString(center) << ");\n";
 
         bool any = false;
         for(int i = 0; i < override_model_.GetCount(); i++)
             if(override_model_[i].override_active) { any = true; break; }
         if(any) {
-            out << "\nUiProgressRing::Style style = ring.GetStyle();\n";
-            if(OverrideActive("progress.normal")) out << "style.progress_palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("progress.normal"))) << ");\n";
-            if(OverrideActive("progress.disabled")) out << "style.progress_palette.face[ST_DISABLED] = UiFill::Solid(" << CppColor(Color(OverrideValue("progress.disabled"))) << ");\n";
-            if(OverrideActive("gradient.enabled")) out << "style.gradient_enabled = " << ((bool)OverrideValue("gradient.enabled") ? "true" : "false") << ";\n";
-            if(OverrideActive("gradient.normal")) out << "style.gradient_end[ST_NORMAL] = " << CppColor(Color(OverrideValue("gradient.normal"))) << ";\n";
-            if(OverrideActive("gradient.disabled")) out << "style.gradient_end[ST_DISABLED] = " << CppColor(Color(OverrideValue("gradient.disabled"))) << ";\n";
+            out << "\nUiRingChart::Style style = chart.GetStyle();\n";
             if(OverrideActive("track.normal")) out << "style.track_palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("track.normal"))) << ");\n";
             if(OverrideActive("track.disabled")) out << "style.track_palette.face[ST_DISABLED] = UiFill::Solid(" << CppColor(Color(OverrideValue("track.disabled"))) << ");\n";
             if(OverrideActive("text.normal")) out << "style.text_palette.ink[ST_NORMAL] = " << CppColor(Color(OverrideValue("text.normal"))) << ";\n";
             if(OverrideActive("text.disabled")) out << "style.text_palette.ink[ST_DISABLED] = " << CppColor(Color(OverrideValue("text.disabled"))) << ";\n";
+            for(int i = 0; i < 6; i++) {
+                String id = "series." + AsString(i);
+                if(OverrideActive(id)) out << "style.series[" << i << "] = " << CppColor(Color(OverrideValue(id))) << ";\n";
+            }
             if(OverrideActive("thickness")) out << Format("style.thickness = %d;\n", (int)OverrideValue("thickness"));
             if(OverrideActive("cap_roundness")) out << Format("style.cap_roundness = %d;\n", (int)OverrideValue("cap_roundness"));
+            if(OverrideActive("segment_gap")) out << Format("style.segment_gap = %d;\n", (int)OverrideValue("segment_gap"));
             if(OverrideActive("ring_inset")) out << Format("style.ring_inset = %d;\n", (int)OverrideValue("ring_inset"));
             if(OverrideActive("font_face")) out << "style.font.FaceName(" << CppString(AsString(OverrideValue("font_face"))) << ");\n";
             if(OverrideActive("font_height")) out << Format("style.font.Height(%d);\n", (int)OverrideValue("font_height"));
             if(OverrideActive("font_bold")) out << "style.font.Bold(" << ((bool)OverrideValue("font_bold") ? "true" : "false") << ");\n";
             if(OverrideActive("font_italic")) out << "style.font.Italic(" << ((bool)OverrideValue("font_italic") ? "true" : "false") << ");\n";
-            if(OverrideActive("animate_on_show")) out << "style.animate_on_show = " << ((bool)OverrideValue("animate_on_show") ? "true" : "false") << ";\n";
-            if(OverrideActive("intro_duration")) out << Format("style.intro_duration_ms = %d;\n", (int)OverrideValue("intro_duration"));
-            if(OverrideActive("indeterminate_duration")) out << Format("style.indeterminate_duration_ms = %d;\n", (int)OverrideValue("indeterminate_duration"));
-            out << "ring.SetCustomStyle(style);\n";
+            out << "chart.SetCustomStyle(style);\n";
         }
         if(!(bool)InspectorValue("enabled", true))
-            out << "ring.Enable(false);\n";
+            out << "chart.Enable(false);\n";
         generated_ = out;
         code_.SetData(generated_);
     }
@@ -414,23 +388,21 @@ private:
 private:
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
-    UiButton replay_;
     UiToolButton theme_, help_, exit_;
-
-    UiPanel preview_panel_;
-    UiProgressRing ring_;
+    UiPanel preview_;
+    UiRingChart chart_;
     UiLabel caption_;
 
-    UiPanel right_panel_;
-    UiBoxLayout right_tools_ { UiDirection::H };
+    UiPanel right_;
+    UiBoxLayout tools_ { UiDirection::H };
     UiToolButton inspector_mode_, overrides_mode_, code_mode_;
     UiStack pages_;
     UiPanel inspector_page_, overrides_page_, code_page_;
     PropertyEditor inspector_, overrides_;
     UiMultiEdit code_;
-    UiToolButton copy_code_;
+    UiToolButton copy_;
 
-    PropertyEditorFactory pe_factory_;
+    PropertyEditorFactory factory_;
     PropertyEditorModel inspector_model_, override_model_;
     String generated_;
 };
@@ -439,5 +411,5 @@ private:
 
 GUI_APP_MAIN
 {
-    UiProgressRingDemo().Run();
+    UiRingChartDemo().Run();
 }

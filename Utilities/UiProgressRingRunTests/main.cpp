@@ -132,6 +132,49 @@ static void TestStyleAndGradient(TestCtx& t)
     t.Expect(!ring.HasCustomStyle(), "ClearCustomStyle restores theme-driven style");
 }
 
+static void TestThemeAndRole(TestCtx& t)
+{
+    t.Section("Theme and semantic role");
+
+    UiThemeContext saved = UiTheme::GetContext();
+    UiThemeContext light = saved;
+    light.preset = UiThemePreset::Minimal;
+    light.mode = UiThemeMode::Light;
+    UiTheme::Set(light);
+
+    UiProgressRing ring;
+    ring.SetRole(UiRole::Alert);
+    t.Expect(ring.GetRole() == UiRole::Alert, "ring stores the semantic role");
+
+    UiProgressBar::Style alert = UiTheme::ResolveProgressBar(UiRole::Alert);
+    Color expected_alert = FaceColor(alert.fill_palette, ST_NORMAL);
+    t.Expect(FaceColor(ring.GetStyle().progress_palette, ST_NORMAL) == expected_alert,
+             "theme-driven ring resolves progress colour from its semantic role");
+    t.Expect(ring.GetStyle().gradient_end[ST_NORMAL] != expected_alert,
+             "theme-driven ring provides a usable role-derived gradient endpoint");
+
+    UiThemeContext dark = light;
+    dark.mode = UiThemeMode::Dark;
+    UiTheme::Set(dark);
+    UiProgressBar::Style dark_alert = UiTheme::ResolveProgressBar(UiRole::Alert);
+    t.Expect(FaceColor(ring.GetStyle().progress_palette, ST_NORMAL)
+                 == FaceColor(dark_alert.fill_palette, ST_NORMAL),
+             "theme-driven ring follows live theme revision changes");
+
+    ring.SetProgressColor(Color(12, 34, 56));
+    UiTheme::Set(light);
+    t.Expect(FaceColor(ring.GetStyle().progress_palette, ST_NORMAL) == Color(12, 34, 56),
+             "explicit local style survives later theme changes");
+    ring.ClearCustomStyle();
+    t.Expect(FaceColor(ring.GetStyle().progress_palette, ST_NORMAL) == expected_alert,
+             "clearing local style restores the current role-driven theme");
+
+    ring.SetRole((UiRole)255);
+    t.Expect(ring.GetRole() == UiRole::Standard, "invalid semantic role normalizes to Standard");
+
+    UiTheme::Set(saved);
+}
+
 static void TestTextSizing(TestCtx& t)
 {
     t.Section("Center text sizing");
@@ -173,14 +216,38 @@ static void TestAnimationStates(TestCtx& t)
     t.Expect(!ring.IsAnimationRunning(), "closed determinate control has no active timer");
 }
 
+static void TestStableRasterCache(TestCtx& t)
+{
+    t.Section("Stable raster cache");
+
+    UiRasterCache::ClearTag("aa/ui-progress-ring");
+    UiProgressRing ring;
+    ring.AnimateOnShow(false)
+        .SetProgressGradient(Color(30, 120, 245), Color(80, 40, 220))
+        .Set(61, 100);
+    ring.SetRect(0, 0, 137, 137);
+
+    ImageDraw draw(137, 137);
+    UiRasterCacheStats before = UiRasterCache::GetStats();
+    ring.Paint(draw);
+    UiRasterCacheStats first = UiRasterCache::GetStats();
+    ring.Paint(draw);
+    UiRasterCacheStats second = UiRasterCache::GetStats();
+
+    t.Expect(first.misses > before.misses, "first stable determinate paint populates the shared ring cache");
+    t.Expect(second.hits > first.hits, "repeated stable determinate paint reuses the exact cached raster");
+}
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
     TestValueContract(t);
     TestGeometry(t);
     TestStyleAndGradient(t);
+    TestThemeAndRole(t);
     TestTextSizing(t);
     TestAnimationStates(t);
+    TestStableRasterCache(t);
 
     Cout() << "\nUIPROGRESSRING_SUMMARY checks=" << t.checks << " failed=" << t.fails << "\n";
     SetExitCode(t.fails ? 1 : 0);
