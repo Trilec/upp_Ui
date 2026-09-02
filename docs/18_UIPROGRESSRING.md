@@ -1,49 +1,94 @@
 # UiProgressRing
 
-`UiProgressRing` is the single-value circular companion to `UiProgressBar`. It is deliberately not a chart control: one semantic value advances toward one total. Multi-value composition belongs to `UiRingChart`.
+`UiProgressRing` is the single-value circular companion to `UiProgressBar`.
+It is deliberately not a chart control: one semantic value advances toward one
+total. Multi-part composition belongs to `UiChartRing`.
 
 ## Contract
 
-- `Set(actual, total)`, `SetTotal`, `Get`, `GetTotal`, `GetRatio`, `GetPercent`, integer operators, and `SetData` / `GetData` follow the linear progress vocabulary.
-- `SetRole(UiRole)` uses the Standard/Subtle/Accent/Alert semantic family. With no custom style, live theme revisions are inherited automatically. `SetCustomStyle` is the explicit local override boundary.
-- Percentage text is centered by default. `SetText` replaces it and `NoPercent` hides the automatic readout.
-- `SetIndeterminate(true)` uses total `<= 0`, matching `UiProgressBar` unknown-total semantics.
-- `AnimateOnShow(true)` is enabled by default. Intro animation changes presentation only; semantic value remains authoritative.
+- `Set(actual, total)`, `SetTotal`, `Get`, `GetTotal`, `GetRatio`, `GetPercent`,
+  integer operators, and `SetData` / `GetData` follow the linear progress value
+  vocabulary.
+- `SetRole(UiRole)` selects the same Standard/Subtle/Accent/Alert semantic family
+  used by the rest of `upp_Ui`. With no custom style, live theme revisions are
+  inherited automatically. `SetCustomStyle` remains the explicit local override
+  boundary.
+- Percentage text is shown in the center by default. `SetText` replaces it and
+  `NoPercent` hides the automatic readout.
+- `SetIndeterminate(true)` preserves the unknown-total convention used by
+  `UiProgressBar`: total `<= 0` means indeterminate.
+- `AnimateOnShow(true)` is enabled by default. The first visible presentation
+  eases from zero to the current target value without changing semantic state.
+  Later value changes are immediate; `RestartIntroAnimation()` explicitly
+  replays the entry motion.
 
-## Geometry and caps
+## Circular geometry
 
-Painting uses a centered square based on the shorter allocated axis, so the ring remains circular in rectangular layouts.
+The control accepts any allocated rectangle. Painting uses a centered square
+based on the shorter axis, so the ring always remains circular rather than
+stretching into an ellipse.
 
-`cap_roundness` is thickness-relative and defaults to `100`:
-- `0` = flat butt end;
-- intermediate values progressively round the two end corners while retaining a central face;
-- `100` = a true semicircular end with radius equal to half the current stroke thickness.
+Ring-specific style fields remain separate from rectangular `UiProgressBar`
+surface metrics:
 
-The sweep is calculated from the exact `double` ratio. Integer percentages are text presentation only.
+- progress colour or along-sweep start/end gradient;
+- independent unused-track colour;
+- center text colour and preferred font;
+- stroke thickness;
+- cap roundness from `0` to `100` percent;
+- ring inset;
+- intro and indeterminate animation durations.
 
-## Shared renderer
+`cap_roundness` is proportional to stroke thickness and defaults to `100`.
+`0` is a flat butt end, intermediate values progressively round the endpoint,
+and `100` is a true semicircular end whose radius is half the current stroke
+thickness.
 
-Exact arc/gradient/cap painting lives in `Ui/UiRingDraw.h/.cpp`. `UiRingDraw` is an internal geometry/render helper, not a common control base. It is shared by `UiProgressRing` and `UiRingChart`.
+The progress sweep is computed directly from the `double` ratio. Integer
+percentages are a text presentation only; the painted geometry is not quantized
+to whole-percent steps.
 
-Solid and gradient progress use one exact Painter arc. Gradient mode uses an angular image brush on the same stroke. Full 100% sweeps are closed circles with no cap seam.
+## Shared circular-arc primitive
+
+Exact arc/gradient/cap painting now lives in `UiDraw` as the generic
+`UiPaintCircularArc` primitive. `UiProgressRing` owns its progress-specific
+track/raster composition locally, while `UiChartRing` owns its multi-segment
+composition. There is no separate ring-renderer subsystem and no common ring
+control base class.
+
+Both solid and gradient progress use one exact Painter arc. Gradient mode uses
+an angular image brush on the same stroke, so the sweep remains continuous.
+Partial arcs use native flat/round caps at the endpoints and UiDraw's
+thickness-relative intermediate cap geometry. Intermediate custom caps use a
+bounded sub-pixel stroke overlap to prevent an antialiasing hairline at the
+cap/stroke join. Full `100%` sweeps are closed circles with no cap seam.
 
 ## Raster policy
 
-Center text remains direct `Draw` text.
+The center text remains direct `Draw` text. Ring geometry follows the accepted
+Ui rendering policy:
 
-- stable determinate presentation -> exact `UiRasterCache` entry tagged `aa/ui-progress-ring`;
+- stable determinate presentation -> exact `UiRasterCache` entry tagged
+  `aa/ui-progress-ring`;
 - intro and indeterminate animation -> live bounded `BufferPainter` raster;
-- oversized rasters outside shared AA-cache policy -> live fallback.
+- oversized rasters outside the shared AA cache policy -> live raster fallback.
 
-The stable cache key includes all raster-affecting geometry and colours, so role/theme changes cannot reuse stale pixels.
+The cache key includes every raster-affecting value: exact viewport size,
+radius, start/sweep, thickness, cap roundness, track/progress/gradient colours
+and gradient enablement. Theme/role changes therefore naturally resolve to a
+new exact key rather than reusing stale pixels.
 
 ## Demo
 
 `examples/UiProgressRingDemo` follows the canonical full-demo shell:
-- Inspector — value/text, semantic role and preview layout;
-- Theme Overrides — Normal/Disabled progress, gradient, track, text, geometry, typography and motion settings, inherited until individually activated;
+
+- Inspector — progress value/text, semantic role and preview layout;
+- Theme Overrides — explicit live-state (Normal/Disabled) progress/gradient/track/text colours,
+  geometry, typography and optional motion timing, inherited until individually activated;
 - Code — generated C++ from the same authored state;
 - Light/Dark, Help, Replay and Exit actions.
+
+The preview remains genuinely theme-driven while no Theme Override is active.
 
 ## Validation
 
@@ -53,11 +98,15 @@ Focused package:
 E:\upp-18468\umk.exe GitHubOut Utilities/UiProgressRingRunTests CLANGx64 -br E:\apps\github\upp_Ui\out\UiProgressRingRunTests.exe
 ```
 
-Expected:
+Expected summary after this tranche:
 
 ```text
 UIPROGRESSRING_SUMMARY checks=60 failed=0
 ```
+
+The focused contract now includes semantic-role/theme inheritance, custom-style
+preservation and exact stable raster-cache reuse in addition to the existing
+value, geometry, cap, gradient, text and animation checks.
 
 Visual demo:
 

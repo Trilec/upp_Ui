@@ -1,14 +1,13 @@
-#include <Ui/UiRingChart.h>
+#include <Ui/UiChartRing.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiTheme.h>
-#include <Ui/UiRingDraw.h>
 #include <Ui/UiDraw.h>
 #include <cmath>
 
 namespace Upp {
 namespace {
 
-Color RingChartFace(const StyledPalette& palette, StyledState state, Color fallback)
+Color ChartRingFace(const StyledPalette& palette, StyledState state, Color fallback)
 {
     const UiFill& fill = palette.face[state];
     if(fill.IsSolid() && !IsNull(fill.color))
@@ -16,15 +15,41 @@ Color RingChartFace(const StyledPalette& palette, StyledState state, Color fallb
     return fallback;
 }
 
-Color RingChartInk(const StyledPalette& palette, StyledState state, Color fallback)
+Color ChartRingInk(const StyledPalette& palette, StyledState state, Color fallback)
 {
     Color c = palette.ink[state];
     return IsNull(c) ? fallback : c;
 }
 
+void ApplyChartRingRoleSeries(UiChartRing::Style& s, UiRole role,
+                              Color primary, Color track, bool dark)
+{
+    if(role == UiRole::Standard) {
+        s.series[0] = primary;
+        if(dark) {
+            for(int i = 1; i < UiChartRing::MAX_SERIES_COLORS; i++)
+                s.series[i] = LtColor(s.series[i], 12);
+        }
+        return;
+    }
+
+    // Chart roles describe the whole inherited series palette, not just the
+    // first slice. Accent and Alert are tonal families of their semantic main
+    // colour. Subtle stays deliberately quiet by blending much further toward
+    // the role track colour. Explicit per-segment colours remain authored data.
+    static const int tonal_mix[UiChartRing::MAX_SERIES_COLORS] =
+        { 0, 38, 70, 100, 128, 154, 180, 205 };
+    static const int subtle_mix[UiChartRing::MAX_SERIES_COLORS] =
+        { 132, 150, 166, 180, 194, 208, 220, 232 };
+    const int *mix = role == UiRole::Subtle ? subtle_mix : tonal_mix;
+    for(int i = 0; i < UiChartRing::MAX_SERIES_COLORS; i++)
+        s.series[i] = Blend(primary, track, mix[i]);
+    s.series_count = UiChartRing::MAX_SERIES_COLORS;
+}
+
 } // namespace
 
-const UiRingChart::Style& UiRingChart::StyleDefault()
+const UiChartRing::Style& UiChartRing::StyleDefault()
 {
     static Style s;
     static bool init = false;
@@ -57,7 +82,7 @@ const UiRingChart::Style& UiRingChart::StyleDefault()
     return s;
 }
 
-UiRingChart::UiRingChart()
+UiChartRing::UiChartRing()
     : role_(UiRole::Standard)
 {
     Transparent();
@@ -65,12 +90,12 @@ UiRingChart::UiRingChart()
     SyncThemeStyle();
 }
 
-void UiRingChart::InvalidateStyleCache()
+void UiChartRing::InvalidateStyleCache()
 {
     theme_revision_ = 0;
 }
 
-UiRingChart::Style& UiRingChart::StyleEdit()
+UiChartRing::Style& UiChartRing::StyleEdit()
 {
     if(!has_custom_style_) {
         style_ = GetEffectiveStyle();
@@ -80,25 +105,22 @@ UiRingChart::Style& UiRingChart::StyleEdit()
     return style_;
 }
 
-UiRingChart::Style UiRingChart::ResolveThemeStyle() const
+UiChartRing::Style UiChartRing::ResolveThemeStyle() const
 {
     Style s = StyleDefault();
     UiProgressBar::Style bar = UiTheme::ResolveProgressBar(role_);
 
     for(int st = 0; st < 4; st++) {
         s.track_palette.face[st] = UiFill::Solid(
-            RingChartFace(bar.track_palette, (StyledState)st,
-                          RingChartFace(s.track_palette, (StyledState)st, Color(229, 231, 235))));
+            ChartRingFace(bar.track_palette, (StyledState)st,
+                          ChartRingFace(s.track_palette, (StyledState)st, Color(229, 231, 235))));
     }
 
-    Color primary = RingChartFace(bar.fill_palette, ST_NORMAL, s.series[0]);
-    s.series[0] = primary;
-
+    Color primary = ChartRingFace(bar.fill_palette, ST_NORMAL, s.series[0]);
+    Color track = ChartRingFace(s.track_palette, ST_NORMAL, Color(229, 231, 235));
     UiThemeContext context = UiTheme::GetContext();
-    if(context.mode == UiThemeMode::Dark) {
-        for(int i = 1; i < MAX_SERIES_COLORS; i++)
-            s.series[i] = LtColor(s.series[i], 12);
-    }
+    ApplyChartRingRoleSeries(s, role_, primary, track,
+                             context.mode == UiThemeMode::Dark);
 
     s.font = bar.font;
     if(context.preset != UiThemePreset::Compact)
@@ -117,7 +139,7 @@ UiRingChart::Style UiRingChart::ResolveThemeStyle() const
     return s;
 }
 
-void UiRingChart::SyncThemeStyle()
+void UiChartRing::SyncThemeStyle()
 {
     if(has_custom_style_)
         return;
@@ -128,15 +150,15 @@ void UiRingChart::SyncThemeStyle()
     theme_revision_ = revision;
 }
 
-const UiRingChart::Style& UiRingChart::GetEffectiveStyle() const
+const UiChartRing::Style& UiChartRing::GetEffectiveStyle() const
 {
     if(has_custom_style_)
         return style_;
-    const_cast<UiRingChart*>(this)->SyncThemeStyle();
+    const_cast<UiChartRing*>(this)->SyncThemeStyle();
     return themed_style_;
 }
 
-UiRingChart& UiRingChart::SetCustomStyle(const Style& s)
+UiChartRing& UiChartRing::SetCustomStyle(const Style& s)
 {
     style_ = s;
     has_custom_style_ = true;
@@ -144,7 +166,7 @@ UiRingChart& UiRingChart::SetCustomStyle(const Style& s)
     return *this;
 }
 
-UiRingChart& UiRingChart::ClearCustomStyle()
+UiChartRing& UiChartRing::ClearCustomStyle()
 {
     if(!has_custom_style_)
         return *this;
@@ -155,7 +177,7 @@ UiRingChart& UiRingChart::ClearCustomStyle()
     return *this;
 }
 
-UiRingChart& UiRingChart::SetRole(UiRole role)
+UiChartRing& UiChartRing::SetRole(UiRole role)
 {
     if(!UiIsValid(role))
         role = UiRole::Standard;
@@ -169,63 +191,63 @@ UiRingChart& UiRingChart::SetRole(UiRole role)
     return *this;
 }
 
-void UiRingChart::OnStyleChanged()
+void UiChartRing::OnStyleChanged()
 {
     RefreshLayout();
     Refresh();
 }
 
-UiRingChart& UiRingChart::AddSegment(double value, const String& label, Color color)
+UiChartRing& UiChartRing::AddSegment(double value, const String& label, Color color)
 {
-    segments_.Add(UiRingSegment(max(0.0, value), label, color));
+    segments_.Add(UiChartRingSegment(max(0.0, value), label, color));
     Refresh();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetSegments(const Vector<UiRingSegment>& segments)
+UiChartRing& UiChartRing::SetSegments(const Vector<UiChartRingSegment>& segments)
 {
     segments_ = clone(segments);
-    for(UiRingSegment& segment : segments_)
+    for(UiChartRingSegment& segment : segments_)
         segment.value = max(0.0, segment.value);
     Refresh();
     return *this;
 }
 
-UiRingChart& UiRingChart::ClearSegments()
+UiChartRing& UiChartRing::ClearSegments()
 {
     segments_.Clear();
     Refresh();
     return *this;
 }
 
-const UiRingSegment& UiRingChart::GetSegment(int index) const
+const UiChartRingSegment& UiChartRing::GetSegment(int index) const
 {
     ASSERT(index >= 0 && index < segments_.GetCount());
     return segments_[index];
 }
 
-UiRingChart& UiRingChart::SetTotal(double total)
+UiChartRing& UiChartRing::SetTotal(double total)
 {
     explicit_total_ = max(0.0, total);
     Refresh();
     return *this;
 }
 
-double UiRingChart::GetDataSum() const
+double UiChartRing::GetDataSum() const
 {
     double sum = 0.0;
-    for(const UiRingSegment& segment : segments_)
+    for(const UiChartRingSegment& segment : segments_)
         sum += max(0.0, segment.value);
     return sum;
 }
 
-double UiRingChart::GetTotal() const
+double UiChartRing::GetTotal() const
 {
     double sum = GetDataSum();
     return explicit_total_ > 0.0 ? max(explicit_total_, sum) : sum;
 }
 
-UiRingChart& UiRingChart::SetCenterText(const String& text)
+UiChartRing& UiChartRing::SetCenterText(const String& text)
 {
     center_text_ = text;
     RefreshLayout();
@@ -233,7 +255,7 @@ UiRingChart& UiRingChart::SetCenterText(const String& text)
     return *this;
 }
 
-UiRingChart& UiRingChart::ClearCenterText()
+UiChartRing& UiChartRing::ClearCenterText()
 {
     center_text_.Clear();
     RefreshLayout();
@@ -241,7 +263,7 @@ UiRingChart& UiRingChart::ClearCenterText()
     return *this;
 }
 
-UiRingChart& UiRingChart::SetTrackColor(Color c)
+UiChartRing& UiChartRing::SetTrackColor(Color c)
 {
     Style& s = StyleEdit();
     for(int st = 0; st < 4; st++)
@@ -251,7 +273,7 @@ UiRingChart& UiRingChart::SetTrackColor(Color c)
     return *this;
 }
 
-UiRingChart& UiRingChart::SetTextColor(Color c)
+UiChartRing& UiChartRing::SetTextColor(Color c)
 {
     Style& s = StyleEdit();
     for(int st = 0; st < 4; st++)
@@ -261,7 +283,7 @@ UiRingChart& UiRingChart::SetTextColor(Color c)
     return *this;
 }
 
-UiRingChart& UiRingChart::SetSeriesColor(int index, Color c)
+UiChartRing& UiChartRing::SetSeriesColor(int index, Color c)
 {
     if(index < 0 || index >= MAX_SERIES_COLORS || IsNull(c))
         return *this;
@@ -272,56 +294,56 @@ UiRingChart& UiRingChart::SetSeriesColor(int index, Color c)
     return *this;
 }
 
-Color UiRingChart::GetSeriesColor(int index) const
+Color UiChartRing::GetSeriesColor(int index) const
 {
     const Style& s = GetEffectiveStyle();
     int count = clamp(s.series_count, 1, MAX_SERIES_COLORS);
     return s.series[minmax(index, 0, count - 1)];
 }
 
-UiRingChart& UiRingChart::SetThickness(int px)
+UiChartRing& UiChartRing::SetThickness(int px)
 {
     StyleEdit().thickness = max(1, px);
     OnStyleChanged();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetCapRoundness(int percent)
+UiChartRing& UiChartRing::SetCapRoundness(int percent)
 {
     StyleEdit().cap_roundness = clamp(percent, 0, 100);
     OnStyleChanged();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetRingInset(int px)
+UiChartRing& UiChartRing::SetRingInset(int px)
 {
     StyleEdit().ring_inset = max(0, px);
     OnStyleChanged();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetSegmentGap(int px)
+UiChartRing& UiChartRing::SetSegmentGap(int px)
 {
     StyleEdit().segment_gap = max(0, px);
     OnStyleChanged();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetFont(Font f)
+UiChartRing& UiChartRing::SetFont(Font f)
 {
     StyleEdit().font = f;
     OnStyleChanged();
     return *this;
 }
 
-UiRingChart& UiRingChart::SetFontSize(int height)
+UiChartRing& UiChartRing::SetFontSize(int height)
 {
     Font f = GetEffectiveStyle().font;
     f.Height(max(1, height));
     return SetFont(f);
 }
 
-Color UiRingChart::ResolveSegmentColor(int index, const UiRingSegment& segment, bool enabled) const
+Color UiChartRing::ResolveSegmentColor(int index, const UiChartRingSegment& segment, bool enabled) const
 {
     Color c = segment.color;
     if(IsNull(c)) {
@@ -332,7 +354,7 @@ Color UiRingChart::ResolveSegmentColor(int index, const UiRingSegment& segment, 
     return enabled ? c : DisabledColor(c);
 }
 
-Font UiRingChart::ResolveTextFont(const Rect& text_rect, bool& visible) const
+Font UiChartRing::ResolveTextFont(const Rect& text_rect, bool& visible) const
 {
     visible = false;
     Font font = GetEffectiveStyle().font;
@@ -356,7 +378,7 @@ Font UiRingChart::ResolveTextFont(const Rect& text_rect, bool& visible) const
     return font;
 }
 
-UiRingChart::Geometry UiRingChart::BuildGeometry(Size size) const
+UiChartRing::Geometry UiChartRing::BuildGeometry(Size size) const
 {
     const Style& style = GetEffectiveStyle();
     Geometry g;
@@ -380,7 +402,7 @@ UiRingChart::Geometry UiRingChart::BuildGeometry(Size size) const
     g.radius = max(0.0, side / 2.0 - inset - g.thickness / 2.0 - 1.0);
 
     int positive_count = 0;
-    for(const UiRingSegment& segment : segments_)
+    for(const UiChartRingSegment& segment : segments_)
         if(segment.value > 0.0)
             positive_count++;
 
@@ -394,7 +416,7 @@ UiRingChart::Geometry UiRingChart::BuildGeometry(Size size) const
     double cursor = -M_PI / 2.0;
     int positive_index = 0;
     for(int i = 0; i < segments_.GetCount(); i++) {
-        const UiRingSegment& segment = segments_[i];
+        const UiChartRingSegment& segment = segments_[i];
         SegmentGeometry sg;
         sg.index = i;
         sg.value = max(0.0, segment.value);
@@ -437,12 +459,12 @@ UiRingChart::Geometry UiRingChart::BuildGeometry(Size size) const
     return g;
 }
 
-UiRingChart::Geometry UiRingChart::GetGeometry(Size size) const
+UiChartRing::Geometry UiChartRing::GetGeometry(Size size) const
 {
     return BuildGeometry(size);
 }
 
-Image UiRingChart::RenderRaster(const Geometry& g, Color track) const
+Image UiChartRing::RenderRaster(const Geometry& g, Color track) const
 {
     Size raster_size = g.square.GetSize();
     if(raster_size.cx <= 0 || raster_size.cy <= 0)
@@ -459,16 +481,16 @@ Image UiRingChart::RenderRaster(const Geometry& g, Color track) const
     for(const SegmentGeometry& segment : g.segments) {
         if(!segment.visible)
             continue;
-        UiPaintRingArc(p, raster_size, center, g.radius,
-                       segment.start_angle, segment.sweep_angle,
-                       g.thickness, g.cap_roundness,
-                       segment.color, segment.color, false);
+        UiPaintCircularArc(p, raster_size, center, g.radius,
+                           segment.start_angle, segment.sweep_angle,
+                           g.thickness, g.cap_roundness,
+                           segment.color, segment.color, false);
     }
     p.Finish();
     return Image(ib);
 }
 
-void UiRingChart::Paint(Draw& w)
+void UiChartRing::Paint(Draw& w)
 {
     Geometry g = BuildGeometry(GetSize());
     if(g.square.IsEmpty() || g.radius <= 0.0)
@@ -476,11 +498,11 @@ void UiRingChart::Paint(Draw& w)
 
     const Style& style = GetEffectiveStyle();
     StyledState state = IsEnabled() ? ST_NORMAL : ST_DISABLED;
-    Color track = RingChartFace(style.track_palette, state, Color(229, 231, 235));
+    Color track = ChartRingFace(style.track_palette, state, Color(229, 231, 235));
 
-    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-ring-chart");
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-chart-ring");
     policy.allow_scale_from_bucket = false;
-    UiRasterCacheKeyBuilder key("aa/ui-ring-chart");
+    UiRasterCacheKeyBuilder key("aa/ui-chart-ring");
     key.Add(g.square.GetSize())
        .Add(g.thickness)
        .Add(g.cap_roundness)
@@ -506,12 +528,12 @@ void UiRingChart::Paint(Draw& w)
         Size tsz = GetTextSize(center_text_, font);
         int tx = g.text_rect.left + (g.text_rect.GetWidth() - tsz.cx) / 2;
         int ty = g.text_rect.top + (g.text_rect.GetHeight() - tsz.cy) / 2;
-        Color ink = RingChartInk(style.text_palette, state, SColorText());
+        Color ink = ChartRingInk(style.text_palette, state, SColorText());
         w.DrawText(tx, ty, center_text_, font, ink);
     }
 }
 
-Size UiRingChart::GetMinSize() const
+Size UiChartRing::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
     Size tsz = center_text_.IsEmpty() ? Size(0, 0) : GetTextSize(center_text_, style.font);

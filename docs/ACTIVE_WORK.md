@@ -62,6 +62,18 @@ Focused tests:
 
 `UiDraw` audit result: **no architectural rewrite required**. Existing facade already matches benchmark policy and preserves fallback/dirty ownership.
 
+## RING CONTROLS — WINDOWS ACCEPTANCE PENDING
+
+Current ring architecture:
+- `UiProgressRing` = one progressing value; now has semantic `UiRole`, live theme inheritance, canonical demo and exact stable raster caching;
+- `UiChartRing` = several proportional values; automatic sum normalization, optional larger total/remainder track, visible segment gaps and themed series palette;
+- shared ring geometry is now the generic `UiPaintCircularArc` primitive in `UiDraw`; `UiProgressRing` and `UiChartRing` keep their own raster/composition code;
+- stable cache tags are `aa/ui-progress-ring` and `aa/ui-chart-ring`;
+- demos: `examples/UiProgressRingDemo`, `examples/UiChartRingDemo`;
+- focused tests: `Utilities/UiProgressRingRunTests` -> expected `60/0`; `Utilities/UiChartRingRunTests` -> expected `39/0`.
+
+Windows gate for this tranche: build `Ui`, both focused tests and both demos in CLANGx64 Debug + Release. Visually check thick strokes, cap roundness 0/50/100, gradients, Light/Dark role inheritance, ChartRing segment gaps/remainder, and teardown. This cleanup also fixes PropertyEditor commit-time override auto-activation and the intermediate-cap AA seam. Source review is complete; Windows compilation/runtime acceptance is still required.
+
 ## WINDOWS GATE — GARY ONLY
 
 Build/run CLANGx64 Debug + Release:

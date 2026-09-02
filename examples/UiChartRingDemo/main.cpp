@@ -49,13 +49,13 @@ Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
     return f.IsSolid() && !IsNull(f.color) ? f.color : fallback;
 }
 
-class UiRingChartDemo : public TopWindow {
+class UiChartRingDemo : public TopWindow {
 public:
-    typedef UiRingChartDemo CLASSNAME;
+    typedef UiChartRingDemo CLASSNAME;
 
-    UiRingChartDemo()
+    UiChartRingDemo()
     {
-        Title("UiRingChart Demo");
+        Title("UiChartRing Demo");
         Sizeable().Zoomable();
         SetRect(0, 0, DPI(1220), DPI(780));
 
@@ -106,8 +106,8 @@ private:
     void BuildHeader()
     {
         Add(header_);
-        header_.SetTitle("UiRingChart")
-               .SetSubTitle("Several proportional values on the shared exact ring renderer")
+        header_.SetTitle("UiChartRing")
+               .SetSubTitle("Several proportional chart values using UiDraw circular arcs")
                .ShowTitleLine(false)
                .SetContentInset(DPI(8))
                .SetContentCell(header_actions_);
@@ -126,7 +126,7 @@ private:
         Add(preview_);
         preview_.Add(chart_);
         preview_.Add(caption_);
-        caption_.SetText("UiRingChart is composition, not progress: values normalize to their sum unless a larger explicit total leaves remainder track.")
+        caption_.SetText("UiChartRing is composition, not progress: values normalize to their sum unless a larger explicit total leaves remainder track.")
                 .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
@@ -173,13 +173,14 @@ private:
         inspector_model_.AddBoolean("enabled", "Enabled", true, "Behaviour");
         inspector_model_.SetGroupSubtitle("Segments", "ordered proportional values; zero values remain authored but are not painted");
         inspector_model_.SetGroupSubtitle("Data", "automatic normalization or a larger explicit remainder total");
+        inspector_model_.SetGroupSubtitle("Theme", "Standard is multicolour; Subtle/Accent/Alert affect the whole inherited series family");
         inspector_model_.StructureChanged();
     }
 
     void BuildOverrides()
     {
-        UiRingChart probe;
-        UiRingChart::Style base = probe.GetStyle();
+        UiChartRing probe;
+        UiChartRing::Style base = probe.GetStyle();
         MarkOverride(override_model_.AddColor("track.normal", "Normal", FaceColor(base.track_palette, ST_NORMAL, Color(229,231,235)), "Track"));
         MarkOverride(override_model_.AddColor("track.disabled", "Disabled", FaceColor(base.track_palette, ST_DISABLED, Color(241,245,249)), "Track"));
         MarkOverride(override_model_.AddColor("text.normal", "Normal", base.text_palette.ink[ST_NORMAL], "Text Ink"));
@@ -195,7 +196,7 @@ private:
         MarkOverride(override_model_.AddBoolean("font_bold", "Bold", base.font.IsBold(), "Typography"));
         MarkOverride(override_model_.AddBoolean("font_italic", "Italic", base.font.IsItalic(), "Typography"));
         override_model_.SetGroupSubtitle("Series", "theme palette unless a segment supplies its own explicit colour");
-        override_model_.SetGroupSubtitle("Geometry", "shared exact ring stroke geometry");
+        override_model_.SetGroupSubtitle("Geometry", "shared exact circular-arc geometry from UiDraw");
         override_model_.StructureChanged();
     }
 
@@ -228,7 +229,7 @@ private:
         code_mode_.WhenAction = [=] { SelectPage(2); };
         theme_.WhenAction = [=] { ToggleTheme(); };
         help_.WhenAction = [=] {
-            PromptOK("UiRingChart reference demo\n\nUiRingChart represents several proportional values. UiProgressRing remains the separate one-value progress control. Theme overrides stay inherited until activated.");
+            PromptOK("UiChartRing reference demo\n\nUiChartRing represents several proportional values. UiProgressRing remains the separate one-value progress control. Editing any override value now activates its override consistently through PropertyEditor.");
         };
         exit_.WhenAction = [=] { Break(); };
         copy_.WhenAction = [=] { WriteClipboardText(generated_); };
@@ -272,7 +273,7 @@ private:
         ApplyProjection();
     }
 
-    bool ApplyOverrides(UiRingChart::Style& style) const
+    bool ApplyOverrides(UiChartRing::Style& style) const
     {
         bool any = false;
         auto FaceOverride = [&](const char *id, StyledPalette& p, StyledState st) {
@@ -304,7 +305,7 @@ private:
     {
         chart_.ClearCustomStyle();
         chart_.SetRole(ParseRole(AsString(InspectorValue("role", "Standard"))));
-        UiRingChart::Style style = chart_.GetStyle();
+        UiChartRing::Style style = chart_.GetStyle();
         if(ApplyOverrides(style))
             chart_.SetCustomStyle(style);
 
@@ -328,7 +329,7 @@ private:
     {
         String role = AsString(InspectorValue("role", "Standard"));
         String out;
-        out << "UiRingChart chart;\n"
+        out << "UiChartRing chart;\n"
             << "chart.SetRole(UiRole::" << role << ")\n"
             << Format("     .AddSegment(%.3f, \"Design\")\n", (double)InspectorValue("v0", 22.0))
             << Format("     .AddSegment(%.3f, \"Development\")\n", (double)InspectorValue("v1", 46.0))
@@ -343,7 +344,7 @@ private:
         for(int i = 0; i < override_model_.GetCount(); i++)
             if(override_model_[i].override_active) { any = true; break; }
         if(any) {
-            out << "\nUiRingChart::Style style = chart.GetStyle();\n";
+            out << "\nUiChartRing::Style style = chart.GetStyle();\n";
             if(OverrideActive("track.normal")) out << "style.track_palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("track.normal"))) << ");\n";
             if(OverrideActive("track.disabled")) out << "style.track_palette.face[ST_DISABLED] = UiFill::Solid(" << CppColor(Color(OverrideValue("track.disabled"))) << ");\n";
             if(OverrideActive("text.normal")) out << "style.text_palette.ink[ST_NORMAL] = " << CppColor(Color(OverrideValue("text.normal"))) << ";\n";
@@ -390,7 +391,7 @@ private:
     UiBoxLayout header_actions_ { UiDirection::H };
     UiToolButton theme_, help_, exit_;
     UiPanel preview_;
-    UiRingChart chart_;
+    UiChartRing chart_;
     UiLabel caption_;
 
     UiPanel right_;
@@ -411,5 +412,5 @@ private:
 
 GUI_APP_MAIN
 {
-    UiRingChartDemo().Run();
+    UiChartRingDemo().Run();
 }

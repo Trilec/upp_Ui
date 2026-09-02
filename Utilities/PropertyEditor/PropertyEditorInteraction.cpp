@@ -92,13 +92,19 @@ void PropertyEditor::ActivateRow(int display_index)
     const PropertyEditorItem& item = (*model_)[row.model_index];
 
     if(PeIsTextBoolean(item) && item.enabled && item.value_editable && !item.read_only) {
-        BeginTransaction(item.id);
+        const String property_id = item.id;
+        const bool activate_override = item.overrideable && !item.override_active;
+        BeginTransaction(property_id);
         String error;
         bool next = !(bool)item.value;
-        if(model_->Commit(item.id, next, &error)) {
-            WhenCommit(item.id, model_->Find(item.id)->value);
+        if(model_->Commit(property_id, next, &error)) {
+            PropertyEditorItem *committed = model_->Find(property_id);
+            Value committed_value = committed ? committed->value : Value(next);
+            if(activate_override && committed && committed->overrideable && !committed->override_active)
+                WhenOverride(property_id, true);
+            WhenCommit(property_id, committed_value);
             EndTransaction();
-            RefreshValue(item.id);
+            RefreshValue(property_id);
         }
         return;
     }
@@ -247,15 +253,31 @@ void PropertyEditor::ApplyEditorCommit(const Value& value)
     if(!item)
         return;
 
-    BeginTransaction(item->id);
+    const String property_id = item->id;
+    const bool activate_override = item->overrideable && !item->override_active;
+    BeginTransaction(property_id);
     String error;
-    if(model_->Commit(item->id, value, &error)) {
-        syncing_editor_ = true;
-        active_editor_->Configure(*item);
-        active_editor_->SetEditorValue(item->value, item->mixed);
-        syncing_editor_ = false;
+    if(model_->Commit(property_id, value, &error)) {
+        item = model_->Find(property_id);
+        Value committed_value = item ? item->value : value;
+        if(active_editor_ && item) {
+            syncing_editor_ = true;
+            active_editor_->Configure(*item);
+            active_editor_->SetEditorValue(item->value, item->mixed);
+            syncing_editor_ = false;
+        }
+
+        // Any successfully authored value activates its override, regardless
+        // of whether the editor was inline, dropdown, popup, font or colour.
+        // Do this only after the editor has been synchronized so a host that
+        // rebuilds the model in WhenOverride cannot invalidate active_editor_
+        // before we finish touching it.
+        item = model_ ? model_->Find(property_id) : nullptr;
+        if(activate_override && item && item->overrideable && !item->override_active)
+            WhenOverride(property_id, true);
+
         dispatching_editor_callback_ = true;
-        WhenCommit(item->id, item->value);
+        WhenCommit(property_id, committed_value);
         dispatching_editor_callback_ = false;
         EndTransaction();
         Refresh();

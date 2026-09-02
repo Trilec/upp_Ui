@@ -32,7 +32,7 @@ static Color FaceColor(const StyledPalette& palette, StyledState state)
 static void TestDataContract(TestCtx& t)
 {
     t.Section("Data contract");
-    UiRingChart chart;
+    UiChartRing chart;
     t.Expect(chart.GetSegmentCount() == 0, "chart starts empty");
     t.Expect(Near(chart.GetDataSum(), 0.0) && Near(chart.GetTotal(), 0.0), "empty chart has zero sum and total");
 
@@ -63,11 +63,11 @@ static void TestDataContract(TestCtx& t)
 static void TestGeometryAndGaps(TestCtx& t)
 {
     t.Section("Geometry and visible gaps");
-    UiRingChart chart;
+    UiChartRing chart;
     chart.SetThickness(20).SetRingInset(4).SetCapRoundness(0).SetSegmentGap(0);
     chart.AddSegment(25).AddSegment(35).AddSegment(40);
 
-    UiRingChart::Geometry g = chart.GetGeometry(Size(180, 120));
+    UiChartRing::Geometry g = chart.GetGeometry(Size(180, 120));
     t.Expect(g.square == RectC(30, 0, 120, 120), "non-square allocation centers a square chart viewport");
     t.Expect(g.radius > 0.0 && g.thickness == 20, "ring geometry resolves radius and thickness");
     t.Expect(Near(g.data_sum, 100.0) && Near(g.total, 100.0) && Near(g.remainder, 0.0), "geometry exposes normalized data totals");
@@ -77,12 +77,12 @@ static void TestGeometryAndGaps(TestCtx& t)
     double end0 = g.segments[0].start_angle + g.segments[0].sweep_angle;
     t.Expect(Near(end0, g.segments[1].start_angle), "flat zero-gap segments meet exactly at their centerline boundary");
     double sweep_sum = 0.0;
-    for(const UiRingChart::SegmentGeometry& sg : g.segments)
+    for(const UiChartRing::SegmentGeometry& sg : g.segments)
         sweep_sum += sg.sweep_angle;
     t.Expect(Near(sweep_sum, 2.0 * M_PI), "flat zero-gap full composition covers the complete circle");
 
     chart.SetCapRoundness(100);
-    UiRingChart::Geometry rounded = chart.GetGeometry(Size(120, 120));
+    UiChartRing::Geometry rounded = chart.GetGeometry(Size(120, 120));
     double rounded_end0 = rounded.segments[0].start_angle + rounded.segments[0].sweep_angle;
     double centerline_gap = rounded.segments[1].start_angle - rounded_end0;
     t.Expect(centerline_gap > 0.0, "round zero-gap segments reserve centerline space for their cap extension");
@@ -90,7 +90,7 @@ static void TestGeometryAndGaps(TestCtx& t)
              "round zero-gap centerline separation compensates two half-thickness caps");
 
     chart.SetSegmentGap(6);
-    UiRingChart::Geometry spaced = chart.GetGeometry(Size(120, 120));
+    UiChartRing::Geometry spaced = chart.GetGeometry(Size(120, 120));
     double spaced_end0 = spaced.segments[0].start_angle + spaced.segments[0].sweep_angle;
     double spaced_centerline = spaced.segments[1].start_angle - spaced_end0;
     t.Expect(spaced_centerline > centerline_gap, "positive segment gap increases visual separation");
@@ -98,7 +98,7 @@ static void TestGeometryAndGaps(TestCtx& t)
              "authored gap is measured between painted rounded ends, not centerlines");
 
     chart.SetTotal(125.0);
-    UiRingChart::Geometry remainder = chart.GetGeometry(Size(120, 120));
+    UiChartRing::Geometry remainder = chart.GetGeometry(Size(120, 120));
     t.Expect(Near(remainder.total, 125.0) && Near(remainder.remainder, 25.0), "explicit larger total leaves themed remainder track");
 }
 
@@ -111,12 +111,12 @@ static void TestStyleThemeAndText(TestCtx& t)
     light.mode = UiThemeMode::Light;
     UiTheme::Set(light);
 
-    UiRingChart chart;
+    UiChartRing chart;
     chart.SetRole(UiRole::Alert).AddSegment(60).AddSegment(40, "Authored", Color(1, 2, 3));
     t.Expect(chart.GetRole() == UiRole::Alert, "chart stores semantic role");
 
     UiProgressBar::Style expected = UiTheme::ResolveProgressBar(UiRole::Alert);
-    UiRingChart::Geometry g = chart.GetGeometry(Size(120, 120));
+    UiChartRing::Geometry g = chart.GetGeometry(Size(120, 120));
     t.Expect(g.segments[0].color == FaceColor(expected.fill_palette, ST_NORMAL), "first inherited series follows role primary colour");
     t.Expect(g.segments[1].color == Color(1, 2, 3), "per-segment authored colour overrides the series palette");
 
@@ -135,8 +135,28 @@ static void TestStyleThemeAndText(TestCtx& t)
     g = chart.GetGeometry(Size(120, 120));
     t.Expect(g.segments[0].color == FaceColor(expected.fill_palette, ST_NORMAL), "clearing local chart style restores role-driven series colour");
 
+    UiChartRing roles;
+    roles.AddSegment(1).AddSegment(1).AddSegment(1);
+    roles.SetRole(UiRole::Standard);
+    UiChartRing::Geometry standard = roles.GetGeometry(Size(120, 120));
+    roles.SetRole(UiRole::Accent);
+    UiChartRing::Geometry accent = roles.GetGeometry(Size(120, 120));
+    t.Expect(accent.segments[1].color != standard.segments[1].color ||
+             accent.segments[2].color != standard.segments[2].color,
+             "Accent role recolours the inherited series beyond the first segment");
+    t.Expect(accent.segments[0].color != accent.segments[1].color,
+             "Accent role uses tonal shades rather than one repeated colour");
+    roles.SetRole(UiRole::Alert);
+    UiChartRing::Geometry alert = roles.GetGeometry(Size(120, 120));
+    t.Expect(alert.segments[1].color != accent.segments[1].color,
+             "Alert role retints the inherited series as a semantic family");
+    roles.SetRole(UiRole::Subtle);
+    UiChartRing::Geometry subtle = roles.GetGeometry(Size(120, 120));
+    t.Expect(subtle.segments[1].color != standard.segments[1].color,
+             "Subtle role applies a muted inherited series family");
+
     chart.SetCenterText("Team").SetFontSize(40);
-    UiRingChart::Geometry text = chart.GetGeometry(Size(90, 90));
+    UiChartRing::Geometry text = chart.GetGeometry(Size(90, 90));
     t.Expect(text.text_visible && text.text_font_height > 0 && text.text_font_height <= 40, "center text fits down without growing past authored size");
     chart.ClearCenterText();
     t.Expect(chart.GetCenterText().IsEmpty(), "center text can be cleared independently of data");
@@ -151,9 +171,9 @@ static void TestStyleThemeAndText(TestCtx& t)
 static void TestRasterCache(TestCtx& t)
 {
     t.Section("Stable raster cache");
-    UiRasterCache::ClearTag("aa/ui-ring-chart");
+    UiRasterCache::ClearTag("aa/ui-chart-ring");
 
-    UiRingChart chart;
+    UiChartRing chart;
     chart.AddSegment(20).AddSegment(30).AddSegment(50).SetCenterText("100");
     chart.SetRect(0, 0, 139, 139);
     ImageDraw draw(139, 139);
@@ -176,6 +196,6 @@ CONSOLE_APP_MAIN
     TestStyleThemeAndText(t);
     TestRasterCache(t);
 
-    Cout() << "\nUIRINGCHART_SUMMARY checks=" << t.checks << " failed=" << t.fails << "\n";
+    Cout() << "\nUICHARTRING_SUMMARY checks=" << t.checks << " failed=" << t.fails << "\n";
     SetExitCode(t.fails ? 1 : 0);
 }

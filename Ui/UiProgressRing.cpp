@@ -1,7 +1,6 @@
 #include <Ui/UiProgressRing.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiTheme.h>
-#include <Ui/UiRingDraw.h>
 #include <Ui/UiDraw.h>
 #include <cmath>
 
@@ -34,6 +33,35 @@ Color UiRingInkColor(const StyledPalette& palette, StyledState state, Color fall
 {
     Color c = palette.ink[state];
     return IsNull(c) ? fallback : c;
+}
+
+Image UiRenderProgressRingRaster(Size raster_size,
+                                 double radius,
+                                 double start_angle,
+                                 double sweep_angle,
+                                 int thickness,
+                                 int cap_roundness,
+                                 Color track,
+                                 Color progress_start,
+                                 Color progress_end,
+                                 bool gradient)
+{
+    if(raster_size.cx <= 0 || raster_size.cy <= 0)
+        return Image();
+
+    ImageBuffer ib(raster_size);
+    ib.SetKind(IMAGE_ALPHA);
+    Fill(~ib, RGBAZero(), ib.GetLength());
+
+    Pointf center(raster_size.cx / 2.0, raster_size.cy / 2.0);
+    BufferPainter p(ib, MODE_ANTIALIASED);
+    if(radius > 0.0 && thickness > 0 && !IsNull(track))
+        p.Circle(center, radius).Stroke((double)thickness, track);
+    UiPaintCircularArc(p, raster_size, center, radius,
+                       start_angle, sweep_angle, thickness, cap_roundness,
+                       progress_start, progress_end, gradient);
+    p.Finish();
+    return Image(ib);
 }
 
 } // namespace

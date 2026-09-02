@@ -15,6 +15,8 @@
     - Keep the established Ui drawing helpers intact while routing the common
       solid styled-surface path through the shared raster cache when antialiased
       rounded geometry would otherwise allocate a fresh ImageBuffer every Paint.
+    - Own reusable low-level Ui drawing primitives that are not control-specific,
+      including exact circular-arc painting shared by progress and chart controls.
 
     Rendering policy
     - Flat/non-AA surfaces remain direct Draw.
@@ -205,6 +207,15 @@ inline void UiPaintStyledSurface(Draw& w,
     if(!foreground_handled)
         UiPaintStyledForeground(w, outer, palette, metrics, skin, st, has_focus);
 }
+
+// Exact AA circular-arc stroke. Cap roundness is 0..100 and is always relative
+// to stroke thickness. When gradient is true, colour interpolates along the arc.
+// This is a drawing primitive only; callers own values, tracks, caching and text.
+void UiPaintCircularArc(Painter& p, Size raster_size,
+                        const Pointf& center, double radius,
+                        double start_angle, double sweep_angle,
+                        int thickness, int cap_roundness,
+                        Color start, Color end, bool gradient);
 
 } // namespace Upp
 

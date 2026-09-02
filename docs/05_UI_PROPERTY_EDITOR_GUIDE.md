@@ -171,6 +171,14 @@ authored values; `override_active` identifies the active local recipe and
 `WhenOverride(id, active)` asks the host to perform that state change. Inactive
 saved values may remain in the model without affecting Preview.
 
+A successful authored value commit to an inactive `overrideable` item requests
+`WhenOverride(id, true)` automatically. This rule is editor-independent: inline
+numeric fields, Choice/Dropdown, Font, Color and other popup/custom editors must
+all behave the same way. Hosts still own the state change itself by updating
+`override_active`/inheritance in `WhenOverride`; PropertyEditor does not silently
+mutate host override state. Explicitly clicking the override action remains the
+way to turn an already-active override off.
+
 An ordinary `resettable` property instead uses `default_value` and emits
 `WhenReset`. It does not become a theme override merely because it has a default.
 Group summaries can report local/total override counts without scanning the
@@ -213,6 +221,8 @@ id. `SelectProperty` and `GetSelectedPropertyId` provide programmatic selection.
 
 - `Utilities/PropertyEditorDemo` is the complete interactive editor matrix.
 - `Utilities/PropertyEditorTests` protects legacy/regression behavior.
+- `Utilities/PropertyEditorOverrideCommitTest` specifically protects generic
+  commit-time override activation through a real Choice/UiDropdown editor.
 - `Utilities/PropertyEditorV1RunTests` covers v1 interaction and stress rules.
 - `Utilities/PropertyEditorCoreProbe` proves the headless package boundary.
 

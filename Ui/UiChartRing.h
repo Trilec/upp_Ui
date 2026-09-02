@@ -1,5 +1,5 @@
-#ifndef _Ui_UiRingChart_h_
-#define _Ui_UiRingChart_h_
+#ifndef _Ui_UiChartRing_h_
+#define _Ui_UiChartRing_h_
 
 /*
     Author
@@ -8,7 +8,7 @@
     License
     - Apache License 2.0, matching this repository's LICENSE file.
 
-    UiRingChart
+    UiChartRing
     ===========
 
     Purpose
@@ -16,7 +16,7 @@
 
     Intent
     - Keep composition data separate from UiProgressRing's one-value progress
-      semantics while sharing the exact ring renderer.
+      semantics while sharing UiDraw's exact circular-arc primitive.
     - Normalize against the segment sum by default; an explicit larger total
       leaves the remainder visible as themed track.
     - Keep V1 presentation-only: no selection, legends or per-segment child
@@ -31,19 +31,19 @@ namespace Upp {
 
 enum class UiRole : byte;
 
-struct UiRingSegment : Moveable<UiRingSegment> {
+struct UiChartRingSegment : Moveable<UiChartRingSegment> {
     double value = 0.0;
     String label;
     Color  color = Null;
 
-    UiRingSegment() = default;
-    UiRingSegment(double v, const String& l = String(), Color c = Null)
+    UiChartRingSegment() = default;
+    UiChartRingSegment(double v, const String& l = String(), Color c = Null)
         : value(v), label(l), color(c) {}
 };
 
-class UiRingChart : public Ctrl {
+class UiChartRing : public Ctrl {
 public:
-    typedef UiRingChart CLASSNAME;
+    typedef UiChartRing CLASSNAME;
     static constexpr int MAX_SERIES_COLORS = 8;
 
     struct Style : ChStyle<Style> {
@@ -97,44 +97,44 @@ public:
 
     static const Style& StyleDefault();
 
-    UiRingChart();
+    UiChartRing();
 
-    UiRingChart& SetCustomStyle(const Style& s);
-    UiRingChart& ClearCustomStyle();
+    UiChartRing& SetCustomStyle(const Style& s);
+    UiChartRing& ClearCustomStyle();
     bool         HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetCustomStyle() const { return style_; }
 
-    UiRingChart& SetRole(UiRole role);
+    UiChartRing& SetRole(UiRole role);
     UiRole       GetRole() const { return role_; }
 
-    UiRingChart& AddSegment(double value, const String& label = String(), Color color = Null);
-    UiRingChart& SetSegments(const Vector<UiRingSegment>& segments);
-    UiRingChart& ClearSegments();
+    UiChartRing& AddSegment(double value, const String& label = String(), Color color = Null);
+    UiChartRing& SetSegments(const Vector<UiChartRingSegment>& segments);
+    UiChartRing& ClearSegments();
     int          GetSegmentCount() const { return segments_.GetCount(); }
-    const UiRingSegment& GetSegment(int index) const;
+    const UiChartRingSegment& GetSegment(int index) const;
 
-    UiRingChart& SetTotal(double total);
-    UiRingChart& ClearTotal() { return SetTotal(0.0); }
+    UiChartRing& SetTotal(double total);
+    UiChartRing& ClearTotal() { return SetTotal(0.0); }
     bool         HasExplicitTotal() const { return explicit_total_ > 0.0; }
     double       GetExplicitTotal() const { return explicit_total_; }
     double       GetDataSum() const;
     double       GetTotal() const;
 
-    UiRingChart& SetCenterText(const String& text);
-    UiRingChart& ClearCenterText();
+    UiChartRing& SetCenterText(const String& text);
+    UiChartRing& ClearCenterText();
     String       GetCenterText() const { return center_text_; }
 
-    UiRingChart& SetTrackColor(Color c);
-    UiRingChart& SetTextColor(Color c);
-    UiRingChart& SetSeriesColor(int index, Color c);
+    UiChartRing& SetTrackColor(Color c);
+    UiChartRing& SetTextColor(Color c);
+    UiChartRing& SetSeriesColor(int index, Color c);
     Color        GetSeriesColor(int index) const;
-    UiRingChart& SetThickness(int px);
-    UiRingChart& SetCapRoundness(int percent);
-    UiRingChart& SetRingInset(int px);
-    UiRingChart& SetSegmentGap(int px);
-    UiRingChart& SetFont(Font f);
-    UiRingChart& SetFontSize(int height);
+    UiChartRing& SetThickness(int px);
+    UiChartRing& SetCapRoundness(int percent);
+    UiChartRing& SetRingInset(int px);
+    UiChartRing& SetSegmentGap(int px);
+    UiChartRing& SetFont(Font f);
+    UiChartRing& SetFontSize(int height);
 
     int  GetThickness() const { return max(1, GetEffectiveStyle().thickness); }
     int  GetCapRoundness() const { return clamp(GetEffectiveStyle().cap_roundness, 0, 100); }
@@ -157,7 +157,7 @@ private:
 
     Geometry BuildGeometry(Size size) const;
     Font ResolveTextFont(const Rect& text_rect, bool& visible) const;
-    Color ResolveSegmentColor(int index, const UiRingSegment& segment, bool enabled) const;
+    Color ResolveSegmentColor(int index, const UiChartRingSegment& segment, bool enabled) const;
     Image RenderRaster(const Geometry& g, Color track) const;
 
     Style style_;
@@ -166,7 +166,7 @@ private:
     bool has_custom_style_ = false;
     UiRole role_;
 
-    Vector<UiRingSegment> segments_;
+    Vector<UiChartRingSegment> segments_;
     double explicit_total_ = 0.0;
     String center_text_;
 };

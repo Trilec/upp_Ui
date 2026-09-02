@@ -37,8 +37,8 @@
       Ctrl integer callback ids are byte offsets, not arbitrary identifiers.
     - 2026-08: replaced absolute cap radius with 0..100 percent cap roundness;
       cap geometry now scales automatically with stroke thickness.
-    - 2026-09: added semantic UiRole theme resolution and shared UiRingDraw;
-      stable determinate ring rasters now use the shared exact UiRasterCache.
+    - 2026-09: added semantic UiRole theme resolution; stable determinate ring
+      rasters use UiRasterCache and shared circular-arc painting lives in UiDraw.
 */
 
 #include <CtrlCore/CtrlCore.h>
