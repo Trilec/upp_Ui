@@ -5,50 +5,71 @@ This file is recovery state, not project history.
 
 ## CURRENT
 
-Task: **UiGraph hierarchy H1 — Backdrop/Subgraph model shell, Windows acceptance pending**.
+BASE: `c58cdf338b835540a58155759dd7474d8169f0c5`
+TASK: **UiGraph hierarchy H2 — active-scope projection/navigation and Backdrop view shell**
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING**
+PUBLISHED: `f126f6d40639c35b5ede101c70ed4b6521f22903` source checkpoint
+VALIDATION: complete-file/source review passed; Windows CLANGx64 Debug/Release pending
 
 Canonical architecture: `docs/23_UIGRAPH_BACKDROP_SUBGRAPH_ARCHITECTURE.md`.
 
-H1 implements:
-- stable root/child `UiGraphScopeRef` ownership while keeping globally stable node IDs;
+H1 remains the model foundation:
+- stable root/child `UiGraphScopeRef` ownership with globally stable node IDs;
 - true Subgraph child scopes represented by an ordinary parent `UiGraphNode`;
-- authoritative Subgraph inputs/outputs mirrored to the parent group node and child `Group Inputs` / `Group Outputs` nodes;
-- hard same-scope edge invariant: parent edges cannot address child endpoints;
-- nested Subgraphs with cycle rejection;
+- authoritative Subgraph inputs/outputs mirrored to parent group and child boundary nodes;
+- hard same-scope edge invariant; nested Subgraphs with cycle rejection;
 - separate presentation-only `UiGraphBackdrop` collection;
-- schema 3 hierarchy data appended at model level; existing `UiGraphNode` stream layout is unchanged;
-- schema-2 root-only migration assigns existing nodes to root with no synthetic groups/backdrops;
-- focused `Utilities/UiGraphHierarchyTest` contract test.
+- schema 3 hierarchy data with schema-2 root-only migration;
+- `Utilities/UiGraphHierarchyTest` contract coverage.
 
-Published sequence:
-- architecture doc: `855308d1f048c6a619ac4bc0211ef4a11b159b8c`;
-- H1 API shell: `76207450cf5ea0b22766bc2058e4faac9ce0b8fc`;
-- H1 model implementation: `7ad9574e49ce214e17e1403b796157bc077c4a2f`;
-- U++ VectorMap index correction: `c163effee4480aca5930dc58a9131249af36e989`;
-- hierarchy contract test: `060917668c5182f45cec108ceb3ae10452482e50`.
+H2 now integrates:
+- `UiNodeGraph` active scope, `SetScope`, Enter/Exit, path and `WhenScopeChanged`;
+- scope-local Fit, selection, data selection, layout, geometry and spatial indexing;
+- Backdrop paint layer fixed below edges/nodes;
+- ordinary group-node `SetNodeCtrl()` support preserved;
+- model switches normalize hierarchy view state to root so stale child scopes cannot resurrect;
+- focused `Utilities/UiNodeGraphHierarchyViewTest` coverage;
+- real package membership for the H2 source slice; `.preview/.next` staging files removed.
 
-## VALIDATION
+Recovery structure during Windows acceptance:
+- `UiGraph/UiNodeGraphBase.h` is the exact pre-H2 validated public header blob;
+- `UiGraph/UiNodeGraph.h` is a narrow H2 declaration wrapper around that base;
+- `UiGraph/UiNodeGraphBase.inc` and `UiGraph/UiNodeGraphRender.inc` remain retained recovery slices;
+- `UiGraph/UiNodeGraphSpatialH2.cpp` is the only packaged spatial translation unit;
+- wrapper/recovery structure may be collapsed after the Windows gate, not before.
 
-H1 has not yet been Windows compiled/run.
-Gary gate: CLANGx64 Debug + Release build `Ui`, `Utilities/UiGraphHierarchyTest`, `Utilities/UiGraphTest`; run both tests with zero failures and preserve exact summaries.
+## SOURCE REVIEW
+
+- package compiles one spatial implementation only;
+- active-scope spatial rebuild enumerates `GetScopeNodes()` / `GetScopeEdges()`, not hidden descendants;
+- Enter/Exit changes view scope only and does not rewrite model topology;
+- root/child Backdrops remain model-independent presentation objects;
+- selection and Fit reject/filter out-of-scope objects;
+- group nodes remain ordinary Ctrl-bearing nodes;
+- existing render/live-camera policy is preserved rather than rewritten;
+- temporary package/header preview artifacts are removed from the checkpoint.
+
+Supervisor environment has no Windows U++ toolchain, so no build/run claim is made here.
 
 Existing Graph performance remains **OPEN**:
-- retained live pan is accepted structurally (`geometry_us=0` inside coverage);
-- 16-node Reference improved materially but is still above desired frame budget in Debug;
-- flat 10k exact geometry preparation/node paint remains far too slow and requires a later dedicated performance tranche.
-Do not call Graph performance closed.
+- retained live pan is structurally accepted (`geometry_us=0` inside coverage);
+- 16-node Reference still requires Release acceptance evidence;
+- flat 10k exact preparation/node paint remains a later dedicated performance tranche.
 
-## NEXT
+## NEXT — GARY COMBINED H1/H2 GATE
 
-If H1 Windows gate is clean, implement H2 immediately:
-- `UiNodeGraph` active scope + Enter/Exit navigation;
-- scope-local geometry/spatial/paint/hit/selection/Fit;
-- Backdrop paint layer below edges/nodes;
-- preserve ordinary group-node `SetNodeCtrl()` support (`UiChartRing`, `UiProgressRing`, etc.);
-- separate hierarchy demo/test; do not disturb the 16-node Reference performance fixture.
+Build CLANGx64 Debug + Release:
+- `Ui`
+- `Utilities/UiGraphHierarchyTest`
+- `Utilities/UiNodeGraphHierarchyViewTest`
+- `Utilities/UiGraphTest`
 
-H3 later: Backdrop editing, interface editing helpers, Collapse Selected into Subgraph, Move to Parent/Ungroup.
-H4 optional later: Nuke-style inline group view/peek.
+Run both hierarchy tests and `UiGraphTest` in Debug + Release with exit 0 / zero failures.
+Report exact summary lines, compiler errors if any, and a brief manual smoke check of root -> child -> parent navigation and Backdrop layering.
+Gary may make only minor obvious compile/API corrections; no hierarchy/model/render architectural changes.
+
+If the gate passes, close H2 and proceed to H3 editing ergonomics:
+Backdrop selection/move/resize, explicit group Enter gesture, interface editing helpers, then Collapse Selected into Subgraph.
 
 ## RECOVERY RULE
 
