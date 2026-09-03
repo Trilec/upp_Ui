@@ -198,6 +198,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         int64 bind_us = 0;
         int64 attach_us = 0;
         int64 view_us = 0;
+        int64 flush_us = 0;
         int64 sync_us = 0;
 
         d.syncing_editors_ = true;
@@ -218,6 +219,8 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
             }
             ensure_us = usecs() - stage;
 
+            d.graph_.BeginViewUpdate();
+
             stage = usecs();
             d.graph_.SetModel(d.scale_model_);
             bind_us = usecs() - stage;
@@ -230,24 +233,33 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
                 d.graph_.CenterOnNode(d.selected_node_);
             }
             view_us = usecs() - stage;
+
+            stage = usecs();
+            d.graph_.EndViewUpdate();
+            flush_us = usecs() - stage;
         }
         else {
-            // Scale mode already disabled first-paint auto-fit. Keep it disabled
-            // until the small internal model is bound, then fit that model once
-            // explicitly below. Re-enabling it here would RefreshLayout() while
-            // the 10k model is still active and redundantly fit/prepare that scene.
+            // Bind, fit and selection form one view transaction. Reference
+            // controls attach only after the final exact geometry exists, so
+            // SetNodeCtrl never forces an intermediate 10k/reference frame.
+            d.graph_.BeginViewUpdate();
+
             int64 stage = usecs();
             d.graph_.UseInternalModel();
             bind_us = usecs() - stage;
 
             stage = usecs();
-            d.AttachReferenceControls();
-            attach_us = usecs() - stage;
-
-            stage = usecs();
             d.graph_.FitToGraph();
             d.SelectReferenceStartNode();
             view_us = usecs() - stage;
+
+            stage = usecs();
+            d.graph_.EndViewUpdate();
+            flush_us = usecs() - stage;
+
+            stage = usecs();
+            d.AttachReferenceControls();
+            attach_us = usecs() - stage;
         }
 
         d.syncing_editors_ = false;
@@ -266,15 +278,18 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         d.diag_peak_switch_us_ = max(d.diag_peak_switch_us_, d.diag_last_switch_us_);
         d.diag_last_interaction_ = d.diag_last_switch_label_;
 
-        RLOG(Format("UIGRAPH_DEMO_SWITCH_STAGE mode=%s ensure_us=%lld bind_us=%lld attach_us=%lld view_us=%lld final_sync_us=%lld total_us=%lld",
+        RLOG(Format("UIGRAPH_DEMO_SWITCH_STAGE mode=%s ensure_us=%lld bind_us=%lld attach_us=%lld view_us=%lld flush_us=%lld final_sync_us=%lld total_us=%lld",
                     scale ? "10k" : "reference",
                     (long long)ensure_us, (long long)bind_us, (long long)attach_us,
-                    (long long)view_us, (long long)sync_us, (long long)elapsed));
-        RLOG(Format("UIGRAPH_DEMO_SWITCH_PROFILE mode=%s elapsed_us=%lld nodes=%d edges=%d prepared=%d/%d geometry_us=%lld",
+                    (long long)view_us, (long long)flush_us, (long long)sync_us,
+                    (long long)elapsed));
+        RLOG(Format("UIGRAPH_DEMO_SWITCH_PROFILE mode=%s elapsed_us=%lld nodes=%d edges=%d prepared=%d/%d geometry_us=%lld geometry_builds=%d spatial_builds=%d",
                     scale ? "10k" : "reference", (long long)elapsed,
                     d.graph_.Model().GetNodeCount(), d.graph_.Model().GetEdgeCount(),
                     d.graph_.GetPreparedNodeCount(), d.graph_.GetPreparedEdgeCount(),
-                    (long long)d.graph_.GetLastGeometryPrepareUsecs()));
+                    (long long)d.graph_.GetLastGeometryPrepareUsecs(),
+                    d.graph_.GetLastViewUpdateGeometryBuildCount(),
+                    d.graph_.GetLastViewUpdateSpatialBuildCount()));
         schedule_diagnostics();
     };
 

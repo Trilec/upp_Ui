@@ -12,4 +12,10 @@
 #undef MouseMove
 #undef UpdatePan
 
+// Exact fallback/settle work for the active camera must use the same
+// screen-error geometry LOD as programmatic view changes. Otherwise the first
+// hover or wheel-settle at fit-all could silently rebuild all micro nodes through
+// the retained rich geometry path.
+#define PrepareGeometry PrepareViewGeometry
 #include "UiNodeGraphView.inc"
+#undef PrepareGeometry

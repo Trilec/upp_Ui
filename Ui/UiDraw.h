@@ -17,6 +17,9 @@
       rounded geometry would otherwise allocate a fresh ImageBuffer every Paint.
     - Own reusable low-level Ui drawing primitives that are not control-specific,
       including exact circular-arc painting shared by progress and chart controls.
+    - Provide an opt-in, screen-error based curve tessellation helper so callers
+      can reduce explicit path segments when projected geometry is small without
+      changing the default rendering path for controls that do not opt in.
 
     Rendering policy
     - Flat/non-AA surfaces remain direct Draw.
@@ -27,6 +30,9 @@
       implementation as an explicit fallback.
     - Dirty-region ownership is unchanged; the cache replaces repeated primitive
       rasterisation, not Ctrl invalidation or viewport policy.
+    - Geometry LOD is caller-owned and opt-in. UiArcSegmentsForPixels() only
+      answers how many explicit segments are needed for a requested screen-space
+      error; it does not globally alter Painter, Draw, styles or hit testing.
 
     Migration
     - UiDrawBase.h is the byte-for-byte pre-facade implementation. It is internal
@@ -207,6 +213,18 @@ inline void UiPaintStyledSurface(Draw& w,
     if(!foreground_handled)
         UiPaintStyledForeground(w, outer, palette, metrics, skin, st, has_focus);
 }
+
+// Opt-in explicit-geometry LOD helper.
+//
+// radius_px and max_error_px are measured in final screen pixels. sweep_angle is
+// in radians. The result is the smallest segment count whose circular chord
+// sagitta stays within max_error_px, clamped to [min_segments, max_segments].
+// Passing max_error_px <= 0 requests max_segments, which is the simple opt-out
+// path for callers that need their authored/high-detail tessellation unchanged.
+int UiArcSegmentsForPixels(double radius_px, double sweep_angle,
+                           double max_error_px = 0.40,
+                           int min_segments = 1,
+                           int max_segments = 64);
 
 // Exact AA circular-arc stroke. Cap roundness is 0..100 and is always relative
 // to stroke thickness. When gradient is true, colour interpolates along the arc.

@@ -62,14 +62,15 @@ UiNodeGraph& UiNodeGraph::SetScope(UiGraphScopeRef scope)
     active_scope_ = scope;
     InvalidateSpatialIndex();
     EnsureSpatialIndex();
-    InvalidateGeometry();
-    PrepareGeometry();
-    UpdateAttachedCtrls();
-    Refresh();
 
-    if(had_selection)
-        WhenSelection();
-    WhenScopeChanged(scope);
+    if(!DeferViewUpdate(false, had_selection)) {
+        PrepareGeometry();
+        UpdateAttachedCtrls();
+        Refresh();
+        if(had_selection)
+            WhenSelection();
+    }
+    QueueScopeChanged(scope);
     return *this;
 }
 
@@ -81,8 +82,11 @@ bool UiNodeGraph::EnterSubgraph(UiGraphNodeRef group_node)
     UiGraphScopeRef child = model_->GetChildScope(group_node);
     if(!child.IsValid() || !model_->ScopeExists(child))
         return false;
+
+    BeginViewUpdate();
     SetScope(child);
     FitToGraph(false);
+    EndViewUpdate();
     return GetScope() == child;
 }
 
@@ -93,8 +97,11 @@ bool UiNodeGraph::ExitScope()
     UiGraphScopeRef parent = model_->GetParentScope(GetScope());
     if(!parent.IsValid())
         return false;
+
+    BeginViewUpdate();
     SetScope(parent);
     FitToGraph(false);
+    EndViewUpdate();
     return GetScope() == parent;
 }
 
@@ -149,7 +156,10 @@ UiNodeGraph& UiNodeGraph::FitToGraph(bool selection_only)
     ClampZoom();
     pan_ = Pointf(sz.cx * 0.5 - (minx + maxx) * 0.5 * zoom_,
                   sz.cy * 0.5 - (miny + maxy) * 0.5 * zoom_);
-    InvalidateGeometry();
+
+    if(DeferViewUpdate(true, false))
+        return *this;
+
     PrepareGeometry();
     UpdateAttachedCtrls();
     Refresh();
@@ -166,7 +176,10 @@ UiNodeGraph& UiNodeGraph::CenterOnNode(UiGraphNodeRef ref)
     Size sz = GetSize();
     pan_ = Pointf(sz.cx * 0.5 - (pos.x + node->size.cx * 0.5) * zoom_,
                   sz.cy * 0.5 - (pos.y + node->size.cy * 0.5) * zoom_);
-    InvalidateGeometry();
+
+    if(DeferViewUpdate(true, false))
+        return *this;
+
     PrepareGeometry();
     UpdateAttachedCtrls();
     Refresh();
@@ -188,7 +201,10 @@ UiNodeGraph& UiNodeGraph::SelectNode(UiGraphNodeRef node, bool additive)
         selected_nodes_.Remove(i);
     else
         selected_nodes_.FindAdd(node.id);
-    InvalidateGeometry();
+
+    if(DeferViewUpdate(false, true))
+        return *this;
+
     PrepareGeometry();
     damage |= GetSelectionDamage() | GetNodeDamage(node);
     RefreshDamage(damage);
@@ -211,7 +227,10 @@ UiNodeGraph& UiNodeGraph::SelectEdge(UiGraphEdgeRef edge, bool additive)
         selected_edges_.Remove(i);
     else
         selected_edges_.FindAdd(edge.id);
-    InvalidateGeometry();
+
+    if(DeferViewUpdate(false, true))
+        return *this;
+
     PrepareGeometry();
     damage |= GetSelectionDamage() | GetEdgeDamage(edge);
     RefreshDamage(damage);
@@ -251,7 +270,10 @@ void UiNodeGraph::SetData(const Value& v)
                 selected_nodes_.FindAdd(found.id);
         }
     }
-    InvalidateGeometry();
+
+    if(DeferViewUpdate(false, true))
+        return;
+
     PrepareGeometry();
     damage |= GetSelectionDamage();
     RefreshDamage(damage);

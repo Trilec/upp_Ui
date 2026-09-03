@@ -104,6 +104,37 @@ Image UiCircularArcAngularGradient(Size size, Pointf center,
 
 } // namespace
 
+int UiArcSegmentsForPixels(double radius_px, double sweep_angle,
+                           double max_error_px,
+                           int min_segments,
+                           int max_segments)
+{
+    min_segments = max(1, min_segments);
+    max_segments = max(min_segments, max_segments);
+
+    const double radius = std::fabs(radius_px);
+    const double sweep = std::fabs(sweep_angle);
+    if(!std::isfinite(radius) || !std::isfinite(sweep) || sweep <= 0.000001)
+        return min_segments;
+    if(max_error_px <= 0.0 || !std::isfinite(max_error_px))
+        return max_segments;
+
+    const double error = max(0.000001, max_error_px);
+    if(radius <= error)
+        return min_segments;
+
+    // Circular chord sagitta: e = r * (1 - cos(theta / 2)). Solve for
+    // theta, then use the smallest number of equal-angle segments that keeps
+    // the projected error within the caller's pixel budget.
+    const double cosine = minmax(1.0 - error / radius, -1.0, 1.0);
+    const double max_angle = 2.0 * std::acos(cosine);
+    if(!std::isfinite(max_angle) || max_angle <= 0.000001)
+        return max_segments;
+
+    const int segments = (int)std::ceil(sweep / max_angle);
+    return minmax(segments, min_segments, max_segments);
+}
+
 void UiPaintCircularArc(Painter& p, Size raster_size,
                         const Pointf& center, double radius,
                         double start_angle, double sweep_angle,

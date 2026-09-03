@@ -38,6 +38,7 @@ file
 	UiGraph/UiNodeGraph.cpp,
 	UiGraph/UiNodeGraphBase.inc,
 	UiGraph/UiNodeGraphRender.inc,
+	UiGraph/UiNodeGraphPerformance.inc,
 	UiGraph/UiNodeGraphHierarchy.inc,
 	UiGraph/UiNodeGraphHierarchyModelSwitch.inc,
 	UiGraph/UiNodeGraphHierarchyPaint.inc,

@@ -1,0 +1,12 @@
+description "UiNodeGraph deterministic view transaction and geometry LOD profiling";
+
+uses
+	Core,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";
