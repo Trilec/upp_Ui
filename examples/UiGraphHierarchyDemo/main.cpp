@@ -28,6 +28,21 @@ UiGraphNode MakeNode(const char *title, Pointf position)
     return n;
 }
 
+// Double-clicking a group node enters its child scope directly, matching the
+// Enter button. EnterSubgraph self-validates that the hit node owns a child
+// scope and lives in the current scope, so this is safe for any node.
+class HierarchyGraph : public UiNodeGraph {
+public:
+    typedef HierarchyGraph CLASSNAME;
+
+    void LeftDouble(Point p, dword flags) override
+    {
+        UiGraphNodeRef hit = HitTestNode(p);
+        if(hit.IsValid() && !EnterSubgraph(hit))
+            UiNodeGraph::LeftDouble(p, flags);
+    }
+};
+
 UiGraphSubgraphPort MakeInterfacePort(const char *id)
 {
     UiGraphSubgraphPort p;
@@ -147,7 +162,7 @@ private:
 
 private:
     UiGraphModel model_;
-    UiNodeGraph graph_;
+    HierarchyGraph graph_;
     UiButton enter_;
     UiButton up_;
     UiLabel scope_;

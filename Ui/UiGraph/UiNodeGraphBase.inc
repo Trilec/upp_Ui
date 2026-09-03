@@ -3012,7 +3012,7 @@ void UiNodeGraph::Layout()
     SyncThemeStyle();
     if(auto_fit_first_paint_ && !first_paint_done_ && model_ && model_->GetNodeCount() > 0) {
         first_paint_done_ = true;
-        FitToGraph();
+        FitToGraph(false);
         return;
     }
     InvalidateGeometry();
