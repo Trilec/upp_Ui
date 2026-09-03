@@ -17,6 +17,7 @@
 
 #define UIGRAPH_HIERARCHY_PRIVATE_DECLS \
     void PaintBackdrops(Draw& w); \
+    void PaintRenderBase(Draw& w); \
     UiNodeGraph& FitToGraphLegacy(bool selection_only); \
     UiNodeGraph& CenterOnNodeLegacy(UiGraphNodeRef node); \
     UiNodeGraph& SelectNodeLegacy(UiGraphNodeRef node, bool additive); \
