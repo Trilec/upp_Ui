@@ -3,29 +3,30 @@
 #include <Ui/UiRenderLayer.h>
 
 // Preserve the validated retained implementation in this translation unit,
-// but keep the active render policy separate. The retained source still owns
-// model/spatial/interaction/geometry behaviour; UiNodeGraphRender.inc owns the
-// current software paint policy so render experiments do not keep growing this
-// staging wrapper.
-//
-// R10A keeps the retained implementation source-compatible with its historical
-// enum vocabulary while canonical authored code uses Rectangle/Ellipse. Mapping
-// old Rectangle to wire-0 LegacyRectangle here is important: canonical Rectangle
-// has a distinct wire value and owns corner_radius semantics.
-//
-// The retained implementation historically called RefreshLayout() after view,
-// model and style methods that had already synchronously rebuilt geometry and
-// attached controls. Layout() then invalidated that fresh geometry and rebuilt it
-// again. Keep layout scheduling only for the one case that genuinely requires a
-// later Layout pass: pending first-paint auto-fit. Natural host resize Layout
-// callbacks are unaffected by this source-level compatibility shim.
+// but keep active render/hierarchy policy separate. H2 aliases only the methods
+// whose semantics must become scope-local; the retained implementation remains
+// callable for recovery until Windows acceptance is complete.
 #define RefreshLayout() do { if(auto_fit_first_paint_ && !first_paint_done_) Ctrl::RefreshLayout(); } while(0)
 #define Rectangle                    LegacyRectangle
 #define UsesRectangularStyledSurface UsesRectangularStyledSurfaceLegacy
 #define Paint                         PaintLegacy
 #define PaintGraphGeometry            PaintGraphGeometryLegacy
 #define PaintNodeDetails              PaintNodeDetailsLegacy
+#define FitToGraph                    FitToGraphLegacy
+#define CenterOnNode                  CenterOnNodeLegacy
+#define SelectNode                    SelectNodeLegacy
+#define SelectEdge                    SelectEdgeLegacy
+#define SetData                       SetDataLegacy
+#define GetData                       GetDataLegacy
+#define Layout                        LayoutLegacy
 #include "UiNodeGraphBase.inc"
+#undef Layout
+#undef GetData
+#undef SetData
+#undef SelectEdge
+#undef SelectNode
+#undef CenterOnNode
+#undef FitToGraph
 #undef PaintNodeDetails
 #undef PaintGraphGeometry
 #undef Paint
@@ -36,14 +37,6 @@
 namespace Upp {
 namespace UiNodeGraphRenderMath {
 
-// Direct dashed/dotted drawing advances a floating phase to exact pattern
-// boundaries. Binary rounding can leave the remaining step below the ULP of both
-// phase and segment position; the caller then asks fmod() with exactly the same
-// phase forever. Detect that no-progress signature without perturbing ordinary
-// remainder math. Two identical calls are allowed (the dot grid legitimately asks
-// for X/Y phases that can match); a third identical call inside the same short
-// execution burst snaps to cycle start, guaranteeing the patterned loop can make
-// a real step. Frame-to-frame repeats reset by the time window.
 inline double fmod(double value, double period)
 {
     if(!(period > 0.0) || !std::isfinite(value) || !std::isfinite(period))
@@ -75,9 +68,14 @@ inline double fmod(double value, double period)
 } // namespace UiNodeGraphRenderMath
 } // namespace Upp
 
-// UiNodeGraphRender.inc currently uses std::fmod only for direct dash phase and
-// cached-grid phase. Redirect those local calls to the no-progress guard above
-// without changing the rest of the translation unit or public API.
+// Keep the accepted R9/R10 software render policy intact but retain its former
+// top-level Paint as a recovery function. H2 owns only the final paint ordering
+// required to place Backdrops between the canvas/grid and graph geometry.
+#define Paint PaintRenderBase
 #define std UiNodeGraphRenderMath
 #include "UiNodeGraphRender.inc"
 #undef std
+#undef Paint
+
+#include "UiNodeGraphHierarchy.inc"
+#include "UiNodeGraphHierarchyPaint.inc"
