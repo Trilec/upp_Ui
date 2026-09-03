@@ -12,6 +12,8 @@
 #define Paint                         PaintLegacy
 #define PaintGraphGeometry            PaintGraphGeometryLegacy
 #define PaintNodeDetails              PaintNodeDetailsLegacy
+#define SetModel                      SetModelLegacy
+#define UseInternalModel              UseInternalModelLegacy
 #define FitToGraph                    FitToGraphLegacy
 #define CenterOnNode                  CenterOnNodeLegacy
 #define SelectNode                    SelectNodeLegacy
@@ -27,6 +29,8 @@
 #undef SelectNode
 #undef CenterOnNode
 #undef FitToGraph
+#undef UseInternalModel
+#undef SetModel
 #undef PaintNodeDetails
 #undef PaintGraphGeometry
 #undef Paint
@@ -78,4 +82,5 @@ inline double fmod(double value, double period)
 #undef Paint
 
 #include "UiNodeGraphHierarchy.inc"
+#include "UiNodeGraphHierarchyModelSwitch.inc"
 #include "UiNodeGraphHierarchyPaint.inc"
