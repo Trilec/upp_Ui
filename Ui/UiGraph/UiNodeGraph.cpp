@@ -81,13 +81,15 @@ inline double fmod(double value, double period)
 } // namespace UiNodeGraphRenderMath
 } // namespace Upp
 
-// Keep the accepted R9/R10 software render policy intact but retain its former
-// top-level Paint as a recovery function. H2 owns only the final paint ordering
-// required to place Backdrops between the canvas/grid and graph geometry.
+// Keep the accepted R9/R10 software render policy intact as the rich/detail
+// fallback. P2 gives the active name to a projected-micro direct Draw path while
+// retaining this exact renderer for ordinary/reference nodes and custom paint.
 #define Paint PaintRenderBase
+#define PaintGraphGeometry PaintGraphGeometryRenderBase
 #define std UiNodeGraphRenderMath
 #include "UiNodeGraphRender.inc"
 #undef std
+#undef PaintGraphGeometry
 #undef Paint
 
 // The retained recovery source uses wire-0 as its historical flat Rectangle.

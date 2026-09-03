@@ -172,7 +172,163 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
     }
 }
 
+Vector<Point> LodIntegerPath(const Vector<Pointf>& path)
+{
+    Vector<Point> out;
+    out.Reserve(path.GetCount());
+    for(const Pointf& p : path) {
+        Point q(fround(p.x), fround(p.y));
+        if(out.IsEmpty() || out.Top() != q)
+            out.Add(q);
+    }
+    if(out.GetCount() > 1 && out.Top() == out[0])
+        out.Drop();
+    return out;
+}
+
 } // namespace
+
+void UiNodeGraph::PaintGraphGeometry(Draw& w)
+{
+    Size size = GetSize();
+    if(size.cx <= 0 || size.cy <= 0 || !model_) {
+        PaintGraphGeometryRenderBase(w);
+        return;
+    }
+    Rect viewport(Point(0, 0), size);
+    Rect paint = w.GetPaintRect() & viewport;
+    if(paint.IsEmpty())
+        return;
+
+    // This fast path is deliberately narrow: normal viewing of projected-micro
+    // nodes below edge-label/detail scale. Rich/reference nodes, active gestures,
+    // custom body/foreground/overlay hooks and non-direct arrow styles retain the
+    // accepted renderer unchanged.
+    if(interaction_ != InteractionMode::None
+       || !marquee_preview_nodes_.IsEmpty()
+       || zoom_ >= lod_policy_.edge_label_zoom
+       || WhenPaintNodeBackground
+       || WhenPaintNodeForeground
+       || WhenPaintNodeOverlay) {
+        PaintGraphGeometryRenderBase(w);
+        return;
+    }
+
+    WorldRect paint_world;
+    paint_world.Include(ScreenToWorld(paint.TopLeft()));
+    paint_world.Include(ScreenToWorld(paint.BottomRight()));
+    paint_world = paint_world.Inflated(GetPaintQueryMargin() / max(zoom_, 0.01));
+    Index<UiGraphId> node_ids;
+    Index<UiGraphId> edge_ids;
+    QuerySpatial(paint_world, node_ids, edge_ids);
+
+    Vector<int> paint_nodes;
+    paint_nodes.Reserve(node_ids.GetCount());
+    for(int i = 0; i < node_ids.GetCount(); i++) {
+        int q = node_geometry_.Find(node_ids[i]);
+        if(q < 0 || (node_geometry_[q].paint_bounds & paint).IsEmpty())
+            continue;
+        if(!node_geometry_[q].micro) {
+            PaintGraphGeometryRenderBase(w);
+            return;
+        }
+        const UiGraphNode* node = model_->FindNode(node_geometry_[q].ref);
+        if(!node || node->shape == UiGraphNodeShape::Custom) {
+            PaintGraphGeometryRenderBase(w);
+            return;
+        }
+        paint_nodes.Add(q);
+    }
+    if(paint_nodes.IsEmpty()) {
+        PaintGraphGeometryRenderBase(w);
+        return;
+    }
+    Sort(paint_nodes, [&](int a, int b) {
+        const NodeGeometry& ga = node_geometry_[a];
+        const NodeGeometry& gb = node_geometry_[b];
+        return ga.z_order != gb.z_order ? ga.z_order < gb.z_order : ga.ref.id < gb.ref.id;
+    });
+
+    Vector<int> paint_edges;
+    paint_edges.Reserve(edge_ids.GetCount());
+    if(zoom_ >= lod_policy_.edge_hide_zoom)
+        for(int i = 0; i < edge_ids.GetCount(); i++) {
+            int q = edge_geometry_.Find(edge_ids[i]);
+            if(q < 0 || (edge_geometry_[q].bounds & paint).IsEmpty())
+                continue;
+            const UiGraphEdge* edge = model_->FindEdge(edge_geometry_[q].ref);
+            if(!edge)
+                continue;
+            UiGraphVisualState state = GetEdgeVisualState(*edge);
+            UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, state);
+            UiGraphArrowStyle arrow = edge->arrow == UiGraphArrowStyle::Inherit ? style.arrow : edge->arrow;
+            if(edge->directed && arrow != UiGraphArrowStyle::None && arrow != UiGraphArrowStyle::Open) {
+                PaintGraphGeometryRenderBase(w);
+                return;
+            }
+            paint_edges.Add(q);
+        }
+
+    last_paint_node_visit_count_ = paint_nodes.GetCount();
+    last_paint_edge_visit_count_ = paint_edges.GetCount();
+    last_painted_node_count_ = 0;
+    last_painted_edge_count_ = 0;
+    last_simplified_edge_count_ = 0;
+    last_edge_paint_usecs_ = 0;
+    last_node_paint_usecs_ = 0;
+    last_node_surface_paint_usecs_ = 0;
+    last_node_details_paint_usecs_ = 0;
+    last_node_content_paint_usecs_ = 0;
+
+    int64 edge_started = usecs();
+    for(int q : paint_edges) {
+        const EdgeGeometry& g = edge_geometry_[q];
+        const UiGraphEdge* edge = model_->FindEdge(g.ref);
+        if(!edge)
+            continue;
+        UiGraphVisualState state = GetEdgeVisualState(*edge);
+        UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, state);
+        if(PaintEdgeDirect(w, *edge, g.points, g.simplified, style, state,
+                           zoom_, lod_policy_)) {
+            last_painted_edge_count_++;
+            if(g.simplified)
+                last_simplified_edge_count_++;
+        }
+    }
+    last_edge_paint_usecs_ = max<int64>(0, usecs() - edge_started);
+
+    int64 node_started = usecs();
+    for(int q : paint_nodes) {
+        const NodeGeometry& g = node_geometry_[q];
+        const UiGraphNode* node = model_->FindNode(g.ref);
+        if(!node)
+            continue;
+        UiGraphVisualState state = GetNodeVisualState(*node);
+        UiGraphNodeStyle style = ResolveNodeStyle(*node, state);
+        int si = VisualStateIndex(state);
+        StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
+        Color face = ResolveFace(style.palette.face[si], White());
+        Color frame = state == UiGraphVisualState::Selected ? SelectedFrameColor(style)
+                                                            : style.palette.frame[si];
+        int frame_width = IsNull(frame) ? 0 : max(1, metrics.frame_width);
+        if(state == UiGraphVisualState::Selected)
+            frame_width = max(frame_width,
+                              max(DPI(2), DPI(fround(lod_policy_.selection_outline_width))));
+
+        if(node->shape == UiGraphNodeShape::Circle || node->shape == UiGraphNodeShape::Ellipse)
+            w.DrawEllipse(g.surface, face, frame_width, frame);
+        else {
+            Vector<Point> path = LodIntegerPath(g.hit_path);
+            if(path.GetCount() >= 3)
+                w.DrawPolygon(path, face, frame_width, frame);
+            else
+                w.DrawRect(g.surface, face);
+        }
+        last_painted_node_count_++;
+    }
+    last_node_surface_paint_usecs_ = max<int64>(0, usecs() - node_started);
+    last_node_paint_usecs_ = last_node_surface_paint_usecs_;
+}
 
 UiNodeGraph& UiNodeGraph::BeginViewUpdate()
 {
@@ -245,14 +401,11 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
         sz = Size(side, side);
     }
 
-    const double title_floor = max(0.16, lod_policy_.title_zoom - 0.16);
-    const double port_visual_floor = max(0.12, lod_policy_.port_zoom - 0.04);
-    const double content_floor = max(0.24, lod_policy_.secondary_text_zoom - 0.08);
-    const bool projected_micro = sz.cx < 38 || sz.cy < 26;
-    const bool overview_geometry = projected_micro
-                                && zoom_ < title_floor
-                                && zoom_ < port_visual_floor
-                                && zoom_ < content_floor;
+    // Projected size is the authoritative detail boundary. A 20px-wide node is
+    // micro regardless of the abstract zoom value; constructing title/content/
+    // port-hit geometry for it only creates invisible work and was the dominant
+    // intermediate-zoom 10k stall exposed by the P1 live profile.
+    const bool overview_geometry = sz.cx < 38 || sz.cy < 26;
 
     if(!overview_geometry) {
         BuildNodeGeometry(node, out);
@@ -272,9 +425,8 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     out.surface = UiStyledSurfaceRect(out.rect, metrics);
     out.hit_path = LodNodeShapePath(node, out.surface);
 
-    // Even when ports are visually suppressed, visible edges still need stable
-    // boundary anchors. Preserve authored port ordering but skip all text,
-    // content, control, label and hit-rectangle geometry at this overview level.
+    // Visible edges still need stable authored-side anchors, but micro geometry
+    // deliberately carries no text/content/control/label/hit rectangles.
     Vector<int> side_ports[4];
     for(int i = 0; i < node.ports.GetCount(); i++) {
         if(!node.ports[i].visible)

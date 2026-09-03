@@ -26,6 +26,7 @@
 #define UIGRAPH_HIERARCHY_PRIVATE_DECLS \
     void PaintBackdrops(Draw& w); \
     void PaintRenderBase(Draw& w); \
+    void PaintGraphGeometryRenderBase(Draw& w); \
     bool DeferViewUpdate(bool viewport_changed, bool selection_changed); \
     void QueueScopeChanged(UiGraphScopeRef scope); \
     void FlushViewUpdate(); \

@@ -34,6 +34,17 @@ UiGraphPort Port(const String& id, UiGraphPortDirection direction)
 void BuildGrid(UiGraphModel& model, Vector<UiGraphNodeRef>& nodes,
                int width, int height, bool mixed_shapes)
 {
+    static const UiGraphNodeShape shapes[] = {
+        UiGraphNodeShape::Rectangle,
+        UiGraphNodeShape::Ellipse,
+        UiGraphNodeShape::Diamond,
+        UiGraphNodeShape::Triangle,
+        UiGraphNodeShape::Hexagon,
+        UiGraphNodeShape::Document,
+        UiGraphNodeShape::Database,
+    };
+    const int shape_count = (int)(sizeof(shapes) / sizeof(shapes[0]));
+
     nodes.Reserve(width * height);
     for(int y = 0; y < height; y++)
         for(int x = 0; x < width; x++) {
@@ -41,9 +52,8 @@ void BuildGrid(UiGraphModel& model, Vector<UiGraphNodeRef>& nodes,
             node.title = Format("N%d_%d", x, y);
             node.position = Pointf(x * 96.0, y * 72.0);
             node.size = Sizef(64, 44);
-            node.shape = mixed_shapes && ((x + y) % 10 == 0)
-                       ? UiGraphNodeShape::Ellipse
-                       : UiGraphNodeShape::Rectangle;
+            node.shape = mixed_shapes ? shapes[(x + y) % shape_count]
+                                      : UiGraphNodeShape::Rectangle;
             node.ports.Add(Port("in", UiGraphPortDirection::Input));
             node.ports.Add(Port("out", UiGraphPortDirection::Output));
             nodes.Add(model.AddNode(node));
@@ -78,7 +88,10 @@ void PrintProfile(const char *phase, UiNodeGraph& graph, int64 paint_us = -1)
     if(paint_us >= 0)
         Cout() << " paint_us=" << paint_us
                << " node_paint_us=" << graph.GetLastNodePaintUsecs()
-               << " edge_paint_us=" << graph.GetLastEdgePaintUsecs();
+               << " edge_paint_us=" << graph.GetLastEdgePaintUsecs()
+               << " surface_us=" << graph.GetLastNodeSurfacePaintUsecs()
+               << " details_us=" << graph.GetLastNodeDetailsPaintUsecs()
+               << " content_us=" << graph.GetLastNodeContentPaintUsecs();
     Cout() << '\n';
 }
 
@@ -140,6 +153,35 @@ CONSOLE_APP_MAIN
     t.Expect(selection_events == 1 && viewport_events == 1,
              "composite view publishes selection and viewport events only after the final frame");
 
+    // Exercise the real problem band: nodes are physically micro on screen but
+    // the global zoom is still high enough that P1 previously rebuilt rich node
+    // geometry and painted thousands of port markers.
+    selection_events = viewport_events = 0;
+    graph.BeginViewUpdate();
+    graph.SetZoom(0.30);
+    graph.CenterOnNode(centre);
+    graph.EndViewUpdate();
+
+    ImageDraw mid_draw(1200, 800);
+    mid_draw.DrawRect(0, 0, 1200, 800, White());
+    int64 mid_paint_started = usecs();
+    graph.Paint(mid_draw);
+    int64 mid_paint_us = usecs() - mid_paint_started;
+
+    PrintProfile("projected_micro_10k", graph, mid_paint_us);
+    t.Expect(graph.GetLastViewUpdateGeometryBuildCount() == 1
+             && graph.GetLastViewUpdateSpatialBuildCount() == 0,
+             "intermediate projected-micro zoom performs one geometry build and reuses spatial state");
+    t.Expect(graph.GetPreparedNodeCount() > 0 && graph.GetPreparedNodeCount() < 10000,
+             "intermediate zoom remains viewport bounded rather than preparing the full graph");
+    t.Expect(graph.GetLastGeometryLodNodeCount() == graph.GetPreparedNodeCount(),
+             "every prepared projected-micro node uses overview geometry independent of global zoom");
+    t.Expect(graph.GetLastNodeDetailsPaintUsecs() == 0
+             && graph.GetLastNodeContentPaintUsecs() == 0,
+             "projected-micro direct scene performs no rich details/ports/content paint pass");
+    t.Expect(graph.GetLastPaintedNodeCount() > 0,
+             "projected-micro direct scene actually paints visible nodes");
+
     selection_events = viewport_events = 0;
     graph.BeginViewUpdate();
     graph.FitToGraph(false);
@@ -160,8 +202,8 @@ CONSOLE_APP_MAIN
              "fit-all acceptance actually prepares all 10,000 visible nodes");
     t.Expect(graph.GetLastGeometryLodNodeCount() == graph.GetPreparedNodeCount(),
              "all fit-all micro nodes use overview geometry LOD");
-    t.Expect(graph.GetLastGeometryPathVertexCount() <= graph.GetPreparedNodeCount() * 8,
-             "overview node silhouettes stay within a small screen-error vertex budget");
+    t.Expect(graph.GetLastGeometryPathVertexCount() <= graph.GetPreparedNodeCount() * 16,
+             "overview mixed-shape silhouettes stay within a bounded screen-error vertex budget");
     t.Expect(viewport_events == 1 && selection_events == 0,
              "fit-all emits one viewport event and no spurious selection event");
 
