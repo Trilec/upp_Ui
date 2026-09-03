@@ -29,6 +29,7 @@ H2 now integrates:
 - ordinary group-node `SetNodeCtrl()` support preserved;
 - model switches normalize hierarchy view state to root so stale child scopes cannot resurrect;
 - focused `Utilities/UiNodeGraphHierarchyViewTest` coverage;
+- small `examples/UiGraphHierarchyDemo` visual navigation/Backdrop fixture;
 - real package membership for the H2 source slice; `.preview/.next` staging files removed.
 
 Recovery structure during Windows acceptance:
@@ -63,9 +64,11 @@ Build CLANGx64 Debug + Release:
 - `Utilities/UiGraphHierarchyTest`
 - `Utilities/UiNodeGraphHierarchyViewTest`
 - `Utilities/UiGraphTest`
+- `examples/UiGraphHierarchyDemo`
 
 Run both hierarchy tests and `UiGraphTest` in Debug + Release with exit 0 / zero failures.
-Report exact summary lines, compiler errors if any, and a brief manual smoke check of root -> child -> parent navigation and Backdrop layering.
+Launch the hierarchy demo and smoke-check Root -> Scene Workshop -> Up, Backdrop-below-graph layering, and the parent group `UiProgressRing` attachment.
+Report exact summary lines and any compiler/runtime errors.
 Gary may make only minor obvious compile/API corrections; no hierarchy/model/render architectural changes.
 
 If the gate passes, close H2 and proceed to H3 editing ergonomics:
