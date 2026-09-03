@@ -1,0 +1,17 @@
+#ifndef _Ui_UiGraph_UiNodeGraph_H2_wrapper_h_
+#define _Ui_UiGraph_UiNodeGraph_H2_wrapper_h_
+
+#include "UiNodeGraphHierarchyApi.h"
+
+// Inject H2 declarations into the exact validated pre-H2 class header while the
+// hierarchy tranche is under Windows acceptance. The wrapper is deliberately
+// narrow and is removed when the recovery slices are collapsed.
+#define WhenViewport WhenViewport; UIGRAPH_HIERARCHY_PUBLIC_DECLS
+#define drag_preview_positions_ drag_preview_positions_; UIGRAPH_HIERARCHY_PRIVATE_DECLS; int uigraph_h2_injection_dummy_
+#include "UiNodeGraphBase.h"
+#undef drag_preview_positions_
+#undef WhenViewport
+#undef UIGRAPH_HIERARCHY_PRIVATE_DECLS
+#undef UIGRAPH_HIERARCHY_PUBLIC_DECLS
+
+#endif
