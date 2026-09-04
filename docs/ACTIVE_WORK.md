@@ -4,37 +4,35 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; not project history.
 
 ## CURRENT
-BASE: `ffe51a2750db4944f54877d60aa15bbde036f2c9`
-GEOMETRY CONTRACT: Windows gate PARTIAL only because RouteEdit midpoint semantics regressed; all geometry/render/P2 checks otherwise PASS.
-TASK: **Route midpoint semantics independent of adaptive tessellation**
-STATUS: **PUBLISHED — TARGETED WINDOWS RETEST PENDING**
-FIX: `454f35a98db17044f6a45652024e8beedb4296b9`
+BASE: `cc0ecba394c8fb2d52cdd7cb1dbbe92ead5cd88e`
+TASK: **final-pixel geometry + authored path/stock shape foundation**
+STATUS: **PUBLISHED — WINDOWS VALIDATION PENDING**
+SHAPE_LAYER: `d9b956abeccc4220a481a50aa153da21c93b5b22`
+ROUTE_FIX: `454f35a98db17044f6a45652024e8beedb4296b9`
 
-## ROOT CAUSE / FIX
-- adaptive Bezier flattening correctly reduced a straight cubic to two endpoints;
-- Graph still used `route[count/2]` as its semantic midpoint, which selected the target endpoint;
-- `UiGeometry::PointAtPolylineFraction()` now derives positions by visible arc length;
-- Graph label/initial route-handle midpoint now uses arc length, not vertex index;
-- authored waypoint handle semantics and the 0.35px geometry contract are unchanged;
-- geometry contract now explicitly forbids semantic positions from depending on tessellation indices.
+## CONTRACT
+- explicit generated curves use one library-owned **0.35 final-device-pixel** error budget;
+- direct Draw/native Painter remains first choice for simple paint-only primitives;
+- normal controls use `UiShapes` for reusable silhouettes and `UiShapePath` for custom authored silhouettes;
+- **dense scenes such as UiNodeGraph may use `UiGeometry` directly** when UiShapePath allocation would be unnecessary work;
+- no control-owned sample-count/curve-quality knobs;
+- semantic handles/labels/anchors never depend on tessellation vertex indexes;
+- raster policy remains separate from geometry.
+
+## PUBLISHED COVERAGE
+- `UiGeometry`: final-pixel math, adaptive curves, containment, radial and polyline helpers;
+- `UiShapePath`: Move/Line/Quadratic/Cubic/Arc/EllipseArc/Close + multi-contour flattening;
+- `UiShapes`: polygon/rounded, rect/capsule/ellipse, N-gon/star, arrow/chevron, chamfer, callout, tag, cloud/document/database, ring/pie;
+- `UiPainterShapePath()` lives in UiDraw;
+- docs/README/Topic++ updated; Graph hot source unchanged in shape-layer tranche.
 
 ## VALIDATION
-Previously PASS on `ffe51a2`:
-- UiGeometryContractTest 24/24;
-- all Graph suites except UiNodeGraphRouteEditTest;
-- P2 micro/render contracts;
-- UiGraphDemo and UiProgressRingDemo visual smoke;
-- diff-check clean.
-New deterministic expectations:
-- UiGeometryContractTest: **25 checks**;
-- UiNodeGraphRouteEditTest: **25 checks**.
-
-## REMAINING
-- targeted Debug+Release retest required for the two changed suites plus core Graph regressions;
-- zoomed-out 10k idle continuous repaint remains the next performance issue;
-- warm unchanged 10k rebind still rebuilds one spatial index;
-- raster efficiency remains separate: blur, gradients, masks, temporary buffers, image analysis.
+- static full-diff/mechanical review PASS; no forbidden sampling knobs or added whitespace defects;
+- `UiShapePathTest`: **27 deterministic checks** added;
+- prior geometry gate: all PASS except RouteEdit midpoint semantics; fix published, targeted retest still pending;
+- shape-layer Debug/Release Windows gate still required.
 
 ## NEXT
-Run targeted Windows gate on current `main`.
-If green, mark geometry contract PASS and investigate idle continuous repaint before further hierarchy work.
+1. Gary: run route-fix + UiShapePath targeted Debug/Release gate and clean obsolete supervisor branches.
+2. If green, mark geometry/shape foundation PASS.
+3. Investigate zoomed-out 10k idle continuous repaint before further hierarchy/render work.
