@@ -13,8 +13,8 @@ Ui is a reusable U++ control library built around a small set of public concepts
 
 This Topic++ group is intentionally short. It is the orientation layer for the
 package; the canonical detailed references live in the repository `docs/`
-guide set. Drawing/shape work must also read `docs/24_UI_GEOMETRY_CONTRACT.md`
-and `docs/25_UI_SHAPE_PATH.md`.
+guide set. Drawing/shape work should read `docs/07_UI_DRAWING_GUIDE.md`;
+large-data/LOD work should read `docs/06_UI_SCALE_AND_LOD_GUIDE.md`.
 
 Topic++ note:
 - `srcdoc.tpp` and `src.tpp` are registered in the package file (`Ui.upp`)

@@ -21,8 +21,8 @@ Demos must demonstrate production drawing APIs rather than inventing demo-only
 geometry. Normal-control examples should use direct Draw/native Painter or
 `UiShapes`/`UiShapePath`; dense scene demos may use the same direct
 `UiGeometry` path as the production control. Never introduce fixed curve
-sample counts in a demo. See `24_UI_GEOMETRY_CONTRACT.md` and
-`25_UI_SHAPE_PATH.md`.
+sample counts in a demo. See `07_UI_DRAWING_GUIDE.md` and
+`07_UI_DRAWING_GUIDE.md`.
 
 ## Direction
 
@@ -335,6 +335,47 @@ Where no explicit style overrides are active, prefer concise role/theme-based
 code rather than emitting every resolved style field.
 
 ---
+
+
+## Generated-code modes
+
+For substantial builder-style demos, generated code should answer three useful
+questions where practical:
+
+1. **Usage** — concise ordinary public API, relying on UiTheme.
+2. **Current changes** — usage plus only authored local changes.
+3. **Full explicit** — the complete relevant local style recipe for
+   learning/debugging.
+
+A mature reference demo does not need to be destabilized merely to make the
+selector UI identical if it already emits equivalent useful code.
+
+## Family demos
+
+Combine demos only when controls genuinely share a production API/style
+foundation.
+
+Current examples:
+
+- the Edit family may share one demo for Line/Password/Mask/MultiEdit;
+- Slider and RangeSlider may share one family demo because they share the slider
+  style foundation.
+
+Do not combine controls merely because their visuals resemble one another.
+
+## Model-backed Data pages
+
+For model-backed collection controls, the Data page edits the **same active
+model** driving the preview.
+
+Examples:
+
+- Dropdown/List/Gallery -> `UiListModel`;
+- Tree -> `UiTreeModel`;
+- Table -> `UiTableModel`;
+- Menu -> `UiMenuModel`.
+
+Never maintain a second demo-only mirror collection.
 
 ## Source structure and readability
 

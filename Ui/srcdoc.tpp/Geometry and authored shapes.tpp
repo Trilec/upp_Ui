@@ -26,6 +26,5 @@ such as handles, labels, and anchors must not depend on tessellation vertex
 indexes.
 
 See repository docs:
-- docs/24_UI_GEOMETRY_CONTRACT.md
-- docs/25_UI_SHAPE_PATH.md
-- docs/22_UI_RENDER_BACKEND_ROADMAP.md
+- docs/07_UI_DRAWING_GUIDE.md
+- docs/06_UI_SCALE_AND_LOD_GUIDE.md

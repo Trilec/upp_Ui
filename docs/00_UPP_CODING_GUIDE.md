@@ -113,8 +113,7 @@ repository, and it is intended to be copyable into another U++ project.
 
 ## Geometry and shape construction
 
-All new control drawing follows the contracts in
-`24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
+All new control drawing follows `07_UI_DRAWING_GUIDE.md`.
 
 Use this decision order:
 
@@ -181,13 +180,14 @@ separate rendering concern.
 ## Reading order
 
 1. `00_UPP_CODING_GUIDE.md` (this guide);
-2. `01_UI_CONTROLS_GUIDE.md` — the control catalogue;
+2. `01_UI_CONTROLS_GUIDE.md` — control catalogue and usage;
 3. `02_UI_THEME_GUIDE.md` — theme and style system;
-4. `03_UI_MODEL_GUIDE.md` — model-driven control architecture;
-5. `04_UI_DEMO_GUIDE.md` — the demo structure;
-6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and extension;
-7. `22_UI_RENDER_BACKEND_ROADMAP.md` — accepted rendering/backend policy;
-8. `24_UI_GEOMETRY_CONTRACT.md` — mandatory final-pixel geometry rules;
-9. `25_UI_SHAPE_PATH.md` — authored paths, stock shapes, and new-control usage.
+4. `03_UI_MODEL_GUIDE.md` — model authority, mutation and identity;
+5. `04_UI_DEMO_GUIDE.md` — executable documentation and demo design;
+6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor and override layout;
+7. `06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD;
+8. `07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/geometry/shape architecture;
+9. `08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing and hierarchy;
+10. `09_UIDOC_GUIDE.md` — document model/view/reuse architecture.
 
 When this guide and an older document conflict, current code and this guide win.

@@ -93,7 +93,7 @@ The common drawing rule is:
 
 Do not create control-local curve sampling quality. Explicit generated geometry
 uses the shared 0.35 final-device-pixel error contract from
-`24_UI_GEOMETRY_CONTRACT.md`.
+`07_UI_DRAWING_GUIDE.md`.
 
 Typical normal-control usage:
 
@@ -111,7 +111,7 @@ If a new silhouette is broadly useful, add a parameterised builder to
 `UiShapes`; if it is control-specific, author it locally as `UiShapePath`.
 A new named silhouette is not by itself a reason to modify `UiGeometry`.
 
-See `25_UI_SHAPE_PATH.md` for the full stock vocabulary and review checklist.
+See `07_UI_DRAWING_GUIDE.md` for the full stock vocabulary and review checklist.
 
 ### State handling and icons
 
@@ -616,6 +616,76 @@ affect runtime measurement, painting, or theme resolution.
 
 ---
 
+
+## UiProgressRing and UiChartRing
+
+These are separate controls with shared circular drawing primitives.
+
+### UiProgressRing
+
+Use `UiProgressRing` for **one current amount against one total**.
+
+Typical API:
+
+```cpp
+UiProgressRing progress;
+progress.Set(42, 100)
+        .SetRole(UiRole::Accent)
+        .SetThickness(DPI(7))
+        .SetCapRoundness(100);
+```
+
+Key behavior:
+
+- `Set(actual, total)`, `Get()`, `GetTotal()`, `GetRatio()`,
+  `GetPercent()`;
+- optional percentage or custom center text;
+- determinate and indeterminate modes;
+- optional progress gradient;
+- track/progress/text styling through the normal theme/custom-style lifecycle;
+- optional presentation-only intro animation;
+- centered square geometry inside any allocated rectangle, so the ring remains
+  circular;
+- stable determinate rasters use the shared raster cache;
+- intro/indeterminate animation uses owned `UiFrameTicker` scheduling;
+- circular strokes use `UiPaintCircularArc` rather than control-local
+  tessellation.
+
+### UiChartRing
+
+Use `UiChartRing` for **several proportional values composing one ring**.
+
+```cpp
+UiChartRing chart;
+chart.AddSegment(30, "Design")
+     .AddSegment(45, "Build")
+     .AddSegment(25, "Review")
+     .SetSegmentGap(DPI(3))
+     .SetCapRoundness(100);
+```
+
+`UiChartRingSegment` stores non-negative value, optional label and optional
+explicit colour.
+
+By default the visible total is the sum of positive values. `SetTotal()` may
+provide a larger explicit total, leaving the remainder visible as track.
+
+The control supports:
+
+- segment gap in visible pixels;
+- flat through fully rounded caps;
+- themed series colours with per-segment overrides;
+- optional center text;
+- stable exact-raster caching;
+- no V1 selection/legend/exploded/nested-ring interaction.
+
+Both controls keep stroked circular presentation as native Painter arcs.
+A different control needing a **filled** wedge/donut section should use
+`UiShapes::RingSegment` or `UiShapes::Pie`; see
+`07_UI_DRAWING_GUIDE.md`.
+
+---
+
 ## Other substantial controls (quick reference)
 
 All entries below follow the common concepts above; read the matching header for
@@ -653,11 +723,12 @@ placeholder, selection, spin toggles, and `WhenAction`/`WhenChange`.
 Boolean controls with `UiCheckVisual` / `UiRadioVisual` variants (Classic, Chip,
 List, Pills) and `WhenAction`.
 
-### UiSlider / UiSliderEdit / UiProgressBar / UiScrollBar
+### UiSlider / UiSliderEdit / UiProgressBar / UiProgressRing / UiChartRing / UiScrollBar
 `UiSlider`: single-handle value slider (the RangeSlider shares its style).
-`UiSliderEdit`: slider + numeric edit composition. `UiProgressBar`: determinate
-and indeterminate progress with role-tuned fills. `UiScrollBar`: themed
-scrollbar with arrow layouts and thin/thick modes.
+`UiSliderEdit`: slider + numeric edit composition. `UiProgressBar`: linear
+determinate/indeterminate progress. `UiProgressRing`: circular single-value
+progress. `UiChartRing`: multi-value proportional donut/ring chart. `UiScrollBar`:
+themed scrollbar with arrow layouts and thin/thick modes.
 
 ### UiAccordion / UiTab / UiStack
 Page/body containers. `UiAccordion`: collapsible sections with drag reorder and
@@ -671,10 +742,19 @@ Model-backed controls with request-first mutation (`WhenReorderRequest`,
 `WhenMoveRequest`, `WhenActionRequest`, `WhenEditRequest`) and
 `EnableInternalMutation(bool)` — see `03_UI_MODEL_GUIDE.md`.
 
-### UiBreadcrumbs / UiDoc
+List/Gallery/Tree/Table use bounded shared `UiItemRender` pools for visible
+presentation. Dropdown uses `UiListModel` as its single row authority and
+reuses shared item rendering for the collapsed face/popup rows. Menu keeps its
+domain-specific `UiMenuModel` because command/check/radio/submenu semantics are
+real model data, while ordinary popup content still uses the shared renderer
+contract. Popup/live renderer count is bounded by visible rows, not total model
+items.
+
+### UiBreadcrumbs / UiDoc / UiNodeGraph
 `UiBreadcrumbs`: path/navigation display with optional icons and dividers.
-`UiDoc`: rich document display/editor surface with annotation lanes
-(`UiDoc::AnnotationLane`) for comments/metadata.
+`UiDoc`: rich document display/editor surface; see `09_UIDOC_GUIDE.md`.
+`UiNodeGraph`: retained model-backed graph editor/viewer with routing, hierarchy,
+spatial culling and LOD; see `08_UIGRAPH_GUIDE.md`.
 
 ### UiColorPicker / UiColorPickerPaletteLab
 Large multi-slot colour editor now contained under `Ui/UiColorPicker/`. It supports

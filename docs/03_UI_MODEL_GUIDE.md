@@ -70,7 +70,7 @@ Control& ClearModel();
 `UiDocCoreTransaction`, `UiDocApplyResult` and position-map notifications carry
 richer positional-edit semantics needed by document views. The ownership
 vocabulary is shared; the domain model and change payload remain appropriate to
-the domain. See `10_UIDOC_MODEL_BINDING.md`.
+the domain. See `09_UIDOC_GUIDE.md`.
 
 ## Switching models
 
@@ -136,7 +136,7 @@ Maintaining a second set of non-model widgets would create parallel state,
 duplicate APIs, and different code paths for the same interaction.
 
 The model also enables high-scale views to keep logical record count independent
-of live `Ctrl`/renderer count. See `06_UI_MODEL_VIEW_SCALE_GUIDE.md`.
+of live `Ctrl`/renderer count. See `06_UI_SCALE_AND_LOD_GUIDE.md`.
 
 ## Controls that deliberately do not need a model
 
@@ -291,6 +291,75 @@ persistent geometry object per character. Binding an external UiDocCore does not
 copy document records or create another layout model.
 
 The deterministic scale tests remain the authority for these invariants.
+
+## Current model families
+
+| Control/view | Semantic model | Identity shape |
+| --- | --- | --- |
+| UiList / UiGallery / UiDropdown | `UiListModel` | sequential index + optional stable item data key |
+| UiTree | `UiTreeModel` | stable tree node ref |
+| UiTable | `UiTableModel` | row/column coordinate/range |
+| UiMenu | `UiMenuModel` | stable menu node ref + command semantics |
+| UiNodeGraph | `UiGraphModel` | stable graph IDs/refs |
+| UiDoc | `UiDocCore` | document positions/anchors + transaction mapping |
+
+The shared ownership vocabulary does not force these domains into one record
+type. A model is shared where semantics are genuinely shared, not for naming
+symmetry.
+
+## Publishing mutable model changes
+
+If a model exposes mutable record access, the edit is incomplete until it
+publishes the change.
+
+Current examples include:
+
+```cpp
+UiListModel::Touch(first, count);
+UiTreeModel::Touch(node);
+UiTableModel::TouchCell(row, col);
+UiTableModel::TouchHeader(axis, index);
+UiMenuModel::Touch(node);
+UiGraphModel::TouchNode(id);
+UiGraphModel::TouchEdge(id);
+```
+
+For one semantic batch, prefer one truthful ranged/bulk notification rather than
+calling `Set()` once per record.
+
+Views then react at the narrowest correct scope. A presentation-only update does
+not justify rebuilding an entire projection/spatial scene.
+
+## Identity under structural mutation
+
+Sequential views use the shared sequential remapping helpers for ordinary
+insert/erase/move operations. Stable application identity may live in
+`UiModelItem::data` when selection must be restored across a full reset/reorder.
+
+Tree, Menu and Graph retain their domain stable IDs instead of being forced
+through sequential remapping.
+
+Table remains coordinate/range based unless its model contract is deliberately
+changed to introduce stable row identity.
+
+UiDoc uses `UiDocPositionMap` from document transactions.
+
+## Observer lifetime
+
+External models are non-owning. Rebinding/deduplication must be lifetime-aware,
+not based only on raw addresses, because a destroyed model can be replaced by a
+new object at the same address.
+
+The shared collection/graph models use weak identity/observer bookkeeping for
+this reason. A fresh object must always receive a fresh observer.
+
+## Scale relationship
+
+Model semantics and large-view performance are deliberately separate concerns.
+Do not add a second data store to solve a rendering problem.
+
+For viewport-bounded renderer pools, mutation scope, spatial indexing and LOD,
+read `06_UI_SCALE_AND_LOD_GUIDE.md`.
 
 ## Common mistakes
 

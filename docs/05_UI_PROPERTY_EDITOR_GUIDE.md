@@ -163,6 +163,13 @@ paint, control state, local/ancestor layout, subtree, structure, selection,
 Inspector schema, generated code, global theme, or full preview. Do not rebuild
 an entire preview for every character when a local paint/layout update is enough.
 
+A committing popup/modal inline editor may synchronously receive the model's
+same-property change notification while still inside its own commit callback.
+PropertyEditor suppresses only that redundant same-property refresh, then performs
+the normal explicit post-commit reconfiguration. Do not allow a committed Color,
+Fill, Font or similar editor to be re-entered into stale configuration by its own
+synchronous notification.
+
 ## Inheritance, overrides, and Reset
 
 Inherited theme state and ordinary Reset are separate contracts. An
@@ -188,6 +195,50 @@ Mixed state means selected objects currently disagree. The editor starts empty;
 entering one valid value commits it as the shared replacement and clears mixed
 state. Never encode mixed numeric values with `DBL_MIN`, `DBL_MAX`, NaN, or a
 display string in the authoritative value.
+
+
+## Override layout grammar
+
+PropertyEditor should present control style concepts using the same nouns as the
+runtime API and UiDesigner.
+
+For a conventional styled control, prefer this order when applicable:
+
+```text
+GENERAL
+FACE
+  SKIN
+FRAME
+INK
+ICON
+TYPOGRAPHY
+CONTENT MARGIN
+FOCUS
+SHADOW
+HIGHLIGHT
+<control-specific groups>
+```
+
+Rules:
+
+- group headings use real API nouns, not parallel design-language synonyms;
+- the group supplies the prefix: `Frame / Width`, not `Frame / Frame Width`;
+- keep General small;
+- Skin is the image-backed implementation of Face and is nested under Face;
+- Face and Frame remain separate;
+- use the control's real state vocabulary rather than manufacturing symmetry;
+- composite controls expose real nested domains such as
+  `Dropdown / Popup`, `Accordion / Header / Body`, `Slider / Track / Thumb`;
+- expose only fields/setters the control actually consumes;
+- Background/Content/Foreground are paint-order concepts, not mandatory
+  PropertyEditor headings.
+
+Demo and UiDesigner presentations of the same control should preserve the same
+stable property id, label, group path, ordering, state names and inheritance
+semantics.
+
+Before adding an override row, verify that preview/runtime application and code
+generation can express the same authored value without creating parallel state.
 
 ## Layout and performance
 

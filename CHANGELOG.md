@@ -6,6 +6,10 @@ This project is experimental and iterating quickly. The goal of this file is to 
 
 ## Unreleased
 
+- Documentation architecture: consolidated tranche-specific scale/render/Graph/
+  ring/geometry/UiDoc notes into the canonical 00–09 guide set. Current design
+  now lives in Large-scale Views & LOD, Drawing & Geometry, UiGraph and UiDoc
+  guides; completed implementation history remains in Git.
 - Geometry/shape foundation: added `UiGeometry` as the final-device-pixel
   adaptive geometry contract, `UiShapePath` as backend-neutral authored path
   topology, and `UiShapes` as the parameterised stock silhouette layer.

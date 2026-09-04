@@ -26,7 +26,7 @@
     - PropertyEditor models are the single authored state. Preview and source
       generation read the same values, avoiding parallel demo-only state.
     - Theme rows remain inherited until their override action is activated.
-    - Override presentation follows docs/11_UI_PROPERTY_OVERRIDE_LAYOUT.md;
+    - Override presentation follows docs/05_UI_PROPERTY_EDITOR_GUIDE.md;
       stable runtime ids are normalized to that human-facing layout before the
       PropertyEditor observes structure changes.
 

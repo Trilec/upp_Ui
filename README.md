@@ -34,14 +34,14 @@ The canonical, portable documentation set lives in `docs/`:
 - `docs/02_UI_THEME_GUIDE.md` — theme and style system
 - `docs/03_UI_MODEL_GUIDE.md` — model-driven architecture and PropertyEditor
 - `docs/04_UI_DEMO_GUIDE.md` — the intended demo structure
-- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — complete PropertyEditor integration,
-  adapters, transactions, providers, layout, and performance contract
-- `docs/22_UI_RENDER_BACKEND_ROADMAP.md` — accepted Draw/Painter/cache/backend policy
-- `docs/24_UI_GEOMETRY_CONTRACT.md` — mandatory 0.35px final-device geometry contract
-- `docs/25_UI_SHAPE_PATH.md` — authored paths, stock shapes, and new-control usage
+- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and override layout
+- `docs/06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD
+- `docs/07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/final-pixel geometry and shapes
+- `docs/08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing and hierarchy
+- `docs/09_UIDOC_GUIDE.md` — document model/view/reuse architecture
 
 Start with `00_UPP_CODING_GUIDE.md`, then read the controls guide before
-touching any control or demo. For drawing/shape work, also read 24 and 25.
+touching any control or demo. For drawing/shape work, read 07; for dense views/LOD, read 06.
 
 The repository-wide geometry rule is deliberate: **normal controls can use
 `UiShapes`; dense scenes such as Graph may go directly to `UiGeometry`.**
