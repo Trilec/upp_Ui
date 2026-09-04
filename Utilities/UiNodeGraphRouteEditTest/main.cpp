@@ -145,6 +145,10 @@ CONSOLE_APP_MAIN
 
     Rect handle = graph.GetEdgeRouteHandleRect(edge);
     t.Expect(!handle.IsEmpty(), "selected Bezier exposes one midpoint route handle at 1:1");
+    Point expected_midpoint(440, 195);
+    t.Expect(!handle.IsEmpty() && abs(handle.CenterPoint().x - expected_midpoint.x) <= 2
+             && abs(handle.CenterPoint().y - expected_midpoint.y) <= 2,
+             "adaptive straight Bezier handle stays at geometric midpoint independent of vertex count");
 
     Vector<Pointf> desired;
     desired.Add(Pointf(200, 100));

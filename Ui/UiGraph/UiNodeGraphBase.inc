@@ -2047,7 +2047,12 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
     int interaction = fround(max(2.0, style.interaction_width * max(0.25, min(1.0, zoom_))));
     out.bounds = RouteBounds(out.points, interaction);
     if(!out.points.IsEmpty()) {
-        out.label_point = out.points[out.points.GetCount() / 2];
+        // Route midpoint is a geometric position, not a vertex-index position.
+        // Adaptive tessellation can legitimately collapse a straight Bezier to
+        // two endpoints; choosing points[count/2] would then select the target
+        // endpoint and move the edit handle as tessellation density changes.
+        Pointf midpoint = UiGeometry::PointAtPolylineFraction(route, 0.5);
+        out.label_point = Point(fround(midpoint.x), fround(midpoint.y));
         bool editable_route = route_style != UiGraphRouteStyle::Custom &&
                               zoom_ >= lod_policy_.route_edit_zoom &&
                               (IsEdgeSelected(edge.ref) || hot_edge_ == edge.ref ||

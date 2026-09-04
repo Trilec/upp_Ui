@@ -42,6 +42,9 @@ public:
     static double Length(Pointf vector);
     static Pointf Normalize(Pointf vector);
     static double PolylineLength(const Vector<Pointf>& points);
+    // Point at a clamped 0..1 fraction of visible polyline arc length.
+    // This is deliberately independent of vertex count/tessellation density.
+    static Pointf PointAtPolylineFraction(const Vector<Pointf>& points, double fraction);
     static double DistanceToPolyline(Pointf point, const Vector<Pointf>& points);
 
     // Analytic/general containment. These avoid manufacturing a dense path just

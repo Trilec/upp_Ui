@@ -188,6 +188,11 @@ CONSOLE_APP_MAIN
              && std::fabs(UiGeometry::DistanceToPolyline(Pointf(3, 2), line) - 1.2) < 1e-9,
              "polyline length and distance remain exact for routing and hit-testing consumers");
 
+    Vector<Pointf> uneven;
+    uneven << Pointf(0, 0) << Pointf(2, 0) << Pointf(10, 0);
+    t.Expect(Near(UiGeometry::PointAtPolylineFraction(uneven, 0.5), Pointf(5, 0), 1e-9),
+             "polyline midpoint follows visible arc length rather than vertex index");
+
     Vector<Pointf> band = UiGeometry::ArcBandPath(Pointf(50, 50), 20.0, 12.0,
                                                   -PI * 0.5, PI * 1.5);
     Vector<Pointf> pie = UiGeometry::PiePath(Pointf(50, 50), 20.0,

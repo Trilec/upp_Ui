@@ -55,6 +55,11 @@ Discrete authored vertices are not automatically simplified. Geometry is also
 independent of colour, theme, state, raster cache, Ctrl ownership and render
 backend.
 
+Semantic positions such as route midpoints, labels, edit handles and anchors
+must be derived from geometry (for example visible arc length or analytic
+intersection), never from a tessellation vertex index. Adaptive flattening is
+allowed to change point count without changing authored interaction semantics.
+
 ## Lines
 
 A straight line has no tessellation requirement. Use `DrawLine` or a native

@@ -142,6 +142,40 @@ double UiGeometry::PolylineLength(const Vector<Pointf>& points)
     return total;
 }
 
+Pointf UiGeometry::PointAtPolylineFraction(const Vector<Pointf>& points, double fraction)
+{
+    if(points.IsEmpty())
+        return Pointf(0, 0);
+    if(points.GetCount() == 1)
+        return points[0];
+
+    fraction = minmax(fraction, 0.0, 1.0);
+    if(fraction <= 0.0)
+        return points[0];
+    if(fraction >= 1.0)
+        return points.Top();
+
+    double total = PolylineLength(points);
+    if(total <= 1e-12)
+        return points[0];
+
+    double target = total * fraction;
+    double traversed = 0.0;
+    for(int i = 1; i < points.GetCount(); i++) {
+        Pointf a = points[i - 1];
+        Pointf b = points[i];
+        double segment = Length(b - a);
+        if(segment <= 1e-12)
+            continue;
+        if(target <= traversed + segment) {
+            double q = (target - traversed) / segment;
+            return a + (b - a) * minmax(q, 0.0, 1.0);
+        }
+        traversed += segment;
+    }
+    return points.Top();
+}
+
 double UiGeometry::DistanceToPolyline(Pointf point, const Vector<Pointf>& points)
 {
     if(points.IsEmpty())
