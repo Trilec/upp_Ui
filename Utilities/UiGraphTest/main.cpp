@@ -340,19 +340,20 @@ static void RunRouteTests(TestCtx& t)
 {
     t.Section("Route builders");
 
-    Vector<Pointf> straight = UiNodeGraph::BuildStraightRoute(Pointf(0, 0), Pointf(100, 100));
+    Vector<Pointf> straight = UiNodeGraph::BuildStraightRoutePx(Pointf(0, 0), Pointf(100, 100));
     t.Expect(straight.GetCount() == 2, "Straight route has two points");
     t.Expect(straight[0] == Pointf(0, 0) && straight.Top() == Pointf(100, 100),
              "Straight route preserves endpoints");
 
-    Vector<Pointf> bezier = UiNodeGraph::BuildBezierRoute(Pointf(0, 0), UiGraphPortSide::Right,
+    Vector<Pointf> bezier = UiNodeGraph::BuildBezierRoutePx(Pointf(0, 0), UiGraphPortSide::Right,
                                                            Pointf(200, 100), UiGraphPortSide::Left,
-                                                           0.4, 16);
-    t.Expect(bezier.GetCount() == 17, "Bezier route uses requested sample count");
+                                                           0.4);
+    t.Expect(bezier.GetCount() > 2,
+             "Bezier route derives enough screen-space geometry for its curvature");
     t.Expect(bezier[0] == Pointf(0, 0) && bezier.Top() == Pointf(200, 100),
              "Bezier route preserves endpoints");
 
-    Vector<Pointf> orthogonal = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> orthogonal = UiNodeGraph::BuildOrthogonalRoutePx(
         Pointf(0, 0), UiGraphPortSide::Right,
         Pointf(200, 100), UiGraphPortSide::Left,
         30.0, 0.0);
@@ -367,7 +368,7 @@ static void RunRouteTests(TestCtx& t)
 
     Vector<Pointf> guides;
     guides << Pointf(70, 40) << Pointf(140, 80);
-    Vector<Pointf> guided = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> guided = UiNodeGraph::BuildOrthogonalRoutePx(
         Pointf(0, 0), UiGraphPortSide::Right,
         Pointf(200, 100), UiGraphPortSide::Left,
         30.0, 0.0, guides);
@@ -381,7 +382,7 @@ static void RunRouteTests(TestCtx& t)
     t.Expect(guided[0] == Pointf(0, 0) && guided.Top() == Pointf(200, 100),
              "Guided route preserves endpoints");
 
-    Vector<Pointf> rounded = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> rounded = UiNodeGraph::BuildOrthogonalRoutePx(
         Pointf(0, 0), UiGraphPortSide::Right,
         Pointf(200, 100), UiGraphPortSide::Left,
         30.0, 8.0);

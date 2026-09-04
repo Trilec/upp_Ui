@@ -208,10 +208,16 @@ CONSOLE_APP_MAIN
 
     Vector<Pointf> middle;
     middle.Add(Pointf(200, 220));
-    Vector<Pointf> curve = UiNodeGraph::BuildBezierRoute(Pointf(0, 0), UiGraphPortSide::Right,
+    Vector<Pointf> curve = UiNodeGraph::BuildBezierRoutePx(Pointf(0, 0), UiGraphPortSide::Right,
                                                           Pointf(400, 0), UiGraphPortSide::Left,
-                                                          0.42, 24, middle);
-    t.Expect(curve.GetCount() == 25 && Near(curve[12], middle[0]),
+                                                          0.42, middle);
+    bool passes_middle = false;
+    for(const Pointf& p : curve)
+        if(Near(p, middle[0])) {
+            passes_middle = true;
+            break;
+        }
+    t.Expect(passes_middle,
              "large downward Bezier bias remains a smooth route through the authored midpoint");
     t.Expect(curve[1].x > curve[0].x && curve[curve.GetCount() - 2].x < curve.Top().x,
              "biased Bezier preserves outward source and inward target endpoint tangents");

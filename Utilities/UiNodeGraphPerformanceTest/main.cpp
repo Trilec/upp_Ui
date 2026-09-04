@@ -102,18 +102,17 @@ CONSOLE_APP_MAIN
     TestCtx t;
     const double pi = 3.14159265358979323846;
 
-    int tiny_segments = UiArcSegmentsForPixels(4.0, 2.0 * pi, 0.40, 4, 64);
-    int large_segments = UiArcSegmentsForPixels(100.0, 2.0 * pi, 0.40, 4, 64);
-    int exact_segments = UiArcSegmentsForPixels(100.0, 2.0 * pi, 0.0, 4, 64);
+    int tiny_segments = UiGeometry::ArcSegments(4.0, 2.0 * pi);
+    int large_segments = UiGeometry::ArcSegments(100.0, 2.0 * pi);
     double segment_angle = 2.0 * pi / large_segments;
     double large_error = 100.0 * (1.0 - std::cos(segment_angle * 0.5));
 
     t.Expect(tiny_segments < large_segments,
              "screen-error tessellation uses fewer segments for a tiny projected curve");
-    t.Expect(large_error <= 0.400001,
-             "screen-error tessellation respects the requested 0.40px sagitta bound");
-    t.Expect(exact_segments == 64,
-             "non-positive pixel error provides the explicit high-detail opt-out path");
+    t.Expect(large_error <= UiGeometry::ErrorPx() + 0.000001,
+             "screen-error tessellation respects the shared device-pixel error contract");
+    t.Expect(std::fabs(UiGeometry::ErrorPx() - 0.35) < 1e-12,
+             "UiGraph consumes the library-wide 0.35px geometry contract");
 
     UiGraphModel scale_model;
     Vector<UiGraphNodeRef> scale_nodes;

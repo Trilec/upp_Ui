@@ -10,6 +10,8 @@ uses
 
 file
 	UiStyle.h,
+	UiGeometry.h,
+	UiGeometry.cpp,
 	UiDraw.h,
 	UiDraw.cpp,
 	UiDrawBase.h,

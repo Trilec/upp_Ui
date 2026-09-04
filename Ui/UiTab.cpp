@@ -1,5 +1,6 @@
 #include <Ui/UiTab.h>
 #include <Ui/UiMeasure.h>
+#include <Ui/UiGeometry.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
 
@@ -18,12 +19,7 @@ static void UiPaintClassicTabActivePath(Draw& w, Size sz, const Rect& strip, con
     auto AddArc = [&](Vector<Pointf>& out, double cx, double cy, double r, double a0, double a1) {
         if(r <= 0)
             return;
-        int steps = max(6, (int)r * 2);
-        for(int i = 1; i <= steps; i++) {
-            double q = (double)i / steps;
-            double a = a0 + (a1 - a0) * q;
-            out.Add(Pointf(cx + cos(a) * r, cy + sin(a) * r));
-        }
+        UiGeometry::AppendArc(out, Pointf(cx, cy), r, a0, a1 - a0);
     };
 
     Vector<Pointf> path;

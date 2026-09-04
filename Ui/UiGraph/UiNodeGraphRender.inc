@@ -170,10 +170,14 @@ void PaintCachedPortMarker(Draw& w, const Rect& target,
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
         BufferPainter p(ib, MODE_ANTIALIASED);
-        Rect local = RectC(0, 0, target.GetWidth(), target.GetHeight());
-        Vector<Pointf> ring = EllipsePath(local, 20);
-        FillPath(p, ring, canvas);
-        StrokePath(p, ring, stroke, frame, true);
+        p.Begin();
+        p.Ellipse(0.5, 0.5,
+                  max(1.0, target.GetWidth() - 1.0),
+                  max(1.0, target.GetHeight() - 1.0));
+        if(!IsNull(canvas))
+            p.Fill(canvas);
+        p.Stroke(stroke, frame);
+        p.End();
         p.Finish();
         return Image(ib);
     });
@@ -362,7 +366,7 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         Vector<Pointf> header;
         header << Pointf(hr.left, hr.top) << Pointf(hr.right, hr.top)
                << Pointf(hr.right, hr.bottom) << Pointf(hr.left, hr.bottom);
-        FillPath(p, RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55), 5),
+        FillPath(p, UiGeometry::RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55)),
                  style.header_face[si]);
     }
 
@@ -386,7 +390,6 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         Point anchor = g.anchors[i];
         Rect pr = RectC(anchor.x - port_radius, anchor.y - port_radius,
                         port_radius * 2 + 1, port_radius * 2 + 1);
-        Vector<Pointf> ring = EllipsePath(pr, 20);
         Color frame = style.port_frame[si];
         if(IsNull(frame)) frame = style.palette.frame[si];
         if(IsNull(frame)) frame = Color(148, 163, 184);
@@ -401,8 +404,14 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         }
         else if(!IsNull(port->color))
             frame = BlendGraphColor(frame, port->color, 0.22);
-        FillPath(p, ring, canvas);
-        StrokePath(p, ring, active ? max(1.5, normal_stroke * 1.5) : normal_stroke, frame, true);
+        p.Begin();
+        p.Ellipse(pr.left + 0.5, pr.top + 0.5,
+                  max(1.0, pr.GetWidth() - 1.0),
+                  max(1.0, pr.GetHeight() - 1.0));
+        if(!IsNull(canvas))
+            p.Fill(canvas);
+        p.Stroke(active ? max(1.5, normal_stroke * 1.5) : normal_stroke, frame);
+        p.End();
     }
 }
 
@@ -758,9 +767,13 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 int radius = DPI(4);
                 Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
                                 radius * 2 + 1, radius * 2 + 1);
-                Vector<Pointf> circle = EllipsePath(rr, 20);
-                FillPath(hp, circle, Color(219, 234, 254));
-                StrokePath(hp, circle, max(1.0, (double)DPI(1)), blue, true);
+                hp.Begin();
+                hp.Ellipse(rr.left + 0.5, rr.top + 0.5,
+                           max(1.0, rr.GetWidth() - 1.0),
+                           max(1.0, rr.GetHeight() - 1.0));
+                hp.Fill(Color(219, 234, 254));
+                hp.Stroke(max(1.0, (double)DPI(1)), blue);
+                hp.End();
             }
         });
     }

@@ -644,12 +644,7 @@ inline void UiPaintStyledCap(Draw& w,
     auto AddArc = [&](Vector<Pointf>& out, double cx, double cy, double a0, double a1) {
         if(rad <= 0)
             return;
-        int steps = max(6, (int)rad * 2);
-        for(int i = 1; i <= steps; i++) {
-            double q = (double)i / steps;
-            double a = a0 + (a1 - a0) * q;
-            out.Add(Pointf(cx + cos(a) * rad, cy + sin(a) * rad));
-        }
+        UiGeometry::AppendArc(out, Pointf(cx, cy), rad, a0, a1 - a0);
     };
 
     Vector<Pointf> fill_poly;

@@ -1,0 +1,14 @@
+description "Ui screen-space geometry contract tests";
+
+uses
+	Core,
+	Draw,
+	Painter,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"CONSOLE" = "";

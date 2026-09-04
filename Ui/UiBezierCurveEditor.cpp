@@ -218,20 +218,18 @@ void UiBezierCurveEditor::Paint(Draw& w)
         p.Stroke(1.0, style_.axis);
         p.End();
 
-        Vector<Pointf> poly;
-        for(int i = 0; i <= 100; ++i) {
-            double t = (double)i / 100.0;
-            double y = UiShadowCurveEval(curve_, t);
-            poly.Add(ToScreen(Pointf(t, y), plot));
-        }
-        if(poly.GetCount() >= 2) {
-            p.Begin();
-            p.Move(poly[0]);
-            for(int i = 1; i < poly.GetCount(); ++i)
-                p.Line(poly[i]);
-            p.Stroke((double)style_.stroke, style_.curve);
-            p.End();
-        }
+        // Preserve the authored cubic as a cubic. BufferPainter flattens native
+        // Beziers in final device space, so a small editor no longer pays for a
+        // fixed 101-point polyline while a large editor still gets enough detail.
+        Pointf p0 = ToScreen(Pointf(0.0, 0.0), plot);
+        Pointf p1 = ToScreen(Pointf(curve_.x1, curve_.y1), plot);
+        Pointf p2 = ToScreen(Pointf(curve_.x2, curve_.y2), plot);
+        Pointf p3 = ToScreen(Pointf(1.0, 1.0), plot);
+        p.Begin();
+        p.Move(p0);
+        p.Cubic(p1, p2, p3);
+        p.Stroke((double)style_.stroke, style_.curve);
+        p.End();
     }
 
     auto draw_handle = [&](Handle h, double x, double y) {

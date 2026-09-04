@@ -40,7 +40,7 @@ void RunRouteNormalization(TestCtx& t)
     Pointf source(0, 0), target(100, 0);
     Vector<Pointf> near_waypoint;
     near_waypoint << Pointf(50, 2);
-    Vector<Pointf> direct = UiNodeGraph::BuildStraightRoute(source, target, near_waypoint);
+    Vector<Pointf> direct = UiNodeGraph::BuildStraightRoutePx(source, target, near_waypoint);
     t.Expect(direct.GetCount() == 2,
              "near-direct straight waypoint collapses to a direct segment");
     t.Expect(direct.GetCount() == 2 && Near(direct[0], source) && Near(direct[1], target),
@@ -48,7 +48,7 @@ void RunRouteNormalization(TestCtx& t)
 
     Vector<Pointf> displaced_waypoint;
     displaced_waypoint << Pointf(50, 20);
-    Vector<Pointf> displaced = UiNodeGraph::BuildStraightRoute(source, target, displaced_waypoint);
+    Vector<Pointf> displaced = UiNodeGraph::BuildStraightRoutePx(source, target, displaced_waypoint);
     t.Expect(displaced.GetCount() == 3,
              "intentional straight-route displacement remains represented");
     t.Expect(displaced.GetCount() == 3 && Near(displaced[1], displaced_waypoint[0]),
@@ -56,7 +56,7 @@ void RunRouteNormalization(TestCtx& t)
 
     Vector<Pointf> ortho_waypoint;
     ortho_waypoint << Pointf(100, 160);
-    Vector<Pointf> ortho = UiNodeGraph::BuildOrthogonalRoute(Pointf(0, 0), UiGraphPortSide::Right,
+    Vector<Pointf> ortho = UiNodeGraph::BuildOrthogonalRoutePx(Pointf(0, 0), UiGraphPortSide::Right,
                                                               Pointf(200, 100), UiGraphPortSide::Left,
                                                               20.0, 0.0, ortho_waypoint);
     t.Expect(ortho.GetCount() >= 4 && Near(ortho[0], Pointf(0, 0))

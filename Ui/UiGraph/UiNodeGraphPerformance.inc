@@ -1,106 +1,7 @@
 namespace Upp {
 namespace {
 
-constexpr double kUiGraphGeometryLodErrorPx = 0.40;
 constexpr double kUiGraphPi = 3.14159265358979323846;
-
-Vector<Pointf> LodRoundedPolygon(const Vector<Pointf>& vertices,
-                                 double radius, int max_samples)
-{
-    if(vertices.GetCount() < 3)
-        return clone(vertices);
-    radius = max(0.0, radius);
-    if(radius <= 0.0001)
-        return clone(vertices);
-
-    const int samples = UiArcSegmentsForPixels(radius, kUiGraphPi * 0.5,
-                                                kUiGraphGeometryLodErrorPx,
-                                                1, max(1, max_samples));
-    Vector<Pointf> out;
-    for(int i = 0; i < vertices.GetCount(); i++) {
-        Pointf prev = vertices[(i + vertices.GetCount() - 1) % vertices.GetCount()];
-        Pointf cur = vertices[i];
-        Pointf next = vertices[(i + 1) % vertices.GetCount()];
-        double a_len = VectorLength(prev - cur);
-        double b_len = VectorLength(next - cur);
-        double r = min(radius, min(a_len, b_len) * 0.45);
-        if(r <= 0.0001) {
-            if(out.IsEmpty() || VectorLength(out.Top() - cur) > 0.01)
-                out.Add(cur);
-            continue;
-        }
-        Pointf entry = a_len > 1e-9 ? cur + (prev - cur) * (r / a_len) : cur;
-        Pointf exit = b_len > 1e-9 ? cur + (next - cur) * (r / b_len) : cur;
-        if(out.IsEmpty() || VectorLength(out.Top() - entry) > 0.01)
-            out.Add(entry);
-        for(int k = 1; k <= samples; k++) {
-            double t = (double)k / samples;
-            double u = 1.0 - t;
-            out.Add(Pointf(u * u * entry.x + 2.0 * u * t * cur.x + t * t * exit.x,
-                           u * u * entry.y + 2.0 * u * t * cur.y + t * t * exit.y));
-        }
-    }
-    return out;
-}
-
-Vector<Pointf> LodEllipsePath(const Rect& r)
-{
-    Vector<Pointf> out;
-    double cx = (r.left + r.right) * 0.5;
-    double cy = (r.top + r.bottom) * 0.5;
-    double rx = max(0.5, r.GetWidth() * 0.5);
-    double ry = max(0.5, r.GetHeight() * 0.5);
-    int samples = UiArcSegmentsForPixels(max(rx, ry), 2.0 * kUiGraphPi,
-                                         kUiGraphGeometryLodErrorPx, 8, 40);
-    out.Reserve(samples);
-    for(int i = 0; i < samples; i++) {
-        double a = 2.0 * kUiGraphPi * i / samples;
-        out.Add(Pointf(cx + std::cos(a) * rx,
-                       cy + std::sin(a) * ry));
-    }
-    return out;
-}
-
-Vector<Pointf> LodCapsulePath(const Rect& r)
-{
-    Vector<Pointf> out;
-    double l = r.left, t = r.top, rr = r.right, b = r.bottom;
-    double w = max(1, r.GetWidth()), h = max(1, r.GetHeight());
-    double radius = min(w, h) * 0.5;
-    int samples = UiArcSegmentsForPixels(radius, kUiGraphPi,
-                                         kUiGraphGeometryLodErrorPx, 3, 16);
-    if(w >= h) {
-        double cy = (t + b) * 0.5;
-        double lc = l + radius;
-        double rc = rr - radius;
-        for(int i = 0; i <= samples; i++) {
-            double a = -kUiGraphPi * 0.5 + kUiGraphPi * i / samples;
-            out.Add(Pointf(rc + std::cos(a) * radius,
-                           cy + std::sin(a) * radius));
-        }
-        for(int i = 0; i <= samples; i++) {
-            double a = kUiGraphPi * 0.5 + kUiGraphPi * i / samples;
-            out.Add(Pointf(lc + std::cos(a) * radius,
-                           cy + std::sin(a) * radius));
-        }
-    }
-    else {
-        double cx = (l + rr) * 0.5;
-        double tc = t + radius;
-        double bc = b - radius;
-        for(int i = 0; i <= samples; i++) {
-            double a = kUiGraphPi * i / samples;
-            out.Add(Pointf(cx + std::cos(a) * radius,
-                           bc + std::sin(a) * radius));
-        }
-        for(int i = 0; i <= samples; i++) {
-            double a = kUiGraphPi + kUiGraphPi * i / samples;
-            out.Add(Pointf(cx + std::cos(a) * radius,
-                           tc + std::sin(a) * radius));
-        }
-    }
-    return out;
-}
 
 Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
 {
@@ -114,21 +15,21 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
     switch(node.shape) {
     case UiGraphNodeShape::Circle:
     case UiGraphNodeShape::Ellipse:
-        return LodEllipsePath(rect);
+        return UiGeometry::EllipsePath(rect);
     case UiGraphNodeShape::Diamond:
         v << Pointf(cx, t) << Pointf(r, cy) << Pointf(cx, b) << Pointf(l, cy);
-        return LodRoundedPolygon(v, radius, 5);
+        return UiGeometry::RoundedPolygon(v, radius);
     case UiGraphNodeShape::Triangle:
         v << Pointf(cx, t) << Pointf(r, b) << Pointf(l, b);
-        return LodRoundedPolygon(v, radius, 5);
+        return UiGeometry::RoundedPolygon(v, radius);
     case UiGraphNodeShape::Hexagon: {
         double dx = rect.GetWidth() * 0.24;
         v << Pointf(l + dx, t) << Pointf(r - dx, t) << Pointf(r, cy)
           << Pointf(r - dx, b) << Pointf(l + dx, b) << Pointf(l, cy);
-        return LodRoundedPolygon(v, radius, 5);
+        return UiGeometry::RoundedPolygon(v, radius);
     }
     case UiGraphNodeShape::Capsule:
-        return LodCapsulePath(rect);
+        return UiGeometry::CapsulePath(rect);
     case UiGraphNodeShape::Cloud: {
         double w = rect.GetWidth(), h = rect.GetHeight();
         v << Pointf(l + w * 0.08, t + h * 0.62)
@@ -142,13 +43,13 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
           << Pointf(l + w * 0.95, t + h * 0.60)
           << Pointf(l + w * 0.82, t + h * 0.80)
           << Pointf(l + w * 0.18, t + h * 0.82);
-        return LodRoundedPolygon(v, max(radius, min(w, h) * 0.10), 6);
+        return UiGeometry::RoundedPolygon(v, max(radius, min(w, h) * 0.10));
     }
     case UiGraphNodeShape::Document: {
         double fold = min(rect.GetWidth(), rect.GetHeight()) * 0.22;
         v << Pointf(l, t) << Pointf(r - fold, t) << Pointf(r, t + fold)
           << Pointf(r, b) << Pointf(l, b);
-        return LodRoundedPolygon(v, radius, 5);
+        return UiGeometry::RoundedPolygon(v, radius);
     }
     case UiGraphNodeShape::Database:
         v << Pointf(l, t + rect.GetHeight() * 0.14)
@@ -159,7 +60,7 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
           << Pointf(r - rect.GetWidth() * 0.18, b)
           << Pointf(l + rect.GetWidth() * 0.18, b)
           << Pointf(l, b - rect.GetHeight() * 0.14);
-        return LodRoundedPolygon(v, max(radius, rect.GetHeight() * 0.08), 5);
+        return UiGeometry::RoundedPolygon(v, max(radius, rect.GetHeight() * 0.08));
     case UiGraphNodeShape::Rectangle:
     case UiGraphNodeShape::Custom:
         v << Pointf(l, t) << Pointf(r, t) << Pointf(r, b) << Pointf(l, b);
@@ -168,7 +69,7 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
     case UiGraphNodeShape::RoundedRectangle:
     default:
         v << Pointf(l, t) << Pointf(r, t) << Pointf(r, b) << Pointf(l, b);
-        return LodRoundedPolygon(v, radius, 6);
+        return UiGeometry::RoundedPolygon(v, radius);
     }
 }
 

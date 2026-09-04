@@ -394,18 +394,18 @@ public:
     Function<Vector<Pointf>(const UiGraphEdge&, Pointf, UiGraphPortSide,
                             Pointf, UiGraphPortSide, const UiGraphEdgeStyle&)> WhenBuildCustomRoute;
 
-    static Vector<Pointf> BuildStraightRoute(Pointf source, Pointf target,
-                                             const Vector<Pointf>& waypoints = Vector<Pointf>());
-    static Vector<Pointf> BuildBezierRoute(Pointf source, UiGraphPortSide source_side,
-                                           Pointf target, UiGraphPortSide target_side,
-                                           double tension = 0.42,
-                                           int samples = 24,
-                                           const Vector<Pointf>& waypoints = Vector<Pointf>());
-    static Vector<Pointf> BuildOrthogonalRoute(Pointf source, UiGraphPortSide source_side,
-                                               Pointf target, UiGraphPortSide target_side,
-                                               double lead = 0.0,
-                                               double corner_radius = 8.0,
+    // Route helpers operate strictly in final projected device pixels.
+    static Vector<Pointf> BuildStraightRoutePx(Pointf source, Pointf target,
                                                const Vector<Pointf>& waypoints = Vector<Pointf>());
+    static Vector<Pointf> BuildBezierRoutePx(Pointf source, UiGraphPortSide source_side,
+                                               Pointf target, UiGraphPortSide target_side,
+                                               double tension = 0.42,
+                                               const Vector<Pointf>& waypoints = Vector<Pointf>());
+    static Vector<Pointf> BuildOrthogonalRoutePx(Pointf source, UiGraphPortSide source_side,
+                                                   Pointf target, UiGraphPortSide target_side,
+                                                   double lead = 0.0,
+                                                   double corner_radius = 8.0,
+                                                   const Vector<Pointf>& waypoints = Vector<Pointf>());
 
 private:
     struct NodeGeometry : Moveable<NodeGeometry> {
@@ -641,7 +641,7 @@ private:
     static UiGraphPortSide ResolvePortSide(const UiGraphPort& port);
     static Pointf SideVector(UiGraphPortSide side);
     static Vector<Pointf> SimplifyRoute(const Vector<Pointf>& route);
-    static Vector<Pointf> RoundPolyline(const Vector<Pointf>& route, double radius, int samples = 4);
+    static Vector<Pointf> RoundPolyline(const Vector<Pointf>& route, double radius);
     static double DistanceToSegment(Pointf p, Pointf a, Pointf b);
     static Rect RouteBounds(const Vector<Point>& route, int inflate);
     static bool PointInPolygon(const Vector<Pointf>& polygon, Pointf point);

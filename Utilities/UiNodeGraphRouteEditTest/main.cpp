@@ -102,7 +102,7 @@ CONSOLE_APP_MAIN
     t.Expect(abs(stock_edge_style.orthogonal_lead) < 1e-9,
              "stock orthogonal route does not impose a fixed endpoint lead");
 
-    Vector<Pointf> compact_route = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> compact_route = UiNodeGraph::BuildOrthogonalRoutePx(
         Pointf(0, 0), UiGraphPortSide::Right,
         Pointf(24, 0), UiGraphPortSide::Left,
         0.0, 0.0);
@@ -111,7 +111,7 @@ CONSOLE_APP_MAIN
 
     Vector<Pointf> corridor_waypoint;
     corridor_waypoint.Add(Pointf(60, 50));
-    Vector<Pointf> corridor_route = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> corridor_route = UiNodeGraph::BuildOrthogonalRoutePx(
         Pointf(0, 0), UiGraphPortSide::Right,
         Pointf(120, 0), UiGraphPortSide::Left,
         0.0, 0.0, corridor_waypoint);
@@ -148,10 +148,16 @@ CONSOLE_APP_MAIN
 
     Vector<Pointf> desired;
     desired.Add(Pointf(200, 100));
-    Vector<Pointf> biased = UiNodeGraph::BuildBezierRoute(Pointf(0, 0), UiGraphPortSide::Right,
+    Vector<Pointf> biased = UiNodeGraph::BuildBezierRoutePx(Pointf(0, 0), UiGraphPortSide::Right,
                                                            Pointf(400, 0), UiGraphPortSide::Left,
-                                                           0.42, 24, desired);
-    t.Expect(biased.GetCount() == 25 && Near(biased[12], desired[0]),
+                                                           0.42, desired);
+    bool biased_hits_middle = false;
+    for(const Pointf& p : biased)
+        if(Near(p, desired[0])) {
+            biased_hits_middle = true;
+            break;
+        }
+    t.Expect(biased_hits_middle,
              "Bezier midpoint bias makes the cubic pass through the authored middle handle");
 
     bool intercept = true;
@@ -210,7 +216,7 @@ CONSOLE_APP_MAIN
                          model.GetNode(a).position.y + model.GetNode(a).size.cy * 0.5);
     Pointf target_anchor(model.GetNode(b).position.x,
                          model.GetNode(b).position.y + model.GetNode(b).size.cy * 0.5);
-    Vector<Pointf> committed_route = UiNodeGraph::BuildOrthogonalRoute(
+    Vector<Pointf> committed_route = UiNodeGraph::BuildOrthogonalRoutePx(
         source_anchor, UiGraphPortSide::Right,
         target_anchor, UiGraphPortSide::Left,
         0.0, 0.0, committed_orthogonal.waypoints);
@@ -228,10 +234,10 @@ CONSOLE_APP_MAIN
     double source_boundary = model.GetNode(a).position.x + model.GetNode(a).size.cx;
     double target_boundary = model.GetNode(b).position.x;
     double route_y = model.GetNode(a).position.y + model.GetNode(a).size.cy * 0.5;
-    Vector<Pointf> extreme_bezier = UiNodeGraph::BuildBezierRoute(
+    Vector<Pointf> extreme_bezier = UiNodeGraph::BuildBezierRoutePx(
         Pointf(source_boundary, route_y), UiGraphPortSide::Right,
         Pointf(target_boundary, route_y), UiGraphPortSide::Left,
-        0.42, 24, clamped_bezier.waypoints);
+        0.42, clamped_bezier.waypoints);
     t.Expect(clamped_bezier.waypoints.GetCount() == 1
              && clamped_bezier.waypoints[0].x >= source_boundary
              && clamped_bezier.waypoints[0].x <= target_boundary

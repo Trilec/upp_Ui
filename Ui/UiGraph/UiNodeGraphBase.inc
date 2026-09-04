@@ -96,96 +96,6 @@ Color SelectedFrameColor(const UiGraphNodeStyle& style)
                                               : style.metrics.focus_color;
 }
 
-Vector<Pointf> RoundedPolygon(const Vector<Pointf>& vertices, double radius, int samples = 5)
-{
-    Vector<Pointf> out;
-    int n = vertices.GetCount();
-    if(n < 3)
-        return clone(vertices);
-    radius = max(0.0, radius);
-    samples = max(1, samples);
-
-    for(int i = 0; i < n; i++) {
-        Pointf prev = vertices[(i + n - 1) % n];
-        Pointf cur = vertices[i];
-        Pointf next = vertices[(i + 1) % n];
-        double a_len = VectorLength(prev - cur);
-        double b_len = VectorLength(next - cur);
-        double r = min(radius, min(a_len, b_len) * 0.45);
-        Pointf entry = a_len > 1e-9 ? cur + (prev - cur) * (r / a_len) : cur;
-        Pointf exit = b_len > 1e-9 ? cur + (next - cur) * (r / b_len) : cur;
-        if(out.IsEmpty() || VectorLength(out.Top() - entry) > 0.01)
-            out.Add(entry);
-        for(int k = 1; k <= samples; k++) {
-            double t = (double)k / samples;
-            double u = 1.0 - t;
-            out.Add(Pointf(u * u * entry.x + 2.0 * u * t * cur.x + t * t * exit.x,
-                           u * u * entry.y + 2.0 * u * t * cur.y + t * t * exit.y));
-        }
-    }
-    return out;
-}
-
-Vector<Pointf> EllipsePath(const Rect& r, int samples = 40)
-{
-    Vector<Pointf> out;
-    double cx = (r.left + r.right) * 0.5;
-    double cy = (r.top + r.bottom) * 0.5;
-    double rx = max(1.0, r.GetWidth() * 0.5);
-    double ry = max(1.0, r.GetHeight() * 0.5);
-    samples = max(12, samples);
-    for(int i = 0; i < samples; i++) {
-        double a = 2.0 * 3.14159265358979323846 * i / samples;
-        out.Add(Pointf(cx + std::cos(a) * rx,
-                       cy + std::sin(a) * ry));
-    }
-    return out;
-}
-
-Vector<Pointf> CapsulePath(const Rect& r, int samples = 16)
-{
-    Vector<Pointf> out;
-    double l = r.left, t = r.top, rr = r.right, b = r.bottom;
-    double w = max(1, r.GetWidth()), h = max(1, r.GetHeight());
-    samples = max(6, samples);
-    if(w >= h) {
-        double radius = h * 0.5;
-        double cy = (t + b) * 0.5;
-        double lc = l + radius;
-        double rc = rr - radius;
-        for(int i = 0; i <= samples; i++) {
-            double a = -3.14159265358979323846 * 0.5
-                     + 3.14159265358979323846 * i / samples;
-            out.Add(Pointf(rc + std::cos(a) * radius,
-                           cy + std::sin(a) * radius));
-        }
-        for(int i = 0; i <= samples; i++) {
-            double a = 3.14159265358979323846 * 0.5
-                     + 3.14159265358979323846 * i / samples;
-            out.Add(Pointf(lc + std::cos(a) * radius,
-                           cy + std::sin(a) * radius));
-        }
-    }
-    else {
-        double radius = w * 0.5;
-        double cx = (l + rr) * 0.5;
-        double tc = t + radius;
-        double bc = b - radius;
-        for(int i = 0; i <= samples; i++) {
-            double a = 0.0 + 3.14159265358979323846 * i / samples;
-            out.Add(Pointf(cx + std::cos(a) * radius,
-                           bc + std::sin(a) * radius));
-        }
-        for(int i = 0; i <= samples; i++) {
-            double a = 3.14159265358979323846
-                     + 3.14159265358979323846 * i / samples;
-            out.Add(Pointf(cx + std::cos(a) * radius,
-                           tc + std::sin(a) * radius));
-        }
-    }
-    return out;
-}
-
 Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
 {
     Vector<Pointf> v;
@@ -198,21 +108,21 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
     switch(node.shape) {
     case UiGraphNodeShape::Circle:
     case UiGraphNodeShape::Ellipse:
-        return EllipsePath(rect);
+        return UiGeometry::EllipsePath(rect);
     case UiGraphNodeShape::Diamond:
         v << Pointf(cx, t) << Pointf(r, cy) << Pointf(cx, b) << Pointf(l, cy);
-        return RoundedPolygon(v, radius);
+        return UiGeometry::RoundedPolygon(v, radius);
     case UiGraphNodeShape::Triangle:
         v << Pointf(cx, t) << Pointf(r, b) << Pointf(l, b);
-        return RoundedPolygon(v, radius);
+        return UiGeometry::RoundedPolygon(v, radius);
     case UiGraphNodeShape::Hexagon: {
         double dx = rect.GetWidth() * 0.24;
         v << Pointf(l + dx, t) << Pointf(r - dx, t) << Pointf(r, cy)
           << Pointf(r - dx, b) << Pointf(l + dx, b) << Pointf(l, cy);
-        return RoundedPolygon(v, radius);
+        return UiGeometry::RoundedPolygon(v, radius);
     }
     case UiGraphNodeShape::Capsule:
-        return CapsulePath(rect);
+        return UiGeometry::CapsulePath(rect);
     case UiGraphNodeShape::Cloud: {
         double w = rect.GetWidth(), h = rect.GetHeight();
         v << Pointf(l + w * 0.08, t + h * 0.62)
@@ -226,13 +136,13 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
           << Pointf(l + w * 0.95, t + h * 0.60)
           << Pointf(l + w * 0.82, t + h * 0.80)
           << Pointf(l + w * 0.18, t + h * 0.82);
-        return RoundedPolygon(v, max(radius, min(w, h) * 0.10), 6);
+        return UiGeometry::RoundedPolygon(v, max(radius, min(w, h) * 0.10));
     }
     case UiGraphNodeShape::Document: {
         double fold = min(rect.GetWidth(), rect.GetHeight()) * 0.22;
         v << Pointf(l, t) << Pointf(r - fold, t) << Pointf(r, t + fold)
           << Pointf(r, b) << Pointf(l, b);
-        return RoundedPolygon(v, radius);
+        return UiGeometry::RoundedPolygon(v, radius);
     }
     case UiGraphNodeShape::Database: {
         v << Pointf(l, t + rect.GetHeight() * 0.14)
@@ -243,7 +153,7 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
           << Pointf(r - rect.GetWidth() * 0.18, b)
           << Pointf(l + rect.GetWidth() * 0.18, b)
           << Pointf(l, b - rect.GetHeight() * 0.14);
-        return RoundedPolygon(v, max(radius, rect.GetHeight() * 0.08), 5);
+        return UiGeometry::RoundedPolygon(v, max(radius, rect.GetHeight() * 0.08));
     }
     case UiGraphNodeShape::Square:
     case UiGraphNodeShape::Rectangle:
@@ -251,10 +161,9 @@ Vector<Pointf> NodeShapePath(const UiGraphNode& node, const Rect& rect)
     case UiGraphNodeShape::Custom:
     default:
         v << Pointf(l, t) << Pointf(r, t) << Pointf(r, b) << Pointf(l, b);
-        return RoundedPolygon(v,
+        return UiGeometry::RoundedPolygon(v,
                               node.shape == UiGraphNodeShape::Rectangle ||
-                              node.shape == UiGraphNodeShape::Custom ? 0.0 : radius,
-                              6);
+                              node.shape == UiGraphNodeShape::Custom ? 0.0 : radius);
     }
 }
 
@@ -473,9 +382,10 @@ void PaintArrow(Painter& p, const Vector<Point>& points,
         return;
     }
     if(arrow == UiGraphArrowStyle::Circle) {
-        Rect rr(fround(tip.x - size * 0.45), fround(tip.y - size * 0.45),
-                fround(tip.x + size * 0.45), fround(tip.y + size * 0.45));
-        FillPath(p, EllipsePath(rr, 24), color);
+        p.Begin();
+        p.Circle(tip, max(0.5, size * 0.45));
+        p.Fill(color);
+        p.End();
         return;
     }
 
@@ -650,21 +560,15 @@ UiNodeGraph::Style ResolveNodeGraphTheme(const UiThemeContext& context)
 
 bool UiNodeGraph::PointInPolygon(const Vector<Pointf>& polygon, Pointf point)
 {
-    if(polygon.GetCount() < 3)
-        return false;
-    bool inside = false;
-    for(int i = 0, j = polygon.GetCount() - 1; i < polygon.GetCount(); j = i++) {
-        const Pointf& a = polygon[j];
-        const Pointf& b = polygon[i];
-        if(DistanceToSegment(point, a, b) <= 0.75)
+    // Graph's historical boundary-inclusive hit contract allows a small
+    // interaction tolerance around the prepared silhouette.
+    if(UiGeometry::ContainsPolygon(polygon, point))
+        return true;
+    for(int i = 0; i < polygon.GetCount(); i++)
+        if(UiGeometry::DistanceToSegment(point, polygon[i],
+                                         polygon[(i + 1) % polygon.GetCount()]) <= 0.75)
             return true;
-        bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
-                       (point.x < (b.x - a.x) * (point.y - a.y) /
-                                      ((b.y - a.y) == 0.0 ? 1e-12 : (b.y - a.y)) + a.x);
-        if(crosses)
-            inside = !inside;
-    }
-    return inside;
+    return false;
 }
 
 bool UiNodeGraph::ShapeContains(const UiGraphNode& node, const Rect& surface, Point point)
@@ -1930,7 +1834,7 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     out.paint_bounds = out.paint_bounds.Inflated(max(1, fround(2 * min(1.0, max(0.25, zoom_)))));
 }
 
-Vector<Pointf> UiNodeGraph::BuildStraightRoute(Pointf source, Pointf target, const Vector<Pointf>& waypoints)
+Vector<Pointf> UiNodeGraph::BuildStraightRoutePx(Pointf source, Pointf target, const Vector<Pointf>& waypoints)
 {
     if(waypoints.GetCount() == 1) {
         double tolerance = max(2.0, min(8.0, VectorLength(target - source) * 0.04));
@@ -1945,15 +1849,19 @@ Vector<Pointf> UiNodeGraph::BuildStraightRoute(Pointf source, Pointf target, con
     return SimplifyRoute(route);
 }
 
-Vector<Pointf> UiNodeGraph::BuildBezierRoute(Pointf source, UiGraphPortSide source_side,
-                                              Pointf target, UiGraphPortSide target_side,
-                                              double tension, int samples,
-                                              const Vector<Pointf>& waypoints)
+Vector<Pointf> UiNodeGraph::BuildBezierRoutePx(Pointf source, UiGraphPortSide source_side,
+                                                  Pointf target, UiGraphPortSide target_side,
+                                                  double tension,
+                                                  const Vector<Pointf>& waypoints)
 {
     Vector<Pointf> route;
     double distance = max(40.0, VectorLength(target - source));
     double handle = max(24.0, distance * minmax(tension, 0.05, 1.25));
-    samples = max(4, samples);
+
+    // Route construction receives projected screen-space endpoints. Preserve the
+    // authored cubic controls and let UiGeometry decide the explicit polyline
+    // density from the shared 0.35px device-space error contract.
+    route.Add(source);
 
     // The normal editor exposes one midpoint handle. With an authored midpoint,
     // use two C1-continuous cubic halves instead of translating both endpoint
@@ -1980,28 +1888,14 @@ Vector<Pointf> UiNodeGraph::BuildBezierRoute(Pointf source, UiGraphPortSide sour
         Pointf b1 = middle + mid_dir * mid_handle;
         Pointf b2 = target + SideVector(target_side) * b_handle;
 
-        int first = max(2, samples / 2);
-        int second = max(2, samples - first);
-        for(int i = 0; i <= first; i++) {
-            double t = (double)i / first, u = 1.0 - t;
-            route.Add(Pointf(u*u*u*source.x + 3*u*u*t*a1.x + 3*u*t*t*a2.x + t*t*t*middle.x,
-                             u*u*u*source.y + 3*u*u*t*a1.y + 3*u*t*t*a2.y + t*t*t*middle.y));
-        }
-        for(int i = 1; i <= second; i++) {
-            double t = (double)i / second, u = 1.0 - t;
-            route.Add(Pointf(u*u*u*middle.x + 3*u*u*t*b1.x + 3*u*t*t*b2.x + t*t*t*target.x,
-                             u*u*u*middle.y + 3*u*u*t*b1.y + 3*u*t*t*b2.y + t*t*t*target.y));
-        }
+        UiGeometry::AppendCubic(route, source, a1, a2, middle);
+        UiGeometry::AppendCubic(route, middle, b1, b2, target);
         return route;
     }
 
     Pointf c1 = source + SideVector(source_side) * handle;
     Pointf c2 = target + SideVector(target_side) * handle;
-    for(int i = 0; i <= samples; i++) {
-        double t = (double)i / samples, u = 1.0 - t;
-        route.Add(Pointf(u*u*u*source.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*target.x,
-                         u*u*u*source.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*target.y));
-    }
+    UiGeometry::AppendCubic(route, source, c1, c2, target);
     return route;
 }
 
@@ -2023,33 +1917,15 @@ Vector<Pointf> UiNodeGraph::SimplifyRoute(const Vector<Pointf>& input)
     return out;
 }
 
-Vector<Pointf> UiNodeGraph::RoundPolyline(const Vector<Pointf>& route, double radius, int samples)
+Vector<Pointf> UiNodeGraph::RoundPolyline(const Vector<Pointf>& route, double radius)
 {
-    if(route.GetCount() < 3 || radius <= 0.0) return clone(route);
-    Vector<Pointf> out;
-    out.Add(route[0]);
-    for(int i = 1; i + 1 < route.GetCount(); i++) {
-        Pointf prev = route[i - 1], cur = route[i], next = route[i + 1];
-        double la = VectorLength(prev - cur), lb = VectorLength(next - cur);
-        double r = min(radius, min(la, lb) * 0.45);
-        Pointf entry = la > 1e-9 ? cur + (prev - cur) * (r / la) : cur;
-        Pointf exit = lb > 1e-9 ? cur + (next - cur) * (r / lb) : cur;
-        out.Add(entry);
-        int n = max(1, samples);
-        for(int k = 1; k <= n; k++) {
-            double t = (double)k / n, u = 1.0 - t;
-            out.Add(Pointf(u*u*entry.x + 2*u*t*cur.x + t*t*exit.x,
-                           u*u*entry.y + 2*u*t*cur.y + t*t*exit.y));
-        }
-    }
-    out.Add(route.Top());
-    return SimplifyRoute(out);
+    return UiGeometry::RoundedPolyline(route, radius);
 }
 
-Vector<Pointf> UiNodeGraph::BuildOrthogonalRoute(Pointf source, UiGraphPortSide source_side,
-                                                  Pointf target, UiGraphPortSide target_side,
-                                                  double lead, double corner_radius,
-                                                  const Vector<Pointf>& waypoints)
+Vector<Pointf> UiNodeGraph::BuildOrthogonalRoutePx(Pointf source, UiGraphPortSide source_side,
+                                                      Pointf target, UiGraphPortSide target_side,
+                                                      double lead, double corner_radius,
+                                                      const Vector<Pointf>& waypoints)
 {
     lead = max(0.0, lead);
     Pointf a = source + SideVector(source_side) * lead;
@@ -2146,9 +2022,9 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
         double route_detail = SmoothUnit(zoom_, lod_policy_.minimal_edge_zoom,
                                          lod_policy_.full_detail_zoom);
         if(route_style == UiGraphRouteStyle::Straight)
-            route = BuildStraightRoute(a, b, waypoints);
+            route = BuildStraightRoutePx(a, b, waypoints);
         else if(route_style == UiGraphRouteStyle::Orthogonal)
-            route = BuildOrthogonalRoute(a, source_side, b, target_side,
+            route = BuildOrthogonalRoutePx(a, source_side, b, target_side,
                                          style.orthogonal_lead * zoom_,
                                          style.orthogonal_radius * zoom_ * route_detail,
                                          waypoints);
@@ -2159,11 +2035,9 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
             route << a << b;
             out.simplified = true;
         }
-        else {
-            int samples = max(4, fround(5.0 + 19.0 * route_detail));
-            route = BuildBezierRoute(a, source_side, b, target_side,
-                                     style.bezier_tension, samples, waypoints);
-        }
+        else
+            route = BuildBezierRoutePx(a, source_side, b, target_side,
+                                     style.bezier_tension, waypoints);
         if(zoom_ < lod_policy_.edge_simplify_zoom)
             out.simplified = true;
     }
@@ -2447,17 +2321,21 @@ Rect UiNodeGraph::RouteBounds(const Vector<Point>& route, int inflate)
 
 double UiNodeGraph::DistanceToSegment(Pointf p, Pointf a, Pointf b)
 {
-    Pointf ab = b - a; double len2 = ab.x * ab.x + ab.y * ab.y;
-    if(len2 <= 1e-9) return VectorLength(p - a);
-    double t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2;
-    t = minmax(t, 0.0, 1.0);
-    return VectorLength(p - (a + ab * t));
+    return UiGeometry::DistanceToSegment(p, a, b);
 }
 
 bool UiNodeGraph::PointInNodeGeometry(const UiGraphNode& node, const NodeGeometry& g, Point p) const
 {
     if(node.shape == UiGraphNodeShape::Custom && WhenHitTestCustomShape)
         return WhenHitTestCustomShape(node, g.surface, p);
+    if(g.surface.IsEmpty() || !g.surface.Contains(p))
+        return false;
+    if(node.shape == UiGraphNodeShape::Rectangle ||
+       node.shape == UiGraphNodeShape::Square ||
+       node.shape == UiGraphNodeShape::Custom)
+        return true;
+    if(!g.hit_path.IsEmpty())
+        return PointInPolygon(g.hit_path, Pointf(p.x, p.y));
     return ShapeContains(node, g.surface, p);
 }
 
@@ -2648,7 +2526,7 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
        && style.show_header_band && !node.collapsed && g.header.GetHeight() > 0) {
         Rect hr = g.header.Deflated(max(1, fround(2 * zoom_)), max(1, fround(2 * zoom_)));
         Vector<Pointf> header; header << Pointf(hr.left, hr.top) << Pointf(hr.right, hr.top) << Pointf(hr.right, hr.bottom) << Pointf(hr.left, hr.bottom);
-        FillPath(p, RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55), 5), style.header_face[si]);
+        FillPath(p, UiGeometry::RoundedPolygon(header, max(0.0, node.corner_radius * zoom_ * 0.55)), style.header_face[si]);
     }
 
     double port_visual_floor = max(0.12, lod_policy_.port_zoom - 0.04);
@@ -2672,15 +2550,24 @@ void UiNodeGraph::PaintNodeDetails(Painter& p, const UiGraphNode& node, const No
         }
         Color fill = BlendGraphColor(node_face, raw_fill, local_factor);
         Rect pr = RectC(anchor.x - port_radius, anchor.y - port_radius, port_radius * 2 + 1, port_radius * 2 + 1);
-        Vector<Pointf> shape;
-        if(port->direction == UiGraphPortDirection::Input) shape = EllipsePath(pr, 20);
-        else if(port->direction == UiGraphPortDirection::Bidirectional) {
-            shape << Pointf(anchor.x, pr.top) << Pointf(pr.right, anchor.y) << Pointf(anchor.x, pr.bottom) << Pointf(pr.left, anchor.y);
+        if(port->direction == UiGraphPortDirection::Input) {
+            p.Begin();
+            p.Ellipse(pr.left + 0.5, pr.top + 0.5,
+                      max(1.0, pr.GetWidth() - 1.0),
+                      max(1.0, pr.GetHeight() - 1.0));
+            p.Fill(fill);
+            p.End();
         }
         else {
-            shape << Pointf(pr.left, pr.top) << Pointf(pr.right, pr.top) << Pointf(pr.right, pr.bottom) << Pointf(pr.left, pr.bottom);
+            Vector<Pointf> shape;
+            if(port->direction == UiGraphPortDirection::Bidirectional)
+                shape << Pointf(anchor.x, pr.top) << Pointf(pr.right, anchor.y)
+                      << Pointf(anchor.x, pr.bottom) << Pointf(pr.left, anchor.y);
+            else
+                shape << Pointf(pr.left, pr.top) << Pointf(pr.right, pr.top)
+                      << Pointf(pr.right, pr.bottom) << Pointf(pr.left, pr.bottom);
+            FillPath(p, shape, fill);
         }
-        FillPath(p, shape, fill);
     }
 }
 
@@ -2747,9 +2634,9 @@ void UiNodeGraph::PaintConnectionPreview(Painter& p)
     UiGraphPortSide source_side = UiGraphPortSide::Right, target_side = UiGraphPortSide::Left;
     Point a = GetPortAnchor(connection_source_, &source_side); Point b = last_point_;
     if(connection_target_.IsValid()) b = GetPortAnchor(connection_target_, &target_side);
-    Vector<Pointf> route = BuildBezierRoute(Pointf(a.x, a.y), source_side,
+    Vector<Pointf> route = BuildBezierRoutePx(Pointf(a.x, a.y), source_side,
                                              Pointf(b.x, b.y), target_side,
-                                             0.35, 20);
+                                             0.35);
     Vector<Point> points; for(const Pointf& q : route) points.Add(Point(fround(q.x), fround(q.y)));
     Color color = connection_target_.IsValid() ? (connection_decision_.IsAllowed() ? Color(34,197,94) : Color(239,68,68)) : Color(59,130,246);
     StrokePolyline(p, points, 2.0, color, DASHED, 7.0, 5.0);
@@ -2933,9 +2820,13 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
             int radius = DPI(4);
             Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
                             radius * 2 + 1, radius * 2 + 1);
-            Vector<Pointf> circle = EllipsePath(rr, 20);
-            FillPath(hp, circle, Color(219, 234, 254));
-            StrokePath(hp, circle, max(1.0, (double)DPI(1)), blue, true);
+            hp.Begin();
+            hp.Ellipse(rr.left + 0.5, rr.top + 0.5,
+                       max(1.0, rr.GetWidth() - 1.0),
+                       max(1.0, rr.GetHeight() - 1.0));
+            hp.Fill(Color(219, 234, 254));
+            hp.Stroke(max(1.0, (double)DPI(1)), blue);
+            hp.End();
         }
         hp.Finish();
         w.DrawImage(paint.left, paint.top, handle_buffer);
