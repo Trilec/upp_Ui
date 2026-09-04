@@ -4,35 +4,37 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; not project history.
 
 ## CURRENT
-BASE: `620134c56f7fd48559112ad197bc51dcd2582f29` — UiGraph performance P2.
-P2: **PASS** on Windows CLANGx64 Debug/Release; no Gary source edits.
-TASK: **UiGeometry first-class final-pixel geometry contract**
-STATUS: **PUBLISHED — PLATFORM VALIDATION PENDING**
-IMPLEMENTATION: `6aa98a23f8449a5eb7f796f43c28b071cb6da938`
-PUBLISHED_GEOMETRY: `e4022cef29b2c5962ff9248bab2392ee84c00141`
+BASE: `ffe51a2750db4944f54877d60aa15bbde036f2c9`
+GEOMETRY CONTRACT: Windows gate PARTIAL only because RouteEdit midpoint semantics regressed; all geometry/render/P2 checks otherwise PASS.
+TASK: **Route midpoint semantics independent of adaptive tessellation**
+STATUS: **PUBLISHED — TARGETED WINDOWS RETEST PENDING**
+FIX: `454f35a98db17044f6a45652024e8beedb4296b9`
 
-## CONTRACT
-- one library-owned **0.35 device-pixel** error budget for explicit generated geometry;
-- geometry decisions use final pixels after DPI/view transforms;
-- no control-owned tessellation quality knobs;
-- prefer direct `Draw`, then native Painter, then `UiGeometry` explicit points only when required;
-- preserve authored discrete topology; geometry remains independent of colour/theme/cache/backend.
+## ROOT CAUSE / FIX
+- adaptive Bezier flattening correctly reduced a straight cubic to two endpoints;
+- Graph still used `route[count/2]` as its semantic midpoint, which selected the target endpoint;
+- `UiGeometry::PointAtPolylineFraction()` now derives positions by visible arc length;
+- Graph label/initial route-handle midpoint now uses arc length, not vertex index;
+- authored waypoint handle semantics and the 0.35px geometry contract are unchanged;
+- geometry contract now explicitly forbids semantic positions from depending on tessellation indices.
 
-## COVERAGE
-- arcs/ellipses, rounded rect/capsule, quadratic/cubic, rounded polyline/polygon;
-- line/polyline metrics and distance, analytic containment, radial band/pie geometry;
-- generated-polyline simplification and pixel-significance tests;
-- shared cap/UiTab/Bezier editor and fixed-detail UiNodeGraph geometry/routes migrated;
-- paint-only circles use native Painter; Graph hit tests reuse prepared silhouettes.
+## VALIDATION
+Previously PASS on `ffe51a2`:
+- UiGeometryContractTest 24/24;
+- all Graph suites except UiNodeGraphRouteEditTest;
+- P2 micro/render contracts;
+- UiGraphDemo and UiProgressRingDemo visual smoke;
+- diff-check clean.
+New deterministic expectations:
+- UiGeometryContractTest: **25 checks**;
+- UiNodeGraphRouteEditTest: **25 checks**.
 
-## VALIDATION / REMAINING
-- complete-file/diff/mechanical source review passed before publication;
-- Windows geometry/render/Graph Debug+Release gate still required;
-- P2 fit-all 10k paint improved ~6x and intermediate micro LOD passed;
-- observed P2 demo issue: zoomed-out 10k viewport can continuously repaint while idle (~41% core);
+## REMAINING
+- targeted Debug+Release retest required for the two changed suites plus core Graph regressions;
+- zoomed-out 10k idle continuous repaint remains the next performance issue;
 - warm unchanged 10k rebind still rebuilds one spatial index;
 - raster efficiency remains separate: blur, gradients, masks, temporary buffers, image analysis.
 
 ## NEXT
-Run the UiGeometry + render + Graph Windows gate on current `main`.
-If green, investigate the idle continuous-repaint cause before further hierarchy work.
+Run targeted Windows gate on current `main`.
+If green, mark geometry contract PASS and investigate idle continuous repaint before further hierarchy work.
