@@ -6,6 +6,19 @@ This project is experimental and iterating quickly. The goal of this file is to 
 
 ## Unreleased
 
+- Geometry/shape foundation: added `UiGeometry` as the final-device-pixel
+  adaptive geometry contract, `UiShapePath` as backend-neutral authored path
+  topology, and `UiShapes` as the parameterised stock silhouette layer.
+  Explicit generated curves use one library-owned 0.35px error budget; normal
+  controls may use `UiShapes`, while dense scenes such as UiNodeGraph may use
+  `UiGeometry` directly to avoid unnecessary authored-command allocation.
+- Shared shape vocabulary now covers polygons/rounded polygons, rectangle/
+  rounded rectangle/capsule/ellipse, regular N-gons, stars, directional arrows
+  and chevrons, chamfers, callouts, tags with holes, cloud/document/database
+  silhouettes, and radial ring/pie shapes. `UiPainterShapePath()` in `UiDraw`
+  renders authored paths without putting appearance/backend state into the path
+  model.
+
 - Demo rewrites: UiMultiEditDemo, UiRadioButtonDemo, UiMenuDemo, and UiTabDemo are now on the normalized builder-shell path with shared header/theme chrome, dotted preview canvas, Usage -> State -> Properties inspectors, and control-specific behavior/layout/color surfaces exposed through live controls.
 - `UiDropdown`: added control-owned popup drag reorder with explicit handle, side placement, blue insertion marker, and model-backed `UiListModel::Move(...)` sync; `UiDropdownDemo` now exposes drag enable/handle/side controls.
 - `UiList`: added control-owned drag reorder with explicit drag handle, side placement, blue insertion marker, and shared-model reorder support; `UiListModel::Move(...)` now accepts move-to-end (`to == GetCount()`), and bound list views now refresh immediately on model changes.

@@ -39,11 +39,20 @@ This specifically reduces visual noise and avoidable line work around the 0.30 o
 
 Low-detail connector width is capped at one screen pixel once the normal simplified-edge LOD is active. Connectivity remains visible longer than ports or secondary text.
 
+Connector curves and rounded corners use `UiGeometry`'s shared adaptive
+final-pixel contract rather than a detail-band sample count. LOD chooses the
+semantic representation (full routed connector, simplified connector, hidden);
+within that representation, explicit geometry never exceeds what projected
+pixels require. See `24_UI_GEOMETRY_CONTRACT.md` and
+`25_UI_SHAPE_PATH.md`.
+
 Straight route editing normalizes a single waypoint that lies very close to the direct source/target segment back to a direct route. This prevents a small accidental route nick from becoming durable presentation geometry.
 
 For the normal one-handle orthogonal editor, the midpoint now controls a stable corridor. Same-orientation endpoint pairs choose a horizontal detour or vertical bridge based on the dominant handle displacement instead of repeatedly re-deriving arbitrary elbows while dragging. Multi-waypoint authored routes retain the existing generic route builder.
 
 The existing request-first `UiGraphEdgeRouteRequest` contract remains unchanged.
+The visible midpoint/route-handle position is arc-length based and independent
+of adaptive path vertex count. Do not reintroduce `route[count/2]` semantics.
 
 ## Embedded controls and retained media
 

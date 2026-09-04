@@ -37,7 +37,14 @@ Built-in Straight, Bezier and Orthogonal edges use route-envelope world bounds r
 
 Spatial hash queries are candidate queries, but returned nodes are filtered through their retained exact world bounds. Pointer hit tests, marquee selection and dirty-paint lookup therefore do not treat every shared hash cell as exact membership.
 
-Prepared and dirty-paint spatial queries use a screen-space margin that shrinks with LOD instead of the former fixed 160-pixel margin. Low-detail edges also use fewer Bezier samples and reduced interaction/bounds inflation. The minimum-zoom overview may reduce non-selected connector representation while preserving semantic topology and selected/hot objects.
+Prepared and dirty-paint spatial queries use a screen-space margin that shrinks with LOD instead of the former fixed 160-pixel margin. Bezier and rounded-route geometry now uses adaptive final-device-pixel flattening through `UiGeometry`; there is no Graph-owned fixed sample count. The minimum-zoom overview may reduce non-selected connector representation while preserving semantic topology and selected/hot objects.
+
+Graph is a dense-scene exception to the normal-control shape path. It may build
+explicit projected paths directly with `UiGeometry` rather than allocating a
+`UiShapePath` command object per node. This is intentional and still obeys the
+same 0.35 px contract. Normal controls should prefer `UiShapes` for reusable
+silhouettes; see `24_UI_GEOMETRY_CONTRACT.md` and
+`25_UI_SHAPE_PATH.md`.
 
 The node body path also has an overview-specific allocation guard. The canonical Ui rounded face/frame helper intentionally uses an antialiased temporary raster for rounded surfaces. Once Graph LOD has already removed active shadows, small ordinary rounded/capsule nodes (up to 48 screen pixels on their longest axis) reuse an exact cached AA face/frame raster instead of allocating one temporary `ImageBuffer` per node per frame. This fast path is deliberately narrow: image fills, enabled skins, dashed frames, active shadows and larger nodes continue through the canonical styled renderer unchanged. Authored highlights remain a separate canonical layer.
 

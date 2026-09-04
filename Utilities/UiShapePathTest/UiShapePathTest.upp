@@ -1,0 +1,7 @@
+description "UiShapePath authored path and stock shape contract tests";
+
+uses
+    Ui;
+
+file
+    main.cpp;

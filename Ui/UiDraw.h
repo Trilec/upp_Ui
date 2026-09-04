@@ -32,6 +32,9 @@
       rasterisation, not Ctrl invalidation or viewport policy.
     - Explicit geometry follows UiGeometry's library-wide 0.35 px error
       contract. Controls do not own independent approximation-quality knobs.
+    - UiPainterShapePath() is the rendering adapter for normal controls using
+      UiShapePath/UiShapes. Dense scenes are not required to allocate authored
+      path objects and may consume UiGeometry directly.
 
     Migration
     - UiDrawBase.h is the byte-for-byte pre-facade implementation. It is internal
@@ -40,6 +43,7 @@
 */
 
 #include <Ui/UiGeometry.h>
+#include <Ui/UiShapePath.h>
 
 // Keep the complete established implementation available under private facade
 // names for fallback paths. All other UiDraw symbols remain unchanged.
@@ -214,6 +218,9 @@ inline void UiPaintStyledSurface(Draw& w,
     if(!foreground_handled)
         UiPaintStyledForeground(w, outer, palette, metrics, skin, st, has_focus);
 }
+
+// Emit an authored UiShapePath into an already active Painter path.
+void UiPainterShapePath(Painter& painter, const UiShapePath& path);
 
 // Exact AA circular-arc stroke. Cap roundness is 0..100 and is always relative
 // to stroke thickness. When gradient is true, colour interpolates along the arc.

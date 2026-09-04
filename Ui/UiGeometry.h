@@ -17,9 +17,13 @@
     - Authored units, DPI scaling and view transforms happen before these calls.
     - Explicit curve geometry targets a library-wide maximum visual error of
       0.35 screen pixels.
-    - Prefer native Draw/Painter primitives. Use this layer only when explicit
-      points are genuinely required for hit testing, clipping, routing, custom
-      shapes or a backend without an equivalent native primitive.
+    - Prefer native Draw/Painter primitives. Normal controls that need a
+      reusable authored silhouette should use UiShapes / UiShapePath above this
+      layer. Use UiGeometry directly when explicit points/math are genuinely
+      required.
+    - Dense/high-count scenes (UiNodeGraph is the canonical example) may use
+      UiGeometry directly when an intermediate UiShapePath would add unnecessary
+      allocation/work.
     - Authored discrete vertices are never simplified implicitly.
 */
 

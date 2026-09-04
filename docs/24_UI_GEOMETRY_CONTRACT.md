@@ -2,7 +2,13 @@
 
 ## Status
 
-This is the rendering geometry contract for all new `upp_Ui` work.
+This is the mandatory rendering-geometry contract for all new `upp_Ui` work.
+Read it together with `25_UI_SHAPE_PATH.md`.
+
+**Agent/control rule:** normal controls should use `UiShapes` for reusable
+authored silhouettes (or author a `UiShapePath` when no stock shape exists).
+Dense scenes such as `UiNodeGraph` may go directly to `UiGeometry` when the
+intermediate authored-path object would add measurable allocation/work.
 
 ## Absolute invariant
 
@@ -28,6 +34,23 @@ Use the cheapest representation that preserves the authored appearance:
 
 Painter already adaptively flattens its native curves. Pre-flattening those
 curves into an oversized polyline defeats that work.
+
+## Control usage decision
+
+Use the highest layer that does not add unnecessary work:
+
+1. **Paint-only primitive** — use direct `Draw` or a native Painter primitive.
+2. **Normal control needing a reusable silhouette** — use `UiShapes`.
+3. **Normal control needing a silhouette not yet named** — author
+   `UiShapePath`; add a new `UiShapes` builder only when the silhouette is
+   broadly reusable.
+4. **Need explicit points for hit testing, routing, clipping or a backend seam** —
+   flatten through `UiShapePath`/`UiGeometry`; never invent sample counts.
+5. **Dense/high-count scene** — direct `UiGeometry` use is allowed and often
+   preferred when `UiShapePath` command allocation would be pure overhead.
+
+This is deliberate layering, not a requirement that every call pass through
+every layer. Reuse must never become an allocation tax.
 
 ## UiGeometry responsibility
 
@@ -83,10 +106,11 @@ geometry tessellation.
 
 ## Migration gate
 
-The repository is not geometry-contract complete while production drawing code
-contains fixed or radius-proportional approximation loops.
+The production drawing audit is complete for the geometry-contract checkpoint.
+New or modified code must not reintroduce fixed/radius-proportional
+approximation loops.
 
-Known migration targets at contract introduction:
+Historical migration targets at contract introduction were:
 
 - shared styled-cap arc sampling;
 - classic UiTab active outline;
@@ -138,6 +162,9 @@ Audited as already compliant and intentionally unchanged:
   approximation sampling);
 - discrete arrow/triangle/diamond vertices;
 - grid/dash repetition where spacing itself is authored visible geometry.
+
+The authored-shape layer introduced after this audit is documented in
+`25_UI_SHAPE_PATH.md`; it does not change the 0.35 px rule.
 
 The next separate efficiency audit is raster work: blur, masks, gradients,
 temporary ImageBuffers, immutable-image analysis and render-layer allocation.

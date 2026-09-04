@@ -51,7 +51,9 @@ to whole-percent steps.
 ## Shared circular-arc primitive
 
 Exact arc/gradient/cap painting now lives in `UiDraw` as the generic
-`UiPaintCircularArc` primitive. `UiProgressRing` owns its progress-specific
+`UiPaintCircularArc` primitive. It follows the repository geometry hierarchy:
+keep the circular stroke as a native Painter arc rather than pre-flattening it
+into a control-owned point loop. `UiProgressRing` owns its progress-specific
 track/raster composition locally, while `UiChartRing` owns its multi-segment
 composition. There is no separate ring-renderer subsystem and no common ring
 control base class.
@@ -62,6 +64,12 @@ Partial arcs use native flat/round caps at the endpoints and UiDraw's
 thickness-relative intermediate cap geometry. Intermediate custom caps use a
 bounded sub-pixel stroke overlap to prevent an antialiasing hairline at the
 cap/stroke join. Full `100%` sweeps are closed circles with no cap seam.
+
+`UiShapes::RingSegment` / `UiShapes::Pie` exist for controls that need an
+authored **filled radial silhouette**. They are not a reason to replace this
+cheaper native stroked-arc path. Normal controls should use the highest shared
+layer that fits the job; dense scenes may use `UiGeometry` directly. See
+`24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
 
 ## Raster policy
 

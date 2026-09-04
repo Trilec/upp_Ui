@@ -4,6 +4,12 @@
 namespace Upp {
 namespace {
 
+Pointf UiShapePathArcPoint(Pointf center, double rx, double ry, double angle)
+{
+    return Pointf(center.x + cos(angle) * rx,
+                  center.y + sin(angle) * ry);
+}
+
 double UiCircularArcClamp01(double v)
 {
     if(v < 0.0) return 0.0;
@@ -103,6 +109,101 @@ Image UiCircularArcAngularGradient(Size size, Pointf center,
 }
 
 } // namespace
+
+void UiPainterShapePath(Painter& painter, const UiShapePath& path)
+{
+    bool have_current = false;
+    Pointf current;
+
+    auto move = [&](Pointf point) {
+        painter.Move(point);
+        current = point;
+        have_current = true;
+    };
+
+    auto line = [&](Pointf point) {
+        if(!have_current)
+            move(point);
+        else {
+            painter.Line(point);
+            current = point;
+        }
+    };
+
+    for(const UiShapeCommand& command : path.GetCommands()) {
+        switch(command.type) {
+        case UiShapeCommandType::MoveTo:
+            move(command.p1);
+            break;
+
+        case UiShapeCommandType::LineTo:
+            line(command.p1);
+            break;
+
+        case UiShapeCommandType::QuadraticTo:
+            if(!have_current)
+                move(command.p2);
+            else {
+                Pointf c1 = current + (command.p1 - current) * (2.0 / 3.0);
+                Pointf c2 = command.p2 + (command.p1 - command.p2) * (2.0 / 3.0);
+                painter.Cubic(c1, c2, command.p2);
+                current = command.p2;
+            }
+            break;
+
+        case UiShapeCommandType::CubicTo:
+            if(!have_current)
+                move(command.p3);
+            else {
+                painter.Cubic(command.p1, command.p2, command.p3);
+                current = command.p3;
+            }
+            break;
+
+        case UiShapeCommandType::Arc: {
+            Pointf arc_start = UiShapePathArcPoint(command.p1, command.radius_x,
+                                                   command.radius_x,
+                                                   command.start_angle);
+            if(!have_current)
+                move(arc_start);
+            else if(UiGeometry::Length(current - arc_start) > 1e-9)
+                line(arc_start);
+            painter.Arc(command.p1, command.radius_x,
+                        command.start_angle, command.sweep_angle);
+            current = UiShapePathArcPoint(command.p1, command.radius_x,
+                                          command.radius_x,
+                                          command.start_angle + command.sweep_angle);
+            break;
+        }
+
+        case UiShapeCommandType::EllipseArc: {
+            Pointf arc_start = UiShapePathArcPoint(command.p1, command.radius_x,
+                                                   command.radius_y,
+                                                   command.start_angle);
+            if(!have_current)
+                move(arc_start);
+            else if(UiGeometry::Length(current - arc_start) > 1e-9)
+                line(arc_start);
+
+            Vector<Pointf> points;
+            points.Add(arc_start);
+            UiGeometry::AppendEllipse(points, command.p1,
+                                      command.radius_x, command.radius_y,
+                                      command.start_angle, command.sweep_angle);
+            for(int i = 1; i < points.GetCount(); i++)
+                line(points[i]);
+            break;
+        }
+
+        case UiShapeCommandType::Close:
+            if(have_current)
+                painter.Close();
+            have_current = false;
+            break;
+        }
+    }
+}
+
 
 void UiPaintCircularArc(Painter& p, Size raster_size,
                         const Pointf& center, double radius,

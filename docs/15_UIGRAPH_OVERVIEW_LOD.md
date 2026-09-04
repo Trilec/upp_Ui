@@ -14,6 +14,14 @@ The overview does **not** mutate `UiGraphModel`. All nodes, ports, edges, identi
 
 Overview reduction is applied only while rebuilding retained geometry. Ordinary paint lookup, node/port/edge hit testing and marquee interaction still receive exact spatial-query results; they simply find paintable edge geometry only for the representatives retained by the overview rebuild.
 
+Population LOD and curve tessellation are separate concerns. Overview reduction
+decides **which semantic representatives are prepared**; `UiGeometry` decides
+**how much explicit projected curve detail can affect final pixels**. No overview
+stage owns a fixed Bezier/arc sample count. Because Graph is a dense scene, it
+may use `UiGeometry` directly instead of allocating `UiShapePath` objects per
+prepared node/edge. See `24_UI_GEOMETRY_CONTRACT.md` and
+`25_UI_SHAPE_PATH.md`.
+
 ## Representative density
 
 The minimum-zoom overview uses world-anchored bins corresponding to approximately 64 screen pixels at the current zoom. Ordinary edges are grouped by:

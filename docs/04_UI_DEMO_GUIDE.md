@@ -1,5 +1,5 @@
 ````markdown
-# 04 — Ui Demo Guide 
+# 04 — Ui Demo Guide
 
 This guide defines the intended demo architecture for `upp_Ui`.
 
@@ -14,6 +14,15 @@ The goal is to make every full demo:
 - useful as readable example source code;
 - powered by the production `PropertyEditor`;
 - self-contained and easy for both humans and agents to understand.
+
+## Drawing/shape demo rule
+
+Demos must demonstrate production drawing APIs rather than inventing demo-only
+geometry. Normal-control examples should use direct Draw/native Painter or
+`UiShapes`/`UiShapePath`; dense scene demos may use the same direct
+`UiGeometry` path as the production control. Never introduce fixed curve
+sample counts in a demo. See `24_UI_GEOMETRY_CONTRACT.md` and
+`25_UI_SHAPE_PATH.md`.
 
 ## Direction
 

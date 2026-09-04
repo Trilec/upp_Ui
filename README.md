@@ -36,13 +36,22 @@ The canonical, portable documentation set lives in `docs/`:
 - `docs/04_UI_DEMO_GUIDE.md` — the intended demo structure
 - `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — complete PropertyEditor integration,
   adapters, transactions, providers, layout, and performance contract
+- `docs/22_UI_RENDER_BACKEND_ROADMAP.md` — accepted Draw/Painter/cache/backend policy
+- `docs/24_UI_GEOMETRY_CONTRACT.md` — mandatory 0.35px final-device geometry contract
+- `docs/25_UI_SHAPE_PATH.md` — authored paths, stock shapes, and new-control usage
 
 Start with `00_UPP_CODING_GUIDE.md`, then read the controls guide before
-touching any control or demo.
+touching any control or demo. For drawing/shape work, also read 24 and 25.
+
+The repository-wide geometry rule is deliberate: **normal controls can use
+`UiShapes`; dense scenes such as Graph may go directly to `UiGeometry`.**
+Do not introduce control-local curve sample counts or force an authored-path
+allocation into a high-count scene merely for uniformity.
 
 ## Repository layout
 
-- `Ui/` — the `Ui` package (controls, themes, layouts, icons, draw helpers).
+- `Ui/` — the `Ui` package (controls, themes, layouts, icons, `UiGeometry`,
+  `UiShapePath`/`UiShapes`, and draw helpers).
 - `Utilities/` — sibling reusable packages: `PropertyEditor`,
   `PropertyEditorCore`, `IconExportCore`, `MakeIconFromSVG`, plus control and
   model test packages.

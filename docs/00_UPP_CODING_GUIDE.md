@@ -111,6 +111,32 @@ repository, and it is intended to be copyable into another U++ project.
   frame, skin content inset, content margin, container inset, gap, item spacing,
   content gap.
 
+## Geometry and shape construction
+
+All new control drawing follows the contracts in
+`24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
+
+Use this decision order:
+
+1. direct `Draw` or native Painter for simple paint-only primitives;
+2. `UiShapes` for reusable stock silhouettes in normal controls;
+3. `UiShapePath` for an authored silhouette that is not already a stock shape;
+4. `UiGeometry` for final-pixel mathematical operations and explicit adaptive
+   points when points are genuinely required;
+5. dense/high-count scenes may call `UiGeometry` directly when constructing an
+   intermediate `UiShapePath` would add unnecessary allocation/work.
+
+**Normal controls can use `UiShapes`; dense scenes such as Graph may go
+directly to `UiGeometry`.** This is the repository-wide rule.
+
+Never add a control-local segment/sample count, radius-proportional subdivision,
+or fixed curve point count. Geometry error is library-owned at 0.35 final device
+pixels. Apply DPI/view transforms before final-pixel geometry decisions, and do
+not derive semantic handles/labels/anchors from tessellation vertex indexes.
+
+Raster concerns (blur, masks, gradients, temporary buffers and caching) remain a
+separate rendering concern.
+
 ## State ownership and avoiding duplicated authorities
 
 - One authoritative source of state per concern. A view model is a projection,
@@ -159,6 +185,9 @@ repository, and it is intended to be copyable into another U++ project.
 3. `02_UI_THEME_GUIDE.md` — theme and style system;
 4. `03_UI_MODEL_GUIDE.md` — model-driven control architecture;
 5. `04_UI_DEMO_GUIDE.md` — the demo structure;
-6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and extension.
+6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and extension;
+7. `22_UI_RENDER_BACKEND_ROADMAP.md` — accepted rendering/backend policy;
+8. `24_UI_GEOMETRY_CONTRACT.md` — mandatory final-pixel geometry rules;
+9. `25_UI_SHAPE_PATH.md` — authored paths, stock shapes, and new-control usage.
 
 When this guide and an older document conflict, current code and this guide win.

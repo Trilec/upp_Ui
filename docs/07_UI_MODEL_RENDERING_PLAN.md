@@ -32,6 +32,9 @@ when a logical model contains tens or hundreds of thousands of records.
 8. Built-in renderers are theme-aware first-class citizens. They use
    `StyledPalette`, `StyledMetrics`, `StyledSkin`, `UiRole` and `UiTheme`; they do
    not hard-code a parallel colour/style system in `Paint()`.
+9. Geometry generation follows the shared final-pixel contract:
+   normal controls/renderers may use `UiShapes`/`UiShapePath`; dense scenes may
+   use `UiGeometry` directly when the authored-path layer would be overhead.
 9. Real child `Ctrl`s are an exceptional escape hatch for genuinely interactive
    embedded content. They are never the default representation of large models.
 10. Existing APIs may be replaced rather than shimmed when the new architecture
@@ -596,6 +599,22 @@ For high-scale model views:
 
 Explicit bulk operations such as Select All, export, filter/projection rebuild or
 Tree structural rebuild may remain O(N) where that is semantically truthful.
+
+## Geometry and silhouette construction
+
+Renderer architecture does not own a second geometry system.
+
+- direct `Draw`/native Painter remains first choice for simple paint;
+- reusable normal-control silhouettes come from `UiShapes`;
+- custom authored silhouettes use `UiShapePath`;
+- explicit adaptive geometry comes from `UiGeometry`;
+- dense/high-count views may bypass `UiShapePath` and use `UiGeometry`
+  directly;
+- no renderer or control may introduce a private sample-count/curve-quality
+  policy.
+
+This keeps presentation reuse and scale compatible. See
+`24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
 
 ## 12. Implementation discipline
 

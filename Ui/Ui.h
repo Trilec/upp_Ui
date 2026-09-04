@@ -37,6 +37,7 @@
     - 2026-08: added UiRenderLayer as the shared bounded batched-AA scene seam.
     - 2026-09: added UiChartRing as the proportional multi-value chart control.
     - 2026-09: exposed UiGeometry as the screen-space adaptive geometry contract.
+    - 2026-09: added UiShapePath and UiShapes as the shared authored-shape layer.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -44,6 +45,8 @@
 
 #include <Ui/UiStyle.h>
 #include <Ui/UiGeometry.h>
+#include <Ui/UiShapePath.h>
+#include <Ui/UiShapes.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiRenderLayer.h>
 #include <Ui/UiAxis.h>

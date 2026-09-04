@@ -80,6 +80,39 @@ declaration first.
   `ClearCustomStyle()`, `HasCustomStyle()`, `GetStyle()`. Theme drives defaults;
   explicit `SetCustomStyle` overrides them (see `02_UI_THEME_GUIDE.md`).
 
+### Drawing geometry and reusable shapes
+
+The common drawing rule is:
+
+- use direct `Draw`/native Painter when the primitive already exists;
+- normal controls use `UiShapes` for reusable silhouettes;
+- use `UiShapePath` when no stock silhouette exists;
+- flatten only when explicit points are actually required;
+- dense/high-count scenes such as `UiNodeGraph` may use `UiGeometry`
+  directly to avoid an unnecessary authored-command allocation layer.
+
+Do not create control-local curve sampling quality. Explicit generated geometry
+uses the shared 0.35 final-device-pixel error contract from
+`24_UI_GEOMETRY_CONTRACT.md`.
+
+Typical normal-control usage:
+
+```cpp
+UiShapePath shape = UiShapes::RoundedRectangle(
+    Rectf(0, 0, width, height), radius);
+
+p.Begin();
+UiPainterShapePath(p, shape);
+p.Fill(face);
+p.End();
+```
+
+If a new silhouette is broadly useful, add a parameterised builder to
+`UiShapes`; if it is control-specific, author it locally as `UiShapePath`.
+A new named silhouette is not by itself a reason to modify `UiGeometry`.
+
+See `25_UI_SHAPE_PATH.md` for the full stock vocabulary and review checklist.
+
 ### State handling and icons
 
 - `ResolveStyledState(enabled, hot, pressed)` selects the palette state.

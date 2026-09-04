@@ -11,22 +11,32 @@ Do **not** route every control through BufferPainter.
 
 Measured software policy:
 1. cheap flat rectangles/lines/text/images -> direct U++ `Draw`;
-2. repeatable antialiased/composed presentation -> shared exact raster cache;
-3. unique specialist vector work -> bounded Painter layer only where useful;
-4. rich skin/shadow/image paths remain explicit fallbacks;
-5. controls/views keep layout, input, dirty-region, state and model ownership; rendering backend consumes presentation semantics.
+2. native Painter primitives/curves -> use Painter without pre-flattening when
+   that is the cheapest exact representation;
+3. repeatable antialiased/composed presentation -> shared exact raster cache;
+4. unique specialist vector work -> bounded Painter layer only where useful;
+5. rich skin/shadow/image paths remain explicit fallbacks;
+6. controls/views keep layout, input, dirty-region, state and model ownership;
+   rendering backend consumes presentation semantics.
 
-Future backend-neutral primitive vocabulary should continue to cover:
-- rect / rounded rect;
-- ellipse / arc / ring;
-- line / polyline / path;
-- text;
-- image / tint;
-- 9-slice;
-- gradient;
-- clip;
-- transform;
-- opacity / layer.
+The geometry/shape stack is now explicit:
+
+- `UiGeometry` — backend-independent final-pixel math and the library-owned
+  0.35 px explicit-geometry error contract;
+- `UiShapePath` — backend-neutral authored Move/Line/Quadratic/Cubic/Arc/
+  EllipseArc/Close topology;
+- `UiShapes` — reusable parameterised stock silhouettes;
+- `UiDraw` — Draw/Painter rendering, appearance and the
+  `UiPainterShapePath()` adapter.
+
+**Normal controls can use `UiShapes`; dense scenes such as Graph may go
+directly to `UiGeometry`.** The layer stack is not a mandatory traversal path:
+do not allocate an authored command object merely for uniformity.
+
+Backend-neutral presentation still needs rect/rounded rect, ellipse/arc/ring,
+line/polyline/path, text, image/tint, 9-slice, gradient, clip, transform and
+opacity/layer semantics, but named silhouettes should normally be authored via
+`UiShapePath`/`UiShapes` rather than expanding backend primitive APIs.
 
 `UiRenderLayer` is a current software helper, not the frozen GPU API.
 
@@ -79,7 +89,7 @@ Accepted outcomes:
 - generated C++ stays lazy behind Code/Copy/Save and never runs from viewport/paint/selection/drag/mode switching;
 - R9.3E removed redundant 10k auto-fit: 10k -> Reference fell from ~8.4-9.0 s to ~0.144-0.189 s.
 
-## R10A — canonical silhouettes — SOURCE COMPLETE, WINDOWS GATE COMBINED WITH PERF CLOSURE
+## R10A — canonical silhouettes — ACCEPTED FOUNDATION
 
 Canonical authored concepts:
 - Rectangle owns arbitrary width/height + corner radius;
@@ -90,7 +100,12 @@ Canonical authored concepts:
 
 Historical enum/wire values remain only for migration/source compatibility while retained recovery source exists.
 
-## Interactive-frame audit — CURRENT ACCEPTANCE CANDIDATE
+Canonical named silhouettes are now conceptually separate from geometry
+tessellation. New reusable silhouettes belong in `UiShapes`; genuinely new
+continuous geometry mathematics belongs in `UiGeometry`. Graph may retain its
+direct `UiGeometry` path because it is a dense scene.
+
+## Interactive-frame audit — ACCEPTED
 
 Evidence that triggered this gate:
 - Reference scene: only 16 nodes / 15 edges;
@@ -155,8 +170,10 @@ Profiling is observer-only:
 - `UiNodeGraphPanProfileTest`: real small middle-pan inside retained coverage must keep geometry serial unchanged and expose `geometry_us=0`;
 - `UiNodeGraphLiveViewTest`: real pan/wheel reuse retained geometry immediately; programmatic `SetZoom`/`PanBy` remain exact; spatial index remains retained.
 
-## Windows acceptance gate
+## Historical P2 Windows acceptance gate — PASS
 
+The interactive-frame/P2 gate passed on Windows CLANGx64 Debug/Release.
+Subsequent geometry/shape-layer validation is tracked in `ACTIVE_WORK.md`.
 Gary validates only; architecture changes return to supervisor.
 
 Build/run Debug + Release:
@@ -187,7 +204,12 @@ Performance/visual acceptance:
 
 ## Next
 
-Only after this gate passes:
+The P2 gate has passed. Current order is:
+
+1. validate the published geometry/shape foundation;
+2. diagnose the observed zoomed-out idle continuous repaint before adding more
+   Graph hierarchy/render complexity;
+3. then resume bounded composition/hierarchy work.
 
 ### R10B — node internal composition
 Separate silhouette from composition:

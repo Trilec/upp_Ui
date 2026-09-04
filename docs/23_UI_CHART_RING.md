@@ -67,8 +67,14 @@ colours remain authored overrides.
 ## Rendering
 
 `UiChartRing` uses the `UiPaintCircularArc` primitive from `UiDraw` for every
-segment. Each visible segment is one exact Painter arc; there is no short-arc
-segmentation approximation.
+segment. Each visible segment remains one native Painter arc; there is no
+control-owned short-arc segmentation approximation.
+
+For another normal control that needs a **filled** wedge, donut section or pie
+silhouette rather than a stroked ring, use `UiShapes::RingSegment` or
+`UiShapes::Pie`. If explicit points are required, their flattening delegates to
+the shared `UiGeometry` 0.35 px contract. Do not add a local segment-count
+setting. See `24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
 
 The chart has no animation in V1, so its ring geometry is an ideal exact
 `UiRasterCache` workload under tag `aa/ui-chart-ring`. Center text remains direct.

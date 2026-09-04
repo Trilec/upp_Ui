@@ -44,6 +44,10 @@ separate things.
 10. **Large logical extent must not overflow geometry.** Shared extent helpers use
     wide intermediates and saturate where native control geometry remains
     integer-based.
+11. **Geometry detail is screen-bounded.** Generated curve detail follows
+    `UiGeometry`'s 0.35 final-device-pixel error contract. High-count scenes may
+    call `UiGeometry` directly; they must not allocate a `UiShapePath` per
+    item merely for abstraction uniformity.
 
 The engineering target for high-scale row/item views is at least 100,000 logical
 records with ordinary viewport cost independent of total model size. This is an
@@ -266,6 +270,12 @@ simple and local. Do not add a parallel quadtree/R-tree/BVH unless measured grap
 workloads demonstrate a real limitation of the hash. A future GPU renderer should
 consume the same model/spatial/prepared-scene boundaries rather than moving model
 semantics into a rendering backend.
+
+For shape construction, normal controls can use `UiShapes`, but Graph is the
+canonical example of a dense scene that may go directly to `UiGeometry` after
+projection to screen pixels. That avoids per-node authored-path allocation while
+preserving exactly the same geometry accuracy contract. See
+`24_UI_GEOMETRY_CONTRACT.md` and `25_UI_SHAPE_PATH.md`.
 
 ## Validation
 
