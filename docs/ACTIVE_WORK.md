@@ -4,33 +4,33 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; not project history.
 
 ## CURRENT
-BASE: `a56940e3a8ac07eb332e2e4c949a8aa0c3d16823`
-TASK: **UiNodeGraph performance P2 — projected-micro direct Draw scene**
+MAIN: `620134c56f7fd48559112ad197bc51dcd2582f29` — UiGraph performance P2, Gary validation in flight.
+BASE: `620134c56f7fd48559112ad197bc51dcd2582f29`
+TASK: **UiGeometry first-class final-pixel geometry contract**
+BRANCH: `supervisor/ui-geometry-contract-20260904`
 STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING**
-PUBLISHED: `fb5d854b367aa445e3a7b3e539a143992fcbc7be`
-VALIDATION: complete-file/diff source review passed; Windows CLANGx64 Debug/Release pending.
-P1: **PASS** at `a56940e3...`; all Debug/Release suites passed and Reference↔10k switching is now instant.
-H2 hierarchy: **PASS** at `71814a4...`.
+IMPLEMENTATION: `6aa98a23f8449a5eb7f796f43c28b071cb6da938`
+VALIDATION: complete-file/diff/mechanical source review passed; Windows CLANGx64 Debug/Release pending.
 
-## P2
-- P1 live evidence isolated the remaining 10k stall: ~588 ms geometry + ~764 ms details/ports while node surfaces were only ~32 ms.
-- projected node size is now authoritative: nodes below 38x26 px use overview geometry regardless of global zoom.
-- micro geometry carries silhouette + stable edge anchors only; no text/content/control/port-hit rectangles.
-- all-micro normal views below edge-label scale use direct `Draw` silhouettes and existing direct-edge paint.
-- rich/reference nodes, custom paint, gestures, marquee, labels and unsupported arrows fall back to the accepted renderer unchanged.
-- deterministic `projected_micro_10k` coverage exercises the former intermediate-zoom failure band with mixed canonical shapes.
-- fit-all P1 screen-error tessellation and coalesced view transactions remain intact.
+## CONTRACT
+- explicit generated geometry has one library-owned **0.35 device-pixel** error budget;
+- geometry decisions use final pixels after DPI/view transforms; no control-owned quality knob;
+- prefer direct `Draw`, then native Painter, then `UiGeometry` explicit points only when required;
+- authored discrete topology is preserved; geometry is independent of colour/theme/cache/backend.
 
-## REMAINING
-- warm unchanged 10k rebind still rebuilds one spatial index; keep measured for a later tranche.
-- per-node dynamic style resolver cost may remain visible after P2; measure before adding any cache.
-- no GPU, world-tile cache or persistent scene cache introduced.
+## COVERAGE
+- arcs/ellipses, rounded rect/capsule, quadratic/cubic, rounded polyline/polygon;
+- line/polyline metrics and distance, analytic containment, radial band/pie geometry;
+- generated-polyline simplification and pixel-significance tests;
+- shared cap/UiTab/Bezier editor and fixed-detail UiNodeGraph geometry/routes migrated;
+- paint-only circles use native Painter; Graph hit tests reuse prepared silhouettes.
 
-## NEXT — GARY P2 GATE
-Build/run Debug + Release performance/render-LOD/canonical-shape/live-view/pan/scale/model-switch plus H1/H2 and `UiGraphTest` regressions.
-Report complete `projected_micro_10k` and `fit_all_10k` profiles, especially geometry/paint/surface/details/content timings.
-Repeat the Release demo slow zoom band; confirm direct-micro visual continuity and compare against the ~1.31 s / ~588 ms / ~764 ms P1 live evidence.
-Run `git diff --check a56940e3a8ac07eb332e2e4c949a8aa0c3d16823..HEAD`; minor compile/API corrections only.
+## AUDIT / REMAINING
+- production `Ui/` manual curve sampling audit completed; known fixed/radius-proportional approximation loops migrated.
+- P2 performance semantics preserved; no GPU, world-tile or persistent-scene cache introduced.
+- raster efficiency is a separate next audit: blur, gradients, masks, temporary buffers and immutable-image analysis.
+- warm unchanged 10k rebind still has the separately measured spatial rebuild.
 
-## RECOVERY RULE
-REFRESH -> INSPECT -> IMPLEMENT -> REVIEW -> PUBLISH -> VERIFY -> VALIDATE.
+## NEXT
+Receive Gary P2 result first. Reconcile any authorised P2 fix before moving `main`.
+Then publish this geometry checkpoint on the accepted P2 head and run UiGeometry + render + Graph Debug/Release regressions.
