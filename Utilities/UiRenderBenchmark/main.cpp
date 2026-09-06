@@ -492,6 +492,7 @@ CONSOLE_APP_MAIN
     TestCtx t;
     const int counts[] = { 10, 100, 1000 };
 
+    UiResetRenderLayerStats();
     Cout() << "UI_RENDER_BENCH_BEGIN"
            << " note=timings_are_informational_no_machine_thresholds"
            << '\n';
@@ -501,13 +502,28 @@ CONSOLE_APP_MAIN
         RunSet(t, count, true);
     }
 
+    UiRenderLayerStats layers = UiGetRenderLayerStats();
+    t.Expect(layers.allocations > 0 && layers.raster_pixels > 0
+             && layers.raster_bytes == layers.raster_pixels * 4,
+             "batched render-layer fallback exposes real allocation and raster-area evidence");
+    Cout() << "UI_RENDER_LAYER_STATS"
+           << " calls=" << layers.calls
+           << " allocations=" << layers.allocations
+           << " raster_pixels=" << layers.raster_pixels
+           << " raster_bytes=" << layers.raster_bytes
+           << " peak_pixels=" << layers.peak_pixels
+           << '\n';
+
     UiRasterCacheStats cache = UiRasterCache::GetStats();
     Cout() << "UI_RENDER_BENCH_CACHE"
            << " entries=" << cache.entries
            << " bytes=" << cache.bytes
            << " hits=" << cache.hits
            << " misses=" << cache.misses
+           << " insertions=" << cache.insertions
            << " evictions=" << cache.evictions
+           << " trim_calls=" << cache.trim_calls
+           << " eviction_scans=" << cache.eviction_scans
            << " skipped=" << cache.skipped_too_large
            << '\n';
 

@@ -128,7 +128,8 @@ public:
     UiRasterCacheKeyBuilder& Add(const Rect& r)      { return AddRect(r); }
     UiRasterCacheKeyBuilder& Add(const String& s)    { return AddString(s); }
     UiRasterCacheKeyBuilder& Add(const char* s)      { return AddString(s ? String(s) : String()); }
-    UiRasterCacheKeyBuilder& Add(double v, int q = 1000) { return AddQuantizedDouble(v, q); }
+    UiRasterCacheKeyBuilder& Add(double v)               { return AddExactDouble(v); }
+    UiRasterCacheKeyBuilder& Add(double v, int q)        { return AddQuantizedDouble(v, q); }
 
     UiRasterCacheKey Build() const
     {
@@ -193,10 +194,22 @@ private:
         return *this;
     }
 
+    UiRasterCacheKeyBuilder& AddExactDouble(double v)
+    {
+        union {
+            double value;
+            uint64 bits;
+        } u;
+        u.value = v;
+        AddToken("dx", Format("%llx", (unsigned long long)u.bits));
+        return *this;
+    }
+
     UiRasterCacheKeyBuilder& AddQuantizedDouble(double v, int q)
     {
+        q = max(1, q);
         int scaled = fround(v * q);
-        AddToken("d", Format("%d@%d", scaled, q));
+        AddToken("dq", Format("%d@%d", scaled, q));
         return *this;
     }
 
@@ -228,7 +241,10 @@ struct UiRasterCacheStats : Moveable<UiRasterCacheStats> {
     int64 bytes = 0;
     int64 hits = 0;
     int64 misses = 0;
+    int64 insertions = 0;
     int64 evictions = 0;
+    int64 trim_calls = 0;
+    int64 eviction_scans = 0;
     int64 skipped_too_large = 0;
 };
 
@@ -365,6 +381,8 @@ public:
         e.bytes = bytes;
         e.last_use = ++UseClockRef();
         EntriesRef().Add(lookup, e);
+        CurrentBytesRef() += bytes;
+        StatsRef().insertions++;
         TrimLocked();
         return img;
     }
@@ -373,14 +391,18 @@ public:
     {
         Mutex::Lock __(MutexRef());
         EntriesRef().Clear();
+        CurrentBytesRef() = 0;
     }
 
     static void ClearTag(const String& tag)
     {
         Mutex::Lock __(MutexRef());
         for(int i = EntriesRef().GetCount() - 1; i >= 0; --i)
-            if(EntriesRef()[i].tag == tag)
+            if(EntriesRef()[i].tag == tag) {
+                CurrentBytesRef() -= EntriesRef()[i].bytes;
                 EntriesRef().Remove(i);
+            }
+        CurrentBytesRef() = max<int64>(0, CurrentBytesRef());
     }
 
     static void Trim()
@@ -401,9 +423,7 @@ public:
         Mutex::Lock __(MutexRef());
         UiRasterCacheStats out = StatsRef();
         out.entries = EntriesRef().GetCount();
-        out.bytes = 0;
-        for(int i = 0; i < EntriesRef().GetCount(); i++)
-            out.bytes += EntriesRef()[i].bytes;
+        out.bytes = CurrentBytesRef();
         return out;
     }
 
@@ -417,8 +437,9 @@ public:
     static String DumpStats()
     {
         UiRasterCacheStats s = GetStats();
-        return Format("UiRasterCache entries=%d bytes=%lld hits=%lld misses=%lld evictions=%lld skipped=%lld",
-                      s.entries, s.bytes, s.hits, s.misses, s.evictions, s.skipped_too_large);
+        return Format("UiRasterCache entries=%d bytes=%lld hits=%lld misses=%lld inserts=%lld evictions=%lld trim_calls=%lld eviction_scans=%lld skipped=%lld",
+                      s.entries, s.bytes, s.hits, s.misses, s.insertions, s.evictions,
+                      s.trim_calls, s.eviction_scans, s.skipped_too_large);
     }
 #endif
 
@@ -461,30 +482,30 @@ private:
         return budget;
     }
 
-    static int64 CurrentBytesLocked()
+    static int64& CurrentBytesRef()
     {
-        int64 total = 0;
-        for(int i = 0; i < EntriesRef().GetCount(); i++)
-            total += EntriesRef()[i].bytes;
-        return total;
+        static int64 bytes = 0;
+        return bytes;
     }
 
     static void TrimLocked()
     {
-        int64 total = CurrentBytesLocked();
-        while(total > BudgetRef() && EntriesRef().GetCount() > 0) {
+        StatsRef().trim_calls++;
+        while(CurrentBytesRef() > BudgetRef() && EntriesRef().GetCount() > 0) {
             int oldest = 0;
             uint64 oldest_use = EntriesRef()[0].last_use;
+            StatsRef().eviction_scans += EntriesRef().GetCount();
             for(int i = 1; i < EntriesRef().GetCount(); i++) {
                 if(EntriesRef()[i].last_use < oldest_use) {
                     oldest_use = EntriesRef()[i].last_use;
                     oldest = i;
                 }
             }
-            total -= EntriesRef()[oldest].bytes;
+            CurrentBytesRef() -= EntriesRef()[oldest].bytes;
             EntriesRef().Remove(oldest);
             StatsRef().evictions++;
         }
+        CurrentBytesRef() = max<int64>(0, CurrentBytesRef());
     }
 };
 

@@ -48,6 +48,30 @@
 
 namespace Upp {
 
+struct UiRenderLayerStats : Moveable<UiRenderLayerStats> {
+    int64 calls = 0;
+    int64 allocations = 0;
+    int64 raster_pixels = 0;
+    int64 raster_bytes = 0;
+    int64 peak_pixels = 0;
+};
+
+inline UiRenderLayerStats& UiRenderLayerStatsRef()
+{
+    static UiRenderLayerStats stats;
+    return stats;
+}
+
+inline UiRenderLayerStats UiGetRenderLayerStats()
+{
+    return UiRenderLayerStatsRef();
+}
+
+inline void UiResetRenderLayerStats()
+{
+    UiRenderLayerStatsRef() = UiRenderLayerStats();
+}
+
 template <class PaintFn>
 inline void UiPaintRenderLayer(Draw& w, const Rect& target, PaintFn paint,
                                bool antialiased = true)
@@ -58,6 +82,14 @@ inline void UiPaintRenderLayer(Draw& w, const Rect& target, PaintFn paint,
     Size sz = target.GetSize();
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
+
+    UiRenderLayerStats& stats = UiRenderLayerStatsRef();
+    const int64 pixels = (int64)sz.cx * (int64)sz.cy;
+    stats.calls++;
+    stats.allocations++;
+    stats.raster_pixels += pixels;
+    stats.raster_bytes += pixels * 4;
+    stats.peak_pixels = max(stats.peak_pixels, pixels);
 
     ImageBuffer buffer(sz);
     buffer.SetKind(IMAGE_ALPHA);

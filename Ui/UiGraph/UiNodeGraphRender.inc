@@ -184,8 +184,9 @@ void PaintCachedPortMarker(Draw& w, const Rect& target,
     if(target.IsEmpty() || IsNull(frame))
         return;
     UiRasterCachePolicy policy = UiRasterPolicyIcon("aa/nodegraph-port");
+    const double canonical_stroke = fround(stroke * 100.0) / 100.0;
     UiRasterCacheKeyBuilder kb("aa/nodegraph-port");
-    kb.Add(target.GetSize()).Add(canvas).Add(frame).Add(stroke, 100);
+    kb.Add(target.GetSize()).Add(canvas).Add(frame).Add(canonical_stroke, 100);
     Image cached = UiRasterCache::Get(kb.Build(), policy, [=] {
         ImageBuffer ib(target.GetSize());
         ib.SetKind(IMAGE_ALPHA);
@@ -197,7 +198,7 @@ void PaintCachedPortMarker(Draw& w, const Rect& target,
                   max(1.0, target.GetHeight() - 1.0));
         if(!IsNull(canvas))
             p.Fill(canvas);
-        p.Stroke(stroke, frame);
+        p.Stroke(canonical_stroke, frame);
         p.End();
         p.Finish();
         return Image(ib);

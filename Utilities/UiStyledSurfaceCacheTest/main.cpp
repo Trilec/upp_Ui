@@ -55,6 +55,15 @@ CONSOLE_APP_MAIN
     UiRasterCache::Clear();
     UiRasterCacheStats start = UiRasterCache::GetStats();
 
+    UiRasterCacheKey exact_a = UiRasterCacheKeyBuilder("double/exact").Add(0.1234561).Build();
+    UiRasterCacheKey exact_b = UiRasterCacheKeyBuilder("double/exact").Add(0.1234562).Build();
+    UiRasterCacheKey quant_a = UiRasterCacheKeyBuilder("double/quant").Add(0.1234561, 100).Build();
+    UiRasterCacheKey quant_b = UiRasterCacheKeyBuilder("double/quant").Add(0.1234562, 100).Build();
+    t.Expect(exact_a.encoded != exact_b.encoded,
+             "double raster keys are exact by default instead of silently quantized");
+    t.Expect(quant_a.encoded == quant_b.encoded,
+             "quantized double keys require an explicit quantization argument");
+
     StyledMetrics rounded = Metrics(12);
     Rect rounded_rect = RectC(12, 12, 120, 48);
     UiPaintStyledBackground(draw, rounded_rect, palette, rounded, skin, ST_NORMAL, false);
@@ -62,6 +71,9 @@ CONSOLE_APP_MAIN
 
     t.Expect(first.entries == 1,
              "first rounded styled surface creates one shared raster entry");
+    t.Expect(first.bytes > 0 && first.insertions == start.insertions + 1
+             && first.trim_calls >= start.trim_calls + 1,
+             "cache maintains byte totals incrementally and exposes insertion/trim churn");
     t.Expect(first.misses == start.misses + 1,
              "first rounded styled surface records one cache miss");
 
