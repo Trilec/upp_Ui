@@ -84,16 +84,35 @@ void RunChildControlLod(TestCtx& t)
 
     UiGraphModel model;
     UiGraphNodeRef ref = model.AddNode(MakeNode(601));
+    Vector<UiGraphNodeRef> far_refs;
+    for(int i = 0; i < 32; i++) {
+        UiGraphNode node = MakeNode(700 + i);
+        node.position = Pointf(5000.0 + i * 420.0, 4200.0 + (i % 4) * 260.0);
+        far_refs.Add(model.AddNode(node));
+    }
 
     UiNodeGraph graph;
     graph.SetAutoFitOnFirstPaint(false);
     graph.SetRect(0, 0, 720, 420);
     graph.SetModel(model);
 
+    Array<UiButton> far_controls;
+    for(UiGraphNodeRef far_ref : far_refs) {
+        UiButton& button = far_controls.Add();
+        button.SetText("Far");
+        graph.SetNodeCtrl(far_ref, button);
+    }
+
     UiButton child;
     child.SetText("Run");
     graph.SetNodeCtrl(ref, child);
     graph.Layout();
+
+    t.Expect(graph.GetRegisteredNodeCtrlCount() == 33
+             && graph.GetActiveNodeCtrlCount() == 1,
+             "33 registered controls activate only the one visible/prepared binding");
+    t.Expect(graph.GetLastNodeCtrlCandidateCount() < 8,
+             "embedded-control camera/layout work is bounded by active/prepared bindings, not all registrations");
 
     Rect full = graph.GetNodeCtrlRect(ref);
     t.Expect(!full.IsEmpty(),
@@ -112,8 +131,47 @@ void RunChildControlLod(TestCtx& t)
     Rect hidden = graph.GetNodeCtrlRect(ref);
     t.Expect(hidden.IsEmpty(),
              "embedded child geometry is removed below the useful detail threshold");
-    t.Expect(graph.GetAttachedNodeCtrlCount() == 1,
-             "LOD hiding does not discard the authoritative child-control binding");
+    t.Expect(graph.GetRegisteredNodeCtrlCount() == 33
+             && graph.GetActiveNodeCtrlCount() == 0,
+             "LOD hiding preserves authoritative bindings while detaching all inactive child controls");
+    t.Expect(graph.GetLastNodeCtrlCandidateCount() < 8,
+             "LOD-suppressed control update remains independent of the 33 registered bindings");
+}
+
+void RunExtensionBounds(TestCtx& t)
+{
+    Cout() << "\n=== Extension bounds ===\n";
+
+    UiGraphModel model;
+    UiGraphNode node = MakeNode(990);
+    node.shape = UiGraphNodeShape::Custom;
+    node.position = Pointf(120, 100);
+    node.size = Sizef(160, 90);
+    UiGraphNodeRef ref = model.AddNode(node);
+
+    UiNodeGraph graph;
+    graph.SetAutoFitOnFirstPaint(false);
+    graph.SetRect(0, 0, 600, 360);
+    UiNodeGraph::ExtensionBounds bounds;
+    bounds.node_hit_margin_px = 36;
+    bounds.node_paint_margin_px = 24;
+    graph.SetExtensionBounds(bounds);
+    graph.WhenHitTestCustomShape = [](const UiGraphNode&, const Rect& surface, Point p) {
+        return p.x >= surface.left - 30 && p.x <= surface.right + 30
+            && p.y >= surface.top - 30 && p.y <= surface.bottom + 30;
+    };
+    graph.SetModel(model);
+    graph.Layout();
+
+    Point outside = graph.WorldToScreen(Pointf(node.position.x + node.size.cx + 24,
+                                                node.position.y + node.size.cy * 0.5));
+    t.Expect(graph.HitTestNode(outside) == ref,
+             "declared custom-node hit margin keeps an outside-surface callback hit in the broad phase");
+
+    bounds.node_hit_margin_px = 8;
+    graph.SetExtensionBounds(bounds);
+    t.Expect(!graph.HitTestNode(outside).IsValid(),
+             "reducing the declared hit margin immediately invalidates broad/prepared bounds");
 }
 
 } // namespace
@@ -123,6 +181,7 @@ CONSOLE_APP_MAIN
     TestCtx t;
     RunRouteNormalization(t);
     RunChildControlLod(t);
+    RunExtensionBounds(t);
 
     Cout() << "\nUINODEGRAPH_DETAIL_LOD_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << '\n';

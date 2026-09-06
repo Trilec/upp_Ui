@@ -239,6 +239,19 @@ public:
         double selection_outline_width = 3.0;
     };
 
+    // Conservative bounds for host callbacks that can legally extend beyond
+    // stock node/edge geometry. Pixel values are FINAL device pixels. The custom
+    // route margin is authored world-space because the broad phase is world-space
+    // and must remain valid across camera changes.
+    struct ExtensionBounds : Moveable<ExtensionBounds> {
+        int node_paint_margin_px = 0;
+        int node_hit_margin_px = 0;
+        int edge_paint_margin_px = 0;
+        int resolved_port_hit_radius_px = 0;
+        int resolved_edge_hit_width_px = 0;
+        double custom_route_world_margin = 0.0;
+    };
+
     static const Style& StyleDefault();
     static UiGraphNodeStyle StyleForRole(const UiGraphNodeStyle& base, UiGraphNodeRole role);
     static bool ShapeContains(const UiGraphNode& node, const Rect& surface, Point point);
@@ -259,6 +272,8 @@ public:
 
     UiNodeGraph& SetLodPolicy(const LodPolicy& policy);
     const LodPolicy& GetLodPolicy() const { return lod_policy_; }
+    UiNodeGraph& SetExtensionBounds(const ExtensionBounds& bounds);
+    const ExtensionBounds& GetExtensionBounds() const { return extension_bounds_; }
 
     UiNodeGraph& SetNodeStyleClass(const String& name, const UiGraphNodeStyle& style);
     UiNodeGraph& RemoveNodeStyleClass(const String& name);
@@ -354,6 +369,9 @@ public:
     int GetLastBatchNodeUpdateCount() const { return last_batch_node_update_count_; }
     int GetLastBatchEdgeUpdateCount() const { return last_batch_edge_update_count_; }
     int GetAttachedNodeCtrlCount() const { return node_ctrls_.GetCount(); }
+    int GetRegisteredNodeCtrlCount() const { return node_ctrls_.GetCount(); }
+    int GetActiveNodeCtrlCount() const { return active_node_ctrls_.GetCount(); }
+    int GetLastNodeCtrlCandidateCount() const { return last_node_ctrl_candidate_count_; }
 
     virtual void SetData(const Value& v) override;
     virtual Value GetData() const override;
@@ -395,6 +413,10 @@ public:
     Event<Draw&, const UiGraphNode&, const Rect&, UiGraphVisualState> WhenPaintNodeOverlay;
     Event<Draw&, const UiGraphEdge&, const Vector<Point>&, UiGraphVisualState> WhenPaintEdgeOverlay;
 
+    // Host callbacks must remain inside GetExtensionBounds(). Painting/hit
+    // extension pixels are final-device values; custom-route broad-phase escape
+    // is declared in world units. Changing the declaration invalidates prepared
+    // geometry/spatial state before further paint or hit testing.
     Function<bool(Painter&, const UiGraphNode&, const Rect&,
                   const UiGraphNodeStyle&, UiGraphVisualState)> WhenPaintCustomShape;
     Function<bool(const UiGraphNode&, const Rect&, Point)> WhenHitTestCustomShape;
@@ -571,6 +593,10 @@ private:
     double EdgeDetailFactor() const;
     double ShadowDetailFactor() const;
     double GetPaintQueryMargin() const;
+    double EffectiveEdgeHitWidth(const UiGraphEdgeStyle& style) const;
+    double MaxEdgeHitWidthForBroadPhase() const;
+    int EffectivePortHitRadius(const UiGraphNodeStyle& style) const;
+    int MaxPortHitRadiusForBroadPhase() const;
     Rect GetShapeSafeContentRect(const UiGraphNode& node, const Rect& content,
                                  const Rect& surface) const;
 
@@ -709,6 +735,7 @@ private:
     mutable uint64 theme_revision_ = 0;
     bool has_custom_style_ = false;
     LodPolicy lod_policy_;
+    ExtensionBounds extension_bounds_;
     VectorMap<String, UiGraphNodeStyle> node_styles_;
     VectorMap<String, UiGraphEdgeStyle> edge_styles_;
 
@@ -728,6 +755,9 @@ private:
     int last_batch_edge_update_count_ = 0;
 
     VectorMap<UiGraphId, Ptr<Ctrl>> node_ctrls_;
+    Index<UiGraphId> active_node_ctrls_;
+    int last_node_ctrl_candidate_count_ = 0;
+    bool node_ctrl_activation_detach_ = false;
     VectorMap<UiGraphId, NodeGeometry> node_geometry_;
     VectorMap<UiGraphId, EdgeGeometry> edge_geometry_;
     bool geometry_dirty_ = true;

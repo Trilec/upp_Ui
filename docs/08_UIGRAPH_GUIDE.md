@@ -85,9 +85,18 @@ Ordinary nodes and ports are retained geometry inside one `UiNodeGraph : Ctrl`.
 
 Do not create one child control per ordinary graph object.
 
-`SetNodeCtrl()` is the explicit escape hatch for a small useful set of real
-embedded controls. Hidden/off-scope/LOD-suppressed controls must not remain an
-unbounded attached population.
+`SetNodeCtrl()` is the explicit escape hatch for real embedded controls.
+Registration and activation are separate:
+
+- a binding may remain registered while its node is offscreen/out-of-scope/LOD-suppressed;
+- only controls whose nodes are prepared, visible and above the content LOD are
+  attached as live child controls;
+- camera/layout updates inspect the active set plus prepared nodes with
+  registrations, not the entire registration map;
+- `GetRegisteredNodeCtrlCount()`, `GetActiveNodeCtrlCount()` and
+  `GetLastNodeCtrlCandidateCount()` expose the distinction.
+
+Ordinary graph objects still must not become one child `Ctrl` per node.
 
 ## 5. Spatial architecture
 
@@ -102,7 +111,23 @@ It supports:
 - local node/edge mutation;
 - style-class-local prepared rebuilds.
 
-Exact shape/route tests happen after candidate lookup.
+Exact shape/route tests happen after candidate lookup. Port and edge broad-phase
+radii are derived from the same effective final-pixel hit policy used by prepared
+bounds/exact tests.
+
+### Extension bounds
+
+Host callbacks may legally paint/hit outside stock geometry, but they must
+declare conservative bounds through `UiNodeGraph::ExtensionBounds`:
+
+- node paint/hit margins — final device pixels;
+- maximum dynamically resolved port hit radius / edge hit width — final device pixels;
+- edge overlay paint margin — final device pixels;
+- custom-route escape margin — authored world units, because the retained broad
+  phase is world-space and must survive camera changes.
+
+Changing the declaration invalidates the spatial/prepared scene before the next
+paint/hit. The declaration is a bounds contract, not a curve-quality or LOD knob.
 
 Do not add a second prepared-viewport scan path for hit testing, and do not add a
 parallel spatial tree without measured evidence.
@@ -301,7 +326,10 @@ Graph exposes observer-only evidence including:
 - LOD population;
 - path vertices;
 - geometry/spatial build counts;
-- geometry/node/edge/surface/details/content phase timing.
+- geometry/node/edge/surface/details/content phase timing;
+- registered/active embedded-control counts and candidate work;
+- spatial cell/global/raw-edge probes and in-place bound updates;
+- backdrop candidate count.
 
 The important contracts are structural:
 

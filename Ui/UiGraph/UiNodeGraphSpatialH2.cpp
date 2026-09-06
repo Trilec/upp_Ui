@@ -154,10 +154,14 @@ UiNodeGraph::WorldRect UiNodeGraph::GetEdgeWorldBounds(const UiGraphEdge& edge) 
     double dx = b.x - a.x;
     double dy = b.y - a.y;
     double distance = std::sqrt(dx * dx + dy * dy);
+    double min_zoom = max(0.01, GetEffectiveStyle().min_zoom);
+    double extension_world = extension_bounds_.edge_paint_margin_px / min_zoom;
     double paint_margin = max(24.0, style.interaction_width + style.arrow_size + 8.0);
+    paint_margin = max(paint_margin, extension_world);
 
     if(route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle)
-        return out.Inflated(max(96.0, distance * 0.50));
+        return out.Inflated(max(max(96.0, distance * 0.50),
+                                extension_bounds_.custom_route_world_margin));
     if(route == UiGraphRouteStyle::Bezier) {
         double handle = max(24.0, distance * minmax(style.bezier_tension, 0.05, 1.25));
         out.Include(a + SideVector(source_side) * handle);
@@ -631,7 +635,7 @@ UiGraphNodeRef UiNodeGraph::HitTestNodeSpatial(Point p) const
     if(!model_)
         return UiGraphNodeRef();
 
-    const int r = max(1, DPI(2));
+    const int r = max(max(1, DPI(2)), extension_bounds_.node_hit_margin_px);
     WorldRect area;
     area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
@@ -670,7 +674,7 @@ UiGraphPortRef UiNodeGraph::HitTestPortSpatial(Point p) const
     if(!model_ || zoom_ < lod_policy_.port_zoom)
         return UiGraphPortRef();
 
-    const int r = max(12, DPI(32));
+    const int r = max(DPI(2), MaxPortHitRadiusForBroadPhase() + DPI(2));
     WorldRect area;
     area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
@@ -712,7 +716,7 @@ UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
     if(!model_ || zoom_ < lod_policy_.edge_simplify_zoom)
         return UiGraphEdgeRef();
 
-    const int r = max(10, DPI(24));
+    const int r = max(DPI(2), (int)std::ceil(MaxEdgeHitWidthForBroadPhase()) + DPI(2));
     WorldRect area;
     area.Include(ScreenToWorld(Point(p.x - r, p.y - r)));
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
@@ -737,10 +741,10 @@ UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
         if(!edge || !edge->selectable)
             continue;
         UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, GetEdgeVisualState(*edge));
+        double hit_width = EffectiveEdgeHitWidth(style);
         for(int n = 1; n < g.points.GetCount(); n++)
             if(DistanceToSegment(Pointf(p.x, p.y),
-                                 Pointf(g.points[n - 1].x, g.points[n - 1].y),
-                                 Pointf(g.points[n].x, g.points[n].y)) <= style.interaction_width)
+                                 g.points[n - 1], g.points[n]) <= hit_width)
                 return g.ref;
     }
     return UiGraphEdgeRef();

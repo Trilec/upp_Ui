@@ -784,6 +784,25 @@ void UiNodeGraph::OnStyleChanged()
     Refresh();
 }
 
+UiNodeGraph& UiNodeGraph::SetExtensionBounds(const ExtensionBounds& bounds)
+{
+    extension_bounds_ = bounds;
+    extension_bounds_.node_paint_margin_px = max(0, extension_bounds_.node_paint_margin_px);
+    extension_bounds_.node_hit_margin_px = max(0, extension_bounds_.node_hit_margin_px);
+    extension_bounds_.edge_paint_margin_px = max(0, extension_bounds_.edge_paint_margin_px);
+    extension_bounds_.resolved_port_hit_radius_px = max(0, extension_bounds_.resolved_port_hit_radius_px);
+    extension_bounds_.resolved_edge_hit_width_px = max(0, extension_bounds_.resolved_edge_hit_width_px);
+    extension_bounds_.custom_route_world_margin = max(0.0, extension_bounds_.custom_route_world_margin);
+
+    InvalidateSpatialIndex();
+    InvalidateGeometry();
+    PrepareGeometry();
+    UpdateAttachedCtrls();
+    RefreshLayout();
+    Refresh();
+    return *this;
+}
+
 UiNodeGraph& UiNodeGraph::SetLodPolicy(const LodPolicy& policy)
 {
     lod_policy_ = policy;
@@ -828,8 +847,42 @@ double UiNodeGraph::ShadowDetailFactor() const
 double UiNodeGraph::GetPaintQueryMargin() const
 {
     double t = SmoothUnit(zoom_, lod_policy_.minimal_edge_zoom, lod_policy_.full_detail_zoom);
-    return lod_policy_.paint_query_margin_low
-         + (lod_policy_.paint_query_margin_full - lod_policy_.paint_query_margin_low) * t;
+    double normal = lod_policy_.paint_query_margin_low
+                  + (lod_policy_.paint_query_margin_full - lod_policy_.paint_query_margin_low) * t;
+    double extension = max(max(extension_bounds_.node_paint_margin_px,
+                               extension_bounds_.node_hit_margin_px),
+                           extension_bounds_.edge_paint_margin_px);
+    extension = max(extension, (double)extension_bounds_.resolved_port_hit_radius_px);
+    extension = max(extension, (double)extension_bounds_.resolved_edge_hit_width_px);
+    return max(normal, extension + DPI(2));
+}
+
+double UiNodeGraph::EffectiveEdgeHitWidth(const UiGraphEdgeStyle& style) const
+{
+    return max(2.0, style.interaction_width * max(0.25, min(1.0, zoom_)));
+}
+
+double UiNodeGraph::MaxEdgeHitWidthForBroadPhase() const
+{
+    double width = EffectiveEdgeHitWidth(GetEffectiveStyle().edge);
+    for(int i = 0; i < edge_styles_.GetCount(); i++)
+        width = max(width, EffectiveEdgeHitWidth(edge_styles_[i]));
+    width = max(width, (double)extension_bounds_.resolved_edge_hit_width_px);
+    return width;
+}
+
+int UiNodeGraph::EffectivePortHitRadius(const UiGraphNodeStyle& style) const
+{
+    return max(DPI(2), fround(style.port_hit_radius * max(0.35, zoom_)));
+}
+
+int UiNodeGraph::MaxPortHitRadiusForBroadPhase() const
+{
+    int radius = EffectivePortHitRadius(GetEffectiveStyle().node);
+    for(int i = 0; i < node_styles_.GetCount(); i++)
+        radius = max(radius, EffectivePortHitRadius(node_styles_[i]));
+    radius = max(radius, extension_bounds_.resolved_port_hit_radius_px);
+    return radius;
 }
 
 Rect UiNodeGraph::GetShapeSafeContentRect(const UiGraphNode& node, const Rect& content,
@@ -1048,6 +1101,18 @@ bool UiNodeGraph::ReconcileModelState(bool reset_like)
         }
 
     if(reset_like) {
+        for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i) {
+            UiGraphNodeRef ref{node_ctrls_.GetKey(i)};
+            if(model_ && model_->Contains(ref))
+                continue;
+            Ptr<Ctrl> ctrl = node_ctrls_[i];
+            int a = active_node_ctrls_.Find(ref.id);
+            if(a >= 0)
+                active_node_ctrls_.Remove(a);
+            node_ctrls_.Remove(i);
+            if(ctrl && ctrl->GetParent() == this)
+                ctrl->Remove();
+        }
         hot_node_ = UiGraphNodeRef();
         hot_edge_ = UiGraphEdgeRef();
         hot_port_ = UiGraphPortRef();
@@ -1156,9 +1221,20 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
             for(UiGraphEdgeRef edge : model_->GetNodeEdges(change.node))
                 UpdateSpatialEdge(edge);
         break;
-    case UiGraphChangeKind::NodeRemoved:
+    case UiGraphChangeKind::NodeRemoved: {
         RemoveSpatialNode(change.node);
+        int q = GetNodeCtrlIndex(change.node);
+        if(q >= 0) {
+            Ptr<Ctrl> ctrl = node_ctrls_[q];
+            node_ctrls_.Remove(q);
+            int a = active_node_ctrls_.Find(change.node.id);
+            if(a >= 0)
+                active_node_ctrls_.Remove(a);
+            if(ctrl && ctrl->GetParent() == this)
+                ctrl->Remove();
+        }
         break;
+    }
     case UiGraphChangeKind::EdgeAdded:
     case UiGraphChangeKind::EdgeUpdated:
         UpdateSpatialEdge(change.edge);
@@ -1260,22 +1336,38 @@ UiNodeGraph& UiNodeGraph::SetNodeCtrl(UiGraphNodeRef node, Ctrl& ctrl)
     if(!model_ || !model_->Contains(node))
         return *this;
     Rect damage = GetNodeDamage(node);
+
     for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i)
-        if(node_ctrls_[i] == &ctrl && node_ctrls_.GetKey(i) != node.id)
+        if(node_ctrls_[i] == &ctrl && node_ctrls_.GetKey(i) != node.id) {
+            UiGraphId old_id = node_ctrls_.GetKey(i);
+            int a = active_node_ctrls_.Find(old_id);
+            if(a >= 0)
+                active_node_ctrls_.Remove(a);
             node_ctrls_.Remove(i);
+            if(ctrl.GetParent() == this) {
+                node_ctrl_activation_detach_ = true;
+                ctrl.Remove();
+                node_ctrl_activation_detach_ = false;
+            }
+        }
+
     int i = GetNodeCtrlIndex(node);
     if(i >= 0 && node_ctrls_[i] == &ctrl)
         return *this;
     if(i >= 0) {
         Ptr<Ctrl> old = node_ctrls_[i];
+        int a = active_node_ctrls_.Find(node.id);
+        if(a >= 0)
+            active_node_ctrls_.Remove(a);
         node_ctrls_.Remove(i);
         if(old && old->GetParent() == this)
             old->Remove();
     }
+
     node_ctrls_.Add(node.id, Ptr<Ctrl>(&ctrl));
-    if(ctrl.GetParent() != this)
-        Add(ctrl);
-    ctrl.Show();
+    // A registered control is not automatically an active child. Visibility,
+    // scope and LOD decide activation in UpdateAttachedCtrls().
+    ctrl.Hide();
     damage |= RebuildNodeAndEdges(node);
     UpdateAttachedCtrls();
     RefreshLayout();
@@ -1291,6 +1383,9 @@ UiNodeGraph& UiNodeGraph::ClearNodeCtrl(UiGraphNodeRef node)
     Rect damage = GetNodeDamage(node);
     Ptr<Ctrl> ctrl = node_ctrls_[i];
     node_ctrls_.Remove(i);
+    int a = active_node_ctrls_.Find(node.id);
+    if(a >= 0)
+        active_node_ctrls_.Remove(a);
     if(ctrl && ctrl->GetParent() == this)
         ctrl->Remove();
     damage |= RebuildNodeAndEdges(node);
@@ -1306,6 +1401,8 @@ void UiNodeGraph::ClearNodeCtrls()
     for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i)
         if(node_ctrls_[i]) controls.Add(node_ctrls_[i]);
     node_ctrls_.Clear();
+    active_node_ctrls_.Clear();
+    last_node_ctrl_candidate_count_ = 0;
     for(Ptr<Ctrl> ctrl : controls)
         if(ctrl && ctrl->GetParent() == this) ctrl->Remove();
     InvalidateGeometry();
@@ -1329,39 +1426,88 @@ Rect UiNodeGraph::GetNodeCtrlRect(UiGraphNodeRef node) const
 void UiNodeGraph::UpdateAttachedCtrls()
 {
     Rect viewport(Point(0, 0), GetSize());
-    for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i) {
-        UiGraphNodeRef ref{node_ctrls_.GetKey(i)};
-        Ptr<Ctrl> ctrl = node_ctrls_[i];
-        if(!ctrl) {
-            node_ctrls_.Remove(i);
-            continue;
-        }
+    last_node_ctrl_candidate_count_ = 0;
+
+    auto should_show = [&](UiGraphNodeRef ref, Ptr<Ctrl> ctrl) -> bool {
+        if(!ctrl)
+            return false;
         const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
         const NodeGeometry* geometry = FindNodeGeometry(ref);
-        if(!node) {
-            node_ctrls_.Remove(i);
-            if(ctrl->GetParent() == this) ctrl->Remove();
+        if(!node || !geometry)
+            return false;
+        UiGraphNodeStyle style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
+        return node->visible && !node->collapsed
+            && model_->GetNodeScope(ref) == GetScope()
+            && zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom)
+            && !geometry->control.IsEmpty()
+            && !(geometry->control & viewport).IsEmpty();
+    };
+
+    // First update only controls that were actually active. This is bounded by
+    // the visible embedded-control population, not by every registered binding.
+    for(int i = active_node_ctrls_.GetCount() - 1; i >= 0; --i) {
+        UiGraphId id = active_node_ctrls_[i];
+        int q = node_ctrls_.Find(id);
+        last_node_ctrl_candidate_count_++;
+        if(q < 0 || !node_ctrls_[q]) {
+            active_node_ctrls_.Remove(i);
             continue;
         }
-        UiGraphNodeStyle style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
-        bool show = node->visible && !node->collapsed && geometry &&
-                    zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom) &&
-                    !geometry->control.IsEmpty() && !(geometry->control & viewport).IsEmpty();
-        if(show) {
-            if(ctrl->GetParent() != this) Add(*ctrl);
-            ctrl->SetRect(geometry->control);
-            ctrl->Show();
-        }
-        else
+        UiGraphNodeRef ref{id};
+        Ptr<Ctrl> ctrl = node_ctrls_[q];
+        if(!should_show(ref, ctrl)) {
             ctrl->Hide();
+            if(ctrl->GetParent() == this) {
+                node_ctrl_activation_detach_ = true;
+                ctrl->Remove();
+                node_ctrl_activation_detach_ = false;
+            }
+            active_node_ctrls_.Remove(i);
+            continue;
+        }
+        const NodeGeometry* geometry = FindNodeGeometry(ref);
+        ctrl->SetRect(geometry->control);
+        ctrl->Show();
+    }
+
+    // Then consider only prepared nodes that have a registered control. Prepared
+    // geometry is already viewport/LOD bounded, so offscreen registrations do not
+    // create per-camera linear work.
+    for(int i = 0; i < node_geometry_.GetCount(); i++) {
+        UiGraphId id = node_geometry_.GetKey(i);
+        if(active_node_ctrls_.Find(id) >= 0)
+            continue;
+        int q = node_ctrls_.Find(id);
+        if(q < 0)
+            continue;
+        last_node_ctrl_candidate_count_++;
+        Ptr<Ctrl> ctrl = node_ctrls_[q];
+        if(!ctrl) {
+            node_ctrls_.Remove(q);
+            continue;
+        }
+        UiGraphNodeRef ref{id};
+        if(!should_show(ref, ctrl))
+            continue;
+        if(ctrl->GetParent() != this)
+            Add(*ctrl);
+        ctrl->SetRect(node_geometry_[i].control);
+        ctrl->Show();
+        active_node_ctrls_.FindAdd(id);
     }
 }
 
 void UiNodeGraph::ChildRemoved(Ctrl *child)
 {
-    for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i)
-        if(node_ctrls_[i] == child)
-            node_ctrls_.Remove(i);
+    if(!node_ctrl_activation_detach_)
+        for(int i = node_ctrls_.GetCount() - 1; i >= 0; --i)
+            if(node_ctrls_[i] == child) {
+                UiGraphId id = node_ctrls_.GetKey(i);
+                int a = active_node_ctrls_.Find(id);
+                if(a >= 0)
+                    active_node_ctrls_.Remove(a);
+                node_ctrls_.Remove(i);
+            }
     Ctrl::ChildRemoved(child);
 }
 
@@ -1844,7 +1990,7 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
             Point anchor = ShapeBoundaryAnchor(out.hit_path, out.surface, side, axis);
             out.anchors.Add(port.id, anchor);
             if(zoom_ >= lod_policy_.port_zoom) {
-                int hit = max(DPI(2), fround(style.port_hit_radius * max(0.35, zoom_)));
+                int hit = EffectivePortHitRadius(style);
                 Rect hit_rect = RectC(anchor.x - hit, anchor.y - hit, hit * 2 + 1, hit * 2 + 1);
                 out.port_hits.Add(port.id, hit_rect);
                 out.paint_bounds |= hit_rect;
@@ -1864,6 +2010,8 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
         }
     }
     out.paint_bounds = out.paint_bounds.Inflated(max(1, fround(2 * min(1.0, max(0.25, zoom_)))));
+    if(extension_bounds_.node_paint_margin_px > 0)
+        out.paint_bounds |= out.surface.Inflated(extension_bounds_.node_paint_margin_px);
 }
 
 Vector<Pointf> UiNodeGraph::BuildStraightRoutePx(Pointf source, Pointf target, const Vector<Pointf>& waypoints)
@@ -2077,8 +2225,10 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
     // Keep prepared edge routes in sub-pixel screen coordinates. Quantization
     // happens only at the integer Draw/legacy-overlay boundary.
     out.points = clone(route);
-    int interaction = fround(max(2.0, style.interaction_width * max(0.25, min(1.0, zoom_))));
+    int interaction = (int)std::ceil(EffectiveEdgeHitWidth(style));
     out.bounds = RouteBounds(out.points, interaction);
+    if(extension_bounds_.edge_paint_margin_px > 0)
+        out.bounds = out.bounds.Inflated(extension_bounds_.edge_paint_margin_px);
     if(!out.points.IsEmpty()) {
         // Route midpoint is a geometric position, not a vertex-index position.
         // Adaptive tessellation can legitimately collapse a straight Bezier to
