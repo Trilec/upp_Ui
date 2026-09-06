@@ -129,7 +129,7 @@ void AppendCubicRec(Vector<Pointf>& out,
     AppendCubicRec(out, mid, p123, p23, p3, tolerance, depth + 1, generated, status);
 }
 
-void SimplifyRangevoid SimplifyRange(const Vector<Pointf>& points, int first, int last,
+void SimplifyRange(const Vector<Pointf>& points, int first, int last,
                    double tolerance, Vector<byte>& keep)
 {
     if(last <= first + 1)
@@ -361,7 +361,7 @@ int UiGeometry::EllipseSegments(double radius_x_px, double radius_y_px,
     return ArcSegments(max(rx, ry), sweep_angle, status);
 }
 
-void UiGeometry::AppendArcvoid UiGeometry::AppendArc(Vector<Pointf>& out, Pointf center,
+void UiGeometry::AppendArc(Vector<Pointf>& out, Pointf center,
                            double radius_px, double start_angle,
                            double sweep_angle, bool include_start,
                            TessellationStatus *status)
@@ -574,7 +574,7 @@ void UiGeometry::AppendCubic(Vector<Pointf>& out,
         status->segments = generated;
 }
 
-Vector<Pointf> UiGeometry::RoundedPolylineVector<Pointf> UiGeometry::RoundedPolyline(const Vector<Pointf>& points,
+Vector<Pointf> UiGeometry::RoundedPolyline(const Vector<Pointf>& points,
                                                double radius_px)
 {
     if(points.GetCount() < 3 || radius_px <= 0.0001)
