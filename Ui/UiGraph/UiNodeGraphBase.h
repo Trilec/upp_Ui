@@ -462,6 +462,7 @@ private:
     struct SpatialCell : Moveable<SpatialCell> {
         Vector<UiGraphId> nodes;
         Vector<UiGraphId> edges;
+        Vector<UiGraphId> backdrops;
     };
 
     enum SpatialQueryFlag : int {
@@ -593,6 +594,7 @@ private:
     void RemoveSpatialEdge(UiGraphEdgeRef ref);
     WorldRect GetNodeWorldBounds(const UiGraphNode& node) const;
     WorldRect GetEdgeWorldBounds(const UiGraphEdge& edge) const;
+    WorldRect GetBackdropWorldBounds(const UiGraphBackdrop& backdrop) const;
     WorldRect GetViewportWorldBounds(double screen_margin) const;
     void QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes,
                       Index<UiGraphId>& edges, int flags) const;
@@ -602,6 +604,8 @@ private:
     UiGraphEdgeRef HitTestEdgeRouteHandle(Point p) const;
     void AddNodeToSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
     void AddEdgeToSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds, bool force_global);
+    void AddBackdropToSpatialCells(UiGraphBackdropRef ref, const WorldRect& bounds);
+    void QueryBackdropSpatial(const WorldRect& area, Index<UiGraphId>& backdrops) const;
     void RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds);
     void RemoveEdgeFromSpatialCells(UiGraphEdgeRef ref, const WorldRect& bounds);
     static int64 SpatialCellKey(int x, int y);
@@ -736,8 +740,10 @@ private:
     VectorMap<int64, SpatialCell> spatial_cells_;
     VectorMap<UiGraphId, WorldRect> node_world_bounds_;
     VectorMap<UiGraphId, WorldRect> edge_world_bounds_;
+    VectorMap<UiGraphId, WorldRect> backdrop_world_bounds_;
     Index<UiGraphId> spatial_global_nodes_;
     Index<UiGraphId> spatial_global_edges_;
+    Index<UiGraphId> spatial_global_backdrops_;
     bool spatial_dirty_ = true;
     int spatial_build_serial_ = 0;
     int spatial_update_serial_ = 0;

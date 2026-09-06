@@ -299,12 +299,10 @@ Value UiNodeGraph::GetData() const
 void UiNodeGraph::Layout()
 {
     SyncThemeStyle();
-    Vector<UiGraphNodeRef> nodes = model_ ? model_->GetScopeNodes(GetScope())
-                                          : Vector<UiGraphNodeRef>();
-    Vector<UiGraphBackdropRef> backdrops = model_ ? model_->GetScopeBackdrops(GetScope())
-                                                  : Vector<UiGraphBackdropRef>();
-    if(auto_fit_first_paint_ && !first_paint_done_ && model_
-       && (!nodes.IsEmpty() || !backdrops.IsEmpty())) {
+    const bool have_scope_content = model_
+        && (model_->GetScopeNodeCount(GetScope()) > 0
+            || model_->GetScopeBackdropCount(GetScope()) > 0);
+    if(auto_fit_first_paint_ && !first_paint_done_ && have_scope_content) {
         first_paint_done_ = true;
         FitToGraph();
         return;
@@ -317,10 +315,27 @@ void UiNodeGraph::Layout()
 void UiNodeGraph::PaintBackdrops(Draw& w)
 {
     last_painted_backdrop_count_ = 0;
+    last_backdrop_candidate_count_ = 0;
     if(!model_)
         return;
 
-    Vector<UiGraphBackdropRef> refs = model_->GetScopeBackdrops(GetScope());
+    EnsureSpatialIndex();
+    Rect paint = w.GetPaintRect() & Rect(Point(0, 0), GetSize());
+    if(paint.IsEmpty())
+        return;
+
+    WorldRect area;
+    area.Include(ScreenToWorld(paint.TopLeft()));
+    area.Include(ScreenToWorld(paint.BottomRight()));
+
+    Index<UiGraphId> ids;
+    QueryBackdropSpatial(area, ids);
+    last_backdrop_candidate_count_ = ids.GetCount();
+
+    Vector<UiGraphBackdropRef> refs;
+    refs.Reserve(ids.GetCount());
+    for(int i = 0; i < ids.GetCount(); i++)
+        refs.Add(UiGraphBackdropRef{ids[i]});
     Sort(refs, [&](UiGraphBackdropRef a, UiGraphBackdropRef b) {
         const UiGraphBackdrop* aa = model_->FindBackdrop(a);
         const UiGraphBackdrop* bb = model_->FindBackdrop(b);
@@ -329,7 +344,6 @@ void UiNodeGraph::PaintBackdrops(Draw& w)
         return aa->z_order != bb->z_order ? aa->z_order < bb->z_order : a.id < b.id;
     });
 
-    Rect paint = w.GetPaintRect() & Rect(Point(0, 0), GetSize());
     const Style& style = GetEffectiveStyle();
     Color paper = ResolveFace(style.canvas_palette.face[ST_NORMAL], SColorPaper());
     Color fill = BlendGraphColor(paper, style.grid_major, 0.11);
@@ -349,9 +363,10 @@ void UiNodeGraph::PaintBackdrops(Draw& w)
             continue;
 
         w.DrawRect(r, fill);
-        Vector<Point> outline;
-        outline << r.TopLeft() << r.TopRight() << r.BottomRight()
-                << r.BottomLeft() << r.TopLeft();
+        Vector<Pointf> outline;
+        outline << Pointf(r.left, r.top) << Pointf(r.right, r.top)
+                << Pointf(r.right, r.bottom) << Pointf(r.left, r.bottom)
+                << Pointf(r.left, r.top);
         DrawPatternedPolyline(w, outline, max(1, DPI(1)), frame, DASHED,
                               max(3.0, 7.0 * min(1.0, zoom_)),
                               max(2.0, 5.0 * min(1.0, zoom_)));

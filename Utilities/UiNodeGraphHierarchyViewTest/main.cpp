@@ -108,6 +108,20 @@ CONSOLE_APP_MAIN
     graph.Layout();
     graph.FitToGraph(false);
 
+    t.Expect(model.GetScopeNodeCount(root) == model.GetScopeNodes(root).GetCount()
+             && model.GetScopeBackdropCount(root) == model.GetScopeBackdrops(root).GetCount(),
+             "scope occupancy counters expose first-fit emptiness without cloning membership vectors");
+
+    graph.BeginBatchUpdate();
+    for(int i = 0; i < 300; i++) {
+        UiGraphBackdrop far;
+        far.title = Format("Far %d", i);
+        far.position = Pointf(5000.0 + i * 220.0, 5000.0 + (i % 7) * 180.0);
+        far.size = Sizef(120, 90);
+        model.AddBackdrop(root, far);
+    }
+    graph.EndBatchUpdate();
+
     t.Expect(graph.GetScope() == root && graph.GetScopePath().IsEmpty(),
              "new view starts in root scope with an empty path");
     t.Expect(graph.GetPreparedNodeCount() == model.GetScopeNodes(root).GetCount(),
@@ -119,6 +133,8 @@ CONSOLE_APP_MAIN
     graph.Paint(root_draw);
     t.Expect(graph.GetLastPaintedBackdropCount() == 1,
              "root paint visits exactly the visible root backdrop");
+    t.Expect(graph.GetLastBackdropCandidateCount() < 16,
+             "root backdrop paint queries only the dirty viewport instead of sorting all 301 root backdrops");
 
     UiProgressRing progress;
     graph.SetNodeCtrl(group, progress);

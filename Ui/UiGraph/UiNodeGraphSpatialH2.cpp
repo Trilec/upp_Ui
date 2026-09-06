@@ -173,7 +173,15 @@ UiNodeGraph::WorldRect UiNodeGraph::GetEdgeWorldBounds(const UiGraphEdge& edge) 
     return out.Inflated(paint_margin);
 }
 
-UiNodeGraph::WorldRect UiNodeGraph::GetViewportWorldBounds(double screen_margin) const
+UiNodeGraph::WorldRect UiNodeGraph::GetBackdropWorldBounds(const UiGraphBackdrop& backdrop) const
+{
+    WorldRect out;
+    out.Include(backdrop.position);
+    out.Include(backdrop.position + Pointf(backdrop.size.cx, backdrop.size.cy));
+    return out;
+}
+
+WorldRect UiNodeGraph::GetViewportWorldBounds(double screen_margin) const
 {
     Size size = GetSize();
     WorldRect out;
@@ -199,8 +207,10 @@ void UiNodeGraph::RebuildSpatialIndex()
     spatial_cells_.Clear();
     node_world_bounds_.Clear();
     edge_world_bounds_.Clear();
+    backdrop_world_bounds_.Clear();
     spatial_global_nodes_.Clear();
     spatial_global_edges_.Clear();
+    spatial_global_backdrops_.Clear();
 
     if(model_) {
         UiGraphScopeRef scope = GetScope();
@@ -226,6 +236,16 @@ void UiNodeGraph::RebuildSpatialIndex()
                 route = FindEdgeStyleClass(edge->style_class).route;
             bool force_global = route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle;
             AddEdgeToSpatialCells(edge->ref, bounds, force_global);
+        }
+
+        Vector<UiGraphBackdropRef> backdrops = model_->GetScopeBackdrops(scope);
+        for(UiGraphBackdropRef ref : backdrops) {
+            const UiGraphBackdrop* backdrop = model_->FindBackdrop(ref);
+            if(!backdrop || !backdrop->visible)
+                continue;
+            WorldRect bounds = GetBackdropWorldBounds(*backdrop);
+            backdrop_world_bounds_.Add(backdrop->ref.id, bounds);
+            AddBackdropToSpatialCells(backdrop->ref, bounds);
         }
     }
 
@@ -287,6 +307,75 @@ void UiNodeGraph::AddEdgeToSpatialCells(UiGraphEdgeRef ref, const WorldRect& bou
             if(FindIndex(spatial_cells_[i].edges, ref.id) < 0)
                 spatial_cells_[i].edges.Add(ref.id);
         }
+}
+
+void UiNodeGraph::AddBackdropToSpatialCells(UiGraphBackdropRef ref, const WorldRect& bounds)
+{
+    if(!ref.IsValid() || !bounds.valid)
+        return;
+    int x0, y0, x1, y1;
+    SpatialCellRange(bounds, x0, y0, x1, y1);
+    int64 cells = x1 >= x0 && y1 >= y0
+                ? (int64)(x1 - x0 + 1) * (int64)(y1 - y0 + 1) : 0;
+    if(cells <= 0)
+        return;
+    if(cells > kNodeGraphMaxCellsPerObject) {
+        spatial_global_backdrops_.FindAdd(ref.id);
+        return;
+    }
+    for(int y = y0; y <= y1; y++)
+        for(int x = x0; x <= x1; x++) {
+            int64 key = SpatialCellKey(x, y);
+            int i = spatial_cells_.Find(key);
+            if(i < 0) {
+                SpatialCell cell;
+                spatial_cells_.Add(key, pick(cell));
+                i = spatial_cells_.GetCount() - 1;
+            }
+            if(FindIndex(spatial_cells_[i].backdrops, ref.id) < 0)
+                spatial_cells_[i].backdrops.Add(ref.id);
+        }
+}
+
+void UiNodeGraph::QueryBackdropSpatial(const WorldRect& area, Index<UiGraphId>& backdrops) const
+{
+    backdrops.Clear();
+    if(!area.valid)
+        return;
+
+    auto collect = [&](const SpatialCell& cell) {
+        for(UiGraphId id : cell.backdrops) {
+            int q = backdrop_world_bounds_.Find(id);
+            if(q >= 0 && backdrop_world_bounds_[q].Intersects(area))
+                backdrops.FindAdd(id);
+        }
+    };
+
+    int x0, y0, x1, y1;
+    SpatialCellRange(area, x0, y0, x1, y1);
+    int64 query_cells = x1 >= x0 && y1 >= y0
+                      ? (int64)(x1 - x0 + 1) * (int64)(y1 - y0 + 1) : 0;
+    int64 sparse_threshold = max<int64>(1024, (int64)spatial_cells_.GetCount() * 4);
+    if(query_cells > sparse_threshold) {
+        for(int i = 0; i < spatial_cells_.GetCount(); i++)
+            if(!spatial_cells_[i].backdrops.IsEmpty())
+                collect(spatial_cells_[i]);
+    }
+    else {
+        for(int y = y0; y <= y1; y++)
+            for(int x = x0; x <= x1; x++) {
+                int i = spatial_cells_.Find(SpatialCellKey(x, y));
+                if(i >= 0)
+                    collect(spatial_cells_[i]);
+            }
+    }
+
+    for(int i = 0; i < spatial_global_backdrops_.GetCount(); i++) {
+        UiGraphId id = spatial_global_backdrops_[i];
+        int q = backdrop_world_bounds_.Find(id);
+        if(q >= 0 && backdrop_world_bounds_[q].Intersects(area))
+            backdrops.FindAdd(id);
+    }
 }
 
 void UiNodeGraph::RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect& bounds)

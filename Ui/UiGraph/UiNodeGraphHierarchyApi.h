@@ -21,6 +21,7 @@
     int GetLastGeometryLodNodeCount() const { return last_geometry_lod_node_count_; } \
     int GetLastGeometryPathVertexCount() const { return last_geometry_path_vertex_count_; } \
     int GetLastPaintedBackdropCount() const { return last_painted_backdrop_count_; } \
+    int GetLastBackdropCandidateCount() const { return last_backdrop_candidate_count_; } \
     Event<UiGraphScopeRef> WhenScopeChanged
 
 #define UIGRAPH_HIERARCHY_PRIVATE_DECLS \
@@ -49,6 +50,7 @@
     UiGraphScopeRef active_scope_ = UiGraphModel::RootScope(); \
     UiGraphModel* scope_model_ = nullptr; \
     int last_painted_backdrop_count_ = 0; \
+    int last_backdrop_candidate_count_ = 0; \
     int view_update_depth_ = 0; \
     bool view_update_dirty_ = false; \
     bool view_update_viewport_changed_ = false; \

@@ -543,6 +543,10 @@ public:
     UiGraphNodeRef GetOwningGroupNode(UiGraphScopeRef scope) const;
     Vector<UiGraphNodeRef> GetScopeNodes(UiGraphScopeRef scope) const;
     Vector<UiGraphEdgeRef> GetScopeEdges(UiGraphScopeRef scope) const;
+    int GetScopeNodeCount(UiGraphScopeRef scope) const {
+        int q = scope.IsValid() ? scope_nodes_.Find(scope.id) : -1;
+        return q >= 0 ? scope_nodes_[q].GetCount() : 0;
+    }
 
     bool AddPort(UiGraphNodeRef node, const UiGraphPort& port);
     bool UpdatePort(UiGraphNodeRef node, const String& port_id, const UiGraphPort& port);
@@ -615,6 +619,10 @@ public:
     UiGraphBackdrop* FindBackdrop(UiGraphBackdropRef ref);
     const UiGraphBackdrop* FindBackdrop(UiGraphBackdropRef ref) const;
     Vector<UiGraphBackdropRef> GetScopeBackdrops(UiGraphScopeRef scope) const;
+    int GetScopeBackdropCount(UiGraphScopeRef scope) const {
+        int q = scope.IsValid() ? scope_backdrops_.Find(scope.id) : -1;
+        return q >= 0 ? scope_backdrops_[q].GetCount() : 0;
+    }
 
     UiGraphValidationReport Validate() const;
     void Clear();
