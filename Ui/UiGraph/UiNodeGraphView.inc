@@ -271,8 +271,15 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             }
         }
 
-        for(int i = 0; i < node_ctrls_.GetCount(); i++) {
-            const UiGraphNode* node = model_->FindNode(UiGraphNodeRef{node_ctrls_.GetKey(i)});
+        // Only prepared registered controls can activate on this projected
+        // camera frame. Scanning the complete registration map here would turn
+        // wheel zoom back into O(total embedded bindings), including offscreen
+        // controls that cannot become active.
+        for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
+            UiGraphId id = live_baseline_nodes_.GetKey(i);
+            if(node_ctrls_.Find(id) < 0)
+                continue;
+            const UiGraphNode* node = model_->FindNode(UiGraphNodeRef{id});
             if(!node)
                 continue;
             UiGraphNodeStyle node_style = ResolveNodeStyle(*node, GetNodeVisualState(*node));

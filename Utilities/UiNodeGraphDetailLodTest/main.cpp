@@ -114,6 +114,16 @@ void RunChildControlLod(TestCtx& t)
     t.Expect(graph.GetLastNodeCtrlCandidateCount() < 8,
              "embedded-control camera/layout work is bounded by active/prepared bindings, not all registrations");
 
+    int far_style_resolves = 0;
+    graph.WhenResolveNodeStyle = [&](const UiGraphNode& node, UiGraphVisualState, UiGraphNodeStyle&) {
+        if(node.ref.id >= 700 && node.ref.id < 732)
+            far_style_resolves++;
+    };
+    graph.MouseWheel(Point(360, 210), 1, 0);
+    t.Expect(far_style_resolves == 0,
+             "live wheel LOD checks ignore offscreen registered controls outside the prepared baseline");
+    graph.WhenResolveNodeStyle.Clear();
+
     Rect full = graph.GetNodeCtrlRect(ref);
     t.Expect(!full.IsEmpty(),
              "embedded child receives geometry at authored 1:1 zoom");
