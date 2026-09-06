@@ -122,8 +122,6 @@ void RunChildControlLod(TestCtx& t)
     graph.MouseWheel(Point(360, 210), 1, 0);
     t.Expect(far_style_resolves == 0,
              "live wheel LOD checks ignore offscreen registered controls outside the prepared baseline");
-    graph.WhenResolveNodeStyle.Clear();
-
     Rect full = graph.GetNodeCtrlRect(ref);
     t.Expect(!full.IsEmpty(),
              "embedded child receives geometry at authored 1:1 zoom");
