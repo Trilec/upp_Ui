@@ -2234,8 +2234,16 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
     // Keep prepared edge routes in sub-pixel screen coordinates. Quantization
     // happens only at the integer Draw/legacy-overlay boundary.
     out.points = clone(route);
-    int interaction = (int)std::ceil(EffectiveEdgeHitWidth(style));
-    out.bounds = RouteBounds(out.points, interaction);
+    double hit_width = EffectiveEdgeHitWidth(style);
+    int si = VisualStateIndex(GetEdgeVisualState(edge));
+    double paint_scale = min(1.0, max(0.01, zoom_));
+    double stroke_extent = max(0.0, style.width[si] * paint_scale * 0.5);
+    UiGraphArrowStyle resolved_arrow = edge.arrow == UiGraphArrowStyle::Inherit
+                                    ? style.arrow : edge.arrow;
+    double arrow_extent = edge.directed && resolved_arrow != UiGraphArrowStyle::None
+                        ? max(0.0, style.arrow_size * paint_scale) : 0.0;
+    int route_pad = (int)std::ceil(max(hit_width, stroke_extent + arrow_extent));
+    out.bounds = RouteBounds(out.points, route_pad);
     if(extension_bounds_.edge_paint_margin_px > 0)
         out.bounds = out.bounds.Inflated(extension_bounds_.edge_paint_margin_px);
     if(!out.points.IsEmpty()) {

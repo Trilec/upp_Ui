@@ -112,6 +112,19 @@ CONSOLE_APP_MAIN
     t.Expect(graph.GetLastGeometryPrepareUsecs() == 0,
              "wheel projection records zero immediate geometry preparation");
 
+    int mutation_geometry = graph.GetGeometryBuildSerial();
+    int mutation_revision = graph.GetPreparedGeometryRevision();
+    const UiGraphNode* mutate_node = model.FindNode(model.GetNodeRef(1));
+    ASSERT(mutate_node);
+    t.Expect(model.SetNodePosition(mutate_node->ref, mutate_node->position + Pointf(3, 2)),
+             "external model mutation succeeds while a wheel projection is pending");
+    t.Expect(graph.GetGeometryBuildSerial() == mutation_geometry
+             && graph.GetPreparedGeometryRevision() > mutation_revision,
+             "local model mutation advances prepared revision without pretending to be a full rebuild");
+    graph.MouseWheel(anchor, 1, 0);
+    t.Expect(graph.GetGeometryBuildSerial() > mutation_geometry,
+             "next live camera delta after approximate-scene mutation falls back to an exact rebuild");
+
     // Many sub-notch wheel events must always project from one immutable exact
     // baseline. Reprojecting already-rounded rectangles accumulates visible drift.
     graph.SetZoom(1.0, anchor);

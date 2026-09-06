@@ -225,8 +225,16 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
     }
 
     if(state.exact_serial != prepared_geometry_revision_
-       || live_baseline_revision_ != prepared_geometry_revision_)
+       || live_baseline_revision_ != prepared_geometry_revision_) {
+        // A semantic/local prepared mutation while wheel geometry is approximate
+        // invalidates the immutable exact baseline. Do not bless the projected
+        // frame as a new baseline; let the caller take the synchronous exact path.
+        if(state.approximate_zoom) {
+            cancel_approximation();
+            return false;
+        }
         sync_exact_state();
+    }
 
     // The prepared exact scene already includes overscan. Require only the new
     // visible viewport to remain inside it; demanding another full query margin
@@ -302,11 +310,12 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
                 return;
             UiNodeGraph *graph = ~weak;
             GraphViewState& current = GraphViewStateFor(graph);
-            if(!current.approximate_zoom || current.exact_serial != serial
-               || graph->prepared_geometry_revision_ != serial) {
+            if(!current.approximate_zoom || current.exact_serial != serial) {
                 current.approximate_zoom = false;
                 return;
             }
+            // Even if semantic/local prepared state changed meanwhile, settling
+            // means rebuilding an exact scene at the current camera.
             graph->SettleLiveViewProjection();
         });
     }
@@ -319,10 +328,6 @@ void UiNodeGraph::SettleLiveViewProjection()
     state.settle.Kill();
     if(!state.approximate_zoom)
         return;
-    if(state.exact_serial != prepared_geometry_revision_) {
-        state.approximate_zoom = false;
-        return;
-    }
 
     InvalidateGeometry();
     PrepareGeometry();
