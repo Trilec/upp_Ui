@@ -194,8 +194,6 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
 
 } // namespace
 
-bool UiNodeGraph::ProjectLiveView} // namespace
-
 bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom)
 {
     GraphViewState& state = GraphViewStateFor(this);

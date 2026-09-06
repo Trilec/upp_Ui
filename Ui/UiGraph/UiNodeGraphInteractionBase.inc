@@ -182,6 +182,20 @@ void UiNodeGraph::FlushBatchModelChanges()
             UpdateSpatialEdge(UiGraphEdgeRef{batch_edges_[i]});
     }
 
+    for(int i = 0; i < batch_removed_nodes_.GetCount(); i++) {
+        UiGraphNodeRef ref{batch_removed_nodes_[i]};
+        int q = GetNodeCtrlIndex(ref);
+        if(q < 0)
+            continue;
+        Ptr<Ctrl> ctrl = node_ctrls_[q];
+        node_ctrls_.Remove(q);
+        int a = active_node_ctrls_.Find(ref.id);
+        if(a >= 0)
+            active_node_ctrls_.Remove(a);
+        if(ctrl && ctrl->GetParent() == this)
+            ctrl->Remove();
+    }
+
     model_revision_ = model_ ? model_->GetRevision() : -1;
     if(full_prepare) {
         InvalidateGeometry();

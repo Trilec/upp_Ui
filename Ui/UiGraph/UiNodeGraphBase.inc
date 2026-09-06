@@ -1251,7 +1251,16 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
     }
 
     model_revision_ = model_ ? model_->GetRevision() : -1;
-    const bool full_prepare = reset_like || zoom_ < lod_policy_.minimal_edge_zoom;
+    const bool structural_like =
+           change.kind == UiGraphChangeKind::NodeScopeChanged
+        || change.kind == UiGraphChangeKind::SubgraphAdded
+        || change.kind == UiGraphChangeKind::SubgraphUpdated
+        || change.kind == UiGraphChangeKind::SubgraphRemoved
+        || change.kind == UiGraphChangeKind::BackdropAdded
+        || change.kind == UiGraphChangeKind::BackdropUpdated
+        || change.kind == UiGraphChangeKind::BackdropRemoved;
+    const bool full_prepare = reset_like || structural_like
+                           || zoom_ < lod_policy_.minimal_edge_zoom;
     if(full_prepare) {
         InvalidateGeometry();
         PrepareGeometry();
@@ -2801,9 +2810,8 @@ void UiNodeGraph::PaintConnectionPreview(Painter& p)
     Vector<Pointf> route = BuildBezierRoutePx(Pointf(a.x, a.y), source_side,
                                              Pointf(b.x, b.y), target_side,
                                              0.35);
-    Vector<Point> points; for(const Pointf& q : route) points.Add(Point(fround(q.x), fround(q.y)));
     Color color = connection_target_.IsValid() ? (connection_decision_.IsAllowed() ? Color(34,197,94) : Color(239,68,68)) : Color(59,130,246);
-    StrokePolyline(p, points, 2.0, color, DASHED, 7.0, 5.0);
+    StrokePolyline(p, route, 2.0, color, DASHED, 7.0, 5.0);
 }
 
 void UiNodeGraph::PaintMarquee(Draw& w) const
