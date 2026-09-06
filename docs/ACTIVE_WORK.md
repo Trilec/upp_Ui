@@ -4,78 +4,100 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; not project history.
 
 ## CURRENT
-TASK: **UiGraph 10k idle repaint**
-STATUS: **SOURCE FIX PUBLISHED — WINDOWS IDLE VALIDATION PENDING**
-BASE: `a6ef8ab843d31ddae6d074772a59420c2a479653`
-FIX: `6c05ed14019db90fab4f63de7aa0734b92f98f99`
-SHAPE_LAYER: `d9b956abeccc4220a481a50aa153da21c93b5b22` — **PASS**
-ROUTE_FIX: `454f35a98db17044f6a45652024e8beedb4296b9` — **PASS**
+TASK: **UI architecture audit remediation — Windows acceptance**
+STATUS: **F1-F10 SOURCE REMEDIATION PUBLISHED — WINDOWS VALIDATION PENDING**
+AUDIT_BASE: `c0decf747c169c8a93a3b393428df09db444ce31`
+AUDIT_DOC: `docs/UI_architecture_audit_curt_060926.txt`
+SOURCE_HEAD: `8a8b2c700c471c5bd9fe2f031778ceda0fef51f0`
 
-## IDLE-REPAINT SOURCE DIAGNOSIS
-- `UiNodeGraph::Paint()` is render-only and does not issue `Refresh()`.
-- Graph owns no repeating frame ticker.
-- live zoom owns one 140 ms `TimeCallback` settle; it is one-shot and clears approximate state.
-- camera setters refresh only when view state changes; hover refreshes only when the hot semantic object changes.
-- the installed UiGraphDemo runtime already debounces diagnostics to one post-interaction sample.
-- a second fallback implementation in `UiGraphDemo.cpp` still started an unconstrained repeating 200 ms diagnostics ticker.
-- `6c05ed...` removes that periodic fallback authority: diagnostics now stop the ticker and refresh only on demand.
-- current source therefore has no unbounded UiGraph/UiGraphDemo diagnostics frame clock.
+Do not call the audit PASS until the current source HEAD or a descendant has passed the
+Windows Debug + Release gate below.
 
-The old fallback ticker was a real idle-contract defect. Because the normal executable installs
-`UiGraphDemoRuntime.cpp`, which already masked it with debounced behavior, Windows validation must
-still determine whether the previously observed 10k idle CPU is now fully gone rather than claiming
-the historic observation was proven to come from this one path.
+## SOURCE REMEDIATION
+- **F1 patterned drawing:** `2437bf8858fe0d24165206ac89bfbc3125198d2f`
+  removes the timing-dependent `std`/fmod shim and adds deterministic pattern evidence.
+- **F2 preparation / mutation:** `5d7d3fda9e3410caa3db58806cc1b26fb7f851ef`
+  routes preparation through the LOD-aware view authority and keeps local prepared updates local.
+- **F3 spatial / population LOD:** `5d7d3f...` adds query masks, sparse occupied-cell fallback
+  and raw/global/cell evidence; `0c2ad15c006b939e466c41b33142406fd06eeb8c` keeps
+  resolved-style edges cell-indexed.
+- **F4 spatial local mutation:** `5d7d3f...` updates retained bounds in place and keeps reusable
+  spatial slots rather than ordered-removing ordinary local updates.
+- **F5 live camera precision:** `a40f9723171b12339183a976c4102aa28e7b8a3b` introduces an
+  immutable exact baseline; `c78de6369751d28515d422001822592b6f07f884` hardens semantic
+  mutation/settle behavior; `c2572c7ba08948b2ad710984aa04e09c37909d88` repairs integration.
+- **F6 numeric geometry contract:** `d004292bd0be5fbd63b358b96b6ee772913fe43c` adds stable
+  arc evaluation, finite supported bounds/work caps and `TessellationStatus`;
+  `e44913d5453ce9e7be05dac881b4bf4ed73070f9` repairs splice integration.
+- **F7 geometry/render contract:** `f52f95964340be5a66605957502d6ff8cb91f0b8` preserves
+  Graph routes as `Pointf` until final integer seams and documents positional/quantization/
+  live/stroke/ellipse/annulus distinctions.
+- **F8 hierarchy cost:** `86c6f0a167d5e8ea784c2f3b2514415766c442ca` uses O(1) scope
+  occupancy for ordinary Layout and spatially bounds backdrop paint candidates.
+- **F9 raster/cache truthfulness:** `5eeb5196e9bfbbd6eefadc03eb5ee4c32ad256ba` makes double
+  keys exact by default, canonicalizes explicit quantization, maintains cache bytes incrementally
+  and exposes cache/render-layer allocation/churn evidence.
+- **F10 hit/extension/control bounds:** `84c091194f568830231ed39957cd741ce0033a48`
+  unifies effective hit widths, adds declared extension bounds and visible/prepared control
+  activation; `4083f47d314f69da5112f77bfc513eb0a8f89f2f` bounds live wheel control checks.
 
-## WINDOWS IDLE GATE
-Validate exact current `main` / `6c05ed...` or descendant:
-1. Debug + Release build `examples/UiGraphDemo`.
-2. Open **10k scale**, Fit, then stop all mouse/keyboard interaction.
-3. With diagnostics **off**, verify the static graph settles to idle and does not continuously repaint.
-4. Open Diagnostics, enable **Live profiling**, perform one pan/zoom, then stop.
-5. Verify one deferred diagnostics update occurs after interaction and the process returns to idle;
-   no 200 ms repeating diagnostics refresh may remain.
-6. Switch Reference -> 10k -> Reference -> 10k and repeat the idle check.
-7. Confirm ordinary selection, pan, wheel zoom and exact settle still work.
-8. Re-run the high-value Graph regression/performance slice affected by view/runtime behavior.
-9. `git diff --check`; final worktree clean.
+Integration repair checkpoint:
+- `1aeecbf1057276f7adfd0d2a7eb69e0a3b24691a` closes hierarchy/batch/Pointf include gaps.
+- Full 29-file remediation diff received a mechanical splice/brace/stale-shim scan.
+- `Ui.upp` contains the active geometry/draw/Graph sources including `UiNodeGraphSpatialH2.cpp`.
+- GitHub exposes no CI status/workflow for the current HEAD; build/runtime acceptance is therefore
+  still **UNKNOWN** until Windows validation.
 
-Prefer structural evidence (no continuing paint/invalidation activity) over a machine-specific CPU
-percentage. If repaint continues, identify the caller issuing the next `Refresh`/layout before any
-paint-path optimization.
+## WINDOWS ACCEPTANCE GATE
+Validate exact current `main` / `8a8b2c7...` or descendant with CLANGx64 Debug + Release.
 
-## ACCEPTED FOUNDATION
-Windows CLANGx64 Debug + Release at exact `8b8f6c3c8c776814c0d9ceda99456c3931840505`:
-- `UiShapePathTest`: 27/27 PASS;
-- `UiGeometryContractTest`: 25/25 PASS;
-- `UiNodeGraphRouteEditTest`: 25/25 PASS;
-- `UiNodeGraphCanonicalShapeTest`: 14/14 PASS;
-- `UiGraphTest`: 90/90 PASS;
-- Release `UiProgressRingDemo` + `UiGraphDemo` smoke: PASS;
-- package/API exposure + `UiPainterShapePath`: PASS.
+Build/run the affected deterministic slice:
+1. `UiGeometryContractTest`
+2. `UiShapePathTest`
+3. `UiNodeGraphPatternedPaintTest`
+4. `UiNodeGraphScaleTest`
+5. `UiNodeGraphOverviewLodTest`
+6. `UiNodeGraphLiveViewTest`
+7. `UiNodeGraphDragDamageTest`
+8. `UiNodeGraphHierarchyViewTest`
+9. `UiNodeGraphDetailLodTest`
+10. `UiNodeGraphRouteEditTest`
+11. `UiNodeGraphCanonicalShapeTest`
+12. `UiStyledSurfaceCacheTest`
+13. `UiRenderBenchmark` — timings informational; record allocation/cache evidence
+14. `UiGraphTest`
 
-Geometry + authored-shape foundation is **ACCEPTED**.
+GUI smoke:
+- `UiGraphDemo` Reference + 10k: selection, pan, wheel zoom, exact settle, patterned edges,
+  hierarchy/backdrops and normal rendering remain correct.
+- Repeat the prior idle gate: 10k Fit then no input must settle idle with Diagnostics off.
+- With Diagnostics + Live profiling: one pan/zoom may schedule one deferred update, then idle;
+  no repeating 200 ms refresh clock may remain.
+- Reference -> 10k -> Reference -> 10k must still settle idle.
 
-## CONTRACT
-- generated curves use one library-owned **0.35 final-device-pixel** error budget;
-- direct Draw/native Painter remains first choice for simple paint;
-- normal controls use `UiShapes` / `UiShapePath` when reusable authored topology is useful;
-- dense scenes such as UiNodeGraph may use `UiGeometry` directly;
-- semantic handles/labels/anchors never depend on tessellation vertex indexes;
-- raster/cache policy remains separate from geometry;
+Final:
+- `git diff --check`: PASS.
+- worktree clean.
+- report exact tested HEAD, Debug/Release results and any visual/perf regressions.
+- Do not weaken tests or change architecture merely to make the gate pass.
+
+## CONTRACTS TO PRESERVE
+- explicit generated curves target **0.35 final-device-pixel positional error** only inside the
+  supported numeric/work envelope reported by `TessellationStatus`;
+- integer quantization, live projection and stroke raster semantics are separate seams;
+- normal controls prefer direct Draw/native Painter; dense Graph may use `UiGeometry` directly;
+- semantic handles/labels/anchors never depend on tessellation vertex index;
+- one retained world broad phase remains authoritative;
+- ordinary graph nodes/ports remain painted geometry, not child controls;
 - a static view must eventually become idle.
-
-## DEFERRED
-- warm unchanged 10k Reference->10k rebind may still perform one avoidable spatial rebuild — verify after idle repaint;
-- raster efficiency audit: blur, gradients, masks, temporary ImageBuffers, immutable-image analysis,
-  render-layer allocation/clearing;
-- further Graph hierarchy work waits until current performance defects are reconciled.
 
 ## BRANCH STATE
 Remote branches:
 - `main`;
 - `supervisor/test-example-hygiene-20260905`.
 
-**Do not delete `supervisor/test-example-hygiene-20260905`; it contains unique unmerged UiDoc test-consolidation work.**
+**Do not delete `supervisor/test-example-hygiene-20260905`; it contains unique unmerged
+UiDoc test-consolidation work.**
 
 ## CANONICAL DOCS
 `00` Coding · `01` Controls · `02` Theme · `03` Model · `04` Demo ·
