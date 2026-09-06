@@ -62,8 +62,9 @@ new evidence. The previous 10k idle repaint concern is also closed by the Window
 - a static view must eventually become idle.
 
 ## BRANCH STATE
-The former `supervisor/test-example-hygiene-20260905` work is fully represented on `main`
-and has no remaining unique work. It may be deleted.
+Remote and local development are back to a single authoritative branch: `main`.
+The former `supervisor/test-example-hygiene-20260905` branch was fully merged,
+validated, and deleted.
 
 ## CANONICAL DOCS
 `00` Coding · `01` Controls · `02` Theme · `03` Model · `04` Demo ·
