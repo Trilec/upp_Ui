@@ -15,8 +15,10 @@
     Contract
     - All coordinates accepted here are FINAL DEVICE/SCREEN PIXELS.
     - Authored units, DPI scaling and view transforms happen before these calls.
-    - Explicit curve geometry targets a library-wide maximum visual error of
-      0.35 screen pixels.
+    - Explicit curve flattening targets a library-wide positional error of
+      0.35 screen pixels inside the documented numeric/work envelope.
+    - Callers that need proof across adversarial inputs can request
+      TessellationStatus; limits are never silently reported as tolerance PASS.
     - Prefer native Draw/Painter primitives. Normal controls that need a
       reusable authored silhouette should use UiShapes / UiShapePath above this
       layer. Use UiGeometry directly when explicit points/math are genuinely
@@ -35,10 +37,24 @@ class UiGeometry {
 public:
     static double ErrorPx()          { return 0.35; }
     static double VisibleExtentPx()  { return 0.50; }
+    static int    MaxCurveSegments() { return 65536; }
+    static int    MaxSubdivisionDepth() { return 24; }
+    static double MaxCoordinatePx()  { return 1.0e9; }
 
-    // Visibility helper for generated detail. This is deliberately not a
-    // control-level LOD policy; it only answers whether an extent can cover
-    // enough of a device pixel to matter geometrically.
+    struct TessellationStatus {
+        bool input_supported = true;
+        bool tolerance_met = true;
+        bool work_limited = false;
+        int  segments = 0;
+
+        bool IsExactContract() const {
+            return input_supported && tolerance_met && !work_limited;
+        }
+    };
+
+    // Presentation significance helper for generated detail. This is a shared
+    // policy threshold, not a mathematical claim that smaller coverage is
+    // incapable of influencing an antialiased pixel.
     static bool IsVisibleExtent(double extent_px);
 
     // Basic screen-space line/vector math shared by routing, hit testing,
@@ -59,24 +75,36 @@ public:
 
     // Smallest equal-angle segment count whose circular sagitta stays inside
     // ErrorPx(). radius/sweep are final pixel-space values.
-    static int ArcSegments(double radius_px, double sweep_angle);
+    static int ArcSegments(double radius_px, double sweep_angle,
+                           TessellationStatus *status);
+    static int ArcSegments(double radius_px, double sweep_angle)
+    {
+        return ArcSegments(radius_px, sweep_angle, nullptr);
+    }
 
     // Conservative ellipse equivalent. max(rx, ry) bounds the parametric
     // curvature error. Closed ellipses enforce only the minimum topology
     // necessary to remain a closed silhouette; callers do not choose quality.
     static int EllipseSegments(double radius_x_px, double radius_y_px,
-                               double sweep_angle);
+                               double sweep_angle, TessellationStatus *status);
+    static int EllipseSegments(double radius_x_px, double radius_y_px,
+                               double sweep_angle)
+    {
+        return EllipseSegments(radius_x_px, radius_y_px, sweep_angle, nullptr);
+    }
 
     // Append explicit screen-space geometry. By default the start point is not
     // appended so callers can concatenate arcs without duplicate vertices.
     static void AppendArc(Vector<Pointf>& out, Pointf center,
                           double radius_px, double start_angle,
-                          double sweep_angle, bool include_start = false);
+                          double sweep_angle, bool include_start = false,
+                          TessellationStatus *status = nullptr);
 
     static void AppendEllipse(Vector<Pointf>& out, Pointf center,
                               double radius_x_px, double radius_y_px,
                               double start_angle, double sweep_angle,
-                              bool include_start = false);
+                              bool include_start = false,
+                              TessellationStatus *status = nullptr);
 
     // Common explicit stock silhouettes. Prefer native Draw/Painter shapes for
     // paint-only use; these exist for hit-testing, clipping, routing or custom
@@ -101,11 +129,13 @@ public:
     // append only as much geometry as ErrorPx() requires.
     static void AppendQuadratic(Vector<Pointf>& out,
                                 Pointf p0, Pointf p1, Pointf p2,
-                                bool include_start = false);
+                                bool include_start = false,
+                                TessellationStatus *status = nullptr);
 
     static void AppendCubic(Vector<Pointf>& out,
                             Pointf p0, Pointf p1, Pointf p2, Pointf p3,
-                            bool include_start = false);
+                            bool include_start = false,
+                            TessellationStatus *status = nullptr);
 
     // Shared corner construction for explicit geometry. RoundedPolyline keeps
     // the first/last point; RoundedPolygon treats the input as a closed shape.

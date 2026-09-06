@@ -22,63 +22,93 @@ bool Finite(Pointf p)
     return std::isfinite(p.x) && std::isfinite(p.y);
 }
 
-bool QuadraticNeedsSplit(Pointf p0, Pointf p1, Pointf p2, double tolerance2)
+bool Supported(Pointf p)
 {
-    Pointf d = p2 - p0;
+    return Finite(p) && std::fabs(p.x) <= UiGeometry::MaxCoordinatePx()
+                     && std::fabs(p.y) <= UiGeometry::MaxCoordinatePx();
+}
+
+double DistanceToSegmentLocal(Pointf p, Pointf a, Pointf b)
+{
+    Pointf d = b - a;
     double q = d.x * d.x + d.y * d.y;
-    if(q <= 1e-30)
-        return SqDistance(p1, p0) > tolerance2;
+    if(!std::isfinite(q) || q <= 1e-30)
+        return std::sqrt(SqDistance(p, a));
+    Pointf ap = p - a;
+    double t = (ap.x * d.x + ap.y * d.y) / q;
+    t = minmax(t, 0.0, 1.0);
+    Pointf nearest(a.x + d.x * t, a.y + d.y * t);
+    return std::sqrt(SqDistance(p, nearest));
+}
 
-    Pointf pd = p1 - p0;
-    double u = (pd.x * d.x + pd.y * d.y) / q;
-    if(u <= 0.0 || u >= 1.0)
-        return true;
-
-    Pointf projection(p0.x + d.x * u, p0.y + d.y * u);
-    return SqDistance(p1, projection) > tolerance2;
+bool QuadraticNeedsSplit(Pointf p0, Pointf p1, Pointf p2, double tolerance)
+{
+    return DistanceToSegmentLocal(p1, p0, p2) > tolerance;
 }
 
 bool CubicNeedsSplit(Pointf p0, Pointf p1, Pointf p2, Pointf p3,
-                     double tolerance2)
+                     double tolerance)
 {
-    Pointf d = p3 - p0;
-    double q = d.x * d.x + d.y * d.y;
-    if(q <= 1e-30)
-        return max(SqDistance(p1, p0), SqDistance(p2, p0)) > tolerance2;
+    return max(DistanceToSegmentLocal(p1, p0, p3),
+               DistanceToSegmentLocal(p2, p0, p3)) > tolerance;
+}
 
-    auto outside = [&](Pointf p) {
-        Pointf pd = p - p0;
-        double u = (pd.x * d.x + pd.y * d.y) / q;
-        if(u <= 0.0 || u >= 1.0)
-            return true;
-        Pointf projection(p0.x + d.x * u, p0.y + d.y * u);
-        return SqDistance(p, projection) > tolerance2;
-    };
-    return outside(p1) || outside(p2);
+void MarkLimited(UiGeometry::TessellationStatus *status)
+{
+    if(status) {
+        status->tolerance_met = false;
+        status->work_limited = true;
+    }
 }
 
 void AppendQuadraticRec(Vector<Pointf>& out,
                         Pointf p0, Pointf p1, Pointf p2,
-                        double tolerance2, int depth)
+                        double tolerance, int depth, int& generated,
+                        UiGeometry::TessellationStatus *status)
 {
-    if(depth >= 16 || !QuadraticNeedsSplit(p0, p1, p2, tolerance2)) {
+    bool split = QuadraticNeedsSplit(p0, p1, p2, tolerance);
+    if(!split) {
         out.Add(p2);
+        generated++;
+        return;
+    }
+    if(depth >= UiGeometry::MaxSubdivisionDepth()
+       || generated >= UiGeometry::MaxCurveSegments()) {
+        MarkLimited(status);
+        out.Add(p2);
+        generated++;
         return;
     }
 
     Pointf p01 = (p0 + p1) * 0.5;
     Pointf p12 = (p1 + p2) * 0.5;
     Pointf mid = (p01 + p12) * 0.5;
-    AppendQuadraticRec(out, p0, p01, mid, tolerance2, depth + 1);
-    AppendQuadraticRec(out, mid, p12, p2, tolerance2, depth + 1);
+    AppendQuadraticRec(out, p0, p01, mid, tolerance, depth + 1, generated, status);
+    if(generated >= UiGeometry::MaxCurveSegments()) {
+        MarkLimited(status);
+        if(out.IsEmpty() || out.Top() != p2)
+            out.Add(p2);
+        return;
+    }
+    AppendQuadraticRec(out, mid, p12, p2, tolerance, depth + 1, generated, status);
 }
 
 void AppendCubicRec(Vector<Pointf>& out,
                     Pointf p0, Pointf p1, Pointf p2, Pointf p3,
-                    double tolerance2, int depth)
+                    double tolerance, int depth, int& generated,
+                    UiGeometry::TessellationStatus *status)
 {
-    if(depth >= 16 || !CubicNeedsSplit(p0, p1, p2, p3, tolerance2)) {
+    bool split = CubicNeedsSplit(p0, p1, p2, p3, tolerance);
+    if(!split) {
         out.Add(p3);
+        generated++;
+        return;
+    }
+    if(depth >= UiGeometry::MaxSubdivisionDepth()
+       || generated >= UiGeometry::MaxCurveSegments()) {
+        MarkLimited(status);
+        out.Add(p3);
+        generated++;
         return;
     }
 
@@ -89,11 +119,17 @@ void AppendCubicRec(Vector<Pointf>& out,
     Pointf p123 = (p12 + p23) * 0.5;
     Pointf mid = (p012 + p123) * 0.5;
 
-    AppendCubicRec(out, p0, p01, p012, mid, tolerance2, depth + 1);
-    AppendCubicRec(out, mid, p123, p23, p3, tolerance2, depth + 1);
+    AppendCubicRec(out, p0, p01, p012, mid, tolerance, depth + 1, generated, status);
+    if(generated >= UiGeometry::MaxCurveSegments()) {
+        MarkLimited(status);
+        if(out.IsEmpty() || out.Top() != p3)
+            out.Add(p3);
+        return;
+    }
+    AppendCubicRec(out, mid, p123, p23, p3, tolerance, depth + 1, generated, status);
 }
 
-void SimplifyRange(const Vector<Pointf>& points, int first, int last,
+void SimplifyRangevoid SimplifyRange(const Vector<Pointf>& points, int first, int last,
                    double tolerance, Vector<byte>& keep)
 {
     if(last <= first + 1)
@@ -250,55 +286,100 @@ bool UiGeometry::ContainsPolygon(const Vector<Pointf>& polygon, Pointf point)
     return inside;
 }
 
-int UiGeometry::ArcSegments(double radius_px, double sweep_angle)
+int UiGeometry::ArcSegments(double radius_px, double sweep_angle,
+                            TessellationStatus *status)
 {
+    if(status)
+        *status = TessellationStatus();
+
     const double radius = std::fabs(radius_px);
     const double sweep = std::fabs(sweep_angle);
-    if(!std::isfinite(radius) || !std::isfinite(sweep) || sweep <= 0.000001)
-        return 1;
-
     const double tau = 2.0 * 3.14159265358979323846;
-    const int topology_min = sweep >= tau - 0.000001 ? 3 : 1;
 
-    const double error = ErrorPx();
-    if(radius <= error)
+    if(!std::isfinite(radius) || !std::isfinite(sweep)
+       || radius > MaxCoordinatePx()) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
+        return 1;
+    }
+    if(sweep <= 1e-12 || radius <= 1e-12) {
+        if(status)
+            status->segments = 1;
+        return 1;
+    }
+
+    const int topology_min = sweep >= tau - 1e-12 ? 3 : 1;
+
+    // Stable inversion of circular sagitta:
+    // e = r * (1 - cos(theta/2)) = 2r * sin^2(theta/4)
+    // theta = 4 asin(sqrt(e / 2r)).
+    const double ratio = ErrorPx() / (2.0 * radius);
+    double max_angle = ratio >= 1.0
+                     ? tau
+                     : 4.0 * std::asin(std::sqrt(max(0.0, ratio)));
+    if(!std::isfinite(max_angle) || max_angle <= 0.0) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
         return topology_min;
+    }
 
-    // Circular chord sagitta:
-    //   e = r * (1 - cos(theta / 2))
-    // Solve for theta and choose the smallest equal-angle segment count.
-    const double cosine = minmax(1.0 - error / radius, -1.0, 1.0);
-    const double max_angle = 2.0 * std::acos(cosine);
-    if(!std::isfinite(max_angle) || max_angle <= 0.000001)
-        return topology_min;
+    double required_d = std::ceil(sweep / max_angle);
+    int required = required_d >= (double)MaxCurveSegments()
+                 ? MaxCurveSegments()
+                 : max(topology_min, (int)required_d);
+    required = max(topology_min, required);
 
-    double required = std::ceil(sweep / max_angle);
-    if(required >= (double)INT_MAX)
-        return INT_MAX;
-    return max(topology_min, (int)required);
+    if(required_d > (double)MaxCurveSegments()) {
+        if(status) {
+            status->tolerance_met = false;
+            status->work_limited = true;
+        }
+    }
+    if(status)
+        status->segments = required;
+    return required;
 }
 
 int UiGeometry::EllipseSegments(double radius_x_px, double radius_y_px,
-                                double sweep_angle)
+                                double sweep_angle, TessellationStatus *status)
 {
-    int segments = ArcSegments(max(std::fabs(radius_x_px), std::fabs(radius_y_px)),
-                               sweep_angle);
-    const double tau = 2.0 * 3.14159265358979323846;
-    if(std::fabs(sweep_angle) >= tau - 0.000001)
-        segments = max(3, segments);
-    return segments;
+    const double rx = std::fabs(radius_x_px);
+    const double ry = std::fabs(radius_y_px);
+    if(!std::isfinite(rx) || !std::isfinite(ry)
+       || rx > MaxCoordinatePx() || ry > MaxCoordinatePx()) {
+        if(status) {
+            *status = TessellationStatus();
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
+        return 1;
+    }
+    return ArcSegments(max(rx, ry), sweep_angle, status);
 }
 
-void UiGeometry::AppendArc(Vector<Pointf>& out, Pointf center,
+void UiGeometry::AppendArcvoid UiGeometry::AppendArc(Vector<Pointf>& out, Pointf center,
                            double radius_px, double start_angle,
-                           double sweep_angle, bool include_start)
+                           double sweep_angle, bool include_start,
+                           TessellationStatus *status)
 {
-    if(!Finite(center) || !std::isfinite(radius_px) ||
-       !std::isfinite(start_angle) || !std::isfinite(sweep_angle))
+    if(status)
+        *status = TessellationStatus();
+    if(!Supported(center) || !std::isfinite(radius_px) ||
+       !std::isfinite(start_angle) || !std::isfinite(sweep_angle)
+       || std::fabs(radius_px) > MaxCoordinatePx()) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
         return;
+    }
 
     double radius = std::fabs(radius_px);
-    int segments = ArcSegments(radius, sweep_angle);
+    int segments = ArcSegments(radius, sweep_angle, status);
     int first = include_start ? 0 : 1;
     for(int i = first; i <= segments; i++) {
         double q = (double)i / (double)segments;
@@ -311,16 +392,24 @@ void UiGeometry::AppendArc(Vector<Pointf>& out, Pointf center,
 void UiGeometry::AppendEllipse(Vector<Pointf>& out, Pointf center,
                                double radius_x_px, double radius_y_px,
                                double start_angle, double sweep_angle,
-                               bool include_start)
+                               bool include_start, TessellationStatus *status)
 {
-    if(!Finite(center) || !std::isfinite(radius_x_px) ||
+    if(status)
+        *status = TessellationStatus();
+    if(!Supported(center) || !std::isfinite(radius_x_px) ||
        !std::isfinite(radius_y_px) || !std::isfinite(start_angle) ||
-       !std::isfinite(sweep_angle))
+       !std::isfinite(sweep_angle) || std::fabs(radius_x_px) > MaxCoordinatePx()
+       || std::fabs(radius_y_px) > MaxCoordinatePx()) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
         return;
+    }
 
     double rx = std::fabs(radius_x_px);
     double ry = std::fabs(radius_y_px);
-    int segments = EllipseSegments(rx, ry, sweep_angle);
+    int segments = EllipseSegments(rx, ry, sweep_angle, status);
     int first = include_start ? 0 : 1;
     for(int i = first; i <= segments; i++) {
         double q = (double)i / (double)segments;
@@ -445,27 +534,47 @@ Vector<Pointf> UiGeometry::PiePath(Pointf center, double radius_px,
 
 void UiGeometry::AppendQuadratic(Vector<Pointf>& out,
                                  Pointf p0, Pointf p1, Pointf p2,
-                                 bool include_start)
+                                 bool include_start, TessellationStatus *status)
 {
-    if(!Finite(p0) || !Finite(p1) || !Finite(p2))
+    if(status)
+        *status = TessellationStatus();
+    if(!Supported(p0) || !Supported(p1) || !Supported(p2)) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
         return;
+    }
     if(include_start)
         out.Add(p0);
-    AppendQuadraticRec(out, p0, p1, p2, Sq(ErrorPx()), 0);
+    int generated = 0;
+    AppendQuadraticRec(out, p0, p1, p2, ErrorPx(), 0, generated, status);
+    if(status)
+        status->segments = generated;
 }
 
 void UiGeometry::AppendCubic(Vector<Pointf>& out,
                              Pointf p0, Pointf p1, Pointf p2, Pointf p3,
-                             bool include_start)
+                             bool include_start, TessellationStatus *status)
 {
-    if(!Finite(p0) || !Finite(p1) || !Finite(p2) || !Finite(p3))
+    if(status)
+        *status = TessellationStatus();
+    if(!Supported(p0) || !Supported(p1) || !Supported(p2) || !Supported(p3)) {
+        if(status) {
+            status->input_supported = false;
+            status->tolerance_met = false;
+        }
         return;
+    }
     if(include_start)
         out.Add(p0);
-    AppendCubicRec(out, p0, p1, p2, p3, Sq(ErrorPx()), 0);
+    int generated = 0;
+    AppendCubicRec(out, p0, p1, p2, p3, ErrorPx(), 0, generated, status);
+    if(status)
+        status->segments = generated;
 }
 
-Vector<Pointf> UiGeometry::RoundedPolyline(const Vector<Pointf>& points,
+Vector<Pointf> UiGeometry::RoundedPolylineVector<Pointf> UiGeometry::RoundedPolyline(const Vector<Pointf>& points,
                                                double radius_px)
 {
     if(points.GetCount() < 3 || radius_px <= 0.0001)

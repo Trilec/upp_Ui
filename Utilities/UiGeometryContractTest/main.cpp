@@ -112,6 +112,27 @@ CONSOLE_APP_MAIN
              && Sagitta(100.0, 2.0 * PI, arc100) <= UiGeometry::ErrorPx() + 1e-9,
              "adaptive circles remain inside the 0.35px sagitta contract");
 
+    UiGeometry::TessellationStatus small_status;
+    int near_full_small = UiGeometry::ArcSegments(0.30, 1.99 * PI, &small_status);
+    t.Expect(small_status.IsExactContract()
+             && Sagitta(0.30, 1.99 * PI, near_full_small) <= UiGeometry::ErrorPx() + 1e-12,
+             "near-full arcs smaller than ErrorPx still receive enough topology to satisfy positional tolerance");
+
+    UiGeometry::TessellationStatus huge_status;
+    int huge_segments = UiGeometry::ArcSegments(1.0e9, 2.0 * PI, &huge_status);
+    t.Expect(huge_segments == UiGeometry::MaxCurveSegments()
+             && huge_status.input_supported && !huge_status.tolerance_met
+             && huge_status.work_limited,
+             "astronomical final-pixel arcs stop at the explicit work budget and report tolerance-not-met");
+
+    UiGeometry::TessellationStatus unsupported_status;
+    Vector<Pointf> unsupported;
+    UiGeometry::AppendQuadratic(unsupported, Pointf(0, 0), Pointf(1.0e12, 2), Pointf(4, 0),
+                                true, &unsupported_status);
+    t.Expect(unsupported.IsEmpty() && !unsupported_status.input_supported
+             && !unsupported_status.tolerance_met,
+             "coordinates outside the supported numeric envelope fail explicitly instead of overflowing silently");
+
     int quarter100 = UiGeometry::ArcSegments(100.0, PI * 0.5);
     t.Expect(quarter100 < arc100,
              "short arc sweep does not pay full-circle geometry cost");
