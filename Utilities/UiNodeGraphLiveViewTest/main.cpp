@@ -35,6 +35,7 @@ void BuildFixture(UiGraphModel& model)
     a.title = "A";
     a.position = Pointf(80, 100);
     a.size = Sizef(180, 100);
+    a.shape = UiGraphNodeShape::Custom;
     a.ports.Add(Port("out", UiGraphPortDirection::Output));
     UiGraphNodeRef ar = model.AddNode(a);
 
@@ -64,6 +65,11 @@ CONSOLE_APP_MAIN
     UiNodeGraph graph;
     graph.SetAutoFitOnFirstPaint(false);
     graph.SetRect(0, 0, 900, 620);
+    Rect captured_custom_surface;
+    graph.WhenHitTestCustomShape = [&](const UiGraphNode&, const Rect& surface, Point p) {
+        captured_custom_surface = surface;
+        return surface.Contains(p);
+    };
     graph.SetModel(model);
     graph.Layout();
     graph.SetZoom(1.0, Point(450, 310));
@@ -105,6 +111,30 @@ CONSOLE_APP_MAIN
              "wheel zoom keeps the pointer anchor stable in world space");
     t.Expect(graph.GetLastGeometryPrepareUsecs() == 0,
              "wheel projection records zero immediate geometry preparation");
+
+    // Many sub-notch wheel events must always project from one immutable exact
+    // baseline. Reprojecting already-rounded rectangles accumulates visible drift.
+    graph.SetZoom(1.0, anchor);
+    int repeated_geometry = graph.GetGeometryBuildSerial();
+    int repeated_revision = graph.GetPreparedGeometryRevision();
+    for(int i = 0; i < 120; i++)
+        graph.MouseWheel(anchor, 1, 0);
+    const UiGraphNode& observed = model.GetNode(0);
+    Point expected_center = graph.WorldToScreen(observed.position
+                           + Pointf(observed.size.cx * 0.5, observed.size.cy * 0.5));
+    captured_custom_surface = RectC(0, 0, 0, 0);
+    UiGraphNodeRef observed_ref = model.GetNodeRef(0);
+    t.Expect(graph.HitTestNode(expected_center) == observed_ref,
+             "many tiny live zoom deltas retain hit agreement at the model-projected node centre");
+    Point actual_center = captured_custom_surface.CenterPoint();
+    t.Expect(abs(actual_center.x - expected_center.x) <= 1
+             && abs(actual_center.y - expected_center.y) <= 1,
+             "live retained geometry stays within one final rounding step of the exact camera projection");
+    for(int i = 0; i < 120; i++)
+        graph.MouseWheel(anchor, -1, 0);
+    t.Expect(graph.GetGeometryBuildSerial() == repeated_geometry
+             && graph.GetPreparedGeometryRevision() == repeated_revision,
+             "tiny forward/reverse live zoom sequence performs no exact or semantic prepared-scene rebuild");
 
     int geometry_before_exact_zoom = graph.GetGeometryBuildSerial();
     graph.SetZoom(1.0, anchor);

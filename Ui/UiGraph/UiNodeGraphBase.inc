@@ -2178,6 +2178,7 @@ Rect UiNodeGraph::RebuildNodeAndEdges(UiGraphNodeRef ref)
         for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
             damage |= RebuildEdge(edge);
     damage |= GetNodeDamage(ref);
+    prepared_geometry_revision_++;
     return damage;
 }
 
@@ -2204,8 +2205,10 @@ Rect UiNodeGraph::RebuildEdge(UiGraphEdgeRef ref)
     }
 
     if(!prepare_edge) {
-        if(i >= 0)
+        if(i >= 0) {
             edge_geometry_.Remove(i);
+            prepared_geometry_revision_++;
+        }
         return damage;
     }
 
@@ -2231,6 +2234,7 @@ Rect UiNodeGraph::RebuildEdge(UiGraphEdgeRef ref)
     else
         edge_geometry_.Add(ref.id, pick(fresh));
     damage |= GetEdgeDamage(ref);
+    prepared_geometry_revision_++;
     return damage;
 }
 

@@ -111,15 +111,16 @@ bool GraphViewLodCompatible(const UiNodeGraph::LodPolicy& lod, double exact_zoom
 }
 
 template <class NodeMap, class EdgeMap>
-void ProjectPreparedGraphGeometry(NodeMap& nodes, EdgeMap& edges,
-                                  double old_zoom, Pointf old_pan,
+void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exact_edges,
+                                  NodeMap& nodes, EdgeMap& edges,
+                                  double exact_zoom, Pointf exact_pan,
                                   double new_zoom, Pointf new_pan)
 {
-    const double scale = new_zoom / max(old_zoom, 1e-9);
+    const double scale = new_zoom / max(exact_zoom, 1e-9);
 
     auto project_pointf = [&](Pointf p) {
-        return Pointf((p.x - old_pan.x) * scale + new_pan.x,
-                      (p.y - old_pan.y) * scale + new_pan.y);
+        return Pointf((p.x - exact_pan.x) * scale + new_pan.x,
+                      (p.y - exact_pan.y) * scale + new_pan.y);
     };
     auto project_point = [&](Point p) {
         Pointf q = project_pointf(Pointf(p.x, p.y));
@@ -137,42 +138,63 @@ void ProjectPreparedGraphGeometry(NodeMap& nodes, EdgeMap& edges,
         return Rect(l, t, max(l, rr), max(t, bb));
     };
 
+    ASSERT(exact_nodes.GetCount() == nodes.GetCount());
+    ASSERT(exact_edges.GetCount() == edges.GetCount());
+
     for(int i = 0; i < nodes.GetCount(); i++) {
+        const auto& src = exact_nodes[i];
         auto& g = nodes[i];
-        g.rect = project_rect(g.rect);
-        g.surface = project_rect(g.surface);
-        g.content = project_rect(g.content);
-        g.paint_bounds = project_rect(g.paint_bounds);
-        g.header = project_rect(g.header);
-        g.icon = project_rect(g.icon);
-        g.title = project_rect(g.title);
-        g.subtitle = project_rect(g.subtitle);
-        g.description = project_rect(g.description);
-        g.control = project_rect(g.control);
-        for(Pointf& q : g.hit_path)
-            q = project_pointf(q);
+        ASSERT(exact_nodes.GetKey(i) == nodes.GetKey(i));
+
+        g.rect = project_rect(src.rect);
+        g.surface = project_rect(src.surface);
+        g.content = project_rect(src.content);
+        g.paint_bounds = project_rect(src.paint_bounds);
+        g.header = project_rect(src.header);
+        g.icon = project_rect(src.icon);
+        g.title = project_rect(src.title);
+        g.subtitle = project_rect(src.subtitle);
+        g.description = project_rect(src.description);
+        g.control = project_rect(src.control);
+
+        ASSERT(g.hit_path.GetCount() == src.hit_path.GetCount());
+        for(int q = 0; q < g.hit_path.GetCount(); q++)
+            g.hit_path[q] = project_pointf(src.hit_path[q]);
+
+        ASSERT(g.anchors.GetCount() == src.anchors.GetCount());
         for(int q = 0; q < g.anchors.GetCount(); q++)
-            g.anchors[q] = project_point(g.anchors[q]);
+            g.anchors[q] = project_point(src.anchors[q]);
+
+        ASSERT(g.port_hits.GetCount() == src.port_hits.GetCount());
         for(int q = 0; q < g.port_hits.GetCount(); q++)
-            g.port_hits[q] = project_rect(g.port_hits[q]);
+            g.port_hits[q] = project_rect(src.port_hits[q]);
+
+        ASSERT(g.port_labels.GetCount() == src.port_labels.GetCount());
         for(int q = 0; q < g.port_labels.GetCount(); q++)
-            g.port_labels[q] = project_rect(g.port_labels[q]);
+            g.port_labels[q] = project_rect(src.port_labels[q]);
+
         g.compact = g.rect.GetWidth() < 120 || g.rect.GetHeight() < 72;
         g.micro = g.rect.GetWidth() < 38 || g.rect.GetHeight() < 26;
     }
 
     for(int i = 0; i < edges.GetCount(); i++) {
+        const auto& src = exact_edges[i];
         auto& g = edges[i];
-        for(Point& q : g.points)
-            q = project_point(q);
-        g.bounds = project_rect(g.bounds);
-        g.label_point = project_point(g.label_point);
-        g.route_handle = project_point(g.route_handle);
-        g.route_handle_hit = project_rect(g.route_handle_hit);
+        ASSERT(exact_edges.GetKey(i) == edges.GetKey(i));
+        ASSERT(g.points.GetCount() == src.points.GetCount());
+
+        for(int q = 0; q < g.points.GetCount(); q++)
+            g.points[q] = project_point(src.points[q]);
+        g.bounds = project_rect(src.bounds);
+        g.label_point = project_point(src.label_point);
+        g.route_handle = project_point(src.route_handle);
+        g.route_handle_hit = project_rect(src.route_handle_hit);
     }
 }
 
 } // namespace
+
+bool UiNodeGraph::ProjectLiveView} // namespace
 
 bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom)
 {
@@ -184,7 +206,7 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
     };
     auto sync_exact_state = [&] {
         state.settle.Kill();
-        state.exact_serial = geometry_build_serial_;
+        state.exact_serial = prepared_geometry_revision_;
         state.exact_zoom = geometry_zoom_;
         state.exact_pan = geometry_pan_;
         state.exact_size = geometry_size_;
@@ -192,6 +214,9 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         // margin. Keep that expanded exact footprint as reusable camera coverage.
         state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                               GraphViewPaintMargin(lod_policy_, geometry_zoom_));
+        live_baseline_nodes_ = clone(node_geometry_);
+        live_baseline_edges_ = clone(edge_geometry_);
+        live_baseline_revision_ = prepared_geometry_revision_;
         state.approximate_zoom = false;
     };
 
@@ -201,7 +226,8 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         return false;
     }
 
-    if(state.exact_serial != geometry_build_serial_)
+    if(state.exact_serial != prepared_geometry_revision_
+       || live_baseline_revision_ != prepared_geometry_revision_)
         sync_exact_state();
 
     // The prepared exact scene already includes overscan. Require only the new
@@ -228,11 +254,11 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             return false;
         }
 
-        const double step_scale = next_zoom / max(geometry_zoom_, 1e-9);
-        for(int i = 0; i < node_geometry_.GetCount(); i++) {
-            const NodeGeometry& g = node_geometry_[i];
-            int width = max(1, fround(g.rect.GetWidth() * step_scale));
-            int height = max(1, fround(g.rect.GetHeight() * step_scale));
+        const double cumulative = next_zoom / max(state.exact_zoom, 1e-9);
+        for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
+            const NodeGeometry& g = live_baseline_nodes_[i];
+            int width = max(1, fround(g.rect.GetWidth() * cumulative));
+            int height = max(1, fround(g.rect.GetHeight() * cumulative));
             bool compact = width < 120 || height < 72;
             bool micro = width < 38 || height < 26;
             if(compact != g.compact || micro != g.micro) {
@@ -254,8 +280,9 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         }
     }
 
-    ProjectPreparedGraphGeometry(node_geometry_, edge_geometry_,
-                                 geometry_zoom_, geometry_pan_, next_zoom, next_pan);
+    ProjectPreparedGraphGeometry(live_baseline_nodes_, live_baseline_edges_,
+                                 node_geometry_, edge_geometry_,
+                                 state.exact_zoom, state.exact_pan, next_zoom, next_pan);
     zoom_ = next_zoom;
     pan_ = next_pan;
     geometry_zoom_ = next_zoom;
@@ -271,14 +298,14 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
     if(approximate_zoom) {
         state.approximate_zoom = true;
         Ptr<UiNodeGraph> weak = this;
-        const int serial = geometry_build_serial_;
+        const int serial = prepared_geometry_revision_;
         state.settle.KillSet(140, [weak, serial] {
             if(!weak)
                 return;
             UiNodeGraph *graph = ~weak;
             GraphViewState& current = GraphViewStateFor(graph);
             if(!current.approximate_zoom || current.exact_serial != serial
-               || graph->geometry_build_serial_ != serial) {
+               || graph->prepared_geometry_revision_ != serial) {
                 current.approximate_zoom = false;
                 return;
             }
@@ -294,7 +321,7 @@ void UiNodeGraph::SettleLiveViewProjection()
     state.settle.Kill();
     if(!state.approximate_zoom)
         return;
-    if(state.exact_serial != geometry_build_serial_) {
+    if(state.exact_serial != prepared_geometry_revision_) {
         state.approximate_zoom = false;
         return;
     }
@@ -304,12 +331,15 @@ void UiNodeGraph::SettleLiveViewProjection()
     UpdateAttachedCtrls();
     Refresh();
 
-    state.exact_serial = geometry_build_serial_;
+    state.exact_serial = prepared_geometry_revision_;
     state.exact_zoom = geometry_zoom_;
     state.exact_pan = geometry_pan_;
     state.exact_size = geometry_size_;
     state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                           GraphViewPaintMargin(lod_policy_, geometry_zoom_));
+    live_baseline_nodes_ = clone(node_geometry_);
+    live_baseline_edges_ = clone(edge_geometry_);
+    live_baseline_revision_ = prepared_geometry_revision_;
     state.approximate_zoom = false;
     WhenViewport();
 }

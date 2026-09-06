@@ -344,6 +344,7 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
             edge_geometry_.Add(ref.id, pick(fresh));
     }
 
+    prepared_geometry_revision_++;
     UpdateAttachedCtrls();
     RefreshDamage(damage.Inflated(damage_pad));
 }

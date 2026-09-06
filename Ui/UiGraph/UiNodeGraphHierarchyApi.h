@@ -61,4 +61,7 @@
     int last_view_update_geometry_build_count_ = 0; \
     int last_view_update_spatial_build_count_ = 0; \
     int last_geometry_lod_node_count_ = 0; \
-    int last_geometry_path_vertex_count_ = 0
+    int last_geometry_path_vertex_count_ = 0; \
+    VectorMap<UiGraphId, NodeGeometry> live_baseline_nodes_; \
+    VectorMap<UiGraphId, EdgeGeometry> live_baseline_edges_; \
+    int live_baseline_revision_ = -1

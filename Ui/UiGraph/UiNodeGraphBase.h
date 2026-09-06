@@ -318,6 +318,7 @@ public:
     // Read-only scale evidence. These counters expose real production work and
     // do not alter model semantics or geometry preparation.
     int GetGeometryBuildSerial() const { return geometry_build_serial_; }
+    int GetPreparedGeometryRevision() const { return prepared_geometry_revision_; }
     int GetSpatialBuildSerial() const { return spatial_build_serial_; }
     int GetSpatialUpdateSerial() const { return spatial_update_serial_; }
     int GetLastSpatialCellProbeCount() const { return last_spatial_cell_probe_count_; }
@@ -727,6 +728,7 @@ private:
     VectorMap<UiGraphId, EdgeGeometry> edge_geometry_;
     bool geometry_dirty_ = true;
     int geometry_build_serial_ = 0;
+    int prepared_geometry_revision_ = 0;
     double geometry_zoom_ = 0.0;
     Pointf geometry_pan_;
     Size geometry_size_;

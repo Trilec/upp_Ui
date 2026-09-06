@@ -403,6 +403,7 @@ void UiNodeGraph::RebuildViewGeometry()
         geometry_size_ = GetSize();
         geometry_dirty_ = false;
         geometry_build_serial_++;
+        prepared_geometry_revision_++;
         return;
     }
 
@@ -485,6 +486,7 @@ void UiNodeGraph::RebuildViewGeometry()
     geometry_size_ = GetSize();
     geometry_dirty_ = false;
     geometry_build_serial_++;
+    prepared_geometry_revision_++;
 }
 
 void UiNodeGraph::FlushViewUpdate()
