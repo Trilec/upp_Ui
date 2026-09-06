@@ -164,17 +164,23 @@ void RunExtensionBounds(TestCtx& t)
     bounds.node_hit_margin_px = 36;
     bounds.node_paint_margin_px = 24;
     graph.SetExtensionBounds(bounds);
-    graph.WhenHitTestCustomShape = [](const UiGraphNode&, const Rect& surface, Point p) {
+    Rect callback_surface;
+    graph.WhenHitTestCustomShape = [&](const UiGraphNode&, const Rect& surface, Point p) {
+        callback_surface = surface;
         return p.x >= surface.left - 30 && p.x <= surface.right + 30
             && p.y >= surface.top - 30 && p.y <= surface.bottom + 30;
     };
     graph.SetModel(model);
     graph.Layout();
 
-    Point outside = graph.WorldToScreen(Pointf(node.position.x + node.size.cx + 24,
-                                                node.position.y + node.size.cy * 0.5));
+    Point node_center = graph.WorldToScreen(node.position
+                      + Pointf(node.size.cx * 0.5, node.size.cy * 0.5));
+    t.Expect(graph.HitTestNode(node_center) == ref && !callback_surface.IsEmpty(),
+             "custom-node callback exposes its styled surface before extension hit testing");
+
+    Point outside(callback_surface.right + 24, callback_surface.CenterPoint().y);
     t.Expect(graph.HitTestNode(outside) == ref,
-             "declared custom-node hit margin keeps an outside-surface callback hit in the broad phase");
+             "declared custom-node hit margin keeps a callback-approved outside-surface hit in the broad phase");
 
     bounds.node_hit_margin_px = 8;
     graph.SetExtensionBounds(bounds);

@@ -239,6 +239,15 @@ void UiNodeGraph::CaptureLiveViewBaseline()
     live_baseline_revision_ = prepared_geometry_revision_;
 }
 
+bool UiNodeGraph::CancelLiveViewProjection()
+{
+    GraphViewState& state = GraphViewStateFor(this);
+    const bool was_approximate = state.approximate_zoom;
+    state.settle.Kill();
+    state.approximate_zoom = false;
+    return was_approximate;
+}
+
 bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom)
 {
     GraphViewState& state = GraphViewStateFor(this);

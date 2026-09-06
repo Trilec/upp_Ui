@@ -126,23 +126,44 @@ CONSOLE_APP_MAIN
              "next live camera delta after approximate-scene mutation falls back to an exact rebuild");
 
     // Many sub-notch wheel events must always project from one immutable exact
-    // baseline. Reprojecting already-rounded rectangles accumulates visible drift.
+    // baseline. Compare the live callback surface against the total transform of
+    // that exact baseline; comparing it to the authored node centre would mix in
+    // legitimate asymmetric styled-shadow surface margins.
     graph.SetZoom(1.0, anchor);
+    const UiGraphNode& observed = model.GetNode(0);
+    UiGraphNodeRef observed_ref = model.GetNodeRef(0);
+    Point baseline_node_center = graph.WorldToScreen(observed.position
+                               + Pointf(observed.size.cx * 0.5, observed.size.cy * 0.5));
+    captured_custom_surface = RectC(0, 0, 0, 0);
+    t.Expect(graph.HitTestNode(baseline_node_center) == observed_ref
+             && !captured_custom_surface.IsEmpty(),
+             "exact baseline exposes the custom node surface before repeated live zoom");
+    Rect baseline_surface = captured_custom_surface;
+    Point baseline_surface_center = baseline_surface.CenterPoint();
+    double baseline_zoom = graph.GetZoom();
+    Pointf baseline_pan = graph.GetPan();
+
     int repeated_geometry = graph.GetGeometryBuildSerial();
     int repeated_revision = graph.GetPreparedGeometryRevision();
     for(int i = 0; i < 120; i++)
         graph.MouseWheel(anchor, 1, 0);
-    const UiGraphNode& observed = model.GetNode(0);
-    Point expected_center = graph.WorldToScreen(observed.position
-                           + Pointf(observed.size.cx * 0.5, observed.size.cy * 0.5));
+
+    Point expected_node_center = graph.WorldToScreen(observed.position
+                                + Pointf(observed.size.cx * 0.5, observed.size.cy * 0.5));
     captured_custom_surface = RectC(0, 0, 0, 0);
-    UiGraphNodeRef observed_ref = model.GetNodeRef(0);
-    t.Expect(graph.HitTestNode(expected_center) == observed_ref,
+    t.Expect(graph.HitTestNode(expected_node_center) == observed_ref,
              "many tiny live zoom deltas retain hit agreement at the model-projected node centre");
-    Point actual_center = captured_custom_surface.CenterPoint();
-    t.Expect(abs(actual_center.x - expected_center.x) <= 1
-             && abs(actual_center.y - expected_center.y) <= 1,
-             "live retained geometry stays within one final rounding step of the exact camera projection");
+
+    const double total_scale = graph.GetZoom() / max(baseline_zoom, 1e-9);
+    Pointf live_pan = graph.GetPan();
+    Point expected_surface_center(
+        fround((baseline_surface_center.x - baseline_pan.x) * total_scale + live_pan.x),
+        fround((baseline_surface_center.y - baseline_pan.y) * total_scale + live_pan.y));
+    Point actual_surface_center = captured_custom_surface.CenterPoint();
+    t.Expect(abs(actual_surface_center.x - expected_surface_center.x) <= 1
+             && abs(actual_surface_center.y - expected_surface_center.y) <= 1,
+             "live retained geometry stays within one final rounding step of the immutable exact baseline transform");
+
     for(int i = 0; i < 120; i++)
         graph.MouseWheel(anchor, -1, 0);
     t.Expect(graph.GetGeometryBuildSerial() == repeated_geometry
@@ -152,7 +173,7 @@ CONSOLE_APP_MAIN
     int geometry_before_exact_zoom = graph.GetGeometryBuildSerial();
     graph.SetZoom(1.0, anchor);
     t.Expect(graph.GetGeometryBuildSerial() > geometry_before_exact_zoom,
-             "programmatic SetZoom keeps the synchronous exact rebuild contract");
+             "programmatic same-value SetZoom cancels pending live projection and rebuilds synchronously exact");
 
     int geometry_before_exact_pan = graph.GetGeometryBuildSerial();
     graph.PanBy(Pointf(3, -2));

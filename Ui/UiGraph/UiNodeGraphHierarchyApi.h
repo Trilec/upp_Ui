@@ -35,6 +35,7 @@
     void RebuildViewGeometry(); \
     void BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& out, bool record_evidence = true); \
     void CaptureLiveViewBaseline(); \
+    bool CancelLiveViewProjection(); \
     UiNodeGraph& SetModelLegacy(UiGraphModel& model); \
     UiNodeGraph& UseInternalModelLegacy(); \
     UiNodeGraph& SetZoomLegacy(double zoom, Point anchor); \

@@ -531,7 +531,8 @@ UiNodeGraph& UiNodeGraph::SetZoom(double zoom, Point anchor)
 {
     const Style& style = GetEffectiveStyle();
     zoom = minmax(zoom, max(0.01, style.min_zoom), max(style.min_zoom, style.max_zoom));
-    if(abs(zoom - zoom_) < 1e-9)
+    const bool had_live_projection = CancelLiveViewProjection();
+    if(abs(zoom - zoom_) < 1e-9 && !had_live_projection)
         return *this;
     if(anchor.x < 0 || anchor.y < 0)
         anchor = Point(GetSize().cx / 2, GetSize().cy / 2);
@@ -552,7 +553,8 @@ UiNodeGraph& UiNodeGraph::SetZoom(double zoom, Point anchor)
 
 UiNodeGraph& UiNodeGraph::SetPan(Pointf pan)
 {
-    if(pan_ == pan)
+    const bool had_live_projection = CancelLiveViewProjection();
+    if(pan_ == pan && !had_live_projection)
         return *this;
     pan_ = pan;
 
@@ -573,7 +575,8 @@ UiNodeGraph& UiNodeGraph::PanBy(Pointf delta)
 
 UiNodeGraph& UiNodeGraph::ResetView()
 {
-    if(abs(zoom_ - 1.0) < 1e-9 && pan_ == Pointf(0, 0))
+    const bool had_live_projection = CancelLiveViewProjection();
+    if(abs(zoom_ - 1.0) < 1e-9 && pan_ == Pointf(0, 0) && !had_live_projection)
         return *this;
     zoom_ = 1.0;
     pan_ = Pointf(0, 0);
