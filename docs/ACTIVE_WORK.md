@@ -8,7 +8,7 @@ TASK: **UI architecture audit remediation — Windows acceptance**
 STATUS: **F1-F10 SOURCE REMEDIATION PUBLISHED — WINDOWS VALIDATION PENDING**
 AUDIT_BASE: `c0decf747c169c8a93a3b393428df09db444ce31`
 AUDIT_DOC: `docs/UI_architecture_audit_curt_060926.txt`
-SOURCE_HEAD: `f5ee42ee6f4fa5d21b58bf9ae647e806db805daa`
+SOURCE_HEAD: `cab3df5c6521fc8fe60cd4bde7036d09664e9a61`
 
 Do not call the audit PASS until the current source HEAD or a descendant has passed the
 Windows Debug + Release gate below.
@@ -48,13 +48,18 @@ Integration repair checkpoint:
 - `f5ee42ee6f4fa5d21b58bf9ae647e806db805daa` fixes Gary's first Windows compile
   blockers: qualifies the active H2 nested `WorldRect` return and captures immutable live-view
   baselines by explicit deep copy into fresh Moveable geometry instead of deleted copy constructors.
+- `b779da3a1b8f56b0810d022bbdda91cf0e40477e` fixes the Windows `far` keyword test parse blocker.
+- `cab3df5c6521fc8fe60cd4bde7036d09664e9a61` restores the public exact-camera mutation
+  contract by cancelling pending live projection before SetZoom/SetPan/ResetView equality exits;
+  it also corrects two audit regressions to measure their intended contracts directly: immutable
+  live-baseline projection and callback-surface extension broad phase.
 - Full 29-file remediation diff received a mechanical splice/brace/stale-shim scan.
 - `Ui.upp` contains the active geometry/draw/Graph sources including `UiNodeGraphSpatialH2.cpp`.
 - GitHub exposes no CI status/workflow for the current HEAD; build/runtime acceptance is therefore
   still **UNKNOWN** until Windows validation.
 
 ## WINDOWS ACCEPTANCE GATE
-Validate exact current `main` / `f5ee42e...` or descendant with CLANGx64 Debug + Release.
+Validate exact current `main` / `cab3df5...` or descendant with CLANGx64 Debug + Release.
 
 Build/run the affected deterministic slice:
 1. `UiGeometryContractTest`
