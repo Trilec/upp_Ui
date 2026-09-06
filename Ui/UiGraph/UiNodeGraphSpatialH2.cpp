@@ -238,7 +238,10 @@ void UiNodeGraph::RebuildSpatialIndex()
             UiGraphRouteStyle route = edge->route;
             if(route == UiGraphRouteStyle::Inherit)
                 route = FindEdgeStyleClass(edge->style_class).route;
-            bool force_global = route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle;
+            // Dynamic style resolution remains cell-indexed under ExtensionBounds.
+        // Only a statically custom route (or a genuinely >256-cell envelope)
+        // needs the global bucket.
+        bool force_global = route == UiGraphRouteStyle::Custom;
             AddEdgeToSpatialCells(edge->ref, bounds, force_global);
         }
 
@@ -483,7 +486,10 @@ void UiNodeGraph::UpdateSpatialEdge(UiGraphEdgeRef ref)
         UiGraphRouteStyle route = edge->route;
         if(route == UiGraphRouteStyle::Inherit)
             route = FindEdgeStyleClass(edge->style_class).route;
-        bool force_global = route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle;
+        // Dynamic style resolution remains cell-indexed under ExtensionBounds.
+        // Only a statically custom route (or a genuinely >256-cell envelope)
+        // needs the global bucket.
+        bool force_global = route == UiGraphRouteStyle::Custom;
         AddEdgeToSpatialCells(ref, bounds, force_global);
     }
     else if(i >= 0)

@@ -145,6 +145,8 @@ CONSOLE_APP_MAIN
     int resolver_edges = resolver_graph.GetPreparedEdgeCount();
     t.Expect(resolver_edges > overview_edges * 3,
              "state-sensitive edge-style resolver disables overview sampling rather than losing custom semantics");
+    t.Expect(resolver_graph.GetLastSpatialGlobalEdgeVisitCount() == 0,
+             "resolved-style grid edges remain cell-indexed instead of forcing a full global-edge scan");
 
     Cout() << "UINODEGRAPH_OVERVIEW_LOD_PROFILE"
            << " detailed_edges=" << detailed_edges
