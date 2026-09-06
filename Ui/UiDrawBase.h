@@ -201,7 +201,7 @@ private:
             uint64 bits;
         } u;
         u.value = v;
-        AddToken("dx", Format("%llx", (unsigned long long)u.bits));
+        AddToken("dx", Format("%llx", (int64)u.bits));
         return *this;
     }
 
