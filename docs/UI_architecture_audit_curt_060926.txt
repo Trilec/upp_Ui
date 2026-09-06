@@ -1,0 +1,352 @@
+ARCHITECTURE AUDIT RESULT
+
+
+OVERALL VERDICT:
+KEEP WITH CORRECTIONS
+
+CONFIDENCE:
+Medium overall.
+High for the cited source defects and isolated numerical counterexamples.
+No claim of Windows runtime, full U++ build, visual acceptance, or measured 100k throughput.
+
+EXECUTIVE SUMMARY:
+Keep the responsibility boundaries, semantic model, painted-node design, shared geometry and three-part LOD vocabulary. These are sensible foundations.
+
+The greatest architectural mistake is treating bounded retained output and unchanged build counters as proof of bounded total work. Candidate collection, container removal, rich preparation after mutation, and backdrop processing can escape those guarantees.
+
+The implementation also contains accumulated recovery scaffolding that now obscures which policy actually executes. A time-dependent replacement for a mathematical function is particularly unsuitable for production drawing.
+
+Correct the specific defects below before using UiNodeGraph internals as the template for Timeline or Canvas. A GPU rewrite would not address these problems.
+
+WHAT IS GOOD:
+- One semantic UiGraphModel authority, stable references, and view-owned camera, selection, gestures and prepared geometry.
+- Explicit separation between same-scope Backdrops and nested Subgraph scopes.
+- Ordinary nodes and ports are painted, avoiding a Ctrl per graph object.
+- Scope membership and incident-edge lookup are indexed; GetNodeEdges clones an incident list rather than scanning every graph edge.
+- World-space spatial indexing survives camera changes.
+- Micro preparation branches before rich content work in BuildViewNodeGeometry.
+- Direct Draw, native Painter, explicit geometry and raster caching are optional representations rather than a mandatory abstraction chain.
+- UiShapePath preserves authored commands; quadratic commands become native cubics in its Painter adapter.
+- Route labels use polyline arc length rather than a generated midpoint index.
+- The live-camera coverage checks, LOD fallback and one-shot zoom settle are worthwhile concepts.
+- Existing structural regression counters are useful and should remain.
+
+TOP RISKS:
+1. Time-dependent patterned-line arithmetic.
+2. Multiple geometry preparation authorities, with ordinary mutations still reaching the older preparer.
+3. Spatial queries and spatial updates with hidden scene-wide costs.
+4. Repeated integer projection accumulating visible error during live zoom.
+5. An accuracy contract stronger than the geometry implementation and final rendering pipeline actually guarantee.
+
+FINDINGS:
+
+F1
+SEVERITY: HIGH
+AREA: Drawing / Correctness
+EVIDENCE:
+Ui/UiGraph/UiNodeGraph.cpp defines UiNodeGraphRenderMath::fmod, then replaces the token std while including UiNodeGraphRender.inc.
+The replacement returns zero after repeated identical arguments within a 500-microsecond window.
+DrawPatternedPolyline in UiNodeGraphRender.inc uses this replacement for dash phase. PaintBackdrops also calls that patterned-line routine.
+
+An isolated C++17 probe compiled the retrieved function with a fixed test clock. Six calls to fmod(5,3) returned:
+2, 2, 0, 2, 0, 2.
+The correct remainder is always 2.
+WHY IT MATTERS:
+Dash progression can depend on execution timing and prior calls. This appears to be a workaround for a non-progressing floating-point loop, but changes mathematical meaning instead of establishing loop progress.
+The existing PatternedPaintTest checks completion and edge counts, not pattern correctness or timing independence.
+RECOMMENDATION:
+Implement explicit deterministic dash-segment progression. Handle near-boundary residues and guarantee a positive advance or a deliberate phase transition. Remove the std macro and replacement function once that loop is corrected.
+DO NOT FIX YET:
+Fix immediately in a separate implementation task; do not merely remove the workaround without repairing termination.
+
+F2
+SEVERITY: HIGH
+AREA: Graph / LOD / Mutation
+EVIDENCE:
+UiNodeGraph.cpp includes UiNodeGraphBase.inc without redirecting PrepareGeometry.
+HandleModelChange therefore calls PrepareGeometry -> RebuildGeometry -> BuildNodeGeometry.
+UiNodeGraphInteraction.cpp includes InteractionBase.inc before its PrepareGeometry alias; FlushBatchModelChanges also uses the old preparer.
+Only the later View.inc inclusion redirects its calls to PrepareViewGeometry.
+Performance.inc supplies RebuildViewGeometry -> BuildViewNodeGeometry, which contains the useful early micro branch.
+SetNodeStyleClass -> RebuildNodeAndEdges also uses BuildNodeGeometry directly.
+WHY IT MATTERS:
+An overview reached through Fit/SetZoom can subsequently undergo rich content preparation after an ordinary mutation or style update.
+Ordinary model notifications invalidate and rebuild prepared scene geometry, rather than updating only the affected prepared objects.
+This contradicts the intended single preparation policy and weakens the documentation's local-mutation guarantee.
+RECOMMENDATION:
+Converge on one preparation entry point and one LOD-aware node builder. Route model notifications, batches, style changes, hit preparation and gesture fallbacks through it. Then implement genuinely local updates where membership and bounds permit.
+Remove obsolete implementations incrementally after each caller family passes regression.
+DO NOT FIX YET:
+Fix before extending this implementation into other dense controls.
+
+F3
+SEVERITY: HIGH
+AREA: Spatial / Population LOD
+EVIDENCE:
+Ui.upp compiles UiNodeGraphSpatialH2.cpp, not the historical UiNodeGraphSpatial.cpp.
+The active QuerySpatial:
+- enumerates every cell coordinate inside the query rectangle;
+- gathers raw edges before overview reduction;
+- unconditionally adds every spatial_global_edges_ entry;
+- collects edges even for node-only hit queries.
+Objects spanning more than 256 cells, custom routes, and all edges when WhenResolveEdgeStyle is installed can enter that global collection.
+RebuildViewGeometry then adds source and target nodes of candidate edges.
+WHY IT MATTERS:
+A small hit query can visit every global edge. A style callback that only changes colour can disable overview reduction and force all edges into the global path.
+A sparse, wide query can spend most of its time probing empty cells.
+Overview reduction bounds some prepared output only after paying for raw collection, lookup and String bin keys. Remote edge endpoints can inflate node preparation.
+RECOMMENDATION:
+Give broad-phase queries explicit node/edge masks and separate semantic queries from presentation reduction; do not let geometry_dirty_ implicitly select query semantics.
+Distinguish trusted conservative bounds from unbounded custom callbacks. Filter oversized built-in edges by valid bounds; require custom-bound contracts or a deliberate slow fallback.
+Add an occupied-cell alternative for excessively large sparse query ranges.
+Measure global visits, cell probes and raw candidates before choosing another spatial structure.
+DO NOT FIX YET:
+Fix the common global-edge/query behaviour soon; require it before claiming robust 100k scaling.
+
+F4
+SEVERITY: HIGH
+AREA: Spatial / Local Mutation / Containers
+EVIDENCE:
+UiNodeGraphBase.h stores node_world_bounds_, edge_world_bounds_ and spatial_cells_ in VectorMap.
+UpdateSpatialNode and UpdateSpatialEdge in SpatialH2.cpp remove existing map entries and append replacements.
+RemoveNodeFromSpatialCells and RemoveEdgeFromSpatialCells erase empty cells from the VectorMap.
+U++ maps combine an Index with a sequence container; ordered removal has movement costs:
+https://www.ultimatepp.org/srcdoc%24Core%24NTL_en-us.html
+WHY IT MATTERS:
+Updating one node can shift a large suffix of the retained bounds map. Updating incident edges can repeat that cost. A spatial-update counter increment does not measure the number of entries moved.
+The hash itself may be fine while its maintenance representation makes local edits scene-size dependent.
+RECOMMENDATION:
+Update an existing bounds value in place. Use stable/reusable slots or another measured erase strategy for cell and object deletion. Keep z-order separate from storage order.
+DO NOT FIX YET:
+Fix soon, before treating local mutation as independent of active-scope size.
+
+F5
+SEVERITY: HIGH
+AREA: View / Geometry / Hit Agreement
+EVIDENCE:
+ProjectPreparedGraphGeometry in View.inc reprojects the current geometry on every event.
+Rectangles, edge points and anchors are rounded back to integers each time; node hit paths retain Pointf.
+Compatibility checks bound zoom ratio and LOD crossings, but not accumulated rounding.
+
+A numerical reproduction of the exact integer recurrence, using the default zoom_step=1.12, 100 wheel inputs of zdelta=1 and a fixed origin:
+initial coordinate: 100
+retained integer coordinate: 100
+camera-exact coordinate: 109.9043846
+cumulative scale: 1.099043846
+This is within the allowed zoom-ratio range. It is a recurrence counterexample, not a Windows input-device test.
+WHY IT MATTERS:
+Geometry can stick during fine zoom and jump at settle. Floating hit paths and rounded surfaces/anchors can diverge.
+Scaling already-flattened geometry also scales its original approximation error; the allowed 1.55 multiplier alone permits a 0.35 error to become 0.5425 before other errors.
+RECOMMENDATION:
+Retain an immutable exact baseline or floating geometry and derive each displayed frame from the total camera transform. Round once at the final drawing boundary.
+State a separate temporary live-view error allowance and test it. Keep the one-shot exact settle.
+DO NOT FIX YET:
+Fix before generalising retained-camera code. Preserve the concept.
+
+F6
+SEVERITY: HIGH
+AREA: Geometry / Numeric Contract
+EVIDENCE:
+UiGeometry.cpp:
+- ArcSegments returns topology_min when radius <= ErrorPx(), irrespective of a nearly full partial sweep.
+- It also returns topology_min when max_angle <= 0.000001.
+- AppendQuadraticRec and AppendCubicRec emit an endpoint at depth 16 without reporting whether tolerance was met.
+- Arc segment counts may reach INT_MAX, while AppendArc/AppendEllipse use an inclusive signed-int loop.
+- Finite input checks do not prevent overflow in intermediate squared lengths or midpoint sums.
+
+Isolated compiled ArcSegments counterexamples:
+radius 0.3, sweep 1.9*pi: 1 segment; midpoint-to-chord error 0.596307 px.
+radius 1e13, sweep 2*pi: 3 segments; midpoint-to-chord error 5e12 px.
+
+A separate numerical reproduction of depth-16 quadratic subdivision, for
+(0,0), (5e11,1e12), (1e12,0),
+gave approximately 52.063 px midpoint error on the first emitted leaf.
+WHY IT MATTERS:
+0.35 is presently a target, not a universal guaranteed maximum.
+Very large values additionally expose excessive allocation, overflow and termination risks.
+RECOMMENDATION:
+Retain 0.35 as the default positional flattening tolerance. Use numerically stable arc-angle evaluation, enforce sweep topology, and define finite supported ranges plus vertex/work budgets.
+Return or expose an explicit tolerance-not-met status when limits intervene.
+Use robust intermediate math and clip/rebase extreme coordinates where applicable.
+DO NOT FIX YET:
+Fix before advertising a hard universal error guarantee. Extreme-world support can remain bounded and explicit.
+
+F7
+SEVERITY: MEDIUM
+AREA: Geometry / API / Rendering Contract
+EVIDENCE:
+BuildEdgeGeometry rounds flattened Pointf routes into Vector<Point>.
+UiPainterShapePath natively forwards circular arcs and cubics but explicitly flattens every EllipseArc.
+UiGeometry::SimplifyPolyline spends its own full 0.35 tolerance; RoundedPolyline/RoundedPolygon use quadratic corner blends, not exact circular fillets.
+ArcBandPath represents a full annulus with radial bridges in one contour.
+WHY IT MATTERS:
+Integer rounding can add up to approximately 0.707 px displacement per vertex. Chained flattening and simplification require a combined budget.
+Centreline positional error does not prove stroke-outline, miter, antialiasing, topology or pixel-colour agreement.
+A bridged annulus can fill correctly while a stroke exposes the artificial cut.
+An extent below 0.5 px can still affect antialiased coverage; invisibility is not a mathematical consequence of that threshold.
+RECOMMENDATION:
+Document separate positional, quantization and live-view allowances. Define rounding semantics, contour stroke semantics and supported fill rules.
+Preserve native ellipse commands where a verified target Painter API can express them; otherwise document the explicit approximation.
+Treat subpixel omission as presentation policy. Do not introduce per-control sample knobs.
+DO NOT FIX YET:
+Clarify the contract soon; defer advanced stroke/tangent guarantees until a real consumer requires them.
+
+F8
+SEVERITY: MEDIUM
+AREA: Hierarchy / Paint / Layout
+EVIDENCE:
+Hierarchy.inc::Layout always calls GetScopeNodes and GetScopeBackdrops before checking whether first-fit is needed.
+GraphModel.cpp returns cloned membership vectors.
+PaintBackdrops clones and sorts the complete active-scope backdrop list on every paint, then rejects offscreen rectangles.
+Backdrops are absent from the node/edge spatial hash.
+WHY IT MATTERS:
+Layout includes O(scope nodes + backdrops) copying even when auto-fit is disabled.
+Backdrop paint is O(B log B) before visibility rejection. The node-only 10k fixture does not establish this hierarchy path's scaling.
+RECOMMENDATION:
+Use cheap scope-count/emptiness access for first-fit decisions. Retain backdrop order and index backdrop bounds for dirty paint, or explicitly document a small-backdrop limit.
+DO NOT FIX YET:
+Fix the unnecessary Layout copying soon. Prioritise backdrop indexing when realistic backdrop populations justify it.
+
+F9
+SEVERITY: MEDIUM
+AREA: Raster / Allocation / Cache
+EVIDENCE:
+UiRenderLayer.h allocates and clears a new ImageBuffer and creates BufferPainter on each call.
+Render.inc retains per-node render-layer fallbacks for custom/nonrectangular bodies and temporary vectors for styles, candidates and shadow paths.
+UiDrawBase.h::AddQuantizedDouble encodes rounded values while some factories, such as PaintCachedPortMarker, draw using the original double.
+UiRasterCache::TrimLocked sums all retained bytes on insertion and scans for oldest entries during eviction.
+WHY IT MATTERS:
+The layer helper centralises code but does not guarantee pooled allocation or batching. An uncommon shape mix can have a very different cost from the micro fixture.
+Quantized keys are not exact keys unless raster inputs are canonicalized identically.
+Cache churn can itself become work.
+RECOMMENDATION:
+Canonicalize factory inputs with keys or encode exact values. Add allocation, raster-area and cache-churn measurements.
+Reuse scratch capacity or bounded buffers only where measured. Batch only where z-order/compositing remains equivalent.
+Do not add an arena or GPU cache speculatively.
+DO NOT FIX YET:
+Fix cache truthfulness soon; defer broader pooling until profiling identifies the dominant path.
+
+F10
+SEVERITY: MEDIUM
+AREA: Hit Testing / Extension Contracts
+EVIDENCE:
+SpatialH2.cpp uses fixed broad-phase radii for port and edge hits.
+BuildEdgeGeometry inflates route bounds using a zoom-scaled interaction width, whereas HitTestEdgeSpatial compares segment distance with the unscaled style.interaction_width after rejecting outside g.bounds.
+UpdateAttachedCtrls scans every registered node control; offscreen controls are hidden rather than automatically bounded by a pool.
+WHY IT MATTERS:
+A declared interaction width can be clipped by a narrower stored bound. Large custom hit radii can exceed fixed query assumptions.
+The small embedded-control population is currently a caller convention, not an enforced view bound.
+RECOMMENDATION:
+Use one effective hit-width calculation across bounds, broad phase and exact tests. Give custom geometry/style callbacks declared paint/hit bounds and invalidation rules.
+Document and instrument the embedded-control limit, or introduce visible activation only if hosts need larger registrations.
+DO NOT FIX YET:
+Fix hit-width consistency soon; defer control pooling unless the escape hatch is being used at scale.
+
+GEOMETRY VERDICT:
+Keep UiGeometry. Final-device-space positional tolerance is the right default for explicit screen geometry, and 0.35 px is a reasonable starting quality target, not a universal perceptual law.
+
+The circular sagitta method is sound in its ordinary supported range. Using the larger ellipse radius is conservative for an axis-aligned ellipse represented as a scaled unit circle. Quadratic/cubic control-hull flatness is a sensible conservative method before termination limits.
+
+For anisotropic or general affine transforms, flatten transformed control geometry or use a proven conservative transform norm. Never flatten at one scale and assume the same error after arbitrary scaling.
+
+Do not conflate final-pixel accuracy with integer coordinates. Preserve floating precision until drawing requires quantization. Keep author vertices semantic; arc-length midpoint positions remain approximations but avoid vertex-density dependence.
+
+LOD VERDICT:
+Keep Population / Presentation / Geometry LOD. They answer distinct useful questions.
+
+The implementation needs one preparation authority and explicit query policies. Threshold logic is duplicated across BuildNodeGeometry, Render.inc and View.inc; some detail is prepared before the paint threshold will use it. Extract shared effective-detail decisions rather than inventing another universal LOD manager.
+
+Selected/hot context preservation is good. It does not make raw candidate processing bounded, and selected high-degree nodes can intentionally defeat overview edge reduction.
+
+LARGE-SCENE VERDICT:
+Keep the spatial hash for similar-sized, locally connected graphs with frequent local edits.
+Current evidence does not justify replacing it wholesale.
+
+Expected query cost includes cell coordinates visited, duplicated cell membership visits, global objects and candidates. Expected live projection cost includes every prepared vertex and rectangle. Neither operation is inherently O(1).
+
+At fit-all, PerformanceTest explicitly expects 10,000 prepared nodes. That is bounded by fixture population, not by a fixed screen-information budget. At 100k, node aggregation or density representation may become necessary even if edge representatives are bounded.
+
+Model/scope switches legitimately rebuild the active index. Warm rebind caching is an optional optimisation with lifetime/revision complexity, not the first repair.
+
+DRAWING VERDICT:
+The representation choices are broadly good.
+Retain direct primitives for cheap work and stock raster reuse where keys are truthful. Explicit graph routes are justified by hit testing and editing.
+Fix patterned drawing before expanding its use.
+Audit rich/custom shape mixes separately from the fast micro path.
+
+FUTURE BACKEND VERDICT:
+The conceptual boundaries are suitable for future backends; the implementation is not a drop-in GPU interface.
+UiGeometry is independent of colour and cache policy, although it uses U++ types.
+UiShapePath is useful authored vocabulary, and UiShapes belongs above it.
+UiDraw owns appropriate responsibilities but its large inline implementation would benefit from internal separation.
+UiRenderLayer accepts a concrete Painter callback and immediately rasterizes. Graph also retains integer screen geometry and directly calls Draw. A future backend would require an adapter for commands/resources, clipping, text and compositing.
+Do not build that abstraction now. Correct CPU correctness and scaling first.
+
+TEST GAPS:
+Existing suites provide useful coverage, but do not prove all architectural claims.
+
+Add targeted evidence for:
+- fractional-radius near-full arcs, extreme finite inputs, work-cap exhaustion and finite output;
+- adversarial quadratic/cubic paths, collinear backtracking, repeated points and long simplification inputs;
+- composed error after flattening, rounding and live projection;
+- many tiny wheel deltas, reversed zoom, changing anchors, geometry/hit agreement and exact settle;
+- actual event-loop timer execution, destruction/rebind while pending, and zero further idle activity;
+- ordinary model/style updates at overview preserving micro preparation;
+- raw spatial visits, empty-cell probes, global-edge population and map movement during local edits;
+- sparse scenes, dense single-cell scenes, long crossing edges, custom callbacks and high-degree hubs;
+- many offscreen backdrops and embedded-control registrations;
+- deterministic patterned output, not only prompt return;
+- identical cache output independent of insertion order for values sharing a quantized key.
+
+GeometryContractTest samples only a few ordinary curves and allows additional error slack. LiveViewTest uses a two-node fixture and does not drive the scheduled settle through an event loop. PatternedPaintTest checks counts and elapsed time rather than dash pixels.
+These are useful regression tests, not complete proofs.
+
+SIMPLIFICATION OPPORTUNITIES:
+- Retire macro-injected headers and renamed legacy method bodies in small reviewed stages.
+- Maintain one preparation pipeline and shared detail decisions.
+- Replace time-based arithmetic workarounds with explicit deterministic algorithms.
+- Make query type and presentation reduction explicit.
+- Move GraphViewState ownership into the control or a small owned camera helper; retain weak callback lifetime guards.
+- Use Git history for recovery instead of multiple active/recovery implementations.
+
+SCALE RISKS:
+At 100k+, likely pressure points are fit-all node preparation, global/long edges, empty-cell probing, dense-cell linear membership checks, ordered map removal, hover-triggered prepared-scene rebuilds, repeated projection of all prepared vertices, backdrop sorting and raster churn.
+A single-cell dense fixture can also make repeated FindIndex duplicate checks during insertion quadratic.
+Do not report 100k-ready until these workload classes have structural evidence.
+
+RECOMMENDED NEXT WORK:
+
+MUST FIX BEFORE BUILDING FURTHER ON THESE PATTERNS:
+1. Repair deterministic patterned-line progression and remove the fmod/std workaround; verify output as well as termination.
+2. Converge all preparation callers onto the micro-aware pipeline, then remove recovery aliases in staged commits. Gate ordinary mutations, batches, style changes, selection and gestures at overview.
+3. Correct live projection from an exact/floating baseline and publish a truthful geometry/error-limit contract with adversarial tests.
+
+SHOULD FIX SOON:
+4. Repair spatial query masks/global-edge handling and in-place bounds updates. Instrument work before reduction and container movement. Evaluate alternative structures only after these changes.
+5. Remove unconditional scope cloning in Layout; reconcile paint/hit bounds, cache canonicalization and extension-point contracts.
+6. Run exact-current-head Windows Debug/Release functional, visual and idle gates, including timer execution and representative 10k/100k pathological fixtures.
+
+SAFE TO DEFER:
+7. Warm model-rebind caches, broad buffer pools, backdrop acceleration for genuinely small populations, node density aggregation until its workload is established, and a GPU command backend.
+
+QUESTIONS / UNCERTAINTIES:
+- The actual U++/CLANGx64 version used on Windows was not established in this environment. No compatibility claim is made for an assumed framework release.
+- A full U++ toolchain was not available on PATH; repository tests were inspected, not executed.
+- The C++ probe used exact retrieved ArcSegments/fmod function bodies with minimal support shims and a fixed clock. Python probes reproduced numerical recurrences. These establish counterexamples, not full application behaviour.
+- Windows idle validation remains pending in ACTIVE_WORK. The active Paint path contains no direct Refresh, the live zoom settle is one-shot, and demo diagnostics stop after a deferred sample. Source inspection does not establish that every host/platform invalidation source is idle.
+- Full raster pixel comparisons, allocation measurements and adversarial GUI scenes remain unrun.
+- Arbitrary custom paint/style/route callbacks require an explicit supported bounds contract; correctness cannot be inferred from a conservative-looking fixed margin.
+- No broad claim is made that all library controls were exhaustively audited; the review concentrated on the requested geometry/drawing seams and graph execution paths.
+
+REPOSITORY CHANGES:
+None.
+No production edits, repository test edits, branch, commit, push or merge.
+Temporary local extracted source and numerical probes were used only for read-only audit evidence.
+
+FINAL ANSWER:
+If I were responsible for upp_Ui for the next five years, I would continue building on this drawing/geometry/LOD architecture.
+
+Before extending it, I would remove the time-dependent drawing workaround, establish one LOD-aware preparation authority, repair cumulative live projection, and make the error and spatial-work guarantees truthful.
+
+I would retain the model/view split, UiGeometry, UiShapePath, UiShapes and the spatial hash for their demonstrated workloads. I would not copy the current macro-layered UiNodeGraph implementation into new controls, and I would not start a GPU rewrite to avoid correcting these CPU-side defects.
+
