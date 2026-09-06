@@ -47,48 +47,12 @@
 #undef Rectangle
 #undef RefreshLayout
 
-namespace Upp {
-namespace UiNodeGraphRenderMath {
-
-inline double fmod(double value, double period)
-{
-    if(!(period > 0.0) || !std::isfinite(value) || !std::isfinite(period))
-        return 0.0;
-
-    struct RepeatState {
-        double value = 0.0;
-        double period = 0.0;
-        int repeats = 0;
-        int64 at_us = 0;
-    };
-    static thread_local RepeatState state;
-
-    const int64 now = usecs();
-    const bool same_burst = value == state.value && period == state.period
-                          && now >= state.at_us && now - state.at_us <= 500;
-    state.repeats = same_burst ? state.repeats + 1 : 0;
-    state.value = value;
-    state.period = period;
-    state.at_us = now;
-
-    if(state.repeats >= 2) {
-        state.repeats = 0;
-        return 0.0;
-    }
-    return std::fmod(value, period);
-}
-
-} // namespace UiNodeGraphRenderMath
-} // namespace Upp
-
 // Keep the accepted R9/R10 software render policy intact as the rich/detail
 // fallback. P2 gives the active name to a projected-micro direct Draw path while
 // retaining this exact renderer for ordinary/reference nodes and custom paint.
 #define Paint PaintRenderBase
 #define PaintGraphGeometry PaintGraphGeometryRenderBase
-#define std UiNodeGraphRenderMath
 #include "UiNodeGraphRender.inc"
-#undef std
 #undef PaintGraphGeometry
 #undef Paint
 

@@ -40,6 +40,29 @@ UiGraphNodeRef AddNode(UiGraphModel& model, const String& title, Pointf pos)
     return model.AddNode(n);
 }
 
+bool SameImage(const Image& a, const Image& b)
+{
+    if(a.GetSize() != b.GetSize())
+        return false;
+    Size sz = a.GetSize();
+    for(int y = 0; y < sz.cy; y++)
+        for(int x = 0; x < sz.cx; x++) {
+            const RGBA& pa = a[y][x];
+            const RGBA& pb = b[y][x];
+            if(pa.r != pb.r || pa.g != pb.g || pa.b != pb.b || pa.a != pb.a)
+                return false;
+        }
+    return true;
+}
+
+Image PaintSnapshot(UiNodeGraph& graph, Size sz)
+{
+    ImageDraw draw(sz.cx, sz.cy);
+    draw.DrawRect(0, 0, sz.cx, sz.cy, White());
+    graph.Paint(draw);
+    return draw;
+}
+
 void AddPatternedEdges(UiGraphModel& model,
                        UiGraphNodeRef a, UiGraphNodeRef b, UiGraphNodeRef c)
 {
@@ -100,6 +123,12 @@ CONSOLE_APP_MAIN
 
     t.Expect(graph.GetLastEdgePaintUsecs() >= 0,
              "patterned edge timing remains observable");
+
+    graph.SetZoom(0.87, Point(550, 350));
+    Image deterministic_a = PaintSnapshot(graph, Size(1100, 700));
+    Image deterministic_b = PaintSnapshot(graph, Size(1100, 700));
+    t.Expect(SameImage(deterministic_a, deterministic_b),
+             "patterned output is deterministic across identical paints");
 
     Cout() << "\nUINODEGRAPH_PATTERNED_PAINT_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << '\n';

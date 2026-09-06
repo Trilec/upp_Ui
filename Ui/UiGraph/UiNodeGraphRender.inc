@@ -78,7 +78,8 @@ void DrawPatternedPolyline(Draw& w, const Vector<Point>& points,
                                       : max(1.0, dash_length);
     double off = line_style == DOTTED ? max(2.0, dash_gap * 0.55)
                                        : max(1.0, dash_gap);
-    double cycle = on + off;
+    const double cycle = on + off;
+    const double eps = 1e-9;
     double phase = 0.0;
 
     for(int i = 1; i < points.GetCount(); i++) {
@@ -86,25 +87,45 @@ void DrawPatternedPolyline(Draw& w, const Vector<Point>& points,
         Pointf b(points[i].x, points[i].y);
         Pointf d = b - a;
         double len = VectorLength(d);
-        if(len <= 1e-9)
+        if(len <= eps)
             continue;
         d /= len;
+
         double pos = 0.0;
-        while(pos < len - 1e-9) {
-            double cp = std::fmod(phase, cycle);
-            bool draw = cp < on;
-            double remain = draw ? on - cp : cycle - cp;
-            double step = min(remain, len - pos);
+        while(pos < len - eps) {
+            const bool draw = phase < on;
+            const double boundary = draw ? on : cycle;
+            double remain = boundary - phase;
+
+            // Snap an exact/near-exact boundary before computing the next
+            // segment. Progress is therefore mathematical and deterministic;
+            // no clock-dependent remainder workaround is required.
+            if(remain <= eps) {
+                phase = draw ? on : 0.0;
+                if(!draw)
+                    continue;
+                remain = cycle - phase;
+            }
+
+            const double step = min(remain, len - pos);
+            if(step <= eps) {
+                phase = draw ? on : 0.0;
+                continue;
+            }
+
             if(draw && step > 0.05) {
                 Pointf p0 = a + d * pos;
                 Pointf p1 = a + d * (pos + step);
                 w.DrawLine(fround(p0.x), fround(p0.y),
                            fround(p1.x), fround(p1.y), width, color);
             }
+
             pos += step;
             phase += step;
-            if(phase >= cycle * 1024.0)
-                phase = std::fmod(phase, cycle);
+            if(phase >= cycle - eps)
+                phase = 0.0;
+            else if(draw && phase >= on - eps)
+                phase = on;
         }
     }
 }
