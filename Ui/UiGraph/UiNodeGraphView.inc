@@ -259,8 +259,6 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             cancel_approximation();
             return false;
         }
-
-        const double cumulative = next_zoom / max(state.exact_zoom, 1e-9);
         for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
             const NodeGeometry& g = live_baseline_nodes_[i];
             int width = max(1, fround(g.rect.GetWidth() * cumulative));
