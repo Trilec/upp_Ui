@@ -1363,12 +1363,12 @@ void UiGraphDemo::SetDiagnosticsEnabled(bool on)
 {
     diagnostics_enabled_ = on;
     btn_diag_enable.SetChecked(on);
-    if(on) {
-        diagnostics_ticker_.Start(200, [=] { RefreshDiagnostics(); });
+
+    // Diagnostics are observer-only. Never leave a periodic UI clock running:
+    // an idle Graph must not be repainted merely to refresh profiling controls.
+    diagnostics_ticker_.Stop();
+    if(on)
         RefreshDiagnostics();
-    }
-    else
-        diagnostics_ticker_.Stop();
 }
 
 void UiGraphDemo::ResetDiagnostics()
