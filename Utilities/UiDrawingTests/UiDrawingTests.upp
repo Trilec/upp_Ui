@@ -1,0 +1,17 @@
+description "Ui final-pixel geometry, authored shape and styled raster-cache tests";
+
+uses
+    Core,
+    Draw,
+    Painter,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    GeometryContract.cpp,
+    ShapePath.cpp,
+    StyledSurfaceCache.cpp;
+
+mainconfig
+    "CONSOLE" = "";

@@ -1,0 +1,16 @@
+description "UiNodeGraph scale, performance and profile contract tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    Scale.cpp,
+    Performance.cpp,
+    PanProfile.cpp,
+    ModelSwitchProfile.cpp;
+
+mainconfig
+    "CONSOLE" = "";

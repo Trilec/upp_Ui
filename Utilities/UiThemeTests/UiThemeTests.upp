@@ -1,0 +1,13 @@
+description "Ui theme structure and surface regression tests";
+
+uses
+    Core,
+    Ui;
+
+file
+    main.cpp,
+    ThemeStructure.cpp,
+    ThemeSurface.cpp;
+
+mainconfig
+    "CONSOLE" = "";

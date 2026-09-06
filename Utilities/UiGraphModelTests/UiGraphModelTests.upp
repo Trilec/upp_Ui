@@ -1,0 +1,14 @@
+description "UiGraph model, topology and hierarchy contract tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    UiGraphCore.cpp,
+    UiGraphHierarchy.cpp;
+
+mainconfig
+    "CONSOLE" = "";

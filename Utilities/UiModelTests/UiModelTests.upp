@@ -1,0 +1,14 @@
+description "Ui data-model authority, binding and mutation contract tests";
+
+uses
+    Core,
+    Ui;
+
+file
+    main.cpp,
+    DataModels.cpp,
+    ModelBinding.cpp,
+    ModelMutation.cpp;
+
+mainconfig
+    "CONSOLE" = "";

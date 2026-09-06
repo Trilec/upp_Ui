@@ -1,0 +1,17 @@
+description "UiNodeGraph presentation, paint and LOD contract tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    DetailLod.cpp,
+    OverviewLod.cpp,
+    RenderLod.cpp,
+    PatternedPaint.cpp,
+    Presentation.cpp;
+
+mainconfig
+    "CONSOLE" = "";

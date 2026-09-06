@@ -1,0 +1,17 @@
+description "Ui viewport-bounded renderer, Gallery, Tree, List and popup-render tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    ModelViewPerformance.cpp,
+    GalleryRegression.cpp,
+    TreeScale.cpp,
+    ListStyle.cpp,
+    DropdownMenuRender.cpp;
+
+mainconfig
+    "CONSOLE" = "";

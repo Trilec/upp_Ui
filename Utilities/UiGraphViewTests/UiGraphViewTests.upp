@@ -1,0 +1,19 @@
+description "UiNodeGraph interaction, routing, hierarchy and live-view contract tests";
+
+uses
+    Core,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    CanonicalShape.cpp,
+    HierarchyView.cpp,
+    InteractionState.cpp,
+    SelectionModifier.cpp,
+    RouteEdit.cpp,
+    DragDamage.cpp,
+    LiveView.cpp;
+
+mainconfig
+    "CONSOLE" = "";
