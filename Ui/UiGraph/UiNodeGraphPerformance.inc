@@ -121,7 +121,8 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     paint_world = paint_world.Inflated(GetPaintQueryMargin() / max(zoom_, 0.01));
     Index<UiGraphId> node_ids;
     Index<UiGraphId> edge_ids;
-    QuerySpatial(paint_world, node_ids, edge_ids);
+    QuerySpatial(paint_world, node_ids, edge_ids,
+                 SPATIAL_QUERY_NODES | SPATIAL_QUERY_EDGES | SPATIAL_QUERY_REDUCE_OVERVIEW);
 
     Vector<int> paint_nodes;
     paint_nodes.Reserve(node_ids.GetCount());
@@ -293,7 +294,8 @@ void UiNodeGraph::PrepareViewGeometry()
     last_geometry_prepare_usecs_ = max<int64>(0, usecs() - started);
 }
 
-void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
+void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& out,
+                                            bool record_evidence)
 {
     Point p = WorldToScreen(GetDisplayNodePosition(node));
     Size sz(max(1, fround(node.size.cx * zoom_)), max(1, fround(node.size.cy * zoom_)));
@@ -310,7 +312,8 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
 
     if(!overview_geometry) {
         BuildNodeGeometry(node, out);
-        last_geometry_path_vertex_count_ += out.hit_path.GetCount();
+        if(record_evidence)
+            last_geometry_path_vertex_count_ += out.hit_path.GetCount();
         return;
     }
 
@@ -377,8 +380,10 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
         inflate = max(inflate, DPI(fround(lod_policy_.selection_outline_width)) + DPI(2));
     out.paint_bounds = out.paint_bounds.Inflated(inflate);
 
-    last_geometry_lod_node_count_++;
-    last_geometry_path_vertex_count_ += out.hit_path.GetCount();
+    if(record_evidence) {
+        last_geometry_lod_node_count_++;
+        last_geometry_path_vertex_count_ += out.hit_path.GetCount();
+    }
 }
 
 void UiNodeGraph::RebuildViewGeometry()
@@ -411,7 +416,8 @@ void UiNodeGraph::RebuildViewGeometry()
 
     Index<UiGraphId> node_candidates;
     Index<UiGraphId> edge_candidates;
-    QuerySpatial(GetViewportWorldBounds(GetPaintQueryMargin()), node_candidates, edge_candidates);
+    QuerySpatial(GetViewportWorldBounds(GetPaintQueryMargin()), node_candidates, edge_candidates,
+                 SPATIAL_QUERY_NODES | SPATIAL_QUERY_EDGES | SPATIAL_QUERY_REDUCE_OVERVIEW);
 
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};

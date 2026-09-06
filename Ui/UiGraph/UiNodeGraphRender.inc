@@ -463,7 +463,8 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     paint_world = paint_world.Inflated(GetPaintQueryMargin() / max(zoom_, 0.01));
     Index<UiGraphId> node_ids;
     Index<UiGraphId> edge_ids;
-    QuerySpatial(paint_world, node_ids, edge_ids);
+    QuerySpatial(paint_world, node_ids, edge_ids,
+                 SPATIAL_QUERY_NODES | SPATIAL_QUERY_EDGES | SPATIAL_QUERY_REDUCE_OVERVIEW);
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_ids.FindAdd(ref.id);

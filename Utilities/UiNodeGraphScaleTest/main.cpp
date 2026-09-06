@@ -276,8 +276,10 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
                                                                        deep_node->size.cy * 0.5));
     t.Expect(graph.HitTestNode(deep_hit) == deep,
              "deep/high-index node is hit directly through the spatially prepared region");
-    t.Expect(graph.GetLastNodeHitCandidateCount() < 24,
-             "public node hit testing uses a tiny spatial neighbourhood rather than scanning prepared geometry");
+    t.Expect(graph.GetLastNodeHitCandidateCount() < 24
+             && graph.GetLastSpatialGlobalEdgeVisitCount() == 0
+             && graph.GetLastSpatialRawEdgeCandidateCount() == 0,
+             "public node hit testing requests nodes only and never collects global/raw edges");
     t.Expect(FindAnyPortAtNode(graph, *deep_node)
              && graph.GetLastPortHitCandidateCount() < 32,
              "public port hit testing stays within a tiny spatial neighbourhood");
@@ -292,13 +294,18 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
              "selection chrome does not duplicate or mutate semantic graph records");
 
     int spatial_updates = graph.GetSpatialUpdateSerial();
+    int spatial_inplace = graph.GetSpatialBoundsInplaceUpdateCount();
+    int local_geometry_build = graph.GetGeometryBuildSerial();
     spatial_build = graph.GetSpatialBuildSerial();
     Pointf old_position = deep_node->position;
     t.Expect(model.SetNodePosition(deep, old_position + Pointf(8, 6)),
              "narrow deep-node model mutation succeeds");
     t.Expect(graph.GetSpatialBuildSerial() == spatial_build
-             && graph.GetSpatialUpdateSerial() > spatial_updates,
-             "narrow node mutation updates local spatial records without rebuilding the full index");
+             && graph.GetSpatialUpdateSerial() > spatial_updates
+             && graph.GetSpatialBoundsInplaceUpdateCount() > spatial_inplace,
+             "narrow node mutation updates retained spatial bounds in place without rebuilding the full index");
+    t.Expect(graph.GetGeometryBuildSerial() == local_geometry_build,
+             "narrow node mutation updates retained prepared objects without rebuilding full viewport geometry");
     t.Expect(graph.GetPreparedNodeCount() < 600 && graph.GetPreparedEdgeCount() < 2200,
              "narrow deep-node mutation preserves bounded viewport preparation");
 
@@ -427,8 +434,8 @@ void RunViewportScale(TestCtx& t, UiGraphModel& model, const Vector<UiGraphNodeR
              && graph.GetBatchFlushSerial() == batch_flush + 1
              && graph.GetSpatialBuildSerial() == batch_spatial_build
              && graph.GetSpatialUpdateSerial() > batch_spatial_updates
-             && graph.GetGeometryBuildSerial() == batch_geometry + 1,
-             "outer batch commit updates local spatial records and rebuilds prepared geometry exactly once");
+             && graph.GetGeometryBuildSerial() == batch_geometry,
+             "outer small batch commit updates local spatial/prepared records without rebuilding the full viewport");
     t.Expect(graph.GetLastBatchNodeUpdateCount() == batch_nodes.GetCount()
              && graph.GetLastBatchEdgeUpdateCount() > 0
              && graph.GetLastBatchEdgeUpdateCount() < 64,

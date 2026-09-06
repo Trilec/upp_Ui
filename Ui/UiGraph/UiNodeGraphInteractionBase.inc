@@ -138,6 +138,29 @@ void UiNodeGraph::FlushBatchModelChanges()
 
     bool reset_like = batch_reset_;
     bool selection_changed = ReconcileModelState(reset_like);
+    Rect damage;
+    for(int i = 0; i < batch_nodes_.GetCount(); i++)
+        damage |= GetNodeDamage(UiGraphNodeRef{batch_nodes_[i]});
+    for(int i = 0; i < batch_removed_nodes_.GetCount(); i++)
+        damage |= GetNodeDamage(UiGraphNodeRef{batch_removed_nodes_[i]});
+    for(int i = 0; i < batch_edges_.GetCount(); i++)
+        damage |= GetEdgeDamage(UiGraphEdgeRef{batch_edges_[i]});
+    for(int i = 0; i < batch_removed_edges_.GetCount(); i++)
+        damage |= GetEdgeDamage(UiGraphEdgeRef{batch_removed_edges_[i]});
+
+    if(model_)
+        for(int i = 0; i < batch_nodes_.GetCount(); i++) {
+            UiGraphNodeRef node{batch_nodes_[i]};
+            for(UiGraphEdgeRef edge : model_->GetNodeEdges(node))
+                if(batch_removed_edges_.Find(edge.id) < 0)
+                    batch_edges_.FindAdd(edge.id);
+        }
+
+    const int touched = batch_nodes_.GetCount() + batch_removed_nodes_.GetCount()
+                      + batch_edges_.GetCount() + batch_removed_edges_.GetCount();
+    const bool full_prepare = batch_reset_ || spatial_dirty_
+                           || zoom_ < lod_policy_.minimal_edge_zoom
+                           || touched > 128;
 
     if(batch_reset_ || spatial_dirty_) {
         InvalidateSpatialIndex();
@@ -146,14 +169,6 @@ void UiNodeGraph::FlushBatchModelChanges()
         last_batch_edge_update_count_ = model_ ? model_->GetEdgeCount() : 0;
     }
     else {
-        if(model_)
-            for(int i = 0; i < batch_nodes_.GetCount(); i++) {
-                UiGraphNodeRef node{batch_nodes_[i]};
-                for(UiGraphEdgeRef edge : model_->GetNodeEdges(node))
-                    if(batch_removed_edges_.Find(edge.id) < 0)
-                        batch_edges_.FindAdd(edge.id);
-            }
-
         last_batch_node_update_count_ = batch_nodes_.GetCount() + batch_removed_nodes_.GetCount();
         last_batch_edge_update_count_ = batch_edges_.GetCount() + batch_removed_edges_.GetCount();
 
@@ -167,6 +182,26 @@ void UiNodeGraph::FlushBatchModelChanges()
             UpdateSpatialEdge(UiGraphEdgeRef{batch_edges_[i]});
     }
 
+    model_revision_ = model_ ? model_->GetRevision() : -1;
+    if(full_prepare) {
+        InvalidateGeometry();
+        PrepareGeometry();
+        UpdateAttachedCtrls();
+        Refresh();
+    }
+    else {
+        for(int i = 0; i < batch_removed_edges_.GetCount(); i++)
+            damage |= RebuildEdge(UiGraphEdgeRef{batch_removed_edges_[i]});
+        for(int i = 0; i < batch_removed_nodes_.GetCount(); i++)
+            damage |= RebuildNodeAndEdges(UiGraphNodeRef{batch_removed_nodes_[i]});
+        for(int i = 0; i < batch_nodes_.GetCount(); i++)
+            damage |= RebuildNodeAndEdges(UiGraphNodeRef{batch_nodes_[i]});
+        for(int i = 0; i < batch_edges_.GetCount(); i++)
+            damage |= RebuildEdge(UiGraphEdgeRef{batch_edges_[i]});
+        UpdateAttachedCtrls();
+        RefreshDamage(damage.Inflated(DPI(4)));
+    }
+
     batch_reset_ = false;
     batch_nodes_.Clear();
     batch_edges_.Clear();
@@ -174,11 +209,6 @@ void UiNodeGraph::FlushBatchModelChanges()
     batch_removed_edges_.Clear();
     batch_flush_serial_++;
 
-    model_revision_ = -1;
-    InvalidateGeometry();
-    PrepareGeometry();
-    UpdateAttachedCtrls();
-    Refresh();
     if(selection_changed)
         WhenSelection();
 }
@@ -287,7 +317,7 @@ void UiNodeGraph::UpdateNodeDrag(Point p)
         if(!node || !node->visible)
             continue;
         NodeGeometry fresh;
-        BuildNodeGeometry(*node, fresh);
+        BuildViewNodeGeometry(*node, fresh, false);
         damage |= fresh.paint_bounds;
         int q = node_geometry_.Find(ref.id);
         if(q >= 0)
@@ -726,7 +756,7 @@ void UiNodeGraph::UpdateMarquee(Point p)
         if(cells > 0 && cells <= kMarqueePreviewMaxCells) {
             Index<UiGraphId> nodes;
             Index<UiGraphId> edges;
-            QuerySpatial(area, nodes, edges);
+            QuerySpatial(area, nodes, edges, SPATIAL_QUERY_NODES);
             last_marquee_candidate_count_ = nodes.GetCount();
             for(int i = 0; i < nodes.GetCount(); i++) {
                 UiGraphNodeRef ref{nodes[i]};
@@ -806,7 +836,7 @@ void UiNodeGraph::CommitMarquee(dword flags)
         area.Include(ScreenToWorld(marquee_.BottomRight()));
         Index<UiGraphId> nodes;
         Index<UiGraphId> edges;
-        QuerySpatial(area, nodes, edges);
+        QuerySpatial(area, nodes, edges, SPATIAL_QUERY_NODES);
         marquee_preview_nodes_.Clear();
         for(int i = 0; i < nodes.GetCount(); i++) {
             UiGraphNodeRef ref{nodes[i]};

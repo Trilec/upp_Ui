@@ -125,8 +125,8 @@ CONSOLE_APP_MAIN
     t.Expect(graph.GetSpatialBuildSerial() == spatial_build_before
              && graph.GetSpatialUpdateSerial() > spatial_update_before,
              "commit updates only local spatial records rather than rebuilding the full index");
-    t.Expect(graph.GetGeometryBuildSerial() == geometry_before + 1,
-             "commit performs one authoritative prepared-geometry rebuild after localized preview moves");
+    t.Expect(graph.GetGeometryBuildSerial() == geometry_before,
+             "commit keeps localized preview/model updates local instead of rebuilding the full prepared viewport");
 
     Cout() << "\nUINODEGRAPH_DRAG_DAMAGE_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << '\n';

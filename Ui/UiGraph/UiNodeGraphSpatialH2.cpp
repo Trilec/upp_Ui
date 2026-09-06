@@ -303,9 +303,9 @@ void UiNodeGraph::RemoveNodeFromSpatialCells(UiGraphNodeRef ref, const WorldRect
             int i = spatial_cells_.Find(SpatialCellKey(x, y));
             if(i < 0)
                 continue;
+            // Keep empty slots reusable. Removing from ordered VectorMap would
+            // shift unrelated cells during an ordinary local move.
             RemoveId(spatial_cells_[i].nodes, ref.id);
-            if(spatial_cells_[i].nodes.IsEmpty() && spatial_cells_[i].edges.IsEmpty())
-                spatial_cells_.Remove(i);
         }
 }
 
@@ -323,9 +323,8 @@ void UiNodeGraph::RemoveEdgeFromSpatialCells(UiGraphEdgeRef ref, const WorldRect
             int i = spatial_cells_.Find(SpatialCellKey(x, y));
             if(i < 0)
                 continue;
+            // Full index rebuild compacts empty slots; local movement does not.
             RemoveId(spatial_cells_[i].edges, ref.id);
-            if(spatial_cells_[i].nodes.IsEmpty() && spatial_cells_[i].edges.IsEmpty())
-                spatial_cells_.Remove(i);
         }
 }
 
@@ -343,17 +342,22 @@ void UiNodeGraph::RemoveSpatialNode(UiGraphNodeRef ref)
 void UiNodeGraph::UpdateSpatialNode(UiGraphNodeRef ref)
 {
     int i = node_world_bounds_.Find(ref.id);
-    if(i >= 0) {
-        WorldRect old = node_world_bounds_[i];
-        RemoveNodeFromSpatialCells(ref, old);
-        node_world_bounds_.Remove(i);
-    }
+    if(i >= 0)
+        RemoveNodeFromSpatialCells(ref, node_world_bounds_[i]);
+
     const UiGraphNode* node = model_ ? model_->FindNode(ref) : nullptr;
     if(node && node->visible && model_->GetNodeScope(ref) == GetScope()) {
         WorldRect bounds = GetNodeWorldBounds(*node);
-        node_world_bounds_.Add(ref.id, bounds);
+        if(i >= 0) {
+            node_world_bounds_[i] = bounds;
+            spatial_bounds_inplace_update_count_++;
+        }
+        else
+            node_world_bounds_.Add(ref.id, bounds);
         AddNodeToSpatialCells(ref, bounds);
     }
+    else if(i >= 0)
+        node_world_bounds_.Remove(i);
     spatial_update_serial_++;
 }
 
@@ -371,62 +375,108 @@ void UiNodeGraph::RemoveSpatialEdge(UiGraphEdgeRef ref)
 void UiNodeGraph::UpdateSpatialEdge(UiGraphEdgeRef ref)
 {
     int i = edge_world_bounds_.Find(ref.id);
-    if(i >= 0) {
-        WorldRect old = edge_world_bounds_[i];
-        RemoveEdgeFromSpatialCells(ref, old);
-        edge_world_bounds_.Remove(i);
-    }
+    if(i >= 0)
+        RemoveEdgeFromSpatialCells(ref, edge_world_bounds_[i]);
+
     const UiGraphEdge* edge = model_ ? model_->FindEdge(ref) : nullptr;
     if(edge && edge->visible && model_->GetNodeScope(edge->source.node) == GetScope()) {
         WorldRect bounds = GetEdgeWorldBounds(*edge);
-        edge_world_bounds_.Add(edge->ref.id, bounds);
+        if(i >= 0) {
+            edge_world_bounds_[i] = bounds;
+            spatial_bounds_inplace_update_count_++;
+        }
+        else
+            edge_world_bounds_.Add(edge->ref.id, bounds);
         UiGraphRouteStyle route = edge->route;
         if(route == UiGraphRouteStyle::Inherit)
             route = FindEdgeStyleClass(edge->style_class).route;
         bool force_global = route == UiGraphRouteStyle::Custom || WhenResolveEdgeStyle;
         AddEdgeToSpatialCells(ref, bounds, force_global);
     }
+    else if(i >= 0)
+        edge_world_bounds_.Remove(i);
     spatial_update_serial_++;
 }
 
-void UiNodeGraph::QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes, Index<UiGraphId>& edges) const
+void UiNodeGraph::QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes,
+                               Index<UiGraphId>& edges, int flags) const
 {
     nodes.Clear();
     edges.Clear();
+    last_spatial_cell_probe_count_ = 0;
+    last_spatial_occupied_cell_visit_count_ = 0;
+    last_spatial_global_node_visit_count_ = 0;
+    last_spatial_global_edge_visit_count_ = 0;
+    last_spatial_raw_edge_candidate_count_ = 0;
     if(!area.valid)
         return;
 
+    const bool want_nodes = (flags & SPATIAL_QUERY_NODES) != 0;
+    const bool want_edges = (flags & SPATIAL_QUERY_EDGES) != 0;
+    const bool reduce_overview = (flags & SPATIAL_QUERY_REDUCE_OVERVIEW) != 0;
     Index<UiGraphId> raw_edges;
-    int x0, y0, x1, y1;
-    SpatialCellRange(area, x0, y0, x1, y1);
-    for(int y = y0; y <= y1; y++)
-        for(int x = x0; x <= x1; x++) {
-            int i = spatial_cells_.Find(SpatialCellKey(x, y));
-            if(i < 0)
-                continue;
-            const SpatialCell& cell = spatial_cells_[i];
+
+    auto collect = [&](const SpatialCell& cell) {
+        if(want_nodes)
             for(UiGraphId id : cell.nodes) {
                 int q = node_world_bounds_.Find(id);
                 if(q >= 0 && node_world_bounds_[q].Intersects(area))
                     nodes.FindAdd(id);
             }
+        if(want_edges)
             for(UiGraphId id : cell.edges) {
                 int q = edge_world_bounds_.Find(id);
                 if(q >= 0 && edge_world_bounds_[q].Intersects(area))
                     raw_edges.FindAdd(id);
             }
+    };
+
+    int x0, y0, x1, y1;
+    SpatialCellRange(area, x0, y0, x1, y1);
+    int64 query_cells = x1 >= x0 && y1 >= y0
+                      ? (int64)(x1 - x0 + 1) * (int64)(y1 - y0 + 1) : 0;
+    int64 sparse_threshold = max<int64>(1024, (int64)spatial_cells_.GetCount() * 4);
+
+    if(query_cells > sparse_threshold) {
+        for(int i = 0; i < spatial_cells_.GetCount(); i++) {
+            const SpatialCell& cell = spatial_cells_[i];
+            if(cell.nodes.IsEmpty() && cell.edges.IsEmpty())
+                continue;
+            last_spatial_occupied_cell_visit_count_++;
+            collect(cell);
+        }
+    }
+    else {
+        for(int y = y0; y <= y1; y++)
+            for(int x = x0; x <= x1; x++) {
+                last_spatial_cell_probe_count_++;
+                int i = spatial_cells_.Find(SpatialCellKey(x, y));
+                if(i >= 0)
+                    collect(spatial_cells_[i]);
+            }
+    }
+
+    if(want_nodes)
+        for(int i = 0; i < spatial_global_nodes_.GetCount(); i++) {
+            last_spatial_global_node_visit_count_++;
+            UiGraphId id = spatial_global_nodes_[i];
+            int q = node_world_bounds_.Find(id);
+            if(q >= 0 && node_world_bounds_[q].Intersects(area))
+                nodes.FindAdd(id);
         }
 
-    for(int i = 0; i < spatial_global_nodes_.GetCount(); i++) {
-        UiGraphId id = spatial_global_nodes_[i];
-        int q = node_world_bounds_.Find(id);
-        if(q >= 0 && node_world_bounds_[q].Intersects(area))
-            nodes.FindAdd(id);
-    }
-    for(int i = 0; i < spatial_global_edges_.GetCount(); i++)
-        raw_edges.FindAdd(spatial_global_edges_[i]);
+    if(want_edges)
+        for(int i = 0; i < spatial_global_edges_.GetCount(); i++) {
+            last_spatial_global_edge_visit_count_++;
+            UiGraphId id = spatial_global_edges_[i];
+            int q = edge_world_bounds_.Find(id);
+            if(q >= 0 && edge_world_bounds_[q].Intersects(area))
+                raw_edges.FindAdd(id);
+        }
 
-    bool overview = geometry_dirty_ && model_ && zoom_ < lod_policy_.minimal_edge_zoom
+    last_spatial_raw_edge_candidate_count_ = raw_edges.GetCount();
+    bool overview = want_edges && reduce_overview && model_
+                 && zoom_ < lod_policy_.minimal_edge_zoom
                  && raw_edges.GetCount() > kNodeGraphOverviewMinEdgeCandidates
                  && !WhenResolveEdgeStyle;
     if(!overview) {
@@ -498,7 +548,7 @@ UiGraphNodeRef UiNodeGraph::HitTestNodeSpatial(Point p) const
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
     Index<UiGraphId> nodes;
     Index<UiGraphId> edges;
-    QuerySpatial(area, nodes, edges);
+    QuerySpatial(area, nodes, edges, SPATIAL_QUERY_NODES);
     last_node_hit_candidate_count_ = nodes.GetCount();
 
     Vector<int> geometry;
@@ -537,7 +587,7 @@ UiGraphPortRef UiNodeGraph::HitTestPortSpatial(Point p) const
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
     Index<UiGraphId> nodes;
     Index<UiGraphId> edges;
-    QuerySpatial(area, nodes, edges);
+    QuerySpatial(area, nodes, edges, SPATIAL_QUERY_NODES);
     last_port_hit_candidate_count_ = nodes.GetCount();
 
     Vector<int> geometry;
@@ -579,7 +629,7 @@ UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
     area.Include(ScreenToWorld(Point(p.x + r, p.y + r)));
     Index<UiGraphId> nodes;
     Index<UiGraphId> edges;
-    QuerySpatial(area, nodes, edges);
+    QuerySpatial(area, nodes, edges, SPATIAL_QUERY_EDGES);
     last_edge_hit_candidate_count_ = edges.GetCount();
 
     Vector<int> geometry;

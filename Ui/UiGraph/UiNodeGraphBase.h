@@ -320,6 +320,12 @@ public:
     int GetGeometryBuildSerial() const { return geometry_build_serial_; }
     int GetSpatialBuildSerial() const { return spatial_build_serial_; }
     int GetSpatialUpdateSerial() const { return spatial_update_serial_; }
+    int GetLastSpatialCellProbeCount() const { return last_spatial_cell_probe_count_; }
+    int GetLastSpatialOccupiedCellVisitCount() const { return last_spatial_occupied_cell_visit_count_; }
+    int GetLastSpatialGlobalNodeVisitCount() const { return last_spatial_global_node_visit_count_; }
+    int GetLastSpatialGlobalEdgeVisitCount() const { return last_spatial_global_edge_visit_count_; }
+    int GetLastSpatialRawEdgeCandidateCount() const { return last_spatial_raw_edge_candidate_count_; }
+    int GetSpatialBoundsInplaceUpdateCount() const { return spatial_bounds_inplace_update_count_; }
     int GetPreparedNodeCount() const { return node_geometry_.GetCount(); }
     int GetPreparedEdgeCount() const { return edge_geometry_.GetCount(); }
     int GetLastNodeCandidateCount() const { return last_node_candidate_count_; }
@@ -457,6 +463,12 @@ private:
         Vector<UiGraphId> edges;
     };
 
+    enum SpatialQueryFlag : int {
+        SPATIAL_QUERY_NODES           = 1 << 0,
+        SPATIAL_QUERY_EDGES           = 1 << 1,
+        SPATIAL_QUERY_REDUCE_OVERVIEW = 1 << 2,
+    };
+
     enum class InteractionMode : byte {
         None = 0,
         NodeDrag,
@@ -581,7 +593,8 @@ private:
     WorldRect GetNodeWorldBounds(const UiGraphNode& node) const;
     WorldRect GetEdgeWorldBounds(const UiGraphEdge& edge) const;
     WorldRect GetViewportWorldBounds(double screen_margin) const;
-    void QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes, Index<UiGraphId>& edges) const;
+    void QuerySpatial(const WorldRect& area, Index<UiGraphId>& nodes,
+                      Index<UiGraphId>& edges, int flags) const;
     UiGraphNodeRef HitTestNodeSpatial(Point p) const;
     UiGraphPortRef HitTestPortSpatial(Point p) const;
     UiGraphEdgeRef HitTestEdgeSpatial(Point p) const;
@@ -726,6 +739,12 @@ private:
     bool spatial_dirty_ = true;
     int spatial_build_serial_ = 0;
     int spatial_update_serial_ = 0;
+    int spatial_bounds_inplace_update_count_ = 0;
+    mutable int last_spatial_cell_probe_count_ = 0;
+    mutable int last_spatial_occupied_cell_visit_count_ = 0;
+    mutable int last_spatial_global_node_visit_count_ = 0;
+    mutable int last_spatial_global_edge_visit_count_ = 0;
+    mutable int last_spatial_raw_edge_candidate_count_ = 0;
 
     int last_node_candidate_count_ = 0;
     int last_edge_candidate_count_ = 0;

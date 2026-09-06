@@ -1135,9 +1135,14 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
         return;
     }
 
-    bool reset_like = change.kind == UiGraphChangeKind::Reset ||
-                      change.kind == UiGraphChangeKind::Cleared;
+    const bool reset_like = change.kind == UiGraphChangeKind::Reset ||
+                            change.kind == UiGraphChangeKind::Cleared;
     bool selection_changed = ReconcileModelState(reset_like);
+    Rect damage;
+    if(change.node.IsValid())
+        damage |= GetNodeDamage(change.node);
+    if(change.edge.IsValid())
+        damage |= GetEdgeDamage(change.edge);
 
     EnsureSpatialIndex();
     switch(change.kind) {
@@ -1170,11 +1175,38 @@ void UiNodeGraph::HandleModelChange(const UiGraphChange& change)
     }
 
     model_revision_ = model_ ? model_->GetRevision() : -1;
-    InvalidateGeometry();
-    PrepareGeometry();
-    UpdateAttachedCtrls();
+    const bool full_prepare = reset_like || zoom_ < lod_policy_.minimal_edge_zoom;
+    if(full_prepare) {
+        InvalidateGeometry();
+        PrepareGeometry();
+        UpdateAttachedCtrls();
+        Refresh();
+    }
+    else {
+        switch(change.kind) {
+        case UiGraphChangeKind::NodeAdded:
+        case UiGraphChangeKind::NodeUpdated:
+        case UiGraphChangeKind::PortAdded:
+        case UiGraphChangeKind::PortUpdated:
+        case UiGraphChangeKind::PortRemoved:
+        case UiGraphChangeKind::NodeRemoved:
+            if(change.node.IsValid())
+                damage |= RebuildNodeAndEdges(change.node);
+            break;
+        case UiGraphChangeKind::EdgeAdded:
+        case UiGraphChangeKind::EdgeUpdated:
+        case UiGraphChangeKind::EdgeRemoved:
+            if(change.edge.IsValid())
+                damage |= RebuildEdge(change.edge);
+            break;
+        default:
+            break;
+        }
+        UpdateAttachedCtrls();
+        RefreshDamage(damage.Inflated(DPI(4)));
+    }
+
     RefreshLayout();
-    Refresh();
     if(selection_changed)
         WhenSelection();
 }
@@ -2085,106 +2117,14 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
 
 void UiNodeGraph::PrepareGeometry()
 {
-    if(batch_update_depth_ > 0)
-        return;
-    if(!geometry_dirty_ && model_ && model_revision_ == model_->GetRevision() &&
-       geometry_zoom_ == zoom_ && geometry_pan_ == pan_ && geometry_size_ == GetSize())
-        return;
-    int64 started = usecs();
-    RebuildGeometry();
-    last_geometry_prepare_usecs_ = max<int64>(0, usecs() - started);
+    // One exact preparation authority: retained callers keep this compatibility
+    // name, but every scene rebuild now flows through projected-size LOD.
+    PrepareViewGeometry();
 }
 
 void UiNodeGraph::RebuildGeometry()
 {
-    node_geometry_.Clear();
-    edge_geometry_.Clear();
-    last_node_candidate_count_ = 0;
-    last_edge_candidate_count_ = 0;
-    last_hidden_edge_count_ = 0;
-    if(!model_) {
-        model_revision_ = -1;
-        geometry_zoom_ = zoom_;
-        geometry_pan_ = pan_;
-        geometry_size_ = GetSize();
-        geometry_dirty_ = false;
-        geometry_build_serial_++;
-        return;
-    }
-
-    EnsureSpatialIndex();
-    for(int i = selected_nodes_.GetCount() - 1; i >= 0; --i)
-        if(!model_->Contains(UiGraphNodeRef{selected_nodes_[i]})) selected_nodes_.Remove(i);
-    for(int i = selected_edges_.GetCount() - 1; i >= 0; --i)
-        if(!model_->Contains(UiGraphEdgeRef{selected_edges_[i]})) selected_edges_.Remove(i);
-
-    Index<UiGraphId> node_candidates;
-    Index<UiGraphId> edge_candidates;
-    QuerySpatial(GetViewportWorldBounds(GetPaintQueryMargin()), node_candidates, edge_candidates);
-
-    for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
-        UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
-        node_candidates.FindAdd(ref.id);
-        if(zoom_ >= lod_policy_.edge_hide_zoom)
-            for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
-                edge_candidates.FindAdd(edge.id);
-    }
-    if(interaction_ == InteractionMode::EdgeRouteDrag && route_edge_.IsValid())
-        edge_candidates.FindAdd(route_edge_.id);
-
-    if(zoom_ >= lod_policy_.edge_hide_zoom)
-        for(int i = 0; i < edge_candidates.GetCount(); i++) {
-            const UiGraphEdge* edge = model_->FindEdge(UiGraphEdgeRef{edge_candidates[i]});
-            if(edge) {
-                node_candidates.FindAdd(edge->source.node.id);
-                node_candidates.FindAdd(edge->target.node.id);
-            }
-        }
-
-    last_node_candidate_count_ = node_candidates.GetCount();
-    last_edge_candidate_count_ = edge_candidates.GetCount();
-
-    Vector<UiGraphNodeRef> order;
-    order.Reserve(node_candidates.GetCount());
-    for(int i = 0; i < node_candidates.GetCount(); i++) {
-        UiGraphNodeRef ref{node_candidates[i]};
-        const UiGraphNode* node = model_->FindNode(ref);
-        if(node && node->visible)
-            order.Add(ref);
-    }
-    Sort(order, [&](UiGraphNodeRef a, UiGraphNodeRef b) {
-        const UiGraphNode* na = model_->FindNode(a);
-        const UiGraphNode* nb = model_->FindNode(b);
-        if(!na || !nb) return a.id < b.id;
-        return na->z_order != nb->z_order ? na->z_order < nb->z_order : a.id < b.id;
-    });
-    for(UiGraphNodeRef ref : order) {
-        const UiGraphNode* node = model_->FindNode(ref);
-        if(!node) continue;
-        NodeGeometry g;
-        BuildNodeGeometry(*node, g);
-        node_geometry_.Add(ref.id, pick(g));
-    }
-
-    if(zoom_ < lod_policy_.edge_hide_zoom)
-        last_hidden_edge_count_ = edge_candidates.GetCount();
-    else
-        for(int i = 0; i < edge_candidates.GetCount(); i++) {
-            UiGraphEdgeRef ref{edge_candidates[i]};
-            const UiGraphEdge* edge = model_->FindEdge(ref);
-            if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target))
-                continue;
-            EdgeGeometry g;
-            BuildEdgeGeometry(*edge, g);
-            edge_geometry_.Add(ref.id, pick(g));
-        }
-
-    model_revision_ = model_->GetRevision();
-    geometry_zoom_ = zoom_;
-    geometry_pan_ = pan_;
-    geometry_size_ = GetSize();
-    geometry_dirty_ = false;
-    geometry_build_serial_++;
+    RebuildViewGeometry();
 }
 
 Rect UiNodeGraph::RebuildNodeAndEdges(UiGraphNodeRef ref)
@@ -2195,15 +2135,43 @@ Rect UiNodeGraph::RebuildNodeAndEdges(UiGraphNodeRef ref)
         return damage;
 
     int i = node_geometry_.Find(ref.id);
+    bool old_micro = i >= 0 && node_geometry_[i].micro;
+    int old_vertices = i >= 0 ? node_geometry_[i].hit_path.GetCount() : 0;
     const UiGraphNode* node = model_->FindNode(ref);
-    if(i >= 0) {
-        if(node && node->visible) {
-            NodeGeometry g;
-            BuildNodeGeometry(*node, g);
-            node_geometry_[i] = pick(g);
-        }
+
+    bool prepare_node = false;
+    if(node && node->visible && model_->GetNodeScope(ref) == GetScope()) {
+        WorldRect view = GetViewportWorldBounds(GetPaintQueryMargin());
+        prepare_node = GetNodeWorldBounds(*node).Intersects(view);
+        if(!prepare_node)
+            for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref)) {
+                int q = edge_world_bounds_.Find(edge.id);
+                if(q >= 0 && edge_world_bounds_[q].Intersects(view)) {
+                    prepare_node = true;
+                    break;
+                }
+            }
+    }
+
+    if(prepare_node) {
+        NodeGeometry fresh;
+        BuildViewNodeGeometry(*node, fresh, false);
+        if(i >= 0)
+            node_geometry_[i] = pick(fresh);
         else
-            node_geometry_.Remove(i);
+            node_geometry_.Add(ref.id, pick(fresh));
+
+        const NodeGeometry* current = FindNodeGeometry(ref);
+        bool new_micro = current && current->micro;
+        int new_vertices = current ? current->hit_path.GetCount() : 0;
+        last_geometry_lod_node_count_ += (new_micro ? 1 : 0) - (old_micro ? 1 : 0);
+        last_geometry_path_vertex_count_ += new_vertices - old_vertices;
+    }
+    else if(i >= 0) {
+        node_geometry_.Remove(i);
+        if(old_micro)
+            last_geometry_lod_node_count_ = max(0, last_geometry_lod_node_count_ - 1);
+        last_geometry_path_vertex_count_ = max(0, last_geometry_path_vertex_count_ - old_vertices);
     }
 
     if(model_)
@@ -2222,18 +2190,46 @@ Rect UiNodeGraph::RebuildEdge(UiGraphEdgeRef ref)
 
     int i = edge_geometry_.Find(ref.id);
     const UiGraphEdge* edge = model_->FindEdge(ref);
-    if(!edge || !edge->visible || !model_->FindPort(edge->source) || !model_->FindPort(edge->target)) {
+    bool valid = edge && edge->visible
+              && model_->GetNodeScope(edge->source.node) == GetScope()
+              && model_->FindPort(edge->source) && model_->FindPort(edge->target);
+
+    bool prepare_edge = false;
+    if(valid && zoom_ >= lod_policy_.edge_hide_zoom) {
+        int q = edge_world_bounds_.Find(ref.id);
+        WorldRect view = GetViewportWorldBounds(GetPaintQueryMargin());
+        prepare_edge = q >= 0 && edge_world_bounds_[q].Intersects(view);
+        prepare_edge |= IsEdgeSelected(ref) || hot_edge_ == ref
+                     || (interaction_ == InteractionMode::EdgeRouteDrag && route_edge_ == ref);
+    }
+
+    if(!prepare_edge) {
         if(i >= 0)
             edge_geometry_.Remove(i);
         return damage;
     }
 
-    EdgeGeometry g;
-    BuildEdgeGeometry(*edge, g);
+    auto ensure_endpoint = [&](UiGraphNodeRef node_ref) {
+        if(node_geometry_.Find(node_ref.id) >= 0)
+            return;
+        const UiGraphNode* node = model_->FindNode(node_ref);
+        if(!node || !node->visible)
+            return;
+        NodeGeometry fresh;
+        BuildViewNodeGeometry(*node, fresh, false);
+        last_geometry_lod_node_count_ += fresh.micro ? 1 : 0;
+        last_geometry_path_vertex_count_ += fresh.hit_path.GetCount();
+        node_geometry_.Add(node_ref.id, pick(fresh));
+    };
+    ensure_endpoint(edge->source.node);
+    ensure_endpoint(edge->target.node);
+
+    EdgeGeometry fresh;
+    BuildEdgeGeometry(*edge, fresh);
     if(i >= 0)
-        edge_geometry_[i] = pick(g);
+        edge_geometry_[i] = pick(fresh);
     else
-        edge_geometry_.Add(ref.id, pick(g));
+        edge_geometry_.Add(ref.id, pick(fresh));
     damage |= GetEdgeDamage(ref);
     return damage;
 }
@@ -2689,7 +2685,8 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     paint_world = paint_world.Inflated(GetPaintQueryMargin() / max(zoom_, 0.01));
     Index<UiGraphId> node_ids;
     Index<UiGraphId> edge_ids;
-    QuerySpatial(paint_world, node_ids, edge_ids);
+    QuerySpatial(paint_world, node_ids, edge_ids,
+                 SPATIAL_QUERY_NODES | SPATIAL_QUERY_EDGES | SPATIAL_QUERY_REDUCE_OVERVIEW);
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_ids.FindAdd(ref.id);
