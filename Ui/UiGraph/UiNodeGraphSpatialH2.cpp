@@ -185,7 +185,7 @@ UiNodeGraph::WorldRect UiNodeGraph::GetBackdropWorldBounds(const UiGraphBackdrop
     return out;
 }
 
-WorldRect UiNodeGraph::GetViewportWorldBounds(double screen_margin) const
+UiNodeGraph::WorldRect UiNodeGraph::GetViewportWorldBounds(double screen_margin) const
 {
     Size size = GetSize();
     WorldRect out;

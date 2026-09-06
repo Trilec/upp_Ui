@@ -194,6 +194,51 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
 
 } // namespace
 
+void UiNodeGraph::CaptureLiveViewBaseline()
+{
+    live_baseline_nodes_.Clear();
+    live_baseline_edges_.Clear();
+
+    for(int i = 0; i < node_geometry_.GetCount(); i++) {
+        const NodeGeometry& src = node_geometry_[i];
+        NodeGeometry dst;
+        dst.ref = src.ref;
+        dst.rect = src.rect;
+        dst.surface = src.surface;
+        dst.content = src.content;
+        dst.paint_bounds = src.paint_bounds;
+        dst.header = src.header;
+        dst.icon = src.icon;
+        dst.title = src.title;
+        dst.subtitle = src.subtitle;
+        dst.description = src.description;
+        dst.control = src.control;
+        dst.hit_path = clone(src.hit_path);
+        dst.anchors = clone(src.anchors);
+        dst.port_hits = clone(src.port_hits);
+        dst.port_labels = clone(src.port_labels);
+        dst.z_order = src.z_order;
+        dst.compact = src.compact;
+        dst.micro = src.micro;
+        live_baseline_nodes_.Add(node_geometry_.GetKey(i), pick(dst));
+    }
+
+    for(int i = 0; i < edge_geometry_.GetCount(); i++) {
+        const EdgeGeometry& src = edge_geometry_[i];
+        EdgeGeometry dst;
+        dst.ref = src.ref;
+        dst.points = clone(src.points);
+        dst.bounds = src.bounds;
+        dst.label_point = src.label_point;
+        dst.route_handle = src.route_handle;
+        dst.route_handle_hit = src.route_handle_hit;
+        dst.simplified = src.simplified;
+        live_baseline_edges_.Add(edge_geometry_.GetKey(i), pick(dst));
+    }
+
+    live_baseline_revision_ = prepared_geometry_revision_;
+}
+
 bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approximate_zoom)
 {
     GraphViewState& state = GraphViewStateFor(this);
@@ -212,9 +257,7 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         // margin. Keep that expanded exact footprint as reusable camera coverage.
         state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                               GraphViewPaintMargin(lod_policy_, geometry_zoom_));
-        live_baseline_nodes_ = clone(node_geometry_);
-        live_baseline_edges_ = clone(edge_geometry_);
-        live_baseline_revision_ = prepared_geometry_revision_;
+        CaptureLiveViewBaseline();
         state.approximate_zoom = false;
     };
 
@@ -345,9 +388,7 @@ void UiNodeGraph::SettleLiveViewProjection()
     state.exact_size = geometry_size_;
     state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                           GraphViewPaintMargin(lod_policy_, geometry_zoom_));
-    live_baseline_nodes_ = clone(node_geometry_);
-    live_baseline_edges_ = clone(edge_geometry_);
-    live_baseline_revision_ = prepared_geometry_revision_;
+    CaptureLiveViewBaseline();
     state.approximate_zoom = false;
     WhenViewport();
 }
