@@ -114,9 +114,10 @@ public:
     static Vector<Pointf> CapsulePath(const Rect& rect);
 
     // Circular radial areas for gauges, pie/donut charts and polar controls.
-    // ArcBandPath uses outer -> inner winding. A full annulus intentionally
-    // repeats its cut-seam endpoints so the inner hole has an exact radial seam;
-    // those seam vertices are topology, not approximation detail.
+    // ArcBandPath is a fill-oriented single-polyline helper. A full annulus
+    // necessarily carries radial bridge/seam topology in that representation;
+    // use UiShapes::RingSegment (separate outer/inner contours) for a reusable
+    // annulus that may also be stroked.
     static Vector<Pointf> ArcBandPath(Pointf center,
                                       double outer_radius_px,
                                       double inner_radius_px,
@@ -147,7 +148,9 @@ public:
                                          double radius_px);
 
     // For generated/sample polylines only. Authored polygon vertices should
-    // remain authored. Endpoints are always preserved.
+    // remain authored. This function spends the full ErrorPx() allowance, so
+    // do not apply it after another full-budget flattening while claiming a
+    // combined ErrorPx() end-to-end bound. Endpoints are always preserved.
     static Vector<Pointf> SimplifyPolyline(const Vector<Pointf>& points);
 
     static double DistanceToSegment(Pointf p, Pointf a, Pointf b);

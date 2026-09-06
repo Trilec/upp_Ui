@@ -7,8 +7,14 @@ Ui drawing uses one layered geometry contract:
 - UiShapes owns reusable parameterised stock silhouettes
 - UiDraw owns Draw/Painter rendering, appearance, caching, and UiPainterShapePath
 
-The library-wide explicit curve error budget is 0.35 final device pixels.
-Controls do not own sample-count or curve-quality settings.
+The library-wide explicit curve **positional** budget is 0.35 final device
+pixels inside UiGeometry's supported numeric/work envelope. TessellationStatus
+reports when a work/numeric limit prevents that tolerance. Final integer Draw
+conversion, live-view projection and stroke rasterization are separate seams:
+Graph preserves Pointf routes and projects each live frame from one immutable
+exact baseline, while integer rounding is performed only at the final Draw or
+legacy-overlay boundary. Controls do not own sample-count or curve-quality
+settings.
 
 Usage rule:
 - simple paint-only primitive -> direct Draw or native Painter

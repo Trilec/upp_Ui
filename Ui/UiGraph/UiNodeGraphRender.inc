@@ -60,7 +60,7 @@ UiLineStyle ResolveDirectLineStyle(const UiGraphEdge& edge,
     return line_style;
 }
 
-void DrawPatternedPolyline(Draw& w, const Vector<Point>& points,
+void DrawPatternedPolyline(Draw& w, const Vector<Pointf>& points,
                            int width, Color color, UiLineStyle line_style,
                            double dash_length, double dash_gap)
 {
@@ -69,8 +69,8 @@ void DrawPatternedPolyline(Draw& w, const Vector<Point>& points,
 
     if(line_style == SOLID) {
         for(int i = 1; i < points.GetCount(); i++)
-            w.DrawLine(points[i - 1].x, points[i - 1].y,
-                       points[i].x, points[i].y, width, color);
+            w.DrawLine(fround(points[i - 1].x), fround(points[i - 1].y),
+                       fround(points[i].x), fround(points[i].y), width, color);
         return;
     }
 
@@ -131,7 +131,7 @@ void DrawPatternedPolyline(Draw& w, const Vector<Point>& points,
 }
 
 bool PaintEdgeDirect(Draw& w, const UiGraphEdge& edge,
-                     const Vector<Point>& points, bool simplified,
+                     const Vector<Pointf>& points, bool simplified,
                      const UiGraphEdgeStyle& style, UiGraphVisualState state,
                      double zoom, const UiNodeGraph::LodPolicy& lod)
 {
@@ -618,8 +618,13 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 w.DrawText(lr.left + DPI(4), lr.top + DPI(2), edge->title,
                            label_font, style.label_ink[si]);
             }
-            if(WhenPaintEdgeOverlay && zoom_ >= lod_policy_.edge_simplify_zoom)
-                WhenPaintEdgeOverlay(w, *edge, g.points, edge_states[i]);
+            if(WhenPaintEdgeOverlay && zoom_ >= lod_policy_.edge_simplify_zoom) {
+                Vector<Point> overlay_points;
+                overlay_points.Reserve(g.points.GetCount());
+                for(const Pointf& q : g.points)
+                    overlay_points.Add(Point(fround(q.x), fround(q.y)));
+                WhenPaintEdgeOverlay(w, *edge, overlay_points, edge_states[i]);
+            }
         }
     last_edge_paint_usecs_ = max<int64>(0, usecs() - edge_started);
 

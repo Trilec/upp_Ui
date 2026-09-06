@@ -438,7 +438,7 @@ private:
 
     struct EdgeGeometry : Moveable<EdgeGeometry> {
         UiGraphEdgeRef ref;
-        Vector<Point> points;
+        Vector<Pointf> points;
         Rect bounds;
         Point label_point;
         Point route_handle;
@@ -657,7 +657,7 @@ private:
     static Vector<Pointf> SimplifyRoute(const Vector<Pointf>& route);
     static Vector<Pointf> RoundPolyline(const Vector<Pointf>& route, double radius);
     static double DistanceToSegment(Pointf p, Pointf a, Pointf b);
-    static Rect RouteBounds(const Vector<Point>& route, int inflate);
+    static Rect RouteBounds(const Vector<Pointf>& route, int inflate);
     static bool PointInPolygon(const Vector<Pointf>& polygon, Pointf point);
 
     void AcquireInteractionCapture();

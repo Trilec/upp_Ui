@@ -184,7 +184,7 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
         ASSERT(g.points.GetCount() == src.points.GetCount());
 
         for(int q = 0; q < g.points.GetCount(); q++)
-            g.points[q] = project_point(src.points[q]);
+            g.points[q] = project_pointf(src.points[q]);
         g.bounds = project_rect(src.bounds);
         g.label_point = project_point(src.label_point);
         g.route_handle = project_point(src.route_handle);

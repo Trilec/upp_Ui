@@ -177,6 +177,9 @@ void UiPainterShapePath(Painter& painter, const UiShapePath& path)
         }
 
         case UiShapeCommandType::EllipseArc: {
+            // The Painter API used here has verified native circular Arc/Cubic
+            // paths but no authored elliptical-arc command. Flatten exactly once
+            // through UiGeometry rather than inventing a control-local quality.
             Pointf arc_start = UiShapePathArcPoint(command.p1, command.radius_x,
                                                    command.radius_y,
                                                    command.start_angle);

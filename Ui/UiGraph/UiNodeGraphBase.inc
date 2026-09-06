@@ -319,7 +319,7 @@ void StrokeSegment(Painter& p, Pointf a, Pointf b, double width, Color color)
     p.End();
 }
 
-void StrokePolyline(Painter& p, const Vector<Point>& points, double width, Color color,
+void StrokePolyline(Painter& p, const Vector<Pointf>& points, double width, Color color,
                     UiLineStyle line_style, double dash_length, double dash_gap)
 {
     if(points.GetCount() < 2 || width <= 0.02)
@@ -361,7 +361,7 @@ void StrokePolyline(Painter& p, const Vector<Point>& points, double width, Color
     }
 }
 
-void PaintArrow(Painter& p, const Vector<Point>& points,
+void PaintArrow(Painter& p, const Vector<Pointf>& points,
                 UiGraphArrowStyle arrow, double size, Color color)
 {
     if(arrow == UiGraphArrowStyle::Inherit || arrow == UiGraphArrowStyle::None ||
@@ -2074,8 +2074,9 @@ void UiNodeGraph::BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out)
             out.simplified = true;
     }
 
-    for(const Pointf& q : route)
-        out.points.Add(Point(fround(q.x), fround(q.y)));
+    // Keep prepared edge routes in sub-pixel screen coordinates. Quantization
+    // happens only at the integer Draw/legacy-overlay boundary.
+    out.points = clone(route);
     int interaction = fround(max(2.0, style.interaction_width * max(0.25, min(1.0, zoom_))));
     out.bounds = RouteBounds(out.points, interaction);
     if(!out.points.IsEmpty()) {
@@ -2316,11 +2317,19 @@ Point UiNodeGraph::GetPortAnchor(const UiGraphPortRef& port, UiGraphPortSide* re
     return node ? WorldToScreen(node->position + Pointf(node->size.cx * 0.5, node->size.cy * 0.5)) : Point(0, 0);
 }
 
-Rect UiNodeGraph::RouteBounds(const Vector<Point>& route, int inflate)
+Rect UiNodeGraph::RouteBounds(const Vector<Pointf>& route, int inflate)
 {
-    if(route.IsEmpty()) return Rect(0, 0, 0, 0);
-    Rect out(route[0], Size(1, 1));
-    for(const Point& p : route) out |= Rect(p, Size(1, 1));
+    if(route.IsEmpty())
+        return RectC(0, 0, 0, 0);
+    double l = route[0].x, t = route[0].y, r = route[0].x, b = route[0].y;
+    for(const Pointf& p : route) {
+        l = min(l, p.x);
+        t = min(t, p.y);
+        r = max(r, p.x);
+        b = max(b, p.y);
+    }
+    Rect out((int)std::floor(l), (int)std::floor(t),
+             (int)std::ceil(r) + 1, (int)std::ceil(b) + 1);
     return out.Inflated(max(0, inflate));
 }
 
@@ -2757,8 +2766,13 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 if(style.draw_label_background) w.DrawRect(lr,style.label_background);
                 w.DrawText(lr.left+DPI(4),lr.top+DPI(2),edge->title,label_font,style.label_ink[si]);
             }
-            if(WhenPaintEdgeOverlay && zoom_ >= lod_policy_.edge_simplify_zoom)
-                WhenPaintEdgeOverlay(w,*edge,g.points,state);
+            if(WhenPaintEdgeOverlay && zoom_ >= lod_policy_.edge_simplify_zoom) {
+                Vector<Point> overlay_points;
+                overlay_points.Reserve(g.points.GetCount());
+                for(const Pointf& q : g.points)
+                    overlay_points.Add(Point(fround(q.x), fround(q.y)));
+                WhenPaintEdgeOverlay(w, *edge, overlay_points, state);
+            }
         }
     last_edge_paint_usecs_ = max<int64>(0, usecs() - edge_started);
 

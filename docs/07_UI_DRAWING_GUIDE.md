@@ -27,9 +27,28 @@ Do not route every control through BufferPainter merely for uniformity.
 **No generated geometry owned by `upp_Ui` should contain detail that cannot
 materially affect the final device image.**
 
-The explicit-geometry error budget is library-owned:
+The explicit-geometry positional budget is library-owned:
 
 **0.35 final device pixels**
+
+That number is a **flattened-centreline positional tolerance**, not a blanket
+pixel-equivalence promise. It is guaranteed only inside the supported
+numeric/work envelope reported by `UiGeometry::TessellationStatus`.
+
+Separate allowances apply at later seams:
+
+- explicit `UiGeometry` curve flattening: <= 0.35 px positional error when
+  `TessellationStatus::IsExactContract()` is true;
+- integer `Draw`/legacy-overlay conversion: one final nearest-pixel rounding,
+  with at most about 0.707 px Euclidean coordinate displacement;
+- live Graph camera projection: always from one immutable exact prepared
+  baseline, so repeated interaction does not accumulate rounding drift;
+- stroke outline, joins/caps and antialiasing remain backend raster semantics;
+  centreline error alone does not prove identical stroke pixels.
+
+`UiGeometry::VisibleExtentPx()` is presentation policy: detail below that
+threshold may be omitted because it is not worth representing explicitly. It is
+not a mathematical statement that subpixel coverage can never affect AA pixels.
 
 Geometry quality is therefore decided after all scale transforms:
 
@@ -176,10 +195,13 @@ This is deliberate architecture, not a special exemption from quality.
 
 ## 6. Native curves stay native
 
-Painter already flattens its native curves appropriately.
+Painter already flattens its verified native curves appropriately.
 
 If a control only needs to paint a cubic or circular arc, do not pre-flatten it
-into a large polyline first.
+into a large polyline first. `UiPainterShapePath` forwards circular `Arc` and
+cubic commands natively. The Painter API used by this package has no verified
+direct authored elliptical-arc command, so `EllipseArc` is intentionally
+flattened once through `UiGeometry` at the shared positional budget.
 
 Use explicit UiGeometry points only when another consumer actually needs points,
 for example:
@@ -211,8 +233,11 @@ Derive semantic positions from geometry:
 Discrete authored vertices are semantic shape topology and are not simplified
 implicitly.
 
-Generated curve/polyline detail may be simplified only inside the common
-screen-error contract.
+Generated curve/polyline detail may be simplified only inside a declared
+combined error budget. Do not flatten a curve at the full 0.35 px allowance and
+then spend another independent 0.35 px simplification allowance while claiming a
+0.35 px end-to-end result. `SimplifyPolyline` is for generated/sample
+polylines whose simplification allowance is itself the contract.
 
 This distinction keeps a triangle a triangle while allowing a large smooth curve
 to receive more points than a 6-pixel curve.
@@ -235,7 +260,11 @@ through `UiPaintCircularArc` rather than converting the stroke into explicit
 ring polygons.
 
 `UiShapes::RingSegment` and `UiShapes::Pie` exist for controls that actually
-need a **filled radial silhouette**.
+need a **filled radial silhouette**. A full `UiShapes::RingSegment` uses
+separate opposite-winding outer/inner closed contours, so a stroke never exposes
+an artificial radial bridge. The lower-level `UiGeometry::ArcBandPath` returns
+one explicit bridged polyline and is therefore a fill-oriented geometry helper;
+do not use that single contour as a stroked annulus contract.
 
 Choose the representation required by the control, not the most abstract API.
 
