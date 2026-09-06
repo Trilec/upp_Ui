@@ -114,11 +114,11 @@ CONSOLE_APP_MAIN
 
     graph.BeginBatchUpdate();
     for(int i = 0; i < 300; i++) {
-        UiGraphBackdrop far;
-        far.title = Format("Far %d", i);
-        far.position = Pointf(5000.0 + i * 220.0, 5000.0 + (i % 7) * 180.0);
-        far.size = Sizef(120, 90);
-        model.AddBackdrop(root, far);
+        UiGraphBackdrop far_backdrop;
+        far_backdrop.title = Format("Far %d", i);
+        far_backdrop.position = Pointf(5000.0 + i * 220.0, 5000.0 + (i % 7) * 180.0);
+        far_backdrop.size = Sizef(120, 90);
+        model.AddBackdrop(root, far_backdrop);
     }
     graph.EndBatchUpdate();
 
