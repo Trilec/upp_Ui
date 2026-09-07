@@ -1575,10 +1575,11 @@ void UiGraphDemo::RefreshDiagnostics()
                      zoom >= lod.edge_label_zoom ? "on" : "off");
     detail << Format("LOD avg[%d]: paint=%.3f geometry=%.3f edge=%.3f node=%.3f ms\n\n",
                      band_samples, band_paint_ms, band_geometry_ms, band_edge_ms, band_node_ms);
-    detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d micro_rasters=%d\n",
+    detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d micro_rasters=%d cached_draws=%d direct_fallbacks=%d\n",
                      graph_.GetLastNodeCandidateCount(), graph_.GetPreparedNodeCount(),
                      graph_.GetLastPaintNodeVisitCount(), graph_.GetLastPaintedNodeCount(),
-                     graph_.GetLastMicroRasterCount());
+                     graph_.GetLastMicroRasterCount(), graph_.GetLastMicroCachedDrawCount(),
+                     graph_.GetLastMicroDirectFallbackCount());
     detail << Format("Edges: candidates=%d prepared=%d visits=%d painted=%d simplified=%d hidden=%d\n",
                      graph_.GetLastEdgeCandidateCount(), graph_.GetPreparedEdgeCount(),
                      graph_.GetLastPaintEdgeVisitCount(), graph_.GetLastPaintedEdgeCount(),

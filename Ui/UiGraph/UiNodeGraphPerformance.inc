@@ -76,9 +76,9 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
 
 void LodIntegerPath(const Vector<Pointf>& path, Vector<Point>& out)
 {
-    // Paint can visit thousands of micro nodes in one frame. Reuse one caller-
-    // owned buffer rather than allocating a fresh Vector for every silhouette.
-    out.Clear();
+    // Paint can visit thousands of micro nodes in one frame. SetCount(0)
+    // preserves the caller-owned Vector capacity; Clear() releases it in U++.
+    out.SetCount(0);
     out.Reserve(path.GetCount());
     for(const Pointf& p : path) {
         Point q(fround(p.x), fround(p.y));
@@ -87,6 +87,15 @@ void LodIntegerPath(const Vector<Pointf>& path, Vector<Point>& out)
     }
     if(out.GetCount() > 1 && out.Top() == out[0])
         out.Drop();
+}
+
+// Painter's default miter limit is 4.0. Reserve the worst-case half-stroke
+// miter extension plus AA coverage so cached sharp joins and dirty bounds agree.
+int LodMicroStrokePad(int frame_width)
+{
+    if(frame_width <= 0)
+        return 1;
+    return max(1, frame_width * 2 + 2);
 }
 
 struct LodMicroRasterKey : Moveable<LodMicroRasterKey> {
@@ -162,6 +171,14 @@ Image LodMicroPolygonRaster(const UiGraphNode& node,
     policy.max_axis = 128;
     policy.max_single_image_bytes = 256 * 1024;
 
+    // UiRasterCache::Get() validates image bytes only after the factory runs and
+    // does not enforce max_axis. Reject before ImageBuffer construction.
+    Size admitted_size = UiQuantizeRasterSize(raster_size, policy);
+    if(admitted_size.cx <= 0 || admitted_size.cy <= 0) {
+        UiRasterCache::NoteSkippedTooLarge();
+        return Image();
+    }
+
     UiRasterCacheKeyBuilder kb("aa/nodegraph-micro-shape");
     kb.Add((int)(byte)node.shape)
       .Add(surface.GetSize())
@@ -203,6 +220,8 @@ Image LodMicroPolygonRaster(const UiGraphNode& node,
 void UiNodeGraph::PaintGraphGeometry(Draw& w)
 {
     last_micro_raster_count_ = 0;
+    last_micro_cached_draw_count_ = 0;
+    last_micro_direct_fallback_count_ = 0;
     Size size = GetSize();
     if(size.cx <= 0 || size.cy <= 0 || !model_) {
         PaintGraphGeometryRenderBase(w);
@@ -396,28 +415,33 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
             if(cached_index < 0
                && micro_rasters.GetCount() < kLodMicroRasterCacheLimit) {
-                LodMicroRasterEntry& entry = micro_rasters.Add();
-                entry.key.Set(*node, g.hit_path, g.surface,
-                              face, frame, frame_width);
-                entry.pad = max(1, (frame_width + 1) / 2);
-                entry.image = LodMicroPolygonRaster(*node, g.hit_path, g.surface,
-                                                    face, frame, frame_width,
-                                                    entry.pad);
-                cached_index = micro_rasters.GetCount() - 1;
+                const int pad = LodMicroStrokePad(frame_width);
+                Image image = LodMicroPolygonRaster(*node, g.hit_path, g.surface,
+                                                    face, frame, frame_width, pad);
+                if(!IsNull(image)) {
+                    LodMicroRasterEntry& entry = micro_rasters.Add();
+                    entry.key.Set(*node, g.hit_path, g.surface,
+                                  face, frame, frame_width);
+                    entry.pad = pad;
+                    entry.image = image;
+                    cached_index = micro_rasters.GetCount() - 1;
+                }
             }
 
-            if(cached_index >= 0 && !IsNull(micro_rasters[cached_index].image)) {
+            if(cached_index >= 0) {
                 const LodMicroRasterEntry& entry = micro_rasters[cached_index];
                 UiDrawCachedRaster(w, g.surface.Inflated(entry.pad), entry.image);
+                last_micro_cached_draw_count_++;
             }
             else {
-                // Dynamic/high-uniqueness scenes and cache-policy refusals keep
+                // High-uniqueness scenes and cache-policy/size refusals keep
                 // the direct retained-silhouette path.
                 LodIntegerPath(g.hit_path, integer_path);
                 if(integer_path.GetCount() >= 3)
                     w.DrawPolygon(integer_path, face, frame_width, frame);
                 else
                     w.DrawRect(g.surface, face);
+                last_micro_direct_fallback_count_++;
             }
         }
         last_painted_node_count_++;
@@ -580,10 +604,12 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
         paint_frame_width = max(paint_frame_width,
                                 max(DPI(2), DPI(fround(lod_policy_.selection_outline_width))));
     if(paint_frame_width > 0)
-        inflate = max(inflate, (paint_frame_width + 1) / 2 + 1);
+        inflate = max(inflate, LodMicroStrokePad(paint_frame_width));
     if(IsNodeSelected(node.ref))
-        inflate = max(inflate, DPI(fround(lod_policy_.selection_outline_width)) + DPI(2));
-    out.paint_bounds = out.paint_bounds.Inflated(inflate);
+        inflate = max(inflate, LodMicroStrokePad(
+            max(paint_frame_width, DPI(fround(lod_policy_.selection_outline_width)))));
+    out.paint_bounds = out.surface.Inflated(inflate);
+    out.paint_bounds |= out.rect;
 
     if(record_evidence) {
         last_geometry_lod_node_count_++;

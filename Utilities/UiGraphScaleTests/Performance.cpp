@@ -187,7 +187,10 @@ int RunPerformanceSuite()
     t.Expect(graph.GetLastMicroRasterCount() > 0
              && graph.GetLastMicroRasterCount() <= 32
              && graph.GetLastMicroRasterCount() < graph.GetLastPaintedNodeCount(),
-             "repeated micro silhouettes use a bounded raster set rather than one raster/allocation per node");
+             "repeated micro silhouettes use a bounded admitted raster set");
+    t.Expect(graph.GetLastMicroCachedDrawCount() > graph.GetLastMicroRasterCount()
+             && graph.GetLastMicroCachedDrawCount() > 0,
+             "resolved repeated micro silhouettes produce real cached draws, not only variant admissions");
 
     selection_events = viewport_events = 0;
     graph.BeginViewUpdate();
@@ -214,8 +217,34 @@ int RunPerformanceSuite()
     t.Expect(graph.GetLastMicroRasterCount() > 0
              && graph.GetLastMicroRasterCount() <= 32,
              "fit-all 10k micro raster reuse remains explicitly bounded");
+    t.Expect(graph.GetLastMicroCachedDrawCount() > 0,
+             "fit-all 10k performs successful cached micro draws");
     t.Expect(viewport_events == 1 && selection_events == 0,
              "fit-all emits one viewport event and no spurious selection event");
+
+    UiGraphModel wide_micro_model;
+    UiGraphNode wide_micro;
+    wide_micro.position = Pointf(0, 0);
+    wide_micro.size = Sizef(1200, 12);
+    wide_micro.shape = UiGraphNodeShape::Triangle;
+    wide_micro.title = "wide micro";
+    wide_micro_model.AddNode(wide_micro);
+
+    UiNodeGraph wide_micro_graph;
+    wide_micro_graph.SetRect(0, 0, 320, 180);
+    wide_micro_graph.SetModel(wide_micro_model);
+    wide_micro_graph.SetZoom(0.20);
+    wide_micro_graph.SetPan(Pointf(30, 70));
+    ImageDraw wide_draw(320, 180);
+    wide_draw.DrawRect(0, 0, 320, 180, White());
+    UiRasterCacheStats cache_before_wide = UiRasterCache::GetStats();
+    wide_micro_graph.Paint(wide_draw);
+    UiRasterCacheStats cache_after_wide = UiRasterCache::GetStats();
+    t.Expect(wide_micro_graph.GetLastMicroRasterCount() == 0
+             && wide_micro_graph.GetLastMicroDirectFallbackCount() > 0,
+             "oversized short-wide micro shape is rejected before raster admission and drawn directly");
+    t.Expect(cache_after_wide.skipped_too_large > cache_before_wide.skipped_too_large,
+             "pre-allocation micro raster size guard records the oversize rejection");
 
     graph.BeginViewUpdate();
     graph.SetModel(reference_model);
