@@ -15,8 +15,24 @@ static PropertyEditorStyle PeMakeStyle(Color background,
     style.frame = Blend(background, text, 72);
     style.row_odd = row_odd;
     style.row_even = row_even;
-    style.row_hover = Blend(row_odd, SColorHighlight(), 24);
-    style.row_selected = Blend(row_even, SColorHighlight(), 72);
+
+    // Theme resolvers are allowed to use identical hot/pressed panel faces.
+    // PropertyEditor still needs independent row states so scanning, hover and
+    // selection remain visible under every UiTheme preset. Derive fallbacks
+    // from the active text/highlight colours rather than introducing a
+    // light-only palette.
+    if(style.row_even == style.row_odd)
+        style.row_even = Blend(row_even, text, 24);
+
+    style.row_hover = Blend(style.row_odd, SColorHighlight(), 24);
+    if(style.row_hover == style.row_even || style.row_hover == style.row_odd)
+        style.row_hover = Blend(style.row_odd, text, 40);
+
+    style.row_selected = Blend(style.row_even, SColorHighlight(), 72);
+    if(style.row_selected == style.row_odd ||
+       style.row_selected == style.row_even ||
+       style.row_selected == style.row_hover)
+        style.row_selected = Blend(style.row_even, text, 72);
     style.group_background = group_background;
     style.group_ink = text;
     style.label_ink = text;
