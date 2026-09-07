@@ -5,46 +5,59 @@ Recovery state only; Git history is implementation history.
 
 ## CURRENT
 TASK: **Final upp_Ui completion acceptance**
-STATUS: **FINAL SOURCE REPAIRS PUBLISHED — WINDOWS VALIDATION PENDING**
+STATUS: **ADVANCED REVIEW MUST-FIX TRANCHE PUBLISHED — WINDOWS VALIDATION PENDING**
+SOURCE_HEAD: `2349a5ebbad24cf37ec6eb4a6f54bdf310aa5fc9`
 
-Current repair checkpoints:
-- `0e72be8d84504a432be9000491fa38341f5d05e3` — bounded exact-raster reuse for repeated
-  retained micro-node silhouettes.
-- `e0d27500a7273e062bc97029f7b9088efaf17255` — stable `Array<StyledMetrics>` storage
-  for per-paint style metrics pointers.
-- `b9c3a863ee424d49f8897b1970897200726c94fc` — PropertyEditor active value-surface
-  wheel routing.
-- `57c41d7a8d321417a970924e3144d1295d707c2a` — all nine multi-file aggregate test
-  packages explicitly declare `noblitz;`.
-- `29ad41007a446935c2ffcb1b72e74370f9c39dc6` — micro-raster reuse is now safe with
-  `WhenResolveNodeStyle`: cache identity includes resolved paint state plus every exact
-  retained local silhouette coordinate, including subpixel phase.
-- `cb3f44066c607721601bd63ccfa321a8b485efd0` — UiGraphDemo diagnostics now expose
-  current zoom, explicit LOD band/features, rolling 16-sample averages and per-LOD averages
-  using one-shot post-viewport sampling only.
+The architecture audit F1-F10 remains accepted. A focused senior review of the final 10k
+micro-rendering / exact-preparation path returned `CHANGE NOW`; its required bounded source
+tranche has now been implemented without changing the accepted architecture.
 
-The architecture audit F1-F10 remains accepted. No architecture rewrite is open.
+## COMPLETED AFTER ADVANCED REVIEW
+
+Micro raster:
+- scratch integer path reset now preserves Vector capacity;
+- one conservative miter/AA stroke pad is shared by cached raster extent and micro paint bounds;
+- padded max-axis/byte eligibility is checked before ImageBuffer construction;
+- failed/oversized raster attempts are not counted as admitted variants;
+- diagnostics distinguish admitted variants, successful cached draws and direct fallbacks;
+- resolved-style cache identity still uses exact retained local path coordinates + paint state;
+- focused regressions cover:
+  - real cached reuse under WhenResolveNodeStyle,
+  - oversized short-wide direct fallback before allocation,
+  - 6 px sharp triangle miter extent,
+  - clipped dirty repaint of that extent,
+  - fractional-radius path identity,
+  - resolver-driven paint identity changes.
+
+Exact preparation:
+- phase evidence now separates reset, spatial, query, sort/order, node, edge, style,
+  silhouette and anchor costs;
+- node sort records resolve/store node pointer + z-order once instead of model lookups
+  inside the comparator and again during construction;
+- four micro side-port index vectors are reusable scratch instead of per-node allocations;
+- identical exact local projected-micro silhouettes reuse a bounded 64-entry preparation-local
+  path cache and are translated into each retained NodeGeometry;
+- anchor semantics remain unchanged and eager; exact settle/programmatic APIs remain synchronous.
+
+Optional ideas from the review (demand-driven anchors, retained-map storage reuse, typed overview
+bins, wider callback-cache contracts) remain deferred until the new phase evidence justifies them.
 
 ## LAST WINDOWS EVIDENCE
+
 At `0968129f882e5ffc8bf65a3ed87fdfc5f3f5a357`:
 - Debug + Release PASS;
 - BLITZ aggregate packages PASS;
 - PropertyEditor PASS;
 - 10k idle / Live profiling idle / Reference <-> 10k switches PASS;
 - 10k Paint ~561.6 ms; node/surface ~554.4 ms; geometry ~622.1 ms; edge ~1.4 ms;
-- prior node/surface baseline was ~838.4 ms, so the hot path already improved materially;
+- prior node/surface baseline was ~838.4 ms;
 - completion remained FAIL only because `micro_rasters=0`.
 
-Root cause of `micro_rasters=0`: UiGraphDemo always installs `WhenResolveNodeStyle`, while the
-first cache implementation disabled raster reuse whenever that resolver existed. `29ad4100...`
-removes that blanket exclusion and keys the actual resolved retained silhouette instead.
-
-## BLITZ TEST CONTRACT
-The nine aggregate hygiene runners intentionally use independent component translation units
-with one executable entry in `main.cpp`. Package-level `noblitz;` prevents SCU concatenation
-without disabling any test.
+The resolved-style cache eligibility bug causing `micro_rasters=0` was fixed afterward at
+`29ad41007a446935c2ffcb1b72e74370f9c39dc6`.
 
 ## FINAL WINDOWS GATE
+
 Fetch current `main` and validate Debug + Release:
 - PropertyEditorTests
 - PropertyEditorOverrideCommitTest
@@ -55,21 +68,35 @@ Fetch current `main` and validate Debug + Release:
 - UiGraphTest
 - all nine aggregate hygiene packages.
 
-Manual:
-- UiChartRingDemo / UiProgressRingDemo: inactive override value click immediately enables the
-  tick; first wheel edits the value; wheel outside the active value surface scrolls normally;
-  explicit override action still toggles independently; row states stay visually distinct.
-- UiGraphDemo Reference + 10k visuals/interactions/LOD correct.
-- 10k reports `micro_rasters > 0 && <= 32`.
-- verify diagnostics zoom updates during/after wheel settle;
-- verify displayed LOD feature transitions, including route handle cutoff at
-  `route_edit_zoom=0.55`, shadow=0.60, icon=0.70, edge simplify=0.50;
-- verify rolling and current-LOD averages update only after activity and idle still remains idle;
-- record same-machine 10k/Reference paint phase timings;
-- 10k node/surface must remain materially below the old ~838 ms baseline;
+Required performance evidence from UiGraphDemo Reference + 10k:
+- `micro_rasters > 0 && <= 32`;
+- `cached_draws > 0`;
+- record `direct_fallbacks`;
+- record current/avg paint, node, geometry and edge timings;
+- record preparation phases:
+  reset / spatial / query / sort / nodes / style / silhouette / anchors / edges;
+- record path-cache hits/misses;
+- verify zoom and LOD diagnostics update across thresholds;
+- verify route handle cutoff at 0.55 and other displayed feature transitions;
+- 10k node/surface remains materially below the old ~838 ms baseline;
+- 10k exact geometry result is evaluated from its phase breakdown rather than one aggregate
+  number alone;
 - 10k idle and Live-profiling idle settle;
-- Reference -> 10k -> Reference -> 10k remains clean;
-- `git diff --check` PASS; final tree clean.
+- Reference -> 10k -> Reference -> 10k remains clean.
+
+Manual PropertyEditor:
+- inactive override value click enables immediately;
+- first wheel edits value;
+- wheel outside active value surface scrolls normally;
+- explicit override toggle remains independent;
+- row states remain visually distinct.
+
+Final hygiene:
+- `git diff --check` PASS;
+- worktree clean.
+
+If one preparation phase remains materially dominant, return the phase evidence before proposing
+another optimisation. Do not broaden architecture without measured cause.
 
 ## CONTRACTS TO PRESERVE
 - explicit generated curves target 0.35 final-device-pixel positional error inside the supported
