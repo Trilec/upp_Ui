@@ -357,6 +357,17 @@ public:
     int GetLastHiddenEdgeCount() const { return last_hidden_edge_count_; }
     int64 GetLastPaintUsecs() const { return last_paint_usecs_; }
     int64 GetLastGeometryPrepareUsecs() const { return last_geometry_prepare_usecs_; }
+    int64 GetLastGeometryResetUsecs() const { return last_geometry_reset_usecs_; }
+    int64 GetLastGeometrySpatialUsecs() const { return last_geometry_spatial_usecs_; }
+    int64 GetLastGeometryQueryUsecs() const { return last_geometry_query_usecs_; }
+    int64 GetLastGeometrySortUsecs() const { return last_geometry_sort_usecs_; }
+    int64 GetLastGeometryNodeUsecs() const { return last_geometry_node_usecs_; }
+    int64 GetLastGeometryStyleUsecs() const { return last_geometry_style_usecs_; }
+    int64 GetLastGeometrySilhouetteUsecs() const { return last_geometry_silhouette_usecs_; }
+    int64 GetLastGeometryAnchorUsecs() const { return last_geometry_anchor_usecs_; }
+    int64 GetLastGeometryEdgeUsecs() const { return last_geometry_edge_usecs_; }
+    int GetLastGeometryPathCacheHitCount() const { return last_geometry_path_cache_hit_count_; }
+    int GetLastGeometryPathCacheMissCount() const { return last_geometry_path_cache_miss_count_; }
     int64 GetLastEdgePaintUsecs() const { return last_edge_paint_usecs_; }
     int64 GetLastNodePaintUsecs() const { return last_node_paint_usecs_; }
     int64 GetLastNodeSurfacePaintUsecs() const { return last_node_surface_paint_usecs_; }
@@ -469,6 +480,15 @@ private:
         Point route_handle;
         Rect route_handle_hit;
         bool simplified = false;
+    };
+
+    struct MicroPathCacheEntry : Moveable<MicroPathCacheEntry> {
+        UiGraphNodeShape shape = UiGraphNodeShape::Rectangle;
+        Size surface_size;
+        double source_cx = 0.0;
+        double source_cy = 0.0;
+        double corner_radius = 0.0;
+        Vector<Pointf> local_path;
     };
 
     struct WorldRect : Moveable<WorldRect> {
@@ -800,6 +820,17 @@ private:
     int last_hidden_edge_count_ = 0;
     int64 last_paint_usecs_ = 0;
     int64 last_geometry_prepare_usecs_ = 0;
+    int64 last_geometry_reset_usecs_ = 0;
+    int64 last_geometry_spatial_usecs_ = 0;
+    int64 last_geometry_query_usecs_ = 0;
+    int64 last_geometry_sort_usecs_ = 0;
+    int64 last_geometry_node_usecs_ = 0;
+    int64 last_geometry_style_usecs_ = 0;
+    int64 last_geometry_silhouette_usecs_ = 0;
+    int64 last_geometry_anchor_usecs_ = 0;
+    int64 last_geometry_edge_usecs_ = 0;
+    int last_geometry_path_cache_hit_count_ = 0;
+    int last_geometry_path_cache_miss_count_ = 0;
     int64 last_edge_paint_usecs_ = 0;
     int64 last_node_paint_usecs_ = 0;
     int64 last_node_surface_paint_usecs_ = 0;
@@ -809,6 +840,11 @@ private:
     mutable int last_port_hit_candidate_count_ = 0;
     mutable int last_edge_hit_candidate_count_ = 0;
     int last_marquee_candidate_count_ = 0;
+
+    // Reused only by exact projected-micro preparation. These are scratch/cache
+    // helpers, never semantic state and never a second geometry authority.
+    Vector<int> micro_side_port_scratch_[4];
+    Vector<MicroPathCacheEntry> micro_path_cache_;
 
     Index<UiGraphId> selected_nodes_;
     Index<UiGraphId> selected_edges_;

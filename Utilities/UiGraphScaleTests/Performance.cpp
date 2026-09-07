@@ -84,7 +84,18 @@ void PrintProfile(const char *phase, UiNodeGraph& graph, int64 paint_us = -1)
            << "/" << graph.GetPreparedEdgeCount()
            << " lod_nodes=" << graph.GetLastGeometryLodNodeCount()
            << " path_vertices=" << graph.GetLastGeometryPathVertexCount()
-           << " geometry_us=" << graph.GetLastGeometryPrepareUsecs();
+           << " path_cache=" << graph.GetLastGeometryPathCacheHitCount()
+           << "/" << graph.GetLastGeometryPathCacheMissCount()
+           << " geometry_us=" << graph.GetLastGeometryPrepareUsecs()
+           << " reset_us=" << graph.GetLastGeometryResetUsecs()
+           << " spatial_us=" << graph.GetLastGeometrySpatialUsecs()
+           << " query_us=" << graph.GetLastGeometryQueryUsecs()
+           << " sort_us=" << graph.GetLastGeometrySortUsecs()
+           << " nodes_us=" << graph.GetLastGeometryNodeUsecs()
+           << " style_us=" << graph.GetLastGeometryStyleUsecs()
+           << " silhouette_us=" << graph.GetLastGeometrySilhouetteUsecs()
+           << " anchors_us=" << graph.GetLastGeometryAnchorUsecs()
+           << " edges_us=" << graph.GetLastGeometryEdgeUsecs();
     if(paint_us >= 0)
         Cout() << " paint_us=" << paint_us
                << " node_paint_us=" << graph.GetLastNodePaintUsecs()
@@ -214,6 +225,13 @@ int RunPerformanceSuite()
              "all fit-all micro nodes use overview geometry LOD");
     t.Expect(graph.GetLastGeometryPathVertexCount() <= graph.GetPreparedNodeCount() * 16,
              "overview mixed-shape silhouettes stay within a bounded screen-error vertex budget");
+    t.Expect(graph.GetLastGeometryPathCacheHitCount() > 0
+             && graph.GetLastGeometryPathCacheMissCount() > 0,
+             "fit-all preparation reuses identical exact local silhouettes while retaining explicit misses");
+    t.Expect(graph.GetLastGeometryNodeUsecs() >= graph.GetLastGeometryStyleUsecs()
+             && graph.GetLastGeometryNodeUsecs() >= graph.GetLastGeometrySilhouetteUsecs()
+             && graph.GetLastGeometryNodeUsecs() >= graph.GetLastGeometryAnchorUsecs(),
+             "node preparation phase contains its measured style/silhouette/anchor subphases");
     t.Expect(graph.GetLastMicroRasterCount() > 0
              && graph.GetLastMicroRasterCount() <= 32,
              "fit-all 10k micro raster reuse remains explicitly bounded");

@@ -3,6 +3,13 @@ namespace {
 
 constexpr double kUiGraphPi = 3.14159265358979323846;
 constexpr int kLodMicroRasterCacheLimit = 32;
+constexpr int kLodMicroPathCacheLimit = 64;
+
+struct ViewNodeOrderRecord : Moveable<ViewNodeOrderRecord> {
+    const UiGraphNode* node = nullptr;
+    UiGraphNodeRef ref;
+    int z_order = 0;
+};
 
 Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
 {
@@ -537,21 +544,70 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     }
 
     UiGraphVisualState node_state = GetNodeVisualState(node);
+    int64 style_started = record_evidence ? usecs() : 0;
     UiGraphNodeStyle style = ResolveNodeStyle(node, node_state);
+    StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
+    if(record_evidence)
+        last_geometry_style_usecs_ += max<int64>(0, usecs() - style_started);
+
     out.ref = node.ref;
     out.rect = RectC(p.x, p.y, sz.cx, sz.cy);
     out.paint_bounds = out.rect;
     out.z_order = node.z_order;
     out.compact = true;
     out.micro = true;
-
-    StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
     out.surface = UiStyledSurfaceRect(out.rect, metrics);
-    out.hit_path = LodNodeShapePath(node, out.surface);
+
+    int64 silhouette_started = record_evidence ? usecs() : 0;
+    int cached_path = -1;
+    for(int i = 0; i < micro_path_cache_.GetCount(); i++) {
+        const MicroPathCacheEntry& entry = micro_path_cache_[i];
+        if(entry.shape == node.shape
+           && entry.surface_size == out.surface.GetSize()
+           && entry.source_cx == node.size.cx
+           && entry.source_cy == node.size.cy
+           && entry.corner_radius == node.corner_radius) {
+            cached_path = i;
+            break;
+        }
+    }
+
+    if(cached_path >= 0) {
+        const Vector<Pointf>& local = micro_path_cache_[cached_path].local_path;
+        out.hit_path.SetCount(local.GetCount());
+        for(int i = 0; i < local.GetCount(); i++)
+            out.hit_path[i] = Pointf(local[i].x + out.surface.left,
+                                     local[i].y + out.surface.top);
+        if(record_evidence)
+            last_geometry_path_cache_hit_count_++;
+    }
+    else {
+        out.hit_path = LodNodeShapePath(node, out.surface);
+        if(record_evidence)
+            last_geometry_path_cache_miss_count_++;
+        if(micro_path_cache_.GetCount() < kLodMicroPathCacheLimit) {
+            MicroPathCacheEntry& entry = micro_path_cache_.Add();
+            entry.shape = node.shape;
+            entry.surface_size = out.surface.GetSize();
+            entry.source_cx = node.size.cx;
+            entry.source_cy = node.size.cy;
+            entry.corner_radius = node.corner_radius;
+            entry.local_path.SetCount(out.hit_path.GetCount());
+            for(int i = 0; i < out.hit_path.GetCount(); i++)
+                entry.local_path[i] = Pointf(out.hit_path[i].x - out.surface.left,
+                                             out.hit_path[i].y - out.surface.top);
+        }
+    }
+    if(record_evidence)
+        last_geometry_silhouette_usecs_ += max<int64>(0, usecs() - silhouette_started);
 
     // Visible edges still need stable authored-side anchors, but micro geometry
-    // deliberately carries no text/content/control/label/hit rectangles.
-    Vector<int> side_ports[4];
+    // deliberately carries no text/content/control/label/hit rectangles. Reuse
+    // four index buffers so each node does not allocate side-port temporaries.
+    int64 anchor_started = record_evidence ? usecs() : 0;
+    for(int si = 0; si < 4; si++)
+        micro_side_port_scratch_[si].SetCount(0);
+
     for(int i = 0; i < node.ports.GetCount(); i++) {
         if(!node.ports[i].visible)
             continue;
@@ -559,16 +615,16 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
         int si = side == UiGraphPortSide::Left ? 0
                : side == UiGraphPortSide::Right ? 1
                : side == UiGraphPortSide::Top ? 2 : 3;
-        side_ports[si].Add(i);
+        micro_side_port_scratch_[si].Add(i);
     }
     for(int si = 0; si < 4; si++)
-        Sort(side_ports[si], [&](int a, int b) {
+        Sort(micro_side_port_scratch_[si], [&](int a, int b) {
             return node.ports[a].order != node.ports[b].order
                  ? node.ports[a].order < node.ports[b].order : a < b;
         });
 
     for(int si = 0; si < 4; si++) {
-        const Vector<int>& indexes = side_ports[si];
+        const Vector<int>& indexes = micro_side_port_scratch_[si];
         int count = indexes.GetCount();
         if(count == 0)
             continue;
@@ -594,6 +650,8 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
             out.anchors.Add(port.id, ShapeBoundaryAnchor(out.hit_path, out.surface, side, axis));
         }
     }
+    if(record_evidence)
+        last_geometry_anchor_usecs_ += max<int64>(0, usecs() - anchor_started);
 
     int inflate = max(1, fround(2 * min(1.0, max(0.25, zoom_))));
     int state_index = VisualStateIndex(node_state);
@@ -619,13 +677,26 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
 
 void UiNodeGraph::RebuildViewGeometry()
 {
+    int64 reset_started = usecs();
     node_geometry_.Clear();
     edge_geometry_.Clear();
+    micro_path_cache_.Clear();
     last_node_candidate_count_ = 0;
     last_edge_candidate_count_ = 0;
     last_hidden_edge_count_ = 0;
     last_geometry_lod_node_count_ = 0;
     last_geometry_path_vertex_count_ = 0;
+    last_geometry_spatial_usecs_ = 0;
+    last_geometry_query_usecs_ = 0;
+    last_geometry_sort_usecs_ = 0;
+    last_geometry_node_usecs_ = 0;
+    last_geometry_style_usecs_ = 0;
+    last_geometry_silhouette_usecs_ = 0;
+    last_geometry_anchor_usecs_ = 0;
+    last_geometry_edge_usecs_ = 0;
+    last_geometry_path_cache_hit_count_ = 0;
+    last_geometry_path_cache_miss_count_ = 0;
+    last_geometry_reset_usecs_ = max<int64>(0, usecs() - reset_started);
 
     if(!model_) {
         model_revision_ = -1;
@@ -638,7 +709,11 @@ void UiNodeGraph::RebuildViewGeometry()
         return;
     }
 
+    int64 spatial_started = usecs();
     EnsureSpatialIndex();
+    last_geometry_spatial_usecs_ = max<int64>(0, usecs() - spatial_started);
+
+    int64 query_started = usecs();
     for(int i = selected_nodes_.GetCount() - 1; i >= 0; --i)
         if(!model_->Contains(UiGraphNodeRef{selected_nodes_[i]}))
             selected_nodes_.Remove(i);
@@ -672,32 +747,35 @@ void UiNodeGraph::RebuildViewGeometry()
 
     last_node_candidate_count_ = node_candidates.GetCount();
     last_edge_candidate_count_ = edge_candidates.GetCount();
+    last_geometry_query_usecs_ = max<int64>(0, usecs() - query_started);
 
-    Vector<UiGraphNodeRef> order;
+    int64 sort_started = usecs();
+    Vector<ViewNodeOrderRecord> order;
     order.Reserve(node_candidates.GetCount());
     for(int i = 0; i < node_candidates.GetCount(); i++) {
         UiGraphNodeRef ref{node_candidates[i]};
         const UiGraphNode* node = model_->FindNode(ref);
-        if(node && node->visible)
-            order.Add(ref);
+        if(node && node->visible) {
+            ViewNodeOrderRecord& record = order.Add();
+            record.node = node;
+            record.ref = ref;
+            record.z_order = node->z_order;
+        }
     }
-    Sort(order, [&](UiGraphNodeRef a, UiGraphNodeRef b) {
-        const UiGraphNode* na = model_->FindNode(a);
-        const UiGraphNode* nb = model_->FindNode(b);
-        if(!na || !nb)
-            return a.id < b.id;
-        return na->z_order != nb->z_order ? na->z_order < nb->z_order : a.id < b.id;
+    Sort(order, [](const ViewNodeOrderRecord& a, const ViewNodeOrderRecord& b) {
+        return a.z_order != b.z_order ? a.z_order < b.z_order : a.ref.id < b.ref.id;
     });
+    last_geometry_sort_usecs_ = max<int64>(0, usecs() - sort_started);
 
-    for(UiGraphNodeRef ref : order) {
-        const UiGraphNode* node = model_->FindNode(ref);
-        if(!node)
-            continue;
+    int64 node_started = usecs();
+    for(const ViewNodeOrderRecord& record : order) {
         NodeGeometry g;
-        BuildViewNodeGeometry(*node, g);
-        node_geometry_.Add(ref.id, pick(g));
+        BuildViewNodeGeometry(*record.node, g);
+        node_geometry_.Add(record.ref.id, pick(g));
     }
+    last_geometry_node_usecs_ = max<int64>(0, usecs() - node_started);
 
+    int64 edge_started = usecs();
     if(zoom_ < lod_policy_.edge_hide_zoom)
         last_hidden_edge_count_ = edge_candidates.GetCount();
     else
@@ -710,6 +788,7 @@ void UiNodeGraph::RebuildViewGeometry()
             BuildEdgeGeometry(*edge, g);
             edge_geometry_.Add(ref.id, pick(g));
         }
+    last_geometry_edge_usecs_ = max<int64>(0, usecs() - edge_started);
 
     model_revision_ = model_->GetRevision();
     geometry_zoom_ = zoom_;

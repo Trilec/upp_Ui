@@ -1587,6 +1587,19 @@ void UiGraphDemo::RefreshDiagnostics()
     detail << Format("Spatial: build=%d update=%d geometry=%d\n",
                      graph_.GetSpatialBuildSerial(), graph_.GetSpatialUpdateSerial(),
                      graph_.GetGeometryBuildSerial());
+    detail << Format("Prepare phases ms: reset=%.3f spatial=%.3f query=%.3f sort=%.3f nodes=%.3f edges=%.3f\n",
+                     graph_.GetLastGeometryResetUsecs() / 1000.0,
+                     graph_.GetLastGeometrySpatialUsecs() / 1000.0,
+                     graph_.GetLastGeometryQueryUsecs() / 1000.0,
+                     graph_.GetLastGeometrySortUsecs() / 1000.0,
+                     graph_.GetLastGeometryNodeUsecs() / 1000.0,
+                     graph_.GetLastGeometryEdgeUsecs() / 1000.0);
+    detail << Format("Node prep ms: style=%.3f silhouette=%.3f anchors=%.3f path_cache=%d/%d\n",
+                     graph_.GetLastGeometryStyleUsecs() / 1000.0,
+                     graph_.GetLastGeometrySilhouetteUsecs() / 1000.0,
+                     graph_.GetLastGeometryAnchorUsecs() / 1000.0,
+                     graph_.GetLastGeometryPathCacheHitCount(),
+                     graph_.GetLastGeometryPathCacheMissCount());
     detail << Format("Hit candidates: nodes=%d ports=%d edges=%d marquee=%d\n",
                      graph_.GetLastNodeHitCandidateCount(), graph_.GetLastPortHitCandidateCount(),
                      graph_.GetLastEdgeHitCandidateCount(), graph_.GetLastMarqueeCandidateCount());
