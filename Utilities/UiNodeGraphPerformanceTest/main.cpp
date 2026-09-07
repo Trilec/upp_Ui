@@ -154,7 +154,11 @@ CONSOLE_APP_MAIN
 
     // Exercise the real problem band: nodes are physically micro on screen but
     // the global zoom is still high enough that P1 previously rebuilt rich node
-    // geometry and painted thousands of port markers.
+    // geometry and painted thousands of port markers. Keep a resolver installed
+    // because the real UiGraphDemo uses one; repeated resolved output must still
+    // be eligible for exact retained-silhouette raster reuse.
+    graph.WhenResolveNodeStyle = [](const UiGraphNode&, UiGraphVisualState,
+                                    UiGraphNodeStyle&) {};
     selection_events = viewport_events = 0;
     graph.BeginViewUpdate();
     graph.SetZoom(0.30);

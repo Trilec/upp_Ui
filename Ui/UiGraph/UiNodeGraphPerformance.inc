@@ -92,25 +92,48 @@ void LodIntegerPath(const Vector<Pointf>& path, Vector<Point>& out)
 struct LodMicroRasterKey : Moveable<LodMicroRasterKey> {
     int shape = 0;
     Size surface_size;
-    double source_cx = 0.0;
-    double source_cy = 0.0;
-    double corner_radius = 0.0;
     Color face;
     Color frame;
     int frame_width = 0;
-    int path_points = 0;
+    Vector<Pointf> local_path;
 
-    bool operator==(const LodMicroRasterKey& b) const
+    bool Matches(const UiGraphNode& node,
+                 const Vector<Pointf>& retained_path,
+                 const Rect& surface,
+                 Color paint_face, Color paint_frame, int paint_frame_width) const
     {
-        return shape == b.shape
-            && surface_size == b.surface_size
-            && source_cx == b.source_cx
-            && source_cy == b.source_cy
-            && corner_radius == b.corner_radius
-            && face == b.face
-            && frame == b.frame
-            && frame_width == b.frame_width
-            && path_points == b.path_points;
+        if(shape != (int)(byte)node.shape
+           || surface_size != surface.GetSize()
+           || face != paint_face
+           || frame != paint_frame
+           || frame_width != paint_frame_width
+           || local_path.GetCount() != retained_path.GetCount())
+            return false;
+
+        for(int i = 0; i < local_path.GetCount(); i++) {
+            Pointf q(retained_path[i].x - surface.left,
+                     retained_path[i].y - surface.top);
+            if(local_path[i] != q)
+                return false;
+        }
+        return true;
+    }
+
+    void Set(const UiGraphNode& node,
+             const Vector<Pointf>& retained_path,
+             const Rect& surface,
+             Color paint_face, Color paint_frame, int paint_frame_width)
+    {
+        shape = (int)(byte)node.shape;
+        surface_size = surface.GetSize();
+        face = paint_face;
+        frame = paint_frame;
+        frame_width = paint_frame_width;
+        local_path.Clear();
+        local_path.Reserve(retained_path.GetCount());
+        for(const Pointf& p : retained_path)
+            local_path.Add(Pointf(p.x - surface.left,
+                                 p.y - surface.top));
     }
 };
 
@@ -142,14 +165,18 @@ Image LodMicroPolygonRaster(const UiGraphNode& node,
     UiRasterCacheKeyBuilder kb("aa/nodegraph-micro-shape");
     kb.Add((int)(byte)node.shape)
       .Add(surface.GetSize())
-      .Add(node.size.cx)
-      .Add(node.size.cy)
-      .Add(node.corner_radius)
       .Add(face)
       .Add(frame)
       .Add(frame_width)
       .Add(retained_path.GetCount())
       .Add(pad);
+    // The retained local path is the final-pixel rendering authority. Include
+    // every exact local coordinate so dynamic style resolution, corner-radius
+    // changes and subpixel phase cannot alias two visibly different rasters.
+    for(const Pointf& p : retained_path) {
+        kb.Add(p.x - surface.left);
+        kb.Add(p.y - surface.top);
+    }
 
     return UiRasterCache::Get(kb.Build(), policy, [&] {
         ImageBuffer ib(raster_size);
@@ -287,7 +314,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     // Micro paint is intentionally appearance-light, but it must also stay
     // allocation-light. Stock roles/style classes are immutable for this paint
     // pass, so resolve and scale them once. Dynamic WhenResolveNodeStyle remains
-    // per-node and uncached because callers are allowed to depend on node/state.
+    // per-node because callers may depend on node/state, but raster reuse is
+    // still safe because the key uses the resolved paint state plus the actual
+    // retained local silhouette.
     UiGraphNodeStyle role_styles[4];
     StyledMetrics role_metrics[4];
     bool role_ready[4] = { false, false, false, false };
@@ -303,7 +332,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     integer_path.Reserve(16);
     Vector<LodMicroRasterEntry> micro_rasters;
     micro_rasters.Reserve(16);
-    const bool allow_micro_raster_cache = !WhenResolveNodeStyle;
     UiGraphNodeStyle dynamic_style;
     StyledMetrics dynamic_metrics;
 
@@ -358,35 +386,24 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(node->shape == UiGraphNodeShape::Circle || node->shape == UiGraphNodeShape::Ellipse)
             w.DrawEllipse(g.surface, face, frame_width, frame);
         else {
-            LodMicroRasterKey key;
-            key.shape = (int)(byte)node->shape;
-            key.surface_size = g.surface.GetSize();
-            key.source_cx = node->size.cx;
-            key.source_cy = node->size.cy;
-            key.corner_radius = node->corner_radius;
-            key.face = face;
-            key.frame = frame;
-            key.frame_width = frame_width;
-            key.path_points = g.hit_path.GetCount();
-
             int cached_index = -1;
-            if(allow_micro_raster_cache) {
-                for(int i = 0; i < micro_rasters.GetCount(); i++)
-                    if(micro_rasters[i].key == key) {
-                        cached_index = i;
-                        break;
-                    }
-
-                if(cached_index < 0
-                   && micro_rasters.GetCount() < kLodMicroRasterCacheLimit) {
-                    LodMicroRasterEntry& entry = micro_rasters.Add();
-                    entry.key = key;
-                    entry.pad = max(1, (frame_width + 1) / 2);
-                    entry.image = LodMicroPolygonRaster(*node, g.hit_path, g.surface,
-                                                        face, frame, frame_width,
-                                                        entry.pad);
-                    cached_index = micro_rasters.GetCount() - 1;
+            for(int i = 0; i < micro_rasters.GetCount(); i++)
+                if(micro_rasters[i].key.Matches(*node, g.hit_path, g.surface,
+                                                face, frame, frame_width)) {
+                    cached_index = i;
+                    break;
                 }
+
+            if(cached_index < 0
+               && micro_rasters.GetCount() < kLodMicroRasterCacheLimit) {
+                LodMicroRasterEntry& entry = micro_rasters.Add();
+                entry.key.Set(*node, g.hit_path, g.surface,
+                              face, frame, frame_width);
+                entry.pad = max(1, (frame_width + 1) / 2);
+                entry.image = LodMicroPolygonRaster(*node, g.hit_path, g.surface,
+                                                    face, frame, frame_width,
+                                                    entry.pad);
+                cached_index = micro_rasters.GetCount() - 1;
             }
 
             if(cached_index >= 0 && !IsNull(micro_rasters[cached_index].image)) {
