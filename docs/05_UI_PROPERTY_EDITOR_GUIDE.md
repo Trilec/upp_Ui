@@ -178,13 +178,17 @@ authored values; `override_active` identifies the active local recipe and
 `WhenOverride(id, active)` asks the host to perform that state change. Inactive
 saved values may remain in the model without affecting Preview.
 
-A successful authored value commit to an inactive `overrideable` item requests
-`WhenOverride(id, true)` automatically. This rule is editor-independent: inline
-numeric fields, Choice/Dropdown, Font, Color and other popup/custom editors must
-all behave the same way. Hosts still own the state change itself by updating
-`override_active`/inheritance in `WhenOverride`; PropertyEditor does not silently
-mutate host override state. Explicitly clicking the override action remains the
-way to turn an already-active override off.
+Entering value editing through the row/value body of an inactive `overrideable`
+item requests `WhenOverride(id, true)` immediately, before the value editor takes
+focus. This makes the first wheel/key/edit gesture belong to the value rather than
+to viewport scrolling. A successful authored value commit still performs the same
+activation request as a fallback for editor-driven commits that did not begin from
+a row click. This rule is editor-independent: numeric fields, Choice/Dropdown,
+Font, Color and other popup/custom editors must all behave the same way. Hosts
+still own the state change itself by updating `override_active`/inheritance in
+`WhenOverride`; PropertyEditor does not silently mutate host override state.
+Explicitly clicking the override action remains the way to toggle override state
+without entering value editing.
 
 An ordinary `resettable` property instead uses `default_value` and emits
 `WhenReset`. It does not become a theme override merely because it has a default.

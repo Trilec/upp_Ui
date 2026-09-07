@@ -412,6 +412,25 @@ void PropertyEditor::LeftDown(Point p, dword)
         ResetSelected();
         return;
     }
+
+    // Clicking the value/body of an inactive override is already an explicit
+    // editing intent. Ask the host to activate the local override before
+    // creating/focusing the editor so wheel/keyboard input belongs to the value
+    // immediately. The host may rebuild the model/rows synchronously from
+    // WhenOverride, so never retain the old row/item reference across it.
+    if(item.overrideable && !item.override_active) {
+        const String property_id = item.id;
+        WhenOverride(property_id, true);
+        if(!model_)
+            return;
+        const int refreshed_row = FindDisplayRowByProperty(property_id);
+        if(refreshed_row < 0)
+            return;
+        selected_display_row_ = refreshed_row;
+        ActivateRow(refreshed_row);
+        return;
+    }
+
     ActivateRow(row);
 }
 

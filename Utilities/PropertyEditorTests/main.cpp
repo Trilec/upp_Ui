@@ -341,6 +341,52 @@ CONSOLE_APP_MAIN
     Check(mouse_requests == 2,
           "mouse row body also requests inherited activation");
 
+    PropertyEditorModel numeric_override_model;
+    PropertyEditorItem& numeric_override =
+        numeric_override_model.AddNumericInt("thickness", "Thickness", 12, 1, 80, 1, "Geometry");
+    numeric_override.overrideable = true;
+    numeric_override.override_active = false;
+    numeric_override.inherited = true;
+
+    PropertyEditor numeric_override_editor;
+    numeric_override_editor.SetRect(0, 0, 320, 160);
+    numeric_override_editor.SetModel(&numeric_override_model);
+    int numeric_override_requests = 0;
+    numeric_override_editor.WhenOverride = [&](String id, bool active) {
+        numeric_override_requests++;
+        Check(id == "thickness" && active,
+              "numeric body click requests local override activation");
+        PropertyEditorItem *item = numeric_override_model.Find(id);
+        if(item) {
+            item->override_active = active;
+            item->inherited = !active;
+        }
+        numeric_override_model.StructureChanged();
+        numeric_override_editor.RefreshModel();
+    };
+    Check(numeric_override_editor.SelectProperty("thickness"),
+          "select inactive numeric override row");
+    numeric_override_editor.Layout();
+
+    const PropertyEditorStyle& numeric_style = numeric_override_editor.GetStyle();
+    const int numeric_y = numeric_style.frame_width + numeric_style.filter_height +
+                          max(0, numeric_style.filter_gap) + numeric_style.group_height +
+                          numeric_style.row_height / 2;
+    const int numeric_override_x = numeric_override_editor.GetSize().cx -
+                                   numeric_style.frame_width -
+                                   max(1, numeric_style.override_width / 2);
+    const int numeric_body_x = max(numeric_style.frame_width + DPI(8),
+                                   numeric_override_x - numeric_style.override_width - DPI(24));
+
+    numeric_override_editor.LeftDown(Point(numeric_body_x, numeric_y), 0);
+    Check(numeric_override_requests == 1 &&
+          numeric_override_model.Find("thickness")->override_active,
+          "one numeric body click activates the override before value editing");
+    const int numeric_before_wheel = (int)numeric_override_model.Find("thickness")->value;
+    numeric_override_editor.MouseWheel(Point(numeric_body_x, numeric_y), 120, 0);
+    Check((int)numeric_override_model.Find("thickness")->value == numeric_before_wheel + 1,
+          "first wheel after activation edits the numeric value instead of scrolling the PropertyEditor");
+
     Cout() << "PropertyEditorTests: Checks: " << checks
            << " Fails: " << fails << "\n";
 
