@@ -364,6 +364,12 @@ public:
         edit_.SetSelection();
     }
 
+    virtual bool HandleMouseWheel(int zdelta, dword keyflags) override
+    {
+        edit_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        return true;
+    }
+
 private:
     PropertyCommitIntEdit edit_;
     bool syncing_ = false;
@@ -473,6 +479,15 @@ public:
         slider_.SetRect(0, 0, width, GetSize().cy);
     }
 
+    virtual bool HandleMouseWheel(int zdelta, dword keyflags) override
+    {
+        if(slider_mode_ && bounded_)
+            slider_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        else
+            edit_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        return true;
+    }
+
 private:
     void ActionIconsChanged() override
     {
@@ -550,6 +565,12 @@ public:
     {
         edit_.SetFocus();
         edit_.SetSelection();
+    }
+
+    virtual bool HandleMouseWheel(int zdelta, dword keyflags) override
+    {
+        edit_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        return true;
     }
 
 private:
@@ -660,6 +681,15 @@ public:
         const int width = max(0, GetSize().cx - toggle_width - DPI(4));
         edit_.SetRect(0, 0, width, GetSize().cy);
         slider_.SetRect(0, 0, width, GetSize().cy);
+    }
+
+    virtual bool HandleMouseWheel(int zdelta, dword keyflags) override
+    {
+        if(slider_mode_ && bounded_)
+            slider_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        else
+            edit_.MouseWheel(Point(0, 0), zdelta, keyflags);
+        return true;
     }
 
 private:

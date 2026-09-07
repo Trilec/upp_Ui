@@ -33,6 +33,9 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) = 0;
     virtual Value GetEditorValue() const = 0;
     virtual void FocusEditor();
+    // Return true when this concrete value editor owns and handled a wheel
+    // gesture directed at its active value surface.
+    virtual bool HandleMouseWheel(int zdelta, dword keyflags) { return false; }
     virtual void SetExpanded(bool) {}
     virtual void SetActionIcons(const PropertyEditorActionIcons& icons)
     {

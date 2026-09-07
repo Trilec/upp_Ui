@@ -386,6 +386,10 @@ CONSOLE_APP_MAIN
     numeric_override_editor.MouseWheel(Point(numeric_body_x, numeric_y), 120, 0);
     Check((int)numeric_override_model.Find("thickness")->value == numeric_before_wheel + 1,
           "first wheel after activation edits the numeric value instead of scrolling the PropertyEditor");
+    const int numeric_after_wheel = (int)numeric_override_model.Find("thickness")->value;
+    numeric_override_editor.MouseWheel(Point(numeric_style.frame_width + DPI(8), numeric_y), 120, 0);
+    Check((int)numeric_override_model.Find("thickness")->value == numeric_after_wheel,
+          "wheel outside the active numeric value surface does not edit the property");
 
     Cout() << "PropertyEditorTests: Checks: " << checks
            << " Fails: " << fails << "\n";

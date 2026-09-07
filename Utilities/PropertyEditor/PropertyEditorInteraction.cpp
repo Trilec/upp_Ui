@@ -495,23 +495,14 @@ Image PropertyEditor::CursorImage(Point p, dword)
 
 void PropertyEditor::MouseWheel(Point p, int zdelta, dword keyflags)
 {
-    // A focused numeric editor owns the wheel while it is being edited. This
-    // keeps the familiar UiIntEdit/UiFloatEdit increment behaviour instead of
-    // unexpectedly moving the entire PropertyEditor viewport.
-    if(active_editor_ && active_editor_->HasFocusDeep() && model_ &&
-       !active_property_id_.IsEmpty()) {
-        const PropertyEditorItem *item = model_->Find(active_property_id_);
-        const bool numeric = item &&
-            (item->kind == PropertyEditorKind::Integer ||
-             item->kind == PropertyEditorKind::Double ||
-             item->kind == PropertyEditorKind::NumericInt ||
-             item->kind == PropertyEditorKind::NumericDouble);
-        Ctrl *focus = Ctrl::GetFocusCtrl();
-        if(numeric && focus && focus != this && focus != active_editor_.operator->()) {
-            focus->MouseWheel(Point(0, 0), zdelta, keyflags);
-            return;
-        }
-    }
+    // Active value editing owns wheel gestures only inside that value surface.
+    // Delegate the actual semantics to the concrete editor instead of relying
+    // on global focus state, which can lag a synchronous override/model refresh.
+    if(active_editor_ && active_display_row_ >= 0 &&
+       active_display_row_ < rows_.GetCount() &&
+       GetValueRect(active_display_row_).Contains(p) &&
+       active_editor_->HandleMouseWheel(zdelta, keyflags))
+        return;
 
     if(viewport_.Contains(p)) {
         int step = max(1, style_.row_height);
