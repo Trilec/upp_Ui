@@ -4,8 +4,16 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; Git history is implementation history.
 
 ## CURRENT
-TASK: **UI architecture audit remediation**
-STATUS: **ACCEPTED — WINDOWS DEBUG/RELEASE + GUI/IDLE GATES PASS**
+TASK: **Post-audit interaction polish**
+STATUS: **ARCHITECTURE ACCEPTED; PROPERTYEDITOR OVERRIDE-EDIT FIX PUBLISHED — WINDOWS CHECK PENDING**
+SOURCE_HEAD: `8a31447cdfa5775c82bb863916fd77909474c5b0`
+
+The architecture audit remains closed and accepted. Current narrow follow-up:
+- inactive override value/body click now requests local activation before editor focus;
+- first wheel/key gesture should therefore edit the value immediately instead of scrolling the editor;
+- explicit override action remains the independent on/off toggle;
+- regression added to `PropertyEditorTests`.
+
 AUDIT_BASE: `c0decf747c169c8a93a3b393428df09db444ce31`
 AUDIT_DOC: `docs/UI_architecture_audit_curt_060926.txt`
 ACCEPTED_TESTED_HEAD: `ccab8178df994c5877673ded525dcab6ae1266b0`
