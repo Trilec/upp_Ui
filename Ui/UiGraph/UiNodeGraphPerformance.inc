@@ -292,7 +292,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     StyledMetrics role_metrics[4];
     bool role_ready[4] = { false, false, false, false };
 
-    Vector<StyledMetrics> class_metrics;
+    Array<StyledMetrics> class_metrics;
     Vector<byte> class_ready;
     if(!WhenResolveNodeStyle && !node_styles_.IsEmpty()) {
         class_metrics.SetCount(node_styles_.GetCount());
