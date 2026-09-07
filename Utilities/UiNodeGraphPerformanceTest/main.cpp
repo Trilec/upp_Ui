@@ -179,7 +179,11 @@ CONSOLE_APP_MAIN
              && graph.GetLastNodeContentPaintUsecs() == 0,
              "projected-micro direct scene performs no rich details/ports/content paint pass");
     t.Expect(graph.GetLastPaintedNodeCount() > 0,
-             "projected-micro direct scene actually paints visible nodes");
+             "projected-micro scene actually paints visible nodes");
+    t.Expect(graph.GetLastMicroRasterCount() > 0
+             && graph.GetLastMicroRasterCount() <= 32
+             && graph.GetLastMicroRasterCount() < graph.GetLastPaintedNodeCount(),
+             "repeated micro silhouettes use a bounded raster set rather than one raster/allocation per node");
 
     selection_events = viewport_events = 0;
     graph.BeginViewUpdate();
@@ -203,6 +207,9 @@ CONSOLE_APP_MAIN
              "all fit-all micro nodes use overview geometry LOD");
     t.Expect(graph.GetLastGeometryPathVertexCount() <= graph.GetPreparedNodeCount() * 16,
              "overview mixed-shape silhouettes stay within a bounded screen-error vertex budget");
+    t.Expect(graph.GetLastMicroRasterCount() > 0
+             && graph.GetLastMicroRasterCount() <= 32,
+             "fit-all 10k micro raster reuse remains explicitly bounded");
     t.Expect(viewport_events == 1 && selection_events == 0,
              "fit-all emits one viewport event and no spurious selection event");
 

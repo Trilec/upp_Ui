@@ -1443,9 +1443,10 @@ void UiGraphDemo::RefreshDiagnostics()
 
     String detail;
     detail << "Interaction: " << diag_last_interaction_ << "\n\n";
-    detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d\n",
+    detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d micro_rasters=%d\n",
                      graph_.GetLastNodeCandidateCount(), graph_.GetPreparedNodeCount(),
-                     graph_.GetLastPaintNodeVisitCount(), graph_.GetLastPaintedNodeCount());
+                     graph_.GetLastPaintNodeVisitCount(), graph_.GetLastPaintedNodeCount(),
+                     graph_.GetLastMicroRasterCount());
     detail << Format("Edges: candidates=%d prepared=%d visits=%d painted=%d simplified=%d hidden=%d\n",
                      graph_.GetLastEdgeCandidateCount(), graph_.GetPreparedEdgeCount(),
                      graph_.GetLastPaintEdgeVisitCount(), graph_.GetLastPaintedEdgeCount(),

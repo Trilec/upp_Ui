@@ -297,12 +297,14 @@ UiNodeGraph demonstrates the complete dense-scene pattern:
 - 10,000-node deterministic fixture;
 - retained world spatial hash;
 - bounded prepared node/edge population;
-- direct micro-node Draw scene when projected nodes are physically tiny;
+- projected-micro nodes keep direct geometry semantics, with native ellipse drawing and
+  bounded exact-raster reuse for repeated retained polygon silhouettes;
+- dynamic/high-uniqueness micro styles fall back to direct drawing after a small local cache cap;
 - rich details/ports omitted in micro mode;
 - overview connector population reduction at extreme zoom;
 - adaptive final-pixel route geometry;
 - one exact geometry settle after reusable live camera movement;
-- profiling counters for candidates, prepared, painted, geometry and phase work.
+- profiling counters for candidates, prepared, painted, micro-raster reuse, geometry and phase work.
 
 The lesson is generic; Graph-specific topology and editing are documented in
 `08_UIGRAPH_GUIDE.md`.

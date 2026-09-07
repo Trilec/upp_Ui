@@ -349,6 +349,7 @@ public:
     int GetLastPaintNodeVisitCount() const { return last_paint_node_visit_count_; }
     int GetLastPaintEdgeVisitCount() const { return last_paint_edge_visit_count_; }
     int GetLastPaintedNodeCount() const { return last_painted_node_count_; }
+    int GetLastMicroRasterCount() const { return last_micro_raster_count_; }
     int GetLastPaintedEdgeCount() const { return last_painted_edge_count_; }
     int GetLastSimplifiedEdgeCount() const { return last_simplified_edge_count_; }
     int GetLastHiddenEdgeCount() const { return last_hidden_edge_count_; }
@@ -789,6 +790,7 @@ private:
     int last_paint_node_visit_count_ = 0;
     int last_paint_edge_visit_count_ = 0;
     int last_painted_node_count_ = 0;
+    int last_micro_raster_count_ = 0;
     int last_painted_edge_count_ = 0;
     int last_simplified_edge_count_ = 0;
     int last_hidden_edge_count_ = 0;

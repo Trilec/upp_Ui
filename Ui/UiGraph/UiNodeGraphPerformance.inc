@@ -2,6 +2,7 @@ namespace Upp {
 namespace {
 
 constexpr double kUiGraphPi = 3.14159265358979323846;
+constexpr int kLodMicroRasterCacheLimit = 32;
 
 Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
 {
@@ -88,10 +89,93 @@ void LodIntegerPath(const Vector<Pointf>& path, Vector<Point>& out)
         out.Drop();
 }
 
+struct LodMicroRasterKey : Moveable<LodMicroRasterKey> {
+    int shape = 0;
+    Size surface_size;
+    double source_cx = 0.0;
+    double source_cy = 0.0;
+    double corner_radius = 0.0;
+    Color face;
+    Color frame;
+    int frame_width = 0;
+    int path_points = 0;
+
+    bool operator==(const LodMicroRasterKey& b) const
+    {
+        return shape == b.shape
+            && surface_size == b.surface_size
+            && source_cx == b.source_cx
+            && source_cy == b.source_cy
+            && corner_radius == b.corner_radius
+            && face == b.face
+            && frame == b.frame
+            && frame_width == b.frame_width
+            && path_points == b.path_points;
+    }
+};
+
+struct LodMicroRasterEntry : Moveable<LodMicroRasterEntry> {
+    LodMicroRasterKey key;
+    Image image;
+    int pad = 0;
+};
+
+Image LodMicroPolygonRaster(const UiGraphNode& node,
+                            const Vector<Pointf>& retained_path,
+                            const Rect& surface,
+                            Color face, Color frame, int frame_width,
+                            int pad)
+{
+    if(surface.IsEmpty() || retained_path.GetCount() < 3)
+        return Image();
+
+    Size raster_size(surface.GetWidth() + pad * 2,
+                     surface.GetHeight() + pad * 2);
+    if(raster_size.cx <= 0 || raster_size.cy <= 0)
+        return Image();
+
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/nodegraph-micro-shape");
+    policy.allow_scale_from_bucket = false;
+    policy.max_axis = 128;
+    policy.max_single_image_bytes = 256 * 1024;
+
+    UiRasterCacheKeyBuilder kb("aa/nodegraph-micro-shape");
+    kb.Add((int)(byte)node.shape)
+      .Add(surface.GetSize())
+      .Add(node.size.cx)
+      .Add(node.size.cy)
+      .Add(node.corner_radius)
+      .Add(face)
+      .Add(frame)
+      .Add(frame_width)
+      .Add(retained_path.GetCount())
+      .Add(pad);
+
+    return UiRasterCache::Get(kb.Build(), policy, [&] {
+        ImageBuffer ib(raster_size);
+        ib.SetKind(IMAGE_ALPHA);
+        Fill(~ib, RGBAZero(), ib.GetLength());
+
+        Vector<Pointf> local;
+        local.Reserve(retained_path.GetCount());
+        for(const Pointf& p : retained_path)
+            local.Add(Pointf(p.x - surface.left + pad,
+                             p.y - surface.top + pad));
+
+        BufferPainter painter(ib, MODE_ANTIALIASED);
+        FillPath(painter, local, face);
+        if(frame_width > 0 && !IsNull(frame))
+            StrokePath(painter, local, (double)frame_width, frame, true);
+        painter.Finish();
+        return Image(ib);
+    });
+}
+
 } // namespace
 
 void UiNodeGraph::PaintGraphGeometry(Draw& w)
 {
+    last_micro_raster_count_ = 0;
     Size size = GetSize();
     if(size.cx <= 0 || size.cy <= 0 || !model_) {
         PaintGraphGeometryRenderBase(w);
@@ -217,6 +301,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
 
     Vector<Point> integer_path;
     integer_path.Reserve(16);
+    Vector<LodMicroRasterEntry> micro_rasters;
+    micro_rasters.Reserve(16);
+    const bool allow_micro_raster_cache = !WhenResolveNodeStyle;
     UiGraphNodeStyle dynamic_style;
     StyledMetrics dynamic_metrics;
 
@@ -271,14 +358,54 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(node->shape == UiGraphNodeShape::Circle || node->shape == UiGraphNodeShape::Ellipse)
             w.DrawEllipse(g.surface, face, frame_width, frame);
         else {
-            LodIntegerPath(g.hit_path, integer_path);
-            if(integer_path.GetCount() >= 3)
-                w.DrawPolygon(integer_path, face, frame_width, frame);
-            else
-                w.DrawRect(g.surface, face);
+            LodMicroRasterKey key;
+            key.shape = (int)(byte)node->shape;
+            key.surface_size = g.surface.GetSize();
+            key.source_cx = node->size.cx;
+            key.source_cy = node->size.cy;
+            key.corner_radius = node->corner_radius;
+            key.face = face;
+            key.frame = frame;
+            key.frame_width = frame_width;
+            key.path_points = g.hit_path.GetCount();
+
+            int cached_index = -1;
+            if(allow_micro_raster_cache) {
+                for(int i = 0; i < micro_rasters.GetCount(); i++)
+                    if(micro_rasters[i].key == key) {
+                        cached_index = i;
+                        break;
+                    }
+
+                if(cached_index < 0
+                   && micro_rasters.GetCount() < kLodMicroRasterCacheLimit) {
+                    LodMicroRasterEntry& entry = micro_rasters.Add();
+                    entry.key = key;
+                    entry.pad = max(1, (frame_width + 1) / 2);
+                    entry.image = LodMicroPolygonRaster(*node, g.hit_path, g.surface,
+                                                        face, frame, frame_width,
+                                                        entry.pad);
+                    cached_index = micro_rasters.GetCount() - 1;
+                }
+            }
+
+            if(cached_index >= 0 && !IsNull(micro_rasters[cached_index].image)) {
+                const LodMicroRasterEntry& entry = micro_rasters[cached_index];
+                UiDrawCachedRaster(w, g.surface.Inflated(entry.pad), entry.image);
+            }
+            else {
+                // Dynamic/high-uniqueness scenes and cache-policy refusals keep
+                // the direct retained-silhouette path.
+                LodIntegerPath(g.hit_path, integer_path);
+                if(integer_path.GetCount() >= 3)
+                    w.DrawPolygon(integer_path, face, frame_width, frame);
+                else
+                    w.DrawRect(g.surface, face);
+            }
         }
         last_painted_node_count_++;
     }
+    last_micro_raster_count_ = micro_rasters.GetCount();
     last_node_surface_paint_usecs_ = max<int64>(0, usecs() - node_started);
     last_node_paint_usecs_ = last_node_surface_paint_usecs_;
 }
@@ -368,7 +495,8 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
         return;
     }
 
-    UiGraphNodeStyle style = ResolveNodeStyle(node, GetNodeVisualState(node));
+    UiGraphVisualState node_state = GetNodeVisualState(node);
+    UiGraphNodeStyle style = ResolveNodeStyle(node, node_state);
     out.ref = node.ref;
     out.rect = RectC(p.x, p.y, sz.cx, sz.cy);
     out.paint_bounds = out.rect;
@@ -427,6 +555,15 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     }
 
     int inflate = max(1, fround(2 * min(1.0, max(0.25, zoom_))));
+    int state_index = VisualStateIndex(node_state);
+    Color paint_frame = node_state == UiGraphVisualState::Selected
+                      ? SelectedFrameColor(style) : style.palette.frame[state_index];
+    int paint_frame_width = IsNull(paint_frame) ? 0 : max(1, metrics.frame_width);
+    if(node_state == UiGraphVisualState::Selected)
+        paint_frame_width = max(paint_frame_width,
+                                max(DPI(2), DPI(fround(lod_policy_.selection_outline_width))));
+    if(paint_frame_width > 0)
+        inflate = max(inflate, (paint_frame_width + 1) / 2 + 1);
     if(IsNodeSelected(node.ref))
         inflate = max(inflate, DPI(fround(lod_policy_.selection_outline_width)) + DPI(2));
     out.paint_bounds = out.paint_bounds.Inflated(inflate);
