@@ -71,6 +71,20 @@ void BuildGrid(UiGraphModel& model, Vector<UiGraphNodeRef>& nodes,
         }
 }
 
+bool HasRedDominantPixel(const Image& image, Rect area)
+{
+    if(IsNull(image))
+        return false;
+    area &= RectC(0, 0, image.GetWidth(), image.GetHeight());
+    for(int y = area.top; y < area.bottom; y++)
+        for(int x = area.left; x < area.right; x++) {
+            const RGBA& p = image[y][x];
+            if(p.a != 0 && p.r > (int)p.g + 20 && p.r > (int)p.b + 20)
+                return true;
+        }
+    return false;
+}
+
 void PrintProfile(const char *phase, UiNodeGraph& graph, int64 paint_us = -1)
 {
     Cout() << "UIGRAPH_PERF_PROFILE"
@@ -263,6 +277,80 @@ int RunPerformanceSuite()
              "oversized short-wide micro shape is rejected before raster admission and drawn directly");
     t.Expect(cache_after_wide.skipped_too_large > cache_before_wide.skipped_too_large,
              "pre-allocation micro raster size guard records the oversize rejection");
+
+    UiGraphModel stroke_model;
+    auto AddStrokeNode = [&](const char *title, Pointf position,
+                             UiGraphNodeShape shape, double corner_radius) {
+        UiGraphNode node;
+        node.title = title;
+        node.position = position;
+        node.size = Sizef(50, 50);
+        node.shape = shape;
+        node.corner_radius = corner_radius;
+        return stroke_model.AddNode(node);
+    };
+    AddStrokeNode("sharp-a", Pointf(0, 0), UiGraphNodeShape::Triangle, 0.0);
+    AddStrokeNode("sharp-b", Pointf(100, 0), UiGraphNodeShape::Triangle, 0.0);
+    AddStrokeNode("rounded-a", Pointf(0, 100), UiGraphNodeShape::RoundedRectangle, 7.3);
+    AddStrokeNode("rounded-b", Pointf(100, 100), UiGraphNodeShape::RoundedRectangle, 7.3);
+    AddStrokeNode("rounded-c", Pointf(200, 100), UiGraphNodeShape::RoundedRectangle, 7.4);
+
+    UiNodeGraph stroke_graph;
+    stroke_graph.SetRect(0, 0, 320, 220);
+    UiNodeGraph::Style stroke_style = UiNodeGraph::StyleDefault();
+    stroke_style.min_zoom = 0.10;
+    stroke_style.show_grid = false;
+    stroke_style.node.metrics.shadow.enabled = false;
+    stroke_style.node.metrics.frame_enabled = true;
+    // 15 authored units at zoom 0.40 -> 6 final pixels.
+    stroke_style.node.metrics.frame_width = 15;
+    stroke_style.node.metrics.focus_color = Color(220, 40, 40);
+    for(int i = 0; i < 4; i++) {
+        stroke_style.canvas_palette.face[i] = UiFill::Solid(White());
+        stroke_style.node.palette.face[i] = UiFill::Solid(White());
+        stroke_style.node.palette.frame[i] = Color(220, 40, 40);
+    }
+    stroke_graph.SetCustomStyle(stroke_style);
+    stroke_graph.WhenResolveNodeStyle = [](const UiGraphNode&, UiGraphVisualState,
+                                           UiGraphNodeStyle&) {};
+    stroke_graph.BeginViewUpdate();
+    stroke_graph.SetModel(stroke_model);
+    stroke_graph.SetZoom(0.40);
+    stroke_graph.SetPan(Pointf(120.35, 90.65));
+    stroke_graph.EndViewUpdate();
+
+    ImageDraw stroke_draw(320, 220);
+    stroke_draw.DrawRect(0, 0, 320, 220, White());
+    stroke_graph.Paint(stroke_draw);
+    Image stroke_image = stroke_draw;
+    t.Expect(stroke_graph.GetLastMicroRasterCount() >= 3
+             && stroke_graph.GetLastMicroCachedDrawCount() == 5
+             && stroke_graph.GetLastMicroDirectFallbackCount() == 0,
+             "fractional-radius local silhouettes retain distinct exact raster identities while repeated shapes reuse");
+    t.Expect(HasRedDominantPixel(stroke_image, RectC(126, 82, 9, 7)),
+             "six-pixel sharp triangle miter survives outside the nominal 20px surface without raster clipping");
+
+    ImageDraw dirty_draw(320, 220);
+    dirty_draw.DrawRect(0, 0, 320, 220, White());
+    dirty_draw.Clip(RectC(108, 78, 45, 48));
+    stroke_graph.Paint(dirty_draw);
+    dirty_draw.End();
+    Image dirty_image = dirty_draw;
+    t.Expect(HasRedDominantPixel(dirty_image, RectC(126, 82, 9, 7)),
+             "clipped dirty repaint retains the sharp miter through conservative micro paint bounds");
+
+    stroke_graph.WhenResolveNodeStyle = [](const UiGraphNode& node, UiGraphVisualState,
+                                           UiGraphNodeStyle& style) {
+        if(node.title == "rounded-b")
+            for(int i = 0; i < 4; i++)
+                style.palette.face[i] = UiFill::Solid(Color(80, 180, 120));
+    };
+    ImageDraw resolved_draw(320, 220);
+    resolved_draw.DrawRect(0, 0, 320, 220, White());
+    stroke_graph.Paint(resolved_draw);
+    t.Expect(stroke_graph.GetLastMicroRasterCount() >= 4
+             && stroke_graph.GetLastMicroCachedDrawCount() == 5,
+             "resolver-driven paint change creates a distinct raster identity without disabling reuse");
 
     graph.BeginViewUpdate();
     graph.SetModel(reference_model);
