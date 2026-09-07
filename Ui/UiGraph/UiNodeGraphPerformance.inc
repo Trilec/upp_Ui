@@ -73,9 +73,11 @@ Vector<Pointf> LodNodeShapePath(const UiGraphNode& node, const Rect& rect)
     }
 }
 
-Vector<Point> LodIntegerPath(const Vector<Pointf>& path)
+void LodIntegerPath(const Vector<Pointf>& path, Vector<Point>& out)
 {
-    Vector<Point> out;
+    // Paint can visit thousands of micro nodes in one frame. Reuse one caller-
+    // owned buffer rather than allocating a fresh Vector for every silhouette.
+    out.Clear();
     out.Reserve(path.GetCount());
     for(const Pointf& p : path) {
         Point q(fround(p.x), fround(p.y));
@@ -84,7 +86,6 @@ Vector<Point> LodIntegerPath(const Vector<Pointf>& path)
     }
     if(out.GetCount() > 1 && out.Top() == out[0])
         out.Drop();
-    return out;
 }
 
 } // namespace
@@ -199,20 +200,70 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     }
     last_edge_paint_usecs_ = max<int64>(0, usecs() - edge_started);
 
+    // Micro paint is intentionally appearance-light, but it must also stay
+    // allocation-light. Stock roles/style classes are immutable for this paint
+    // pass, so resolve and scale them once. Dynamic WhenResolveNodeStyle remains
+    // per-node and uncached because callers are allowed to depend on node/state.
+    UiGraphNodeStyle role_styles[4];
+    StyledMetrics role_metrics[4];
+    bool role_ready[4] = { false, false, false, false };
+
+    Vector<StyledMetrics> class_metrics;
+    Vector<byte> class_ready;
+    if(!WhenResolveNodeStyle && !node_styles_.IsEmpty()) {
+        class_metrics.SetCount(node_styles_.GetCount());
+        class_ready.SetCount(node_styles_.GetCount(), 0);
+    }
+
+    Vector<Point> integer_path;
+    integer_path.Reserve(16);
+    UiGraphNodeStyle dynamic_style;
+    StyledMetrics dynamic_metrics;
+
     int64 node_started = usecs();
     for(int q : paint_nodes) {
         const NodeGeometry& g = node_geometry_[q];
         const UiGraphNode* node = model_->FindNode(g.ref);
         if(!node)
             continue;
+
         UiGraphVisualState state = GetNodeVisualState(*node);
-        UiGraphNodeStyle style = ResolveNodeStyle(*node, state);
+        const UiGraphNodeStyle* style = nullptr;
+        const StyledMetrics* metrics = nullptr;
+
+        if(WhenResolveNodeStyle) {
+            dynamic_style = ResolveNodeStyle(*node, state);
+            dynamic_metrics = ScaleNodeMetrics(dynamic_style.metrics, zoom_);
+            style = &dynamic_style;
+            metrics = &dynamic_metrics;
+        }
+        else {
+            int class_index = node->style_class.IsEmpty() ? -1 : node_styles_.Find(node->style_class);
+            if(class_index >= 0) {
+                style = &node_styles_[class_index];
+                if(!class_ready[class_index]) {
+                    class_metrics[class_index] = ScaleNodeMetrics(style->metrics, zoom_);
+                    class_ready[class_index] = 1;
+                }
+                metrics = &class_metrics[class_index];
+            }
+            else {
+                int role = minmax((int)node->role, 0, 3);
+                if(!role_ready[role]) {
+                    role_styles[role] = StyleForRole(GetEffectiveStyle().node, node->role);
+                    role_metrics[role] = ScaleNodeMetrics(role_styles[role].metrics, zoom_);
+                    role_ready[role] = true;
+                }
+                style = &role_styles[role];
+                metrics = &role_metrics[role];
+            }
+        }
+
         int si = VisualStateIndex(state);
-        StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
-        Color face = ResolveFace(style.palette.face[si], White());
-        Color frame = state == UiGraphVisualState::Selected ? SelectedFrameColor(style)
-                                                            : style.palette.frame[si];
-        int frame_width = IsNull(frame) ? 0 : max(1, metrics.frame_width);
+        Color face = ResolveFace(style->palette.face[si], White());
+        Color frame = state == UiGraphVisualState::Selected ? SelectedFrameColor(*style)
+                                                            : style->palette.frame[si];
+        int frame_width = IsNull(frame) ? 0 : max(1, metrics->frame_width);
         if(state == UiGraphVisualState::Selected)
             frame_width = max(frame_width,
                               max(DPI(2), DPI(fround(lod_policy_.selection_outline_width))));
@@ -220,9 +271,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(node->shape == UiGraphNodeShape::Circle || node->shape == UiGraphNodeShape::Ellipse)
             w.DrawEllipse(g.surface, face, frame_width, frame);
         else {
-            Vector<Point> path = LodIntegerPath(g.hit_path);
-            if(path.GetCount() >= 3)
-                w.DrawPolygon(path, face, frame_width, frame);
+            LodIntegerPath(g.hit_path, integer_path);
+            if(integer_path.GetCount() >= 3)
+                w.DrawPolygon(integer_path, face, frame_width, frame);
             else
                 w.DrawRect(g.surface, face);
         }
