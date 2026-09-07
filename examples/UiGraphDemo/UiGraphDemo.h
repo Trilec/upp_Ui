@@ -117,6 +117,10 @@ private:
     void SetDiagnosticsEnabled(bool on);
     void ResetDiagnostics();
     void RefreshDiagnostics();
+    void ScheduleDiagnosticsSample();
+    void SampleDiagnostics();
+    int CurrentDiagnosticsLodBand() const;
+    String CurrentDiagnosticsLodLabel() const;
     void RecordViewportDiagnostics();
     void RecordSwitchDiagnostics(const String& label, int64 elapsed_us);
 
@@ -149,6 +153,7 @@ private:
     UiProgressBar bar_diag_paint, bar_diag_geometry, bar_diag_edges, bar_diag_nodes, bar_diag_switch;
     UiMultiEdit edit_diagnostics;
     UiFrameTicker diagnostics_ticker_;
+    TimeCallback diagnostics_sample_tc_;
 
     PropertyEditorFactory pe_factory;
     PropertyEditorModel pe_model_node;
@@ -179,6 +184,20 @@ private:
     int64 diag_peak_geometry_us_ = 0;
     int64 diag_peak_edge_us_ = 0;
     int64 diag_peak_node_us_ = 0;
+
+    enum { DIAG_HISTORY_CAPACITY = 16, DIAG_LOD_BAND_COUNT = 5 };
+    int diag_history_count_ = 0;
+    int diag_history_pos_ = 0;
+    int64 diag_history_paint_[DIAG_HISTORY_CAPACITY] = {};
+    int64 diag_history_geometry_[DIAG_HISTORY_CAPACITY] = {};
+    int64 diag_history_edge_[DIAG_HISTORY_CAPACITY] = {};
+    int64 diag_history_node_[DIAG_HISTORY_CAPACITY] = {};
+    int diag_lod_samples_[DIAG_LOD_BAND_COUNT] = {};
+    int64 diag_lod_paint_sum_[DIAG_LOD_BAND_COUNT] = {};
+    int64 diag_lod_geometry_sum_[DIAG_LOD_BAND_COUNT] = {};
+    int64 diag_lod_edge_sum_[DIAG_LOD_BAND_COUNT] = {};
+    int64 diag_lod_node_sum_[DIAG_LOD_BAND_COUNT] = {};
+
     int64 diag_last_switch_us_ = 0;
     int64 diag_peak_switch_us_ = 0;
     String diag_last_switch_label_ = "No mode switch yet";

@@ -1367,8 +1367,11 @@ void UiGraphDemo::SetDiagnosticsEnabled(bool on)
     // Diagnostics are observer-only. Never leave a periodic UI clock running:
     // an idle Graph must not be repainted merely to refresh profiling controls.
     diagnostics_ticker_.Stop();
-    if(on)
+    diagnostics_sample_tc_.Kill();
+    if(on) {
         RefreshDiagnostics();
+        ScheduleDiagnosticsSample();
+    }
 }
 
 void UiGraphDemo::ResetDiagnostics()
@@ -1378,6 +1381,90 @@ void UiGraphDemo::ResetDiagnostics()
     diag_peak_edge_us_ = 0;
     diag_peak_node_us_ = 0;
     diag_peak_switch_us_ = 0;
+    diag_history_count_ = 0;
+    diag_history_pos_ = 0;
+    for(int i = 0; i < DIAG_HISTORY_CAPACITY; i++) {
+        diag_history_paint_[i] = 0;
+        diag_history_geometry_[i] = 0;
+        diag_history_edge_[i] = 0;
+        diag_history_node_[i] = 0;
+    }
+    for(int i = 0; i < DIAG_LOD_BAND_COUNT; i++) {
+        diag_lod_samples_[i] = 0;
+        diag_lod_paint_sum_[i] = 0;
+        diag_lod_geometry_sum_[i] = 0;
+        diag_lod_edge_sum_[i] = 0;
+        diag_lod_node_sum_[i] = 0;
+    }
+    RefreshDiagnostics();
+    if(diagnostics_enabled_)
+        ScheduleDiagnosticsSample();
+}
+
+int UiGraphDemo::CurrentDiagnosticsLodBand() const
+{
+    const UiNodeGraph::LodPolicy& lod = graph_.GetLodPolicy();
+    const double zoom = graph_.GetZoom();
+    if(zoom < lod.edge_hide_zoom)
+        return 4;
+    if(zoom < lod.minimal_edge_zoom)
+        return 3;
+    if(zoom < lod.edge_simplify_zoom)
+        return 2;
+    if(zoom < lod.full_detail_zoom)
+        return 1;
+    return 0;
+}
+
+String UiGraphDemo::CurrentDiagnosticsLodLabel() const
+{
+    switch(CurrentDiagnosticsLodBand()) {
+    case 4: return "L4 edges hidden";
+    case 3: return "L3 overview";
+    case 2: return "L2 simplified edges";
+    case 1: return "L1 reduced detail";
+    default: return "L0 full detail";
+    }
+}
+
+void UiGraphDemo::ScheduleDiagnosticsSample()
+{
+    if(!diagnostics_enabled_)
+        return;
+    Ptr<UiGraphDemo> self = this;
+    // Coalesce wheel/pan bursts and sample after the next GUI paint. This is
+    // one-shot work only: no periodic profiler clock survives idle.
+    diagnostics_sample_tc_.KillSet(1, [self] {
+        if(self)
+            self->SampleDiagnostics();
+    });
+}
+
+void UiGraphDemo::SampleDiagnostics()
+{
+    if(!diagnostics_enabled_)
+        return;
+
+    const int64 paint = max<int64>(0, graph_.GetLastPaintUsecs());
+    const int64 geometry = max<int64>(0, graph_.GetLastGeometryPrepareUsecs());
+    const int64 edges = max<int64>(0, graph_.GetLastEdgePaintUsecs());
+    const int64 nodes = max<int64>(0, graph_.GetLastNodePaintUsecs());
+
+    const int slot = diag_history_pos_;
+    diag_history_paint_[slot] = paint;
+    diag_history_geometry_[slot] = geometry;
+    diag_history_edge_[slot] = edges;
+    diag_history_node_[slot] = nodes;
+    diag_history_pos_ = (diag_history_pos_ + 1) % DIAG_HISTORY_CAPACITY;
+    diag_history_count_ = min(DIAG_HISTORY_CAPACITY, diag_history_count_ + 1);
+
+    const int band = CurrentDiagnosticsLodBand();
+    diag_lod_samples_[band]++;
+    diag_lod_paint_sum_[band] += paint;
+    diag_lod_geometry_sum_[band] += geometry;
+    diag_lod_edge_sum_[band] += edges;
+    diag_lod_node_sum_[band] += nodes;
+
     RefreshDiagnostics();
 }
 
@@ -1393,8 +1480,14 @@ void UiGraphDemo::RecordViewportDiagnostics()
         diag_last_interaction_ = "Viewport refresh";
     diag_previous_zoom_ = zoom;
     diag_previous_pan_ = pan;
-    if(diagnostics_enabled_)
+
+    // Status is camera state, not profiling state: keep zoom visible throughout
+    // live projection and again after exact settle.
+    UpdateStatus();
+    if(diagnostics_enabled_) {
         RefreshDiagnostics();
+        ScheduleDiagnosticsSample();
+    }
 }
 
 void UiGraphDemo::RecordSwitchDiagnostics(const String& label, int64 elapsed_us)
@@ -1403,8 +1496,11 @@ void UiGraphDemo::RecordSwitchDiagnostics(const String& label, int64 elapsed_us)
     diag_last_switch_us_ = max<int64>(0, elapsed_us);
     diag_peak_switch_us_ = max(diag_peak_switch_us_, diag_last_switch_us_);
     diag_last_interaction_ = label;
-    if(diagnostics_enabled_)
+    UpdateStatus();
+    if(diagnostics_enabled_) {
         RefreshDiagnostics();
+        ScheduleDiagnosticsSample();
+    }
 }
 
 void UiGraphDemo::RefreshDiagnostics()
@@ -1421,18 +1517,33 @@ void UiGraphDemo::RefreshDiagnostics()
     diag_peak_edge_us_ = max(diag_peak_edge_us_, edges);
     diag_peak_node_us_ = max(diag_peak_node_us_, nodes);
 
+    int64 avg_paint = 0, avg_geometry = 0, avg_edges = 0, avg_nodes = 0;
+    for(int i = 0; i < diag_history_count_; i++) {
+        avg_paint += diag_history_paint_[i];
+        avg_geometry += diag_history_geometry_[i];
+        avg_edges += diag_history_edge_[i];
+        avg_nodes += diag_history_node_[i];
+    }
+    if(diag_history_count_ > 0) {
+        avg_paint /= diag_history_count_;
+        avg_geometry /= diag_history_count_;
+        avg_edges /= diag_history_count_;
+        avg_nodes /= diag_history_count_;
+    }
+
     auto set_frame_metric = [=](UiLabel& label, UiProgressBar& bar,
-                                const char *name, int64 current, int64 peak) {
-        label.SetText(Format("%s  %.3f ms   peak %.3f ms", name,
-                             current / 1000.0, peak / 1000.0));
+                                const char *name, int64 current, int64 average, int64 peak) {
+        label.SetText(Format("%s  %.3f ms   avg%d %.3f   peak %.3f", name,
+                             current / 1000.0, diag_history_count_, average / 1000.0,
+                             peak / 1000.0));
         bar.Set((int)min<int64>(current, frame_budget_us), frame_budget_us);
         bar.SetText(Format("%.1f%% of 16.67 ms frame", current * 100.0 / frame_budget_us));
     };
 
-    set_frame_metric(lbl_diag_paint, bar_diag_paint, "Paint", paint, diag_peak_paint_us_);
-    set_frame_metric(lbl_diag_geometry, bar_diag_geometry, "Geometry prepare", geometry, diag_peak_geometry_us_);
-    set_frame_metric(lbl_diag_edges, bar_diag_edges, "Edge paint", edges, diag_peak_edge_us_);
-    set_frame_metric(lbl_diag_nodes, bar_diag_nodes, "Node paint", nodes, diag_peak_node_us_);
+    set_frame_metric(lbl_diag_paint, bar_diag_paint, "Paint", paint, avg_paint, diag_peak_paint_us_);
+    set_frame_metric(lbl_diag_geometry, bar_diag_geometry, "Geometry prepare", geometry, avg_geometry, diag_peak_geometry_us_);
+    set_frame_metric(lbl_diag_edges, bar_diag_edges, "Edge paint", edges, avg_edges, diag_peak_edge_us_);
+    set_frame_metric(lbl_diag_nodes, bar_diag_nodes, "Node paint", nodes, avg_nodes, diag_peak_node_us_);
 
     lbl_diag_switch.SetText(Format("%s  %.3f ms   peak %.3f ms",
                                    diag_last_switch_label_, diag_last_switch_us_ / 1000.0,
@@ -1442,7 +1553,28 @@ void UiGraphDemo::RefreshDiagnostics()
                                    diag_last_switch_us_ * 100.0 / switch_budget_us));
 
     String detail;
-    detail << "Interaction: " << diag_last_interaction_ << "\n\n";
+    const UiNodeGraph::LodPolicy& lod = graph_.GetLodPolicy();
+    const double zoom = graph_.GetZoom();
+    const int band = CurrentDiagnosticsLodBand();
+    const int band_samples = diag_lod_samples_[band];
+    const double band_paint_ms = band_samples ? diag_lod_paint_sum_[band] / (1000.0 * band_samples) : 0.0;
+    const double band_geometry_ms = band_samples ? diag_lod_geometry_sum_[band] / (1000.0 * band_samples) : 0.0;
+    const double band_edge_ms = band_samples ? diag_lod_edge_sum_[band] / (1000.0 * band_samples) : 0.0;
+    const double band_node_ms = band_samples ? diag_lod_node_sum_[band] / (1000.0 * band_samples) : 0.0;
+
+    detail << "Interaction: " << diag_last_interaction_ << "\n";
+    detail << Format("Zoom: %.4f   LOD: %s   micro=%d/%d\n",
+                     zoom, CurrentDiagnosticsLodLabel(),
+                     graph_.GetLastGeometryLodNodeCount(), graph_.GetPreparedNodeCount());
+    detail << Format("LOD features: route=%s shadow=%s icon=%s ports=%s labels=%s edge-label=%s\n",
+                     zoom >= lod.route_edit_zoom ? "on" : "off",
+                     zoom >= lod.shadow_zoom ? "on" : "off",
+                     zoom >= lod.icon_zoom ? "on" : "off",
+                     zoom >= lod.port_zoom ? "on" : "off",
+                     zoom >= lod.port_label_zoom ? "on" : "off",
+                     zoom >= lod.edge_label_zoom ? "on" : "off");
+    detail << Format("LOD avg[%d]: paint=%.3f geometry=%.3f edge=%.3f node=%.3f ms\n\n",
+                     band_samples, band_paint_ms, band_geometry_ms, band_edge_ms, band_node_ms);
     detail << Format("Nodes: candidates=%d prepared=%d visits=%d painted=%d micro_rasters=%d\n",
                      graph_.GetLastNodeCandidateCount(), graph_.GetPreparedNodeCount(),
                      graph_.GetLastPaintNodeVisitCount(), graph_.GetLastPaintedNodeCount(),
