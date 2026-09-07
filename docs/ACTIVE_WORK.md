@@ -3,75 +3,81 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `e0d27500a7273e062bc97029f7b9088efaf17255`
-TASK: **Close PropertyEditor first-wheel override regression, then finish final Windows acceptance**
-TOUCHED:
-- `Utilities/PropertyEditor/PropertyValueEditors.h`
-- `Utilities/PropertyEditor/PropertyValueEditors.cpp`
-- `Utilities/PropertyEditor/PropertyEditorInteraction.cpp`
-- `Utilities/PropertyEditorTests/main.cpp`
-- `docs/ACTIVE_WORK.md`
-STATUS: **SOURCE REPAIR PUBLISHED — WINDOWS VALIDATION PENDING**
-PUBLISHED: this commit (PropertyEditor active-value wheel ownership repair)
-VALIDATION: source/diff review complete; Windows CLANGx64 focused/full gate pending.
-NEXT ACTION: run PropertyEditor focused gates first; if green, resume the complete final Windows gate.
+## CURRENT
+TASK: **Final upp_Ui completion acceptance**
+STATUS: **SOURCE/PACKAGE REPAIRS PUBLISHED — WINDOWS VALIDATION PENDING**
 
-## CURRENT REPAIR
+Current repair checkpoints:
+- `0e72be8d84504a432be9000491fa38341f5d05e3` — bounded exact-raster reuse for repeated
+  retained micro-node silhouettes, with native ellipse/direct fallback retained.
+- `e0d27500a7273e062bc97029f7b9088efaf17255` — stable `Array<StyledMetrics>` storage
+  for per-paint style metrics pointers.
+- `b9c3a863ee424d49f8897b1970897200726c94fc` — PropertyEditor active value-surface
+  wheel routing; first wheel after override activation goes to the concrete value editor.
+- `57c41d7a8d321417a970924e3144d1295d707c2a` — all nine multi-file aggregate test
+  packages explicitly declare `noblitz;`, preserving their intended separate translation units.
 
-Inactive override body/value clicks still request `WhenOverride(id, true)` before editor activation.
-The host remains authoritative for override/inheritance state, and the explicit override action
-remains the independent on/off toggle.
+The architecture audit F1-F10 remains accepted. No architecture rewrite is open.
 
-Wheel ownership is now local and deterministic:
-- only the active value rectangle can hand a wheel gesture to its active value editor;
-- the concrete value editor owns wheel semantics;
-- Integer/Double/NumericInt/NumericDouble forward to their real `UiIntEdit`,
-  `UiFloatEdit` or active `UiSlider`;
-- PropertyEditor scrolling remains the fallback outside the active value surface;
-- global focus state is no longer used to decide ownership across synchronous model refresh.
+## BLITZ TEST CONTRACT
+Aggregate hygiene runners intentionally contain independent component translation units with
+file-local anonymous-namespace helpers. They have one executable entry in `main.cpp`, not one
+entry per component. They are now package-level `noblitz;` so a normal BLITZ-enabled U++ build
+does not SCU-concatenate those test components.
 
-Regression coverage verifies both sides: first wheel after inactive numeric override activation
-edits the value, while a wheel outside the active numeric value surface does not.
+Affected aggregate packages:
+- UiControlTests
+- UiDrawingTests
+- UiGraphModelTests
+- UiGraphRenderTests
+- UiGraphScaleTests
+- UiGraphViewTests
+- UiModelTests
+- UiModelViewTests
+- UiThemeTests
 
-Gary's prior mechanical UiGraph compile repair at `e0d27500...` is preserved:
-`Ui/UiGraph/UiNodeGraphPerformance.inc` uses `Array<StyledMetrics>` for stable storage.
+This changes compilation mode only; no test is skipped or weakened.
 
-## REQUIRED WINDOWS GATE
+## FINAL WINDOWS GATE
+Fetch current `main` and validate Debug + Release:
+- PropertyEditorTests
+- PropertyEditorOverrideCommitTest
+- UiGraphScaleTests
+- UiNodeGraphPerformanceTest
+- UiGraphRenderTests
+- UiGraphViewTests
+- UiGraphTest
+- the nine aggregate hygiene packages above.
 
-1. `Utilities/PropertyEditorTests`
-2. `Utilities/PropertyEditorOverrideCommitTest`
-3. If both pass, UiDesigner focused RC sequence:
-   `Tests`, `RegressionTests`, `FoundationTests`, `ExportedThemeContractTest`.
-4. If all focused tests pass, run UiDesigner `RunSupervisorValidation.ps1` completely.
-5. Then complete the existing manual/generated Theme fidelity checks before RC closure.
-
-Also retain the final upp_Ui acceptance items already established:
-- UiGraphScaleTests and UiNodeGraphPerformanceTest;
-- UiGraphRenderTests, UiGraphViewTests and UiGraphTest;
-- UiChartRingDemo/UiProgressRingDemo override click -> immediate tick -> first wheel edits value;
-- UiGraphDemo Reference + 10k visuals/interactions/LOD;
-- 10k `micro_rasters > 0 && <= 32`;
-- same-machine 10k/Reference phase timings and idle checks;
-- Reference -> 10k -> Reference -> 10k remains clean;
+Manual:
+- UiChartRingDemo / UiProgressRingDemo: inactive override value click immediately enables the
+  tick; first wheel edits the value; wheel outside the active value surface scrolls normally;
+  explicit override action still toggles independently; row states stay visually distinct.
+- UiGraphDemo Reference + 10k: visuals/interactions/LOD correct.
+- 10k reports `micro_rasters > 0 && <= 32`.
+- Record same-machine 10k/Reference paint phase timings.
+- 10k node/surface must improve clearly and repeatably from the prior ~838 ms baseline without
+  meaningful Reference regression.
+- 10k idle and Live-profiling idle settle.
+- Reference -> 10k -> Reference -> 10k remains clean.
 - `git diff --check` PASS; final tree clean.
 
-## CONTRACTS TO PRESERVE
+If 10k node/surface remains near the old ~800 ms band, return performance evidence rather than
+accepting completion.
 
-- generated explicit curves target 0.35 final-device-pixel positional error inside the supported
+## CONTRACTS TO PRESERVE
+- explicit generated curves target 0.35 final-device-pixel positional error inside the supported
   `TessellationStatus` envelope;
 - direct Draw/native Painter first; shared exact raster cache for stable repeated AA;
-- Graph may use `UiGeometry` directly for dense final-pixel geometry;
+- dense Graph may use `UiGeometry` directly;
 - semantic positions never depend on tessellation vertex index;
 - one retained world broad phase remains authoritative;
-- static views eventually become idle;
-- reusable PropertyEditor defects are fixed in `upp_Ui`, never through Designer workarounds.
+- static views eventually become idle.
 
 ## BRANCH STATE
-
 Single authoritative branch: `main`.
 
 ## CANONICAL DOCS
-
 `00` Coding · `01` Controls · `02` Theme · `03` Model · `04` Demo ·
 `05` PropertyEditor · `06` Large-scale Views & LOD · `07` Drawing & Geometry ·
 `08` UiGraph · `09` UiDoc
