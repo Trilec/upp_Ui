@@ -1,5 +1,7 @@
 description "UiNodeGraph interaction, routing, hierarchy and live-view contract tests";
 
+noblitz;
+
 uses
     Core,
     CtrlLib,

@@ -1,5 +1,7 @@
 description "Ui deterministic non-model control contract tests";
 
+noblitz;
+
 uses
     Core,
     Draw,

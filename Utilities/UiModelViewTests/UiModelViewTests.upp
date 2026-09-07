@@ -1,5 +1,7 @@
 description "Ui viewport-bounded renderer, Gallery, Tree, List and popup-render tests";
 
+noblitz;
+
 uses
     Core,
     CtrlLib,

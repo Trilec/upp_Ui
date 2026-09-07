@@ -1,5 +1,7 @@
 description "UiGraph model, topology and hierarchy contract tests";
 
+noblitz;
+
 uses
     Core,
     CtrlLib,

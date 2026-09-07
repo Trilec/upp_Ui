@@ -1,5 +1,7 @@
 description "UiNodeGraph scale, performance and profile contract tests";
 
+noblitz;
+
 uses
     Core,
     CtrlLib,

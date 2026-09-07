@@ -1,5 +1,7 @@
 description "Ui theme structure and surface regression tests";
 
+noblitz;
+
 uses
     Core,
     Ui;

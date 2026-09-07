@@ -1,5 +1,7 @@
 description "UiNodeGraph presentation, paint and LOD contract tests";
 
+noblitz;
+
 uses
     Core,
     CtrlLib,

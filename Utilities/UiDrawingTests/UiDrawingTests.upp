@@ -1,5 +1,7 @@
 description "Ui final-pixel geometry, authored shape and styled raster-cache tests";
 
+noblitz;
+
 uses
     Core,
     Draw,

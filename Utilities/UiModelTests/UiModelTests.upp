@@ -1,5 +1,7 @@
 description "Ui data-model authority, binding and mutation contract tests";
 
+noblitz;
+
 uses
     Core,
     Ui;
