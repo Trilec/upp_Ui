@@ -4,75 +4,67 @@ Remote `main` is authoritative. Fetch before work/publish; never force-update `m
 Recovery state only; Git history is implementation history.
 
 ## CURRENT
-TASK: **Post-audit interaction polish**
-STATUS: **ARCHITECTURE ACCEPTED; PROPERTYEDITOR OVERRIDE-EDIT FIX PUBLISHED — WINDOWS CHECK PENDING**
-SOURCE_HEAD: `8a31447cdfa5775c82bb863916fd77909474c5b0`
+TASK: **Final post-audit completion gate**
+STATUS: **SOURCE COMPLETE — FINAL WINDOWS ACCEPTANCE PENDING**
+SOURCE_HEAD: `0e72be8d84504a432be9000491fa38341f5d05e3`
 
-The architecture audit remains closed and accepted. Current narrow follow-up:
-- inactive override value/body click now requests local activation before editor focus;
-- first wheel/key gesture should therefore edit the value immediately instead of scrolling the editor;
+The architecture audit remains closed and accepted. Final source follow-up is complete:
+- PropertyEditor inactive override body/value click activates the override before editor focus,
+  so the first wheel/key gesture edits the value instead of scrolling the viewport;
 - explicit override action remains the independent on/off toggle;
-- regression added to `PropertyEditorTests`.
+- themed PropertyEditor row states remain visually distinct across theme presets;
+- Graph micro paint reuses one integer path buffer and resolves/scales stock styles per paint;
+- repeated retained polygon micro silhouettes use the existing exact raster cache, bounded to
+  at most 32 paint-local raster variants; ellipses remain native Draw;
+- dynamic/high-uniqueness styles fall back to direct retained-silhouette drawing;
+- micro paint bounds include frame extent;
+- library-wide drawing sweep found no remaining fixed-sample curve policy or blanket
+  BufferPainter migration issue.
 
-AUDIT_BASE: `c0decf747c169c8a93a3b393428df09db444ce31`
-AUDIT_DOC: `docs/UI_architecture_audit_curt_060926.txt`
-ACCEPTED_TESTED_HEAD: `ccab8178df994c5877673ded525dcab6ae1266b0`
-HYGIENE_ACCEPTED_HEAD: `bdb6c745ddeeeca6d3ff47db9133f04317bd9a95`
+## PRIOR ACCEPTANCE
+Audit F1-F10 Windows CLANGx64 Debug + Release: PASS.
+14-suite gate: Geometry 28/0; ShapePath 27/0; PatternedPaint 10/0; Scale 54/0;
+OverviewLOD 12/0; LiveView 19/0; DragDamage 8/0; HierarchyView 30/0;
+DetailLOD 19/0; RouteEdit 25/0; CanonicalShape 14/0;
+StyledSurfaceCache 14/0; RenderBenchmark 109/0; UiGraph 90/90.
 
-## ACCEPTANCE
-Windows CLANGx64 Debug + Release PASS on the full 14-suite audit gate:
-- Geometry 28/0; ShapePath 27/0; PatternedPaint 10/0; Scale 54/0;
-- OverviewLOD 12/0; LiveView 19/0; DragDamage 8/0; HierarchyView 30/0;
-- DetailLOD 19/0; RouteEdit 25/0; CanonicalShape 14/0;
-- StyledSurfaceCache 14/0; RenderBenchmark 109/0; UiGraph 90/90.
+UiGraphDemo Reference + 10k, hierarchy, interaction and idle gates: PASS.
+10k Fit and Live profiling settled idle (~4% core on validator machine).
+Reference -> 10k -> Reference -> 10k: one geometry/spatial build per switch.
 
-`UiGraphDemo` PASS:
-- Reference + 10k render/interaction correct;
-- patterned edges, selection/hit/ports/pan/wheel, exact settle, hierarchy/backdrops,
-  embedded controls and clipping all checked;
-- 10k Fit settles idle (~4% core observed on validator machine);
-- Diagnostics + Live profiling returns idle with no repeating 200 ms refresh;
-- Reference -> 10k -> Reference -> 10k settles cleanly with one geometry/spatial build per switch.
+Pre-final-optimisation observed same-machine profile:
+- 10k: Paint ~849.9 ms; node/surface ~838.4 ms; edge ~2.0 ms;
+  ~2450 painted nodes and ~325 painted edges.
+- Reference: Paint ~33.7 ms; node ~16.9 ms; geometry ~6.4 ms; edge ~4.1 ms.
 
-Render/cache evidence:
-- render layer: calls=635 allocations=635 raster_pixels=311439608
-  raster_bytes=1245758432 peak_pixels=4521924;
-- raster cache: entries=8 bytes=79200 hits=41591 misses=33 insertions=33
-  evictions=0 trim_calls=33 eviction_scans=0 skipped=0.
+## FINAL WINDOWS GATE
+Validate current `main` / SOURCE_HEAD descendant Debug + Release:
+- PropertyEditorTests and PropertyEditorOverrideCommitTest;
+- UiGraphScaleTests and UiNodeGraphPerformanceTest;
+- UiGraphRenderTests, UiGraphViewTests and UiGraphTest;
+- UiChartRingDemo/UiProgressRingDemo override click -> immediate tick -> first wheel edits value;
+- UiGraphDemo Reference + 10k visuals/interactions/LOD;
+- confirm 10k reports `micro_rasters > 0 && <= 32`;
+- record same-machine 10k and Reference phase timings; 10k node/surface must show a clear,
+  repeatable improvement from the ~838 ms prior baseline without meaningful Reference regression;
+- 10k idle and Live-profiling idle must still settle;
+- Reference -> 10k -> Reference -> 10k must remain clean;
+- `git diff --check` PASS; final tree clean.
 
-Final validation hygiene: `git diff --check` PASS; tree clean.
-
-## TEST HYGIENE
-The reconciled aggregate test layer was validated Debug + Release and is now on `main`:
-- UiControlTests 13 suites;
-- UiDrawingTests 3;
-- UiGraphModelTests 2;
-- UiGraphRenderTests 5;
-- UiGraphScaleTests 4;
-- UiGraphViewTests 7;
-- UiModelTests 3;
-- UiModelViewTests 5;
-- UiThemeTests 2.
-All PASS with zero failed sub-suites.
-
-## AUDIT OUTCOME
-F1-F10 remediation is closed and accepted. Do not reopen the architecture audit without
-new evidence. The previous 10k idle repaint concern is also closed by the Windows idle gate.
+If the 10k node/surface path remains in the old ~800 ms band, do not accept completion:
+return the evidence for another source pass.
 
 ## CONTRACTS TO PRESERVE
-- explicit generated curves target 0.35 final-device-pixel positional error inside the
-  supported numeric/work envelope reported by `TessellationStatus`;
-- integer quantization, live projection and stroke raster semantics remain separate seams;
-- normal controls prefer direct Draw/native Painter; dense Graph may use `UiGeometry` directly;
-- semantic handles/labels/anchors never depend on tessellation vertex index;
+- generated explicit curves target 0.35 final-device-pixel positional error inside the
+  supported `TessellationStatus` envelope;
+- direct Draw/native Painter first; shared exact raster cache for stable repeated AA;
+- Graph may use `UiGeometry` directly for dense final-pixel geometry;
+- semantic positions never depend on tessellation vertex index;
 - one retained world broad phase remains authoritative;
-- ordinary graph nodes/ports remain painted geometry, not child controls;
-- a static view must eventually become idle.
+- static views eventually become idle.
 
 ## BRANCH STATE
-Remote and local development are back to a single authoritative branch: `main`.
-The former `supervisor/test-example-hygiene-20260905` branch was fully merged,
-validated, and deleted.
+Single authoritative branch: `main`.
 
 ## CANONICAL DOCS
 `00` Coding · `01` Controls · `02` Theme · `03` Model · `04` Demo ·
