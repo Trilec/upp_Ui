@@ -36,10 +36,14 @@ Image GraphDemoShapeIcon(UiGraphNodeShape shape)
     }
     case UiGraphNodeShape::Cloud:
         p.Move(l + DPI(2), cy + DPI(3))
-         .Cubic(l, cy - DPI(1), l + DPI(3), t + DPI(2), l + DPI(7), t + DPI(3))
-         .Cubic(l + DPI(9), t - DPI(1), r - DPI(5), t, r - DPI(4), t + DPI(4))
-         .Cubic(r + DPI(1), t + DPI(4), r + DPI(1), b - DPI(2), r - DPI(3), b - DPI(1))
-         .Line(l + DPI(4), b).Cubic(l, b, l, cy + DPI(5), l + DPI(2), cy + DPI(3)).Close();
+         .Cubic(Pointf(l, cy - DPI(1)), Pointf(l + DPI(3), t + DPI(2)),
+                Pointf(l + DPI(7), t + DPI(3)))
+         .Cubic(Pointf(l + DPI(9), t - DPI(1)), Pointf(r - DPI(5), t),
+                Pointf(r - DPI(4), t + DPI(4)))
+         .Cubic(Pointf(r + DPI(1), t + DPI(4)), Pointf(r + DPI(1), b - DPI(2)),
+                Pointf(r - DPI(3), b - DPI(1)))
+         .Line(l + DPI(4), b)
+         .Cubic(Pointf(l, b), Pointf(l, cy + DPI(5)), Pointf(l + DPI(2), cy + DPI(3))).Close();
         break;
     case UiGraphNodeShape::Document: {
         double fold = DPI(5);
@@ -53,7 +57,8 @@ Image GraphDemoShapeIcon(UiGraphNodeShape shape)
         p.Move(l, t + DPI(3)).Line(l, b - DPI(3));
         p.Move(r, t + DPI(3)).Line(r, b - DPI(3));
         p.Move(l, b - DPI(3))
-         .Cubic(l + DPI(2), b + DPI(1), r - DPI(2), b + DPI(1), r, b - DPI(3));
+         .Cubic(Pointf(l + DPI(2), b + DPI(1)), Pointf(r - DPI(2), b + DPI(1)),
+                Pointf(r, b - DPI(3)));
         break;
     case UiGraphNodeShape::Rectangle:
     default:
