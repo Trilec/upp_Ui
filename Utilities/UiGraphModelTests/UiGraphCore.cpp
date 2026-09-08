@@ -118,6 +118,13 @@ static void RunPortAndCompatibilityTests(TestCtx& t)
     consumer.ports.Top().custom_type = "Widget";
     UiGraphNodeRef c = model.AddNode(consumer);
 
+    Vector<UiGraphPortRef> relocation;
+    relocation.Add(UiGraphPortRef{p, "number"});
+    relocation.Reserve(8);
+    t.Expect(relocation.GetCount() == 1 &&
+                 relocation[0] == UiGraphPortRef{p, "number"},
+             "UiGraphPortRef survives Vector relocation without changing aggregate API");
+
     t.Expect(model.ValidateConnection(UiGraphPortRef{p, "number"}, UiGraphPortRef{c, "number"}).IsAllowed(),
              "Numeric family is compatible");
     t.Expect(model.ValidateConnection(UiGraphPortRef{p, "text"}, UiGraphPortRef{c, "text"}).IsAllowed(),

@@ -223,6 +223,13 @@ struct UiGraphPortRef {
     void Serialize(Stream& s) { node.Serialize(s); s % port_id; }
 };
 
+// Preserve UiGraphPortRef's aggregate API while allowing U++ Vector-family
+// containers to relocate it with its ordinary move constructor/destructor.
+// Inheriting Moveable here would change aggregate initialization used broadly
+// by the public graph API.
+template <>
+inline constexpr bool is_upp_guest<UiGraphPortRef> = true;
+
 inline hash_t GetHashValue(const UiGraphPortRef& r)
 {
     CombineHash h;
