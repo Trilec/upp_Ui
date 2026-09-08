@@ -61,6 +61,34 @@ inline void GraphDemoSetNodeTag(UiGraphNode& node, const String& tag)
     node.data = data;
 }
 
+enum class GraphDemoCommandKind : byte {
+    Move = 0,
+    Route,
+    Connection,
+    Delete,
+    AddNode,
+};
+
+struct GraphDemoNodeSnapshot : Moveable<GraphDemoNodeSnapshot> {
+    UiGraphNode node;
+    UiGraphScopeRef scope;
+};
+
+struct GraphDemoCommand : Moveable<GraphDemoCommand> {
+    GraphDemoCommandKind kind = GraphDemoCommandKind::Move;
+    String label;
+    VectorMap<UiGraphId, Pointf> before_positions;
+    VectorMap<UiGraphId, Pointf> after_positions;
+    UiGraphEdgeRef route_edge;
+    Vector<Pointf> before_waypoints;
+    Vector<Pointf> after_waypoints;
+    UiGraphEdge created_edge;
+    bool has_created_edge = false;
+    Vector<UiGraphEdge> replaced_edges;
+    Vector<GraphDemoNodeSnapshot> nodes;
+    Vector<UiGraphEdge> edges;
+};
+
 class UiGraphDemo;
 void InstallUiGraphDemoRuntime(UiGraphDemo& demo);
 
@@ -124,6 +152,22 @@ private:
     void RecordViewportDiagnostics();
     void RecordSwitchDiagnostics(const String& label, int64 elapsed_us);
 
+    void HandleNodeMoveRequest(UiGraphNodeMoveRequest& request);
+    void HandleEdgeRouteRequest(UiGraphEdgeRouteRequest& request);
+    void HandleConnectionRequest(UiGraphConnectionRequest& request);
+    void HandleDeleteRequest(UiGraphDeleteRequest& request);
+    bool ExecuteConnectionCommand(const UiGraphPortRef& source, const UiGraphPortRef& target,
+                                  UiGraphRouteStyle route = UiGraphRouteStyle::Inherit);
+    void PushGraphHistory(GraphDemoCommand&& command);
+    bool ApplyGraphHistory(const GraphDemoCommand& command, bool undo);
+    void UndoGraphEdit();
+    void RedoGraphEdit();
+    void ClearGraphHistory();
+    void ScheduleAutoConnect(const Vector<UiGraphNodeRef>& moved);
+    void OfferAutoConnect();
+    bool ConfirmAutoConnect(const UiGraphPortRef& source, const UiGraphPortRef& target,
+                            const UiGraphConnectionDecision& decision);
+
     const UiGraphNode* SelectedNode() const;
     UiGraphNode* SelectedNode();
     const UiGraphEdge* SelectedEdge() const;
@@ -166,6 +210,13 @@ private:
     VectorMap<String, UiGraphNodeStyle> custom_styles_;
     VectorMap<String, Value> face_recipes_;
     VectorMap<String, UiGraphNodeStyle> scale_resolved_style_cache_;
+
+    Vector<GraphDemoCommand> graph_undo_;
+    Vector<GraphDemoCommand> graph_redo_;
+    bool replaying_graph_history_ = false;
+    bool auto_connect_always_ = false;
+    Vector<UiGraphNodeRef> pending_auto_connect_nodes_;
+    TimeCallback auto_connect_tc_;
 
     UiButton embedded_action_;
     UiToggle embedded_toggle_;
