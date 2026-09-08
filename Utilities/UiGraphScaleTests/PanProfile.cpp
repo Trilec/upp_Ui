@@ -103,6 +103,15 @@ void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
     t.Expect(graph.GetPreparedNodeCount() < 10000
              && graph.GetPreparedEdgeCount() < 9900,
              Format("%s remains viewport/LOD bounded below total graph size", phase));
+
+    if(zoom < 0.25) {
+        t.Expect(graph.GetLastNodeDetailsPaintUsecs() == 0
+                 && graph.GetLastNodeContentPaintUsecs() == 0,
+                 "overview middle-pan stays on the projected-micro renderer instead of rich details/content");
+        t.Expect(graph.GetLastMicroRasterCount() > 0
+                 || graph.GetLastMicroDirectFallbackCount() > 0,
+                 "overview middle-pan records projected-micro paint evidence");
+    }
 }
 
 } // namespace
