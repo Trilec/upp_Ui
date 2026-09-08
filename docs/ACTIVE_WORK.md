@@ -7,16 +7,23 @@ TASK: UIGRAPH-EXECUTION-CONSOLIDATION — keep 10k speed; remove competing execu
 BRANCH: `performance/uigraph-execution-consolidation-20260908`
 TOUCHED: `Ui/UiGraph/UiNodeGraph*`, `Ui/Ui.upp`, render/pan regression tests,
 `examples/UiGraphDemo`, `docs/08_UIGRAPH_GUIDE.md`, this log and validator task.
-STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PARTIAL.
 PUBLISHED: Checkpoint 1 `9d77e9e6d54400b2ee588249b14944647cb9e464`;
 checkpoint 2 `866fedf0b76f50448feaf356b64b608bb7d0f6a5`.
 The final source/checkpoint is the commit containing this log (resolve with
 `git log -1 --format=%H -- docs/ACTIVE_WORK.md`); a commit cannot contain its own hash.
-VALIDATION: git diff --check; expanded public-header comparison; 195 retained active
-method-body comparisons after explicit name normalisation; Graph package/include
-membership; one spatial source; one demo viewport handler/one-shot observer;
-12 isolated C++ policy checks passed. Full U++/Windows build and runtime NOT RUN here.
-NEXT ACTION: Run `docs/UIGRAPH_EXECUTION_CONSOLIDATION_VALIDATE.md` on the latest branch.
+VALIDATION: U++/Windows CLANGx64 Debug + Release passed for UiGraphModelTests,
+UiGraphViewTests, UiGraphRenderTests, UiGraphScaleTests, UiNodeGraphPanProfileTest,
+UiNodeGraphPerformanceTest, UiNodeGraphPresentationTest and UiGraphDemo. The
+execution-path gate reports `checks=8 failed=0` in both configurations. Release
+10k pan node paint improved from BASE `64.426/179.974 ms` (mid/overview) to
+`19.285/115.700 ms`; paint improved from `79.644/191.716 ms` to `33.533/130.306 ms`.
+At L3/zoom 0.20 the demo retained micro paint, with details/ports and content/text
+at zero. Current branch remains manually pending for the full diagnostics
+enabled/disabled/hidden status matrix, full reference visual interaction sweep and
+two-window baseline visual comparison.
+NEXT ACTION: Finish the remaining manual checks in
+`docs/UIGRAPH_EXECUTION_CONSOLIDATION_VALIDATE.md` before merging into main.
 Do not merge into main until the platform gate passes.
 
 ## Published implementation
