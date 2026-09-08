@@ -13,12 +13,15 @@ CURRENT SOURCE CHECKPOINT: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
 BASE: `cc386585d0eb5287c0f096d01a70a79e7df42fd7` / `main`
 TASK: UIGRAPH-EXECUTION-CONSOLIDATION — retain 10k speed; clarify execution ownership.
 BRANCH: `performance/uigraph-execution-consolidation-20260908`
-TOUCHED: Ui/UiGraph LOD/paint/view policy; Ui/Ui.upp; render and pan-profile tests.
-STATUS: Checkpoint 1 source-reviewed; Windows build/runtime validation pending.
-PUBLISHED: This checkpoint is the commit containing this entry; previous remote tip is BASE.
+TOUCHED: Ui/UiGraph implementation/header consolidation; Ui/Ui.upp; docs/08_UIGRAPH_GUIDE.md; prior LOD/render/pan tests.
+STATUS: Checkpoint 2 source-reviewed; Windows build/runtime validation pending.
+PUBLISHED: This checkpoint is the commit containing this entry; previous published checkpoint is `9d77e9e6d54400b2ee588249b14944647cb9e464`.
 VALIDATION: Full source diff reviewed; git diff --check passed. No local U++ toolchain.
-NEXT ACTION: Remove obsolete implementation bodies/aliases; name files by responsibility;
-then restore independent normal demo status observation and publish the final validation gate.
+NEXT ACTION: Restore independent normal demo status observation and publish the final validation gate.
+Checkpoint 2 removes method/declaration alias macros and obsolete implementations,
+splits geometry/camera/paint/projection responsibilities and gives production spatial
+its canonical filename. All 195 retained active member bodies were compared after
+explicit alias/name normalisation; no unplanned body changes. Windows validation pending.
 
 Checkpoint 1 centralises projected-size/visibility/edge-backend decisions, reports the
 selected paint path and fallback reason, and preflights Painter-required edges before

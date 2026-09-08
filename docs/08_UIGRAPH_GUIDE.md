@@ -382,3 +382,57 @@ Do not put into UiGraph:
 - a second model/topology authority;
 - a private curve-quality/sample-count system;
 - a GPU dependency merely to compensate for avoidable CPU work.
+
+
+## 20. Execution ownership and source map
+
+`UiNodeGraph.h` contains the actual class declarations. `UiNodeGraph.cpp` includes
+internal implementation parts exactly once, without method-renaming macros. The
+`.inc` suffix deliberately preserves shared helper linkage and the existing build
+boundary; it does not indicate a second implementation or a runtime backend.
+
+| Responsibility | Source / entry point |
+| --- | --- |
+| Lifetime, styles, notifications, attached controls | `UiNodeGraphCore.inc` |
+| Exact node/edge preparation, anchors and geometry LOD | `UiNodeGraphGeometry.inc`: `PrepareViewGeometry`, `BuildViewNodeGeometry`, `BuildNodeGeometry` |
+| World-space queries and scope filtering | `UiNodeGraphSpatial.cpp` |
+| Programmatic camera and batched view updates | `UiNodeGraphCamera.inc` |
+| Live pan/zoom projection and settle | `UiNodeGraphProjection.inc`: `ProjectLiveView`, `SettleLiveViewProjection` |
+| Scope navigation, selection, fit/layout and backdrops | `UiNodeGraphHierarchy.inc` |
+| Model replacement | `UiNodeGraphModelBinding.inc` |
+| Frame/grid/overlay orchestration | `UiNodeGraphPaint.inc`: `Paint` |
+| Backend admission and micro surfaces/edges | `UiNodeGraphPaintMicro.inc`: `PaintGraphGeometry` |
+| Rich surfaces, port glyphs, details/content and edges | `UiNodeGraphPaintRich.inc`: `PaintGraphRich` |
+| Shared projected-size, visibility and edge-backend policy | `UiNodeGraphLod.h` |
+| Editing gestures and interaction lifecycle | `UiNodeGraphInteraction.cpp` |
+
+H2 was a hierarchy migration label, not a second runtime spatial mode. Its accepted
+scope-aware spatial implementation is now the sole `UiNodeGraphSpatial.cpp` in
+`Ui.upp`. Old spatial sources and replaced methods are recoverable from Git history.
+Do not restore a parallel production copy to fix a regression.
+
+Two paint backends remain intentional. Micro drawing avoids rich per-node work;
+merging their drawing loops would risk the measured 10k improvement. Shared policy
+is small, inline and allocation-free. Backend admission completes before drawing,
+so a Painter-only edge cannot disappear after a partial micro frame. Admitted edge
+styles are reused between preflight and micro drawing.
+
+LOD is not a fixed number of scene-wide bands. Host zoom thresholds and each node's
+projected size both matter: a mixed-size scene can contain micro and rich nodes at
+the same zoom. Micro nodes omit content and port glyphs even when another node or
+edge requires rich scene paint. Semantic port anchors remain available. Idle and
+middle-pan permit micro drawing; semantic editing gestures, rich-sized nodes,
+custom painting and Painter-required edges can intentionally select rich paint.
+`GetLastPaintPath()` and `GetLastPaintFallbackReason()` expose that choice directly.
+Camera projection eligibility and render backend admission are separate checks.
+
+The supported canonical built-ins remain Rectangle, Ellipse, Diamond, Triangle,
+Hexagon, Cloud, Document and Database (eight), plus the Custom callback extension.
+Historical shape enum values remain for compatibility. No shapes or route types
+were added or removed by this consolidation; Straight, Bezier and Orthogonal remain
+the three built-in connection routes. Shape identity and authored styling survive LOD.
+
+Before changing a threshold, update the shared policy and check live projection
+compatibility. Before changing a glyph, distinguish the node port glyph from the
+separate edge arrow. Run the execution-path suite and 10k pan profile; a paint speed
+claim requires runtime measurements, not file reduction or source inspection.

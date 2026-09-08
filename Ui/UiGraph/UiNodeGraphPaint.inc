@@ -1,3 +1,5 @@
+// Top-level paint orchestration: frame/grid, backdrops, graph and overlays.
+
 namespace Upp {
 
 void UiNodeGraph::Paint(Draw& w)
@@ -57,7 +59,7 @@ void UiNodeGraph::Paint(Draw& w)
         }
     }
 
-    // Fixed H2 paint order: canvas/grid -> Backdrops -> edges/nodes -> overlays.
+    // Scene paint order: canvas/grid -> Backdrops -> edges/nodes -> overlays.
     PaintBackdrops(w);
     if(model_)
         PaintGraphGeometry(w);
@@ -68,3 +70,4 @@ void UiNodeGraph::Paint(Draw& w)
 }
 
 } // namespace Upp
+

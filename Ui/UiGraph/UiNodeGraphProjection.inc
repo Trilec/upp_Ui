@@ -1,3 +1,7 @@
+// Live camera projection from an immutable exact baseline. Coverage and LOD
+// checks permit reuse; incompatible changes and quiet settle prepare exactly.
+// Compiled once by UiNodeGraphInteraction.cpp.
+
 namespace Upp {
 namespace {
 
@@ -262,7 +266,7 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         state.exact_zoom = geometry_zoom_;
         state.exact_pan = geometry_pan_;
         state.exact_size = geometry_size_;
-        // RebuildGeometry already prepares candidates using the Graph paint-query
+        // RebuildViewGeometry already prepares candidates using the Graph paint-query
         // margin. Keep that expanded exact footprint as reusable camera coverage.
         state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                               GraphViewPaintMargin(lod_policy_, geometry_zoom_));
@@ -387,7 +391,7 @@ void UiNodeGraph::SettleLiveViewProjection()
         return;
 
     InvalidateGeometry();
-    PrepareGeometry();
+    PrepareViewGeometry();
     UpdateAttachedCtrls();
     Refresh();
 
@@ -417,7 +421,7 @@ void UiNodeGraph::UpdatePan(Point p)
 
     pan_ = next_pan;
     InvalidateGeometry();
-    PrepareGeometry();
+    PrepareViewGeometry();
     UpdateAttachedCtrls();
     Refresh();
     WhenViewport();
@@ -454,7 +458,7 @@ void UiNodeGraph::MouseMove(Point p, dword)
         hot_node_ = node;
         hot_edge_ = edge;
         InvalidateGeometry();
-        PrepareGeometry();
+        PrepareViewGeometry();
         UpdateAttachedCtrls();
         Refresh();
     }

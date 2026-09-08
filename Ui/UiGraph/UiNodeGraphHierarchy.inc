@@ -1,3 +1,5 @@
+// Active scope navigation, scope-aware fit/selection/layout and backdrops.
+
 namespace Upp {
 
 UiGraphScopeRef UiNodeGraph::GetScope() const
@@ -64,7 +66,7 @@ UiNodeGraph& UiNodeGraph::SetScope(UiGraphScopeRef scope)
     EnsureSpatialIndex();
 
     if(!DeferViewUpdate(false, had_selection)) {
-        PrepareGeometry();
+        PrepareViewGeometry();
         UpdateAttachedCtrls();
         Refresh();
         if(had_selection)
@@ -160,7 +162,7 @@ UiNodeGraph& UiNodeGraph::FitToGraph(bool selection_only)
     if(DeferViewUpdate(true, false))
         return *this;
 
-    PrepareGeometry();
+    PrepareViewGeometry();
     UpdateAttachedCtrls();
     Refresh();
     WhenViewport();
@@ -180,7 +182,7 @@ UiNodeGraph& UiNodeGraph::CenterOnNode(UiGraphNodeRef ref)
     if(DeferViewUpdate(true, false))
         return *this;
 
-    PrepareGeometry();
+    PrepareViewGeometry();
     UpdateAttachedCtrls();
     Refresh();
     WhenViewport();
@@ -205,7 +207,7 @@ UiNodeGraph& UiNodeGraph::SelectNode(UiGraphNodeRef node, bool additive)
     if(DeferViewUpdate(false, true))
         return *this;
 
-    PrepareGeometry();
+    PrepareViewGeometry();
     damage |= GetSelectionDamage() | GetNodeDamage(node);
     RefreshDamage(damage);
     WhenSelection();
@@ -231,7 +233,7 @@ UiNodeGraph& UiNodeGraph::SelectEdge(UiGraphEdgeRef edge, bool additive)
     if(DeferViewUpdate(false, true))
         return *this;
 
-    PrepareGeometry();
+    PrepareViewGeometry();
     damage |= GetSelectionDamage() | GetEdgeDamage(edge);
     RefreshDamage(damage);
     WhenSelection();
@@ -274,7 +276,7 @@ void UiNodeGraph::SetData(const Value& v)
     if(DeferViewUpdate(false, true))
         return;
 
-    PrepareGeometry();
+    PrepareViewGeometry();
     damage |= GetSelectionDamage();
     RefreshDamage(damage);
     WhenSelection();
@@ -308,7 +310,7 @@ void UiNodeGraph::Layout()
         return;
     }
     InvalidateGeometry();
-    PrepareGeometry();
+    PrepareViewGeometry();
     UpdateAttachedCtrls();
 }
 
@@ -380,3 +382,4 @@ void UiNodeGraph::PaintBackdrops(Draw& w)
 }
 
 } // namespace Upp
+

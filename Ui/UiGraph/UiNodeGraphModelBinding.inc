@@ -13,7 +13,7 @@ UiNodeGraph& UiNodeGraph::SetModel(UiGraphModel& model)
     if(interaction_ != InteractionMode::None || interaction_capture_owned_)
         CancelMode();
 
-    // Clear attached controls without invoking the retained ClearNodeCtrls()
+    // Clear attached controls without invoking ClearNodeCtrls()
     // geometry refresh. A model switch immediately invalidates that geometry
     // anyway, and in a view transaction it must not materialise an intermediate
     // old-model frame.
@@ -68,3 +68,4 @@ UiNodeGraph& UiNodeGraph::UseInternalModel()
 }
 
 } // namespace Upp
+
