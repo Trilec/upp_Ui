@@ -3,80 +3,73 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `c9375e6dcf141058e23347124ce624bc15b49aa8`
-TASK: **UIGRAPH-PERF-STYLE-01 — remove measured 10k style-preparation bottleneck**
+BASE: `cd587fa51a8323b84820c8e041e9f819cba32a09`
+TASK: **UIGRAPH-VIS-EDGE-01 — connector visual correctness**
 TOUCHED:
-- `Ui/UiGraph/UiNodeGraphBase.h`
-- `Ui/UiGraph/UiNodeGraphPerformance.inc`
-- `Utilities/UiGraphScaleTests/Performance.cpp`
-- `Utilities/UiNodeGraphPerformanceTest/main.cpp`
-- `examples/UiGraphDemo/UiGraphDemo.h`
-- `examples/UiGraphDemo/UiGraphDemo.cpp`
+- `Ui/UiGraph/UiNodeGraphBase.inc`
+- `Ui/UiGraph/UiNodeGraphRender.inc`
+- `Utilities/UiGraphRenderTests/Presentation.cpp`
+- `Utilities/UiNodeGraphPresentationTest/main.cpp`
 - `docs/ACTIVE_WORK.md`
 STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING**
 PUBLISHED: supervisor checkpoint pending squash/merge to `main`
-VALIDATION: source/diff review + deterministic regression coverage added; Windows Debug/Release pending.
+VALIDATION: source/diff review + mirrored render regressions added; Windows Debug/Release pending.
 
-## MEASURED CAUSE
+## PREVIOUS CHECKPOINT
 
-Validated live profiling now accumulates correctly at `c9375e6...`.
-10k L3 captures showed node preparation dominated by style work:
-- nodes ~622 ms, style ~619 ms in one capture;
-- nodes ~483 ms, style ~481 ms in another;
-- silhouette/anchors were ~1–2 ms combined.
+`cd587fa51a8323b84820c8e041e9f819cba32a09`
+- split 10k projected-micro style preparation into resolver vs metric scaling;
+- UiGraphDemo caches deterministic scale preset resolution by role + preset;
+- generic per-node `WhenResolveNodeStyle` semantics remain unchanged;
+- platform performance validation still required.
 
-This satisfies the prior profiling gate. Do not reopen spatial/path/raster work without new evidence.
+## ROOT CAUSES
+
+1. Circle edge marker was centred on the route endpoint, which is the node boundary.
+   Nodes paint after edges, so the inward half of the marker was covered by the node.
+
+2. Detailed edges used two paint backends:
+   - None/Open arrows often used integer `DrawLine`;
+   - Circle/Diamond/Triangle forced antialiased `Painter`.
+   This produced different apparent thickness/aliasing for otherwise equivalent connectors.
 
 ## CURRENT IMPLEMENTATION
 
-- exact projected-micro preparation now splits `style` evidence into:
-  - resolver cost;
-  - metric-scaling cost;
-- the aggregate style counter is exactly resolver + scale;
-- UiGraphDemo reports both subphases in Live profiling;
-- the 10k demo resolver now caches deterministic resolved preset styles by
-  role + preset instead of rebuilding palette/font/preset state for every node;
-- custom per-node styles and selected-state preview remain uncached and preserve
-  existing semantics;
-- theme toggle clears the demo cache;
-- generic `WhenResolveNodeStyle` semantics remain per-node and unchanged.
+- Circle marker centre is shifted backward by its radius so its forward edge is tangent
+  to the target endpoint and the complete marker stays outside the node body.
+- Non-simplified connectors at/above `edge_simplify_zoom` now share the antialiased
+  Painter path with retained sub-pixel coordinates.
+- Direct integer Draw remains the overview/simplified path for scale performance.
+- Mirrored presentation tests cover:
+  - visible circle extent behind the target tangent;
+  - antialiased detailed ordinary connector rendering.
 
 ## CONTRACTS PRESERVED
 
-- no callback-result cache was added to generic UiNodeGraph;
-- semantic model remains authoritative;
-- projected-micro silhouette/path/raster contracts are unchanged;
-- diagnostics remain observer-only and settle idle;
-- exact/programmatic camera operations remain synchronous.
+- route construction/tessellation is unchanged;
+- semantic port anchors are unchanged;
+- edge bounds already conservatively include arrow extent;
+- low-detail/simplified 10k connector path remains direct and cheap;
+- no model or interaction semantics changed.
 
 ## WINDOWS VALIDATION NEEDED
 
-Build/run:
-- `UiGraphScaleTests` Debug + Release;
-- `UiNodeGraphPerformanceTest` Debug + Release;
-- `UiGraphDemo` Debug + Release.
+Build/run Debug + Release:
+- `UiGraphRenderTests`;
+- `UiNodeGraphPresentationTest`;
+- `UiGraphDemo`.
 
-Record at 10k L3:
-- total node prep;
-- style / resolve / scale;
-- silhouette / anchors;
-- paint / node surface;
-- micro_rasters / cached_draws / direct_fallbacks;
-- idle behavior.
-
-Acceptance:
-- all builds/tests PASS;
-- resolver+scale equals aggregate style evidence;
-- 10k style/node preparation is materially lower than the ~480–620 ms measured baseline;
-- no regression in raster/path-cache evidence;
-- Reference mode remains visually/functionally unchanged.
+Manual UiGraphDemo:
+- compare Straight / Bezier / Orthogonal detailed connectors at ~0.8–1.0 zoom;
+- verify None/Open/Circle/Diamond/Triangle edges have consistent line quality;
+- verify Circle marker is complete, correctly sized, and tangent to the node/port;
+- verify overview 10k remains responsive and uses the existing simplified/direct path.
 
 ## NEXT ACTION
 
-After this checkpoint is validated/published:
-1. connector visual correctness;
-2. Undo/Redo + proximity auto-connect;
+After this checkpoint:
+1. Undo/Redo command history;
+2. proximity auto-connect integrated into the same command path;
 3. left authoring palette.
 
-If the new split shows metric scaling rather than resolver work still dominates, stop and report
-the evidence before another optimisation.
+Do not begin authoring-palette work before Undo/Redo and auto-connect semantics are stable.
