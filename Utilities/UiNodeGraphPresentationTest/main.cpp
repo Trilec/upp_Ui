@@ -185,6 +185,49 @@ void RunEdgeVisualConsistencyTest(TestCtx& t)
              "full-detail ordinary connector uses the same antialiased sub-pixel Painter path as marker-bearing edges");
 }
 
+
+void RunPortMarkerTangentTest(TestCtx& t)
+{
+    UiGraphModel model;
+    UiGraphNode node = ImageNode("Port marker", Pointf(240, 90), UiGraphNodeShape::Rectangle);
+    node.size = Sizef(120, 70);
+    node.subtitle.Clear();
+    node.description.Clear();
+    UiGraphNodeRef ref = model.AddNode(node);
+
+    UiNodeGraph graph;
+    graph.SetAutoFitOnFirstPaint(false);
+    graph.SetRect(0, 0, 640, 260);
+
+    UiNodeGraph::Style style = UiNodeGraph::StyleDefault();
+    style.show_grid = false;
+    style.node.metrics.shadow.enabled = false;
+    style.node.port_radius = 4;
+    const Color port_frame(220, 40, 40);
+    for(int i = 0; i < 4; i++) {
+        style.canvas_palette.face[i] = UiFill::Solid(White());
+        style.node.palette.face[i] = UiFill::Solid(White());
+        style.node.palette.frame[i] = Color(120, 130, 145);
+        style.node.port_frame[i] = port_frame;
+    }
+    graph.SetCustomStyle(style);
+    graph.SetModel(model);
+    graph.Layout();
+
+    ImageDraw draw(640, 260);
+    draw.DrawRect(0, 0, 640, 260, White());
+    graph.Paint(draw);
+    Image image = draw;
+
+    Point anchor = graph.WorldToScreen(Pointf(240, 125));
+    Rect outside = RectC(anchor.x - 9, anchor.y - 5, 7, 11);
+    Rect inside = RectC(anchor.x + 1, anchor.y - 5, 6, 11);
+    t.Expect(CountRedDominantPixels(image, outside) > 0,
+             "input port circle is fully visible on the connector side of the node boundary");
+    t.Expect(CountRedDominantPixels(image, inside) == 0,
+             "input port circle is tangent outside the node instead of overlapping/clipping into its body");
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
@@ -329,6 +372,7 @@ CONSOLE_APP_MAIN
              "biased Bezier preserves outward source and inward target endpoint tangents");
 
     RunEdgeVisualConsistencyTest(t);
+    RunPortMarkerTangentTest(t);
 
     t.Expect(graph.GetLastPaintUsecs() >= 0 && graph.GetLastNodePaintUsecs() >= 0,
              "image proof retains normal Graph paint timing evidence");
