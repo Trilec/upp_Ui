@@ -280,7 +280,10 @@ bool UiGraphDemo::ExecuteConnectionCommand(const UiGraphPortRef& source,
             command.replaced_edges.Add(*edge);
     }
 
+    graph_.BeginBatchUpdate();
     UiGraphEdgeRef created = model.Connect(source, target, route);
+    graph_.EndBatchUpdate();
+
     const UiGraphEdge* edge = model.FindEdge(created);
     if(!created.IsValid() || !edge)
         return false;
