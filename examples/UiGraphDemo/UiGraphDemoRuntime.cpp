@@ -281,6 +281,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         d.syncing_editors_ = false;
         d.btn_reference.SetChecked(!scale);
         d.btn_scale.SetChecked(scale);
+        d.RefreshAuthoringPalette();
 
         int64 stage = usecs();
         sync_selection();
