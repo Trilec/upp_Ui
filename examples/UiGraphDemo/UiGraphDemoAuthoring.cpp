@@ -13,8 +13,8 @@ Image GraphDemoShapeIcon(UiGraphNodeShape shape)
     BufferPainter p(ib, MODE_ANTIALIASED);
     const Color ink(55, 65, 81);
     const double stroke = max(1.0, (double)DPI(1));
-    const double l = DPI(3.0), t = DPI(4.0);
-    const double r = side - DPI(3.0), b = side - DPI(4.0);
+    const double l = DPI(3), t = DPI(4);
+    const double r = side - DPI(3), b = side - DPI(4);
     const double cx = (l + r) * 0.5, cy = (t + b) * 0.5;
 
     p.Begin();
