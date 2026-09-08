@@ -3,7 +3,7 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `9efe164ea3725c4579e7600943fc01da17d7efc9`
+BASE: `7985c868fa0e77c9fd7e81eb03a410a6689448c8`
 TASK: **UIGRAPH-AUTHOR-PALETTE-01 — left authoring rail**
 TOUCHED:
 - `examples/UiGraphDemo/UiGraphDemo.h`
@@ -14,9 +14,9 @@ TOUCHED:
 - `examples/UiGraphDemo/UiGraphDemo.upp`
 - `Ui/UiGraph/UiNodeGraphSpatialH2.cpp`
 - `docs/ACTIVE_WORK.md`
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING**
-PUBLISHED: supervisor checkpoint pending squash/merge to `main`
-VALIDATION: source/diff/package-membership review complete; Windows GUI validation pending.
+STATUS: **PUBLISHED — WINDOWS VALIDATION PENDING**
+PUBLISHED: `7985c868fa0e77c9fd7e81eb03a410a6689448c8`
+VALIDATION: source/diff/package-membership review complete; Windows Debug/Release + GUI/runtime validation pending.
 
 ## PUBLISHED CHECKPOINTS IN THIS SERIES
 
