@@ -77,6 +77,7 @@ void UiGraphDemo::PushGraphHistory(GraphDemoCommand&& command)
         graph_undo_.Remove(0);
     graph_redo_.Clear();
     UpdateStatus();
+    RefreshAuthoringPalette();
 }
 
 void UiGraphDemo::ClearGraphHistory()
@@ -86,6 +87,7 @@ void UiGraphDemo::ClearGraphHistory()
     graph_undo_.Clear();
     graph_redo_.Clear();
     UpdateStatus();
+    RefreshAuthoringPalette();
 }
 
 bool UiGraphDemo::ApplyGraphHistory(const GraphDemoCommand& command, bool undo)
@@ -183,6 +185,7 @@ void UiGraphDemo::UndoGraphEdit()
     else
         graph_undo_.Add(pick(command));
     SyncSelection();
+    RefreshAuthoringPalette();
 }
 
 void UiGraphDemo::RedoGraphEdit()
@@ -205,6 +208,7 @@ void UiGraphDemo::RedoGraphEdit()
     else
         graph_redo_.Add(pick(command));
     SyncSelection();
+    RefreshAuthoringPalette();
 }
 
 void UiGraphDemo::HandleNodeMoveRequest(UiGraphNodeMoveRequest& request)
@@ -299,7 +303,7 @@ bool UiGraphDemo::ExecuteConnectionCommand(const UiGraphPortRef& source,
 void UiGraphDemo::HandleConnectionRequest(UiGraphConnectionRequest& request)
 {
     request.accept = ExecuteConnectionCommand(request.source, request.target,
-                                              UiGraphRouteStyle::Inherit);
+                                              authoring_route_);
     request.handled = true;
 }
 
@@ -504,7 +508,7 @@ void UiGraphDemo::OfferAutoConnect()
         accept = ConfirmAutoConnect(candidate.source, candidate.target, candidate.decision);
     if(accept)
         ExecuteConnectionCommand(candidate.source, candidate.target,
-                                 UiGraphRouteStyle::Inherit);
+                                 authoring_route_);
 }
 
 } // namespace Upp
