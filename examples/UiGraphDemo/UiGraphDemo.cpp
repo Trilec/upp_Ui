@@ -313,7 +313,19 @@ UiGraphDemo::UiGraphDemo()
 
     graph_.WhenResolveNodeStyle = [=](const UiGraphNode& node, UiGraphVisualState state,
                                       UiGraphNodeStyle& style) {
-        ApplyDemoPreset(node, style);
+        if(scale_mode_ && !node.style_class.StartsWith("custom:")) {
+            String key = Format("%d|%s", (int)node.role, node.style_class);
+            int i = scale_resolved_style_cache_.Find(key);
+            if(i < 0) {
+                UiGraphNodeStyle resolved = style;
+                ApplyDemoPreset(node, resolved);
+                i = scale_resolved_style_cache_.Add(key, resolved);
+            }
+            style = scale_resolved_style_cache_[i];
+        }
+        else
+            ApplyDemoPreset(node, style);
+
         if(state == UiGraphVisualState::Selected && node.ref == selected_node_)
             GraphDemoProjectState(style, style_preview_state_, ST_PRESSED);
     };
@@ -1148,6 +1160,7 @@ void UiGraphDemo::ToggleTheme()
     context.mode = context.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
     UiTheme::Set(context);
     Ctrl::SwapDarkLight();
+    scale_resolved_style_cache_.Clear();
     graph_.OnStyleChanged();
     pe_inspector.SetPaletteMode(context.mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark
                                                                    : PropertyEditorPaletteMode::Light);
@@ -1594,8 +1607,10 @@ void UiGraphDemo::RefreshDiagnostics()
                      graph_.GetLastGeometrySortUsecs() / 1000.0,
                      graph_.GetLastGeometryNodeUsecs() / 1000.0,
                      graph_.GetLastGeometryEdgeUsecs() / 1000.0);
-    detail << Format("Node prep ms: style=%.3f silhouette=%.3f anchors=%.3f path_cache=%d/%d\n",
+    detail << Format("Node prep ms: style=%.3f resolve=%.3f scale=%.3f silhouette=%.3f anchors=%.3f path_cache=%d/%d\n",
                      graph_.GetLastGeometryStyleUsecs() / 1000.0,
+                     graph_.GetLastGeometryStyleResolveUsecs() / 1000.0,
+                     graph_.GetLastGeometryStyleScaleUsecs() / 1000.0,
                      graph_.GetLastGeometrySilhouetteUsecs() / 1000.0,
                      graph_.GetLastGeometryAnchorUsecs() / 1000.0,
                      graph_.GetLastGeometryPathCacheHitCount(),
