@@ -363,6 +363,8 @@ public:
     int64 GetLastGeometrySortUsecs() const { return last_geometry_sort_usecs_; }
     int64 GetLastGeometryNodeUsecs() const { return last_geometry_node_usecs_; }
     int64 GetLastGeometryStyleUsecs() const { return last_geometry_style_usecs_; }
+    int64 GetLastGeometryStyleResolveUsecs() const { return last_geometry_style_resolve_usecs_; }
+    int64 GetLastGeometryStyleScaleUsecs() const { return last_geometry_style_scale_usecs_; }
     int64 GetLastGeometrySilhouetteUsecs() const { return last_geometry_silhouette_usecs_; }
     int64 GetLastGeometryAnchorUsecs() const { return last_geometry_anchor_usecs_; }
     int64 GetLastGeometryEdgeUsecs() const { return last_geometry_edge_usecs_; }
@@ -826,6 +828,8 @@ private:
     int64 last_geometry_sort_usecs_ = 0;
     int64 last_geometry_node_usecs_ = 0;
     int64 last_geometry_style_usecs_ = 0;
+    int64 last_geometry_style_resolve_usecs_ = 0;
+    int64 last_geometry_style_scale_usecs_ = 0;
     int64 last_geometry_silhouette_usecs_ = 0;
     int64 last_geometry_anchor_usecs_ = 0;
     int64 last_geometry_edge_usecs_ = 0;

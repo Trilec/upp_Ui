@@ -107,6 +107,8 @@ void PrintProfile(const char *phase, UiNodeGraph& graph, int64 paint_us = -1)
            << " sort_us=" << graph.GetLastGeometrySortUsecs()
            << " nodes_us=" << graph.GetLastGeometryNodeUsecs()
            << " style_us=" << graph.GetLastGeometryStyleUsecs()
+           << " style_resolve_us=" << graph.GetLastGeometryStyleResolveUsecs()
+           << " style_scale_us=" << graph.GetLastGeometryStyleScaleUsecs()
            << " silhouette_us=" << graph.GetLastGeometrySilhouetteUsecs()
            << " anchors_us=" << graph.GetLastGeometryAnchorUsecs()
            << " edges_us=" << graph.GetLastGeometryEdgeUsecs();
@@ -246,6 +248,9 @@ int RunPerformanceSuite()
              && graph.GetLastGeometryNodeUsecs() >= graph.GetLastGeometrySilhouetteUsecs()
              && graph.GetLastGeometryNodeUsecs() >= graph.GetLastGeometryAnchorUsecs(),
              "node preparation phase contains its measured style/silhouette/anchor subphases");
+    t.Expect(graph.GetLastGeometryStyleUsecs()
+                 == graph.GetLastGeometryStyleResolveUsecs() + graph.GetLastGeometryStyleScaleUsecs(),
+             "style preparation evidence is exactly split into resolver and metric-scaling costs");
     t.Expect(graph.GetLastMicroRasterCount() > 0
              && graph.GetLastMicroRasterCount() <= 32,
              "fit-all 10k micro raster reuse remains explicitly bounded");

@@ -544,11 +544,17 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     }
 
     UiGraphVisualState node_state = GetNodeVisualState(node);
-    int64 style_started = record_evidence ? usecs() : 0;
+    int64 resolve_started = record_evidence ? usecs() : 0;
     UiGraphNodeStyle style = ResolveNodeStyle(node, node_state);
+    int64 resolve_us = record_evidence ? max<int64>(0, usecs() - resolve_started) : 0;
+    int64 scale_started = record_evidence ? usecs() : 0;
     StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
-    if(record_evidence)
-        last_geometry_style_usecs_ += max<int64>(0, usecs() - style_started);
+    int64 scale_us = record_evidence ? max<int64>(0, usecs() - scale_started) : 0;
+    if(record_evidence) {
+        last_geometry_style_resolve_usecs_ += resolve_us;
+        last_geometry_style_scale_usecs_ += scale_us;
+        last_geometry_style_usecs_ += resolve_us + scale_us;
+    }
 
     out.ref = node.ref;
     out.rect = RectC(p.x, p.y, sz.cx, sz.cy);
@@ -691,6 +697,8 @@ void UiNodeGraph::RebuildViewGeometry()
     last_geometry_sort_usecs_ = 0;
     last_geometry_node_usecs_ = 0;
     last_geometry_style_usecs_ = 0;
+    last_geometry_style_resolve_usecs_ = 0;
+    last_geometry_style_scale_usecs_ = 0;
     last_geometry_silhouette_usecs_ = 0;
     last_geometry_anchor_usecs_ = 0;
     last_geometry_edge_usecs_ = 0;
