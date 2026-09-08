@@ -105,6 +105,7 @@ private:
     void BuildHeader();
     void BuildPreview();
     void BuildAuthoringPanel();
+    void LayoutAuthoringPanel();
     void BuildRightRail();
     void BuildNodeEditorModel();
     void BuildEdgeEditorModel();
