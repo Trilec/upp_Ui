@@ -1181,11 +1181,11 @@ void UiGraphDemo::UpdateStatus()
     String selection;
     if(selected_nodes || selected_edges)
         selection = Format("  selected=%dn/%de", selected_nodes, selected_edges);
-    lbl_status.SetText(Format("%s  nodes=%d  edges=%d  prepared=%d/%d  candidates=%d/%d  zoom=%.2f%s",
+    lbl_status.SetText(Format("%s  nodes=%d  edges=%d  prepared=%d/%d  candidates=%d/%d  zoom=%.2f  undo=%d redo=%d%s",
                               mode, graph_.Model().GetNodeCount(), graph_.Model().GetEdgeCount(),
                               graph_.GetPreparedNodeCount(), graph_.GetPreparedEdgeCount(),
                               graph_.GetLastNodeCandidateCount(), graph_.GetLastEdgeCandidateCount(),
-                              graph_.GetZoom(), selection));
+                              graph_.GetZoom(), graph_undo_.GetCount(), graph_redo_.GetCount(), selection));
 }
 
 void UiGraphDemo::MarkGeneratedCodeDirty()
