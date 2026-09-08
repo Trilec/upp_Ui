@@ -143,7 +143,8 @@ bool PaintEdgeDirect(Draw& w, const UiGraphEdge& edge,
     // with Painter for Circle/Diamond/Triangle made otherwise identical edges
     // differ in apparent width and aliasing. The direct Draw path remains the
     // overview/simplified backend where its lower cost is useful at scale.
-    if(!simplified && zoom >= lod.edge_simplify_zoom)
+    if(UiNodeGraphDetail::ResolveEdgePaintBackend(edge, style, simplified, zoom, lod)
+       == UiNodeGraphDetail::EdgePaintBackend::Painter)
         return false;
 
     int si = minmax((int)state, 0, 3);
@@ -157,9 +158,6 @@ bool PaintEdgeDirect(Draw& w, const UiGraphEdge& edge,
         return true;
 
     UiGraphArrowStyle arrow = edge.arrow == UiGraphArrowStyle::Inherit ? style.arrow : edge.arrow;
-    if(edge.directed && arrow != UiGraphArrowStyle::None && arrow != UiGraphArrowStyle::Open)
-        return false;
-
     UiLineStyle line_style = ResolveDirectLineStyle(edge, style, simplified,
                                                     zoom, lod.edge_simplify_zoom);
     int width = max(1, fround(widthf));
@@ -652,9 +650,6 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     int64 details_started = usecs();
     const Style& graph_style = GetEffectiveStyle();
     Color canvas = ResolveFace(graph_style.canvas_palette.face[ST_NORMAL], SColorPaper());
-    double port_floor = max(0.12, lod_policy_.port_zoom - 0.04);
-    double port_full = max(port_floor + 0.08, lod_policy_.port_zoom + 0.16);
-    bool show_ports = SmoothUnit(zoom_, port_floor, port_full) > 0.01;
 
     for(int i = 0; i < paint_nodes.GetCount(); i++) {
         const NodeGeometry& g = node_geometry_[paint_nodes[i]];
@@ -733,7 +728,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                                    max(0, fround(node->corner_radius * zoom_ * 0.55)));
         }
 
-        if(show_ports && !g.anchors.IsEmpty()) {
+        if(UiNodeGraphDetail::ShowNodePorts(g.micro, zoom_, lod_policy_) && !g.anchors.IsEmpty()) {
             int port_radius = max(1, fround(style.port_radius * min(1.0, max(0.24, zoom_))));
             double normal_stroke = max(1.0, (double)DPI(1));
             for(int a = 0; a < g.anchors.GetCount(); a++) {
@@ -765,14 +760,15 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                                 port_radius * 2 + 1, port_radius * 2 + 1);
                 PaintCachedPortMarker(w, pr, canvas, frame,
                                       active ? max(1.5, normal_stroke * 1.5) : normal_stroke);
+                last_painted_port_count_++;
             }
         }
     }
     last_node_details_paint_usecs_ = max<int64>(0, usecs() - details_started);
 
     int64 content_started = usecs();
-    double content_floor = max(0.24, lod_policy_.secondary_text_zoom - 0.08);
-    double text_floor = max(0.24, lod_policy_.title_zoom - 0.04);
+    double content_floor = UiNodeGraphDetail::ContentPaintFloor(lod_policy_);
+    double text_floor = UiNodeGraphDetail::TitlePaintFloor(lod_policy_);
     for(int i = 0; i < paint_nodes.GetCount(); i++) {
         const NodeGeometry& g = node_geometry_[paint_nodes[i]];
         const UiGraphNode* node = model_->FindNode(g.ref);
@@ -930,3 +926,4 @@ void UiNodeGraph::Paint(Draw& w)
 }
 
 } // namespace Upp
+

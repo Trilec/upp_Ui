@@ -332,6 +332,15 @@ public:
     bool GetPortScreenAnchor(const UiGraphPortRef& port, Point& anchor) const;
     Rect GetEdgeRouteHandleRect(UiGraphEdgeRef edge) const;
 
+    enum class PaintPath { None, Micro, Rich };
+    enum class PaintFallbackReason {
+        None, EmptyScene, SemanticGesture, MarqueePreview, DetailScale,
+        CustomPaint, NonMicroNode, CustomShape, NoMicroNodes, PainterEdge
+    };
+    PaintPath GetLastPaintPath() const { return last_paint_path_; }
+    PaintFallbackReason GetLastPaintFallbackReason() const { return last_paint_fallback_reason_; }
+    int GetLastPaintedPortCount() const { return last_painted_port_count_; }
+
     // Read-only scale evidence. These counters expose real production work and
     // do not alter model semantics or geometry preparation.
     int GetGeometryBuildSerial() const { return geometry_build_serial_; }
@@ -688,6 +697,9 @@ private:
 
     void PaintGrid(Draw& w, const Rect& outer) const;
     void PaintGraphGeometry(Draw& w);
+    PaintPath last_paint_path_ = PaintPath::None;
+    PaintFallbackReason last_paint_fallback_reason_ = PaintFallbackReason::None;
+    int last_painted_port_count_ = 0;
     void PaintEdge(Painter& p, const UiGraphEdge& edge,
                    const EdgeGeometry& geometry, const UiGraphEdgeStyle& style,
                    UiGraphVisualState state);
@@ -892,3 +904,4 @@ private:
 } // namespace Upp
 
 #endif
+

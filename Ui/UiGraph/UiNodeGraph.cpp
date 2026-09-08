@@ -1,4 +1,5 @@
 #include <Ui/UiGraph/UiNodeGraph.h>
+#include <Ui/UiGraph/UiNodeGraphLod.h>
 #include <Ui/Ui.h>
 #include <Ui/UiRenderLayer.h>
 
@@ -74,3 +75,4 @@
 
 #include "UiNodeGraphHierarchyModelSwitch.inc"
 #include "UiNodeGraphHierarchyPaint.inc"
+

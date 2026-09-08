@@ -13,7 +13,9 @@ file
     OverviewLod.cpp,
     RenderLod.cpp,
     PatternedPaint.cpp,
-    Presentation.cpp;
+    Presentation.cpp,
+    ExecutionPath.cpp;
 
 mainconfig
     "CONSOLE" = "";
+

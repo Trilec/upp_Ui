@@ -39,6 +39,7 @@ file
 	UiGraph/UiGraphModel.h,
 	UiGraph/UiGraphModel.cpp,
 	UiGraph/UiNodeGraph.h,
+	UiGraph/UiNodeGraphLod.h,
 	UiGraph/UiNodeGraphBase.h,
 	UiGraph/UiNodeGraphHierarchyApi.h,
 	UiGraph/UiNodeGraph.cpp,
@@ -195,3 +196,4 @@ file
 	UiColorPicker/UiColorPickerPaletteLab.cpp,
 	src.tpp,
 	srcdoc.tpp;
+

@@ -226,12 +226,20 @@ Image LodMicroPolygonRaster(const UiGraphNode& node,
 
 void UiNodeGraph::PaintGraphGeometry(Draw& w)
 {
+    last_paint_path_ = PaintPath::None;
+    last_paint_fallback_reason_ = PaintFallbackReason::None;
+    last_painted_port_count_ = 0;
+    auto rich = [&](PaintFallbackReason reason) {
+        last_paint_path_ = PaintPath::Rich;
+        last_paint_fallback_reason_ = reason;
+        PaintGraphGeometryRenderBase(w);
+    };
     last_micro_raster_count_ = 0;
     last_micro_cached_draw_count_ = 0;
     last_micro_direct_fallback_count_ = 0;
     Size size = GetSize();
     if(size.cx <= 0 || size.cy <= 0 || !model_) {
-        PaintGraphGeometryRenderBase(w);
+        rich(PaintFallbackReason::EmptyScene);
         return;
     }
     Rect viewport(Point(0, 0), size);
@@ -243,13 +251,19 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     // nodes below edge-label/detail scale. Rich/reference nodes, active gestures,
     // custom body/foreground/overlay hooks and non-direct arrow styles retain the
     // accepted renderer unchanged.
-    if((interaction_ != InteractionMode::None && interaction_ != InteractionMode::Pan)
-       || !marquee_preview_nodes_.IsEmpty()
-       || zoom_ >= lod_policy_.edge_label_zoom
-       || WhenPaintNodeBackground
-       || WhenPaintNodeForeground
-       || WhenPaintNodeOverlay) {
-        PaintGraphGeometryRenderBase(w);
+    // Camera-only pan has the same presentation as idle. Semantic gestures
+    // retain the established rich overlay path; record why before doing work.
+    PaintFallbackReason reason = PaintFallbackReason::None;
+    if(interaction_ != InteractionMode::None && interaction_ != InteractionMode::Pan)
+        reason = PaintFallbackReason::SemanticGesture;
+    else if(!marquee_preview_nodes_.IsEmpty())
+        reason = PaintFallbackReason::MarqueePreview;
+    else if(zoom_ >= lod_policy_.edge_label_zoom)
+        reason = PaintFallbackReason::DetailScale;
+    else if(WhenPaintNodeBackground || WhenPaintNodeForeground || WhenPaintNodeOverlay)
+        reason = PaintFallbackReason::CustomPaint;
+    if(reason != PaintFallbackReason::None) {
+        rich(reason);
         return;
     }
 
@@ -269,18 +283,18 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
         if(q < 0 || (node_geometry_[q].paint_bounds & paint).IsEmpty())
             continue;
         if(!node_geometry_[q].micro) {
-            PaintGraphGeometryRenderBase(w);
+            rich(PaintFallbackReason::NonMicroNode);
             return;
         }
         const UiGraphNode* node = model_->FindNode(node_geometry_[q].ref);
         if(!node || node->shape == UiGraphNodeShape::Custom) {
-            PaintGraphGeometryRenderBase(w);
+            rich(PaintFallbackReason::CustomShape);
             return;
         }
         paint_nodes.Add(q);
     }
     if(paint_nodes.IsEmpty()) {
-        PaintGraphGeometryRenderBase(w);
+        rich(PaintFallbackReason::NoMicroNodes);
         return;
     }
     Sort(paint_nodes, [&](int a, int b) {
@@ -290,7 +304,11 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     });
 
     Vector<int> paint_edges;
+    Vector<UiGraphEdgeStyle> paint_edge_styles;
+    Vector<UiGraphVisualState> paint_edge_states;
     paint_edges.Reserve(edge_ids.GetCount());
+    paint_edge_styles.Reserve(edge_ids.GetCount());
+    paint_edge_states.Reserve(edge_ids.GetCount());
     if(zoom_ >= lod_policy_.edge_hide_zoom)
         for(int i = 0; i < edge_ids.GetCount(); i++) {
             int q = edge_geometry_.Find(edge_ids[i]);
@@ -301,14 +319,18 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 continue;
             UiGraphVisualState state = GetEdgeVisualState(*edge);
             UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, state);
-            UiGraphArrowStyle arrow = edge->arrow == UiGraphArrowStyle::Inherit ? style.arrow : edge->arrow;
-            if(edge->directed && arrow != UiGraphArrowStyle::None && arrow != UiGraphArrowStyle::Open) {
-                PaintGraphGeometryRenderBase(w);
+            if(UiNodeGraphDetail::ResolveEdgePaintBackend(*edge, style,
+                    edge_geometry_[q].simplified, zoom_, lod_policy_)
+               == UiNodeGraphDetail::EdgePaintBackend::Painter) {
+                rich(PaintFallbackReason::PainterEdge);
                 return;
             }
             paint_edges.Add(q);
+            paint_edge_styles.Add(pick(style));
+            paint_edge_states.Add(state);
         }
 
+    last_paint_path_ = PaintPath::Micro;
     last_paint_node_visit_count_ = paint_nodes.GetCount();
     last_paint_edge_visit_count_ = paint_edges.GetCount();
     last_painted_node_count_ = 0;
@@ -321,15 +343,17 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_node_content_paint_usecs_ = 0;
 
     int64 edge_started = usecs();
-    for(int q : paint_edges) {
-        const EdgeGeometry& g = edge_geometry_[q];
+    for(int i = 0; i < paint_edges.GetCount(); i++) {
+        const EdgeGeometry& g = edge_geometry_[paint_edges[i]];
         const UiGraphEdge* edge = model_->FindEdge(g.ref);
         if(!edge)
             continue;
-        UiGraphVisualState state = GetEdgeVisualState(*edge);
-        UiGraphEdgeStyle style = ResolveEdgeStyle(*edge, state);
-        if(PaintEdgeDirect(w, *edge, g.points, g.simplified, style, state,
-                           zoom_, lod_policy_)) {
+        const UiGraphVisualState state = paint_edge_states[i];
+        const UiGraphEdgeStyle& style = paint_edge_styles[i];
+        const bool painted = PaintEdgeDirect(w, *edge, g.points, g.simplified, style, state,
+                                             zoom_, lod_policy_);
+        ASSERT(painted); // All Painter-required edges were rejected before paint.
+        if(painted) {
             last_painted_edge_count_++;
             if(g.simplified)
                 last_simplified_edge_count_++;
@@ -534,7 +558,7 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     // micro regardless of the abstract zoom value; constructing title/content/
     // port-hit geometry for it only creates invisible work and was the dominant
     // intermediate-zoom 10k stall exposed by the P1 live profile.
-    const bool overview_geometry = sz.cx < 38 || sz.cy < 26;
+    const bool overview_geometry = UiNodeGraphDetail::IsMicroNode(sz.cx, sz.cy);
 
     if(!overview_geometry) {
         BuildNodeGeometry(node, out);
@@ -910,3 +934,4 @@ UiNodeGraph& UiNodeGraph::ResetView()
 }
 
 } // namespace Upp
+

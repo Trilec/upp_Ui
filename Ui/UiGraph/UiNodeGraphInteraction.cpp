@@ -1,4 +1,5 @@
 #include <Ui/UiGraph/UiNodeGraph.h>
+#include <Ui/UiGraph/UiNodeGraphLod.h>
 
 // Preserve the complete validated interaction implementation byte-for-byte in
 // UiNodeGraphInteractionBase.inc, but compile the three live-camera entry points
@@ -19,3 +20,4 @@
 #define PrepareGeometry PrepareViewGeometry
 #include "UiNodeGraphView.inc"
 #undef PrepareGeometry
+

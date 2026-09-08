@@ -83,9 +83,9 @@ bool GraphViewCrosses(double from, double to, double threshold)
 
 bool GraphViewLodCompatible(const UiNodeGraph::LodPolicy& lod, double exact_zoom, double next_zoom)
 {
-    const double title_floor = max(0.24, lod.title_zoom - 0.04);
-    const double content_floor = max(0.24, lod.secondary_text_zoom - 0.08);
-    const double port_floor = max(0.12, lod.port_zoom - 0.04);
+    const double title_floor = UiNodeGraphDetail::TitlePaintFloor(lod);
+    const double content_floor = UiNodeGraphDetail::ContentPaintFloor(lod);
+    const double port_floor = UiNodeGraphDetail::PortPaintFloor(lod);
     const double thresholds[] = {
         lod.edge_hide_zoom,
         lod.minimal_edge_zoom,
@@ -173,8 +173,8 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
         for(int q = 0; q < g.port_labels.GetCount(); q++)
             g.port_labels[q] = project_rect(src.port_labels[q]);
 
-        g.compact = g.rect.GetWidth() < 120 || g.rect.GetHeight() < 72;
-        g.micro = g.rect.GetWidth() < 38 || g.rect.GetHeight() < 26;
+        g.compact = UiNodeGraphDetail::IsCompactNode(g.rect.GetWidth(), g.rect.GetHeight());
+        g.micro = UiNodeGraphDetail::IsMicroNode(g.rect.GetWidth(), g.rect.GetHeight());
     }
 
     for(int i = 0; i < edges.GetCount(); i++) {
@@ -315,8 +315,8 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             const NodeGeometry& g = live_baseline_nodes_[i];
             int width = max(1, fround(g.rect.GetWidth() * cumulative));
             int height = max(1, fround(g.rect.GetHeight() * cumulative));
-            bool compact = width < 120 || height < 72;
-            bool micro = width < 38 || height < 26;
+            bool compact = UiNodeGraphDetail::IsCompactNode(width, height);
+            bool micro = UiNodeGraphDetail::IsMicroNode(width, height);
             if(compact != g.compact || micro != g.micro) {
                 cancel_approximation();
                 return false;
@@ -481,3 +481,4 @@ void UiNodeGraph::MouseWheel(Point p, int zdelta, dword)
 }
 
 } // namespace Upp
+

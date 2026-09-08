@@ -1877,8 +1877,8 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     out.rect = RectC(p.x, p.y, sz.cx, sz.cy);
     out.paint_bounds = out.rect;
     out.z_order = node.z_order;
-    out.compact = sz.cx < 120 || sz.cy < 72;
-    out.micro = sz.cx < 38 || sz.cy < 26;
+    out.compact = UiNodeGraphDetail::IsCompactNode(sz.cx, sz.cy);
+    out.micro = UiNodeGraphDetail::IsMicroNode(sz.cx, sz.cy);
 
     StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
     StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
@@ -3117,3 +3117,4 @@ Rect UiNodeGraph::GetGraphScreenBounds(bool selection_only) const
 }
 
 } // namespace Upp
+

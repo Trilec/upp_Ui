@@ -8,6 +8,27 @@ TASK: **UIGRAPH-RC-PAN-PORT-DIAG-01 — validate final measured Graph correction
 STATUS: **SOURCE FIXES PUBLISHED — WINDOWS VALIDATION PENDING**
 CURRENT SOURCE CHECKPOINT: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
 
+## EXECUTION CONSOLIDATION BRANCH
+
+BASE: `cc386585d0eb5287c0f096d01a70a79e7df42fd7` / `main`
+TASK: UIGRAPH-EXECUTION-CONSOLIDATION — retain 10k speed; clarify execution ownership.
+BRANCH: `performance/uigraph-execution-consolidation-20260908`
+TOUCHED: Ui/UiGraph LOD/paint/view policy; Ui/Ui.upp; render and pan-profile tests.
+STATUS: Checkpoint 1 source-reviewed; Windows build/runtime validation pending.
+PUBLISHED: This checkpoint is the commit containing this entry; previous remote tip is BASE.
+VALIDATION: Full source diff reviewed; git diff --check passed. No local U++ toolchain.
+NEXT ACTION: Remove obsolete implementation bodies/aliases; name files by responsibility;
+then restore independent normal demo status observation and publish the final validation gate.
+
+Checkpoint 1 centralises projected-size/visibility/edge-backend decisions, reports the
+selected paint path and fallback reason, and preflights Painter-required edges before
+micro drawing. Edge style resolution is reused across micro preflight/drawing. Tests
+cover middle pan, a rich neighbour, micro port visibility and custom edge thresholds.
+Public host API remains compatible; paint evidence getters are additive.
+
+The previous main release gate below remains pending; no new performance numbers
+are claimed. Do not merge this branch before Windows validation.
+
 ## PUBLISHED CORRECTIONS
 
 - `dc196091ba1452bc7bd2091124cc4391d22503a3`
@@ -113,3 +134,4 @@ Still complete the previously unverified proximity matrix:
 
 Validate current `main` descendant. If all above passes, close the UiGraph RC gate.
 Do not reopen style/spatial/raster architecture without new measured evidence.
+

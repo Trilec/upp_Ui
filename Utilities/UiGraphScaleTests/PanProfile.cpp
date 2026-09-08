@@ -111,6 +111,9 @@ void ProfilePan(TestCtx& t, UiNodeGraph& graph, ImageDraw& draw,
         t.Expect(graph.GetLastMicroRasterCount() > 0
                  || graph.GetLastMicroDirectFallbackCount() > 0,
                  "overview middle-pan records projected-micro paint evidence");
+        t.Expect(graph.GetLastPaintPath() == UiNodeGraph::PaintPath::Micro
+                 && graph.GetLastPaintFallbackReason() == UiNodeGraph::PaintFallbackReason::None,
+                 "overview middle-pan has no rich-render fallback reason");
     }
 }
 
@@ -151,3 +154,4 @@ int RunPanProfileSuite()
            << " failed=" << t.fails << '\n';
     return t.fails ? 1 : 0;
 }
+
