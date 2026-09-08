@@ -1456,7 +1456,7 @@ void UiGraphDemo::SampleDiagnostics()
     diag_history_edge_[slot] = edges;
     diag_history_node_[slot] = nodes;
     diag_history_pos_ = (diag_history_pos_ + 1) % DIAG_HISTORY_CAPACITY;
-    diag_history_count_ = min(DIAG_HISTORY_CAPACITY, diag_history_count_ + 1);
+    diag_history_count_ = min<int>(DIAG_HISTORY_CAPACITY, diag_history_count_ + 1);
 
     const int band = CurrentDiagnosticsLodBand();
     diag_lod_samples_[band]++;
