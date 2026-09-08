@@ -595,6 +595,84 @@ UiGraphPortRef UiNodeGraph::HitTestPortSpatial(Point p) const
     return UiGraphPortRef();
 }
 
+Vector<UiGraphPortRef> UiNodeGraph::QueryPortsNear(Point p, int radius_px) const
+{
+    UiNodeGraph* self = const_cast<UiNodeGraph*>(this);
+    self->PrepareGeometry();
+    self->EnsureSpatialIndex();
+
+    Vector<UiGraphPortRef> out;
+    if(!model_ || zoom_ < lod_policy_.port_zoom)
+        return out;
+
+    radius_px = max(1, radius_px);
+    WorldRect area;
+    area.Include(ScreenToWorld(Point(p.x - radius_px, p.y - radius_px)));
+    area.Include(ScreenToWorld(Point(p.x + radius_px, p.y + radius_px)));
+
+    Index<UiGraphId> nodes;
+    Index<UiGraphId> edges;
+    QuerySpatial(area, nodes, edges, SPATIAL_QUERY_NODES);
+
+    struct Candidate : Moveable<Candidate> {
+        UiGraphPortRef ref;
+        double distance2 = 0.0;
+    };
+    Vector<Candidate> candidates;
+    const double limit2 = (double)radius_px * radius_px;
+
+    for(int n = 0; n < nodes.GetCount(); n++) {
+        int q = node_geometry_.Find(nodes[n]);
+        if(q < 0)
+            continue;
+        const NodeGeometry& g = node_geometry_[q];
+        const UiGraphNode* node = model_->FindNode(g.ref);
+        if(!node)
+            continue;
+        for(int a = 0; a < g.anchors.GetCount(); a++) {
+            UiGraphPortRef ref{node->ref, g.anchors.GetKey(a)};
+            const UiGraphPort* port = model_->FindPort(ref);
+            if(!port || !port->visible || !port->enabled)
+                continue;
+            Point anchor = g.anchors[a];
+            double dx = anchor.x - p.x;
+            double dy = anchor.y - p.y;
+            double d2 = dx * dx + dy * dy;
+            if(d2 <= limit2) {
+                Candidate& candidate = candidates.Add();
+                candidate.ref = ref;
+                candidate.distance2 = d2;
+            }
+        }
+    }
+
+    Sort(candidates, [](const Candidate& a, const Candidate& b) {
+        if(abs(a.distance2 - b.distance2) > 1e-9)
+            return a.distance2 < b.distance2;
+        if(a.ref.node.id != b.ref.node.id)
+            return a.ref.node.id < b.ref.node.id;
+        return a.ref.port_id < b.ref.port_id;
+    });
+    out.Reserve(candidates.GetCount());
+    for(const Candidate& candidate : candidates)
+        out.Add(candidate.ref);
+    return out;
+}
+
+bool UiNodeGraph::GetPortScreenAnchor(const UiGraphPortRef& port, Point& anchor) const
+{
+    UiNodeGraph* self = const_cast<UiNodeGraph*>(this);
+    self->PrepareGeometry();
+    const NodeGeometry* geometry = FindNodeGeometry(port.node);
+    if(!geometry)
+        return false;
+    int q = geometry->anchors.Find(port.port_id);
+    if(q < 0)
+        return false;
+    anchor = geometry->anchors[q];
+    return true;
+}
+
 UiGraphEdgeRef UiNodeGraph::HitTestEdgeSpatial(Point p) const
 {
     UiNodeGraph* self = const_cast<UiNodeGraph*>(this);

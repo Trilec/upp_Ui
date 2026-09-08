@@ -12,6 +12,7 @@ file
 	UiGraphDemo.h,
 	UiGraphDemo.cpp,
 	UiGraphDemoRuntime.cpp,
+	UiGraphDemoCommands.cpp,
 	UiGraphDemoData.cpp,
 	main.cpp;
 

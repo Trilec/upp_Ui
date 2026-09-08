@@ -248,6 +248,49 @@ void RunBatchRemovalTest(TestCtx& t)
              "batch scope is fully closed after reconciliation");
 }
 
+void RunHostHistoryAndProximityTest(TestCtx& t)
+{
+    Cout() << "\n=== Host history + port proximity ===\n";
+
+    UiGraphModel model;
+    UiGraphNodeRef a = model.AddNode(MakeNode(601, "A", Pointf(80, 120), true));
+    UiGraphNodeRef b = model.AddNode(MakeNode(602, "B", Pointf(225, 120), true));
+    UiGraphPortRef a_out{a, "out"};
+    UiGraphPortRef b_in{b, "in"};
+
+    UiNodeGraph graph;
+    PrepareGraph(graph, model);
+
+    Point a_anchor, b_anchor;
+    t.Expect(graph.GetPortScreenAnchor(a_out, a_anchor)
+             && graph.GetPortScreenAnchor(b_in, b_anchor),
+             "public port-anchor query resolves prepared screen positions");
+
+    Point midpoint((a_anchor.x + b_anchor.x) / 2, (a_anchor.y + b_anchor.y) / 2);
+    int radius = max(20, abs(b_anchor.x - a_anchor.x));
+    Vector<UiGraphPortRef> nearby = graph.QueryPortsNear(midpoint, radius);
+    bool saw_a = false, saw_b = false;
+    for(const UiGraphPortRef& ref : nearby) {
+        saw_a |= ref == a_out;
+        saw_b |= ref == b_in;
+    }
+    t.Expect(saw_a && saw_b,
+             "bounded port-proximity query finds nearby endpoints through retained spatial state");
+    t.Expect(model.ValidateConnection(a_out, b_in).IsAllowed(),
+             "proximity discovery remains separate from authoritative connection validation");
+
+    int undo_requests = 0;
+    int redo_requests = 0;
+    graph.WhenUndoRequest = [&] { undo_requests++; };
+    graph.WhenRedoRequest = [&] { redo_requests++; };
+    t.Expect(graph.Key(K_CTRL | K_Z, 1)
+             && graph.Key(K_CTRL | K_Y, 1)
+             && graph.Key(K_CTRL | K_SHIFT | K_Z, 1),
+             "Graph routes standard undo/redo shortcuts to host-owned history");
+    t.Expect(undo_requests == 1 && redo_requests == 2,
+             "history shortcut events fire exactly once per accepted key gesture");
+}
+
 } // namespace
 
 CONSOLE_APP_MAIN
@@ -258,6 +301,7 @@ CONSOLE_APP_MAIN
     RunConnectionRemovalTest(t);
     RunSelectionRemovalTest(t);
     RunBatchRemovalTest(t);
+    RunHostHistoryAndProximityTest(t);
 
     Cout() << "\nUINODEGRAPH_INTERACTION_STATE_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << '\n';

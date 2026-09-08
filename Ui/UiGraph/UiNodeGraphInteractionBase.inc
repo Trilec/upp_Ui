@@ -1104,6 +1104,14 @@ void UiNodeGraph::MouseWheel(Point p, int zdelta, dword)
 
 bool UiNodeGraph::Key(dword key, int count)
 {
+    if(key == (K_CTRL | K_Z) && WhenUndoRequest) {
+        WhenUndoRequest();
+        return true;
+    }
+    if((key == (K_CTRL | K_Y) || key == (K_CTRL | K_SHIFT | K_Z)) && WhenRedoRequest) {
+        WhenRedoRequest();
+        return true;
+    }
     if(key == K_ESCAPE) {
         CancelMode();
         return true;

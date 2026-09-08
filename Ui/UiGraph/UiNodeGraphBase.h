@@ -328,6 +328,8 @@ public:
     UiGraphNodeRef HitTestNode(Point p) const;
     UiGraphEdgeRef HitTestEdge(Point p) const;
     UiGraphPortRef HitTestPort(Point p) const;
+    Vector<UiGraphPortRef> QueryPortsNear(Point p, int radius_px = 20) const;
+    bool GetPortScreenAnchor(const UiGraphPortRef& port, Point& anchor) const;
     Rect GetEdgeRouteHandleRect(UiGraphEdgeRef edge) const;
 
     // Read-only scale evidence. These counters expose real production work and
@@ -415,6 +417,8 @@ public:
     Event<UiGraphEdgeRouteRequest&> WhenEdgeRouteRequest;
     Event<UiGraphConnectionRequest&> WhenConnectionRequest;
     Event<UiGraphDeleteRequest&> WhenDeleteRequest;
+    Event<> WhenUndoRequest;
+    Event<> WhenRedoRequest;
     Event<const UiGraphNode&, UiGraphVisualState, UiGraphNodeStyle&> WhenResolveNodeStyle;
     Event<const UiGraphEdge&, UiGraphVisualState, UiGraphEdgeStyle&> WhenResolveEdgeStyle;
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
