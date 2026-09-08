@@ -104,6 +104,7 @@ private:
 
     void BuildHeader();
     void BuildPreview();
+    void BuildAuthoringPanel();
     void BuildRightRail();
     void BuildNodeEditorModel();
     void BuildEdgeEditorModel();
@@ -163,6 +164,9 @@ private:
     void UndoGraphEdit();
     void RedoGraphEdit();
     void ClearGraphHistory();
+    void CreatePaletteNode(UiGraphNodeShape shape, const String& title);
+    void SetAuthoringRoute(UiGraphRouteStyle route);
+    void RefreshAuthoringPalette();
     void ScheduleAutoConnect(const Vector<UiGraphNodeRef>& moved);
     void OfferAutoConnect();
     bool ConfirmAutoConnect(const UiGraphPortRef& source, const UiGraphPortRef& target,
@@ -178,6 +182,13 @@ private:
     UiBoxLayout box_header_actions { UiDirection::H };
     UiButton btn_reference, btn_scale, btn_fit, btn_one_to_one;
     UiToolButton btn_theme, btn_exit;
+
+    UiPanel pnl_authoring;
+    UiLabel lbl_author_history, lbl_author_nodes, lbl_author_edges;
+    UiToolButton btn_author_undo, btn_author_redo;
+    UiButton btn_node_rectangle, btn_node_ellipse, btn_node_diamond, btn_node_triangle;
+    UiButton btn_node_hexagon, btn_node_cloud, btn_node_document, btn_node_database;
+    UiButton btn_edge_straight, btn_edge_bezier, btn_edge_orthogonal;
 
     UiPanel pnl_preview;
     UiNodeGraph graph_;
@@ -215,6 +226,7 @@ private:
     Vector<GraphDemoCommand> graph_redo_;
     bool replaying_graph_history_ = false;
     bool auto_connect_always_ = false;
+    UiGraphRouteStyle authoring_route_ = UiGraphRouteStyle::Bezier;
     Vector<UiGraphNodeRef> pending_auto_connect_nodes_;
     TimeCallback auto_connect_tc_;
 
