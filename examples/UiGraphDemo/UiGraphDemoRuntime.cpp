@@ -133,6 +133,21 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     };
 
     d.graph_.WhenSelection = sync_selection;
+    d.graph_.WhenNodeMoveRequest = [&d](UiGraphNodeMoveRequest& request) {
+        d.HandleNodeMoveRequest(request);
+    };
+    d.graph_.WhenEdgeRouteRequest = [&d](UiGraphEdgeRouteRequest& request) {
+        d.HandleEdgeRouteRequest(request);
+    };
+    d.graph_.WhenConnectionRequest = [&d](UiGraphConnectionRequest& request) {
+        d.HandleConnectionRequest(request);
+    };
+    d.graph_.WhenDeleteRequest = [&d](UiGraphDeleteRequest& request) {
+        d.HandleDeleteRequest(request);
+    };
+    d.graph_.WhenUndoRequest = [&d] { d.UndoGraphEdit(); };
+    d.graph_.WhenRedoRequest = [&d] { d.RedoGraphEdit(); };
+
     d.graph_.WhenViewport = [&d, schedule_diagnostics] {
         // Profiling OFF or Diagnostics hidden means literally no observer work:
         // no comparisons, strings, counters copied, timers armed or controls touched.
@@ -193,6 +208,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
         }
 
         d.CommitStyleTransaction();
+        d.ClearGraphHistory();
         const int64 switch_started = usecs();
         int64 ensure_us = 0;
         int64 bind_us = 0;
