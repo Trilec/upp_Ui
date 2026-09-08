@@ -79,41 +79,6 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     }
     d.SyncNodeEditor();
 
-    // Diagnostics are deliberately observer-only. Graph interaction completes
-    // and stores its own counters first; this sampler copies those counters into
-    // controls later. No text/progress update is allowed from the measured
-    // zoom/pan/switch path itself.
-    auto refresh_diagnostics = [&d] {
-        if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
-            return;
-        d.SampleDiagnostics();
-        String detail = AsString(d.edit_diagnostics.GetData());
-        detail << Format("\nNode phases: surface=%.3f ms  details/ports=%.3f ms  content/text=%.3f ms  total=%.3f ms\n",
-                         d.graph_.GetLastNodeSurfacePaintUsecs() / 1000.0,
-                         d.graph_.GetLastNodeDetailsPaintUsecs() / 1000.0,
-                         d.graph_.GetLastNodeContentPaintUsecs() / 1000.0,
-                         d.graph_.GetLastNodePaintUsecs() / 1000.0);
-        d.edit_diagnostics.SetData(detail);
-        // Status is cheap camera/readout state. Keep it out of the measured
-        // gesture itself, but make sure the post-interaction snapshot shows the
-        // actual settled zoom/pan rather than a stale pre-runtime value.
-        d.UpdateStatus();
-    };
-
-    // Debounced post-interaction sampling: each viewport/switch event replaces
-    // one TimeCallback. Continuous wheel/pan input therefore performs no
-    // diagnostics formatting/control repaint, and idle owns no repeating clock.
-    auto schedule_diagnostics = [&d, refresh_diagnostics] {
-        d.diagnostics_sample_tc_.Kill();
-        if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
-            return;
-        Ptr<UiGraphDemo> self = &d;
-        d.diagnostics_sample_tc_.KillSet(200, [self, refresh_diagnostics] {
-            if(self)
-                refresh_diagnostics();
-        });
-    };
-
     auto sync_selection = [&d] {
         if(d.syncing_editors_)
             return;
@@ -150,57 +115,23 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     d.graph_.WhenUndoRequest = [&d] { d.UndoGraphEdit(); };
     d.graph_.WhenRedoRequest = [&d] { d.RedoGraphEdit(); };
 
-    d.graph_.WhenViewport = [&d, schedule_diagnostics] {
-        // Profiling OFF or Diagnostics hidden means literally no observer work:
-        // no comparisons, strings, counters copied, timers armed or controls touched.
-        if(d.syncing_editors_ || !d.diagnostics_enabled_
-           || d.stk_right_pages.GetActivePage() != 3)
-            return;
-        const double zoom = d.graph_.GetZoom();
-        const Pointf pan = d.graph_.GetPan();
-        if(zoom != d.diag_previous_zoom_)
-            d.diag_last_interaction_ = "Zoom / mouse wheel";
-        else if(pan.x != d.diag_previous_pan_.x || pan.y != d.diag_previous_pan_.y)
-            d.diag_last_interaction_ = "Pan / scroll";
-        else
-            d.diag_last_interaction_ = "Viewport refresh";
-        d.diag_previous_zoom_ = zoom;
-        d.diag_previous_pan_ = pan;
-        // Only arm/rearm the post-interaction sampler. The Graph's measured
-        // counters and Paint run before any diagnostics controls are rewritten.
-        schedule_diagnostics();
-    };
-
-    auto select_page = [&d, refresh_diagnostics](int page) {
-        d.diagnostics_sample_tc_.Kill();
+    auto select_page = [&d](int page) {
         d.SelectPage(page);
         if(page == 0)
             d.SyncNodeEditor();
         else if(page == 1)
             d.SyncStyleEditor();
         else if(page == 3 && d.diagnostics_enabled_)
-            refresh_diagnostics();
+            d.SampleDiagnostics();
     };
     d.btn_inspector_mode.WhenAction = [select_page] { select_page(0); };
     d.btn_style_mode.WhenAction = [select_page] { select_page(1); };
     d.btn_code_mode.WhenAction = [select_page] { select_page(2); };
     d.btn_diagnostics_mode.WhenAction = [select_page] { select_page(3); };
 
-    d.btn_diag_enable.WhenAction = [&d, refresh_diagnostics] {
-        const bool on = d.btn_diag_enable.IsChecked();
-        d.diagnostics_enabled_ = on;
-        d.diagnostics_sample_tc_.Kill();
-        if(on && d.stk_right_pages.GetActivePage() == 3)
-            refresh_diagnostics();
-        // When off, no pending sampler remains. The visible controls deliberately
-        // retain the last snapshot so the user can see that values are frozen.
-    };
-    d.btn_diag_reset.WhenAction = [&d, refresh_diagnostics] {
-        d.ResetDiagnostics();
-        refresh_diagnostics();
-    };
+    // Base events own diagnostics enable/reset and the viewport observer.
 
-    auto switch_mode = [&d, sync_selection, schedule_diagnostics, normalize_model_shapes](bool scale) {
+    auto switch_mode = [&d, sync_selection, normalize_model_shapes](bool scale) {
         if(scale == d.scale_mode_ && d.graph_.Model().GetNodeCount() > 0) {
             d.btn_reference.SetChecked(!scale);
             d.btn_scale.SetChecked(scale);
@@ -309,7 +240,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
                     (long long)d.graph_.GetLastGeometryPrepareUsecs(),
                     d.graph_.GetLastViewUpdateGeometryBuildCount(),
                     d.graph_.GetLastViewUpdateSpatialBuildCount()));
-        schedule_diagnostics();
+        d.ScheduleViewportObservation();
     };
 
     d.btn_reference.WhenAction = [switch_mode] { switch_mode(false); };
@@ -317,3 +248,4 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
 }
 
 } // namespace Upp
+

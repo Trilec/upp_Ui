@@ -147,11 +147,11 @@ private:
     void SetDiagnosticsEnabled(bool on);
     void ResetDiagnostics();
     void RefreshDiagnostics();
-    void ScheduleDiagnosticsSample();
+    void ScheduleViewportObservation();
     void SampleDiagnostics();
     int CurrentDiagnosticsLodBand() const;
     String CurrentDiagnosticsLodLabel() const;
-    void RecordViewportDiagnostics();
+    void OnViewportChanged();
     void RecordSwitchDiagnostics(const String& label, int64 elapsed_us);
 
     void HandleNodeMoveRequest(UiGraphNodeMoveRequest& request);
@@ -208,7 +208,7 @@ private:
     UiLabel lbl_diag_paint, lbl_diag_geometry, lbl_diag_edges, lbl_diag_nodes, lbl_diag_switch;
     UiProgressBar bar_diag_paint, bar_diag_geometry, bar_diag_edges, bar_diag_nodes, bar_diag_switch;
     UiMultiEdit edit_diagnostics;
-    TimeCallback diagnostics_sample_tc_;
+    TimeCallback viewport_observer_tc_;
 
     PropertyEditorFactory pe_factory;
     PropertyEditorModel pe_model_node;
@@ -278,3 +278,4 @@ private:
 } // namespace Upp
 
 #endif
+

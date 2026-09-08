@@ -12,6 +12,7 @@ file
 	UiGraphDemo.h,
 	UiGraphDemo.cpp,
 	UiGraphDemoRuntime.cpp,
+	UiGraphDemoObservation.cpp,
 	UiGraphDemoCommands.cpp,
 	UiGraphDemoAuthoring.cpp,
 	UiGraphDemoData.cpp,
@@ -19,3 +20,4 @@ file
 
 mainconfig
 	"" = "GUI";
+

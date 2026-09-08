@@ -436,3 +436,11 @@ Before changing a threshold, update the shared policy and check live projection
 compatibility. Before changing a glyph, distinguish the node port glyph from the
 separate edge arrow. Run the execution-path suite and 10k pan profile; a paint speed
 claim requires runtime measurements, not file reduction or source inspection.
+
+Demo viewport observation lives in `examples/UiGraphDemo/UiGraphDemoObservation.cpp`.
+One `WhenViewport` callback schedules a replaceable 200 ms observer. Normal status
+updates regardless of the diagnostics page/toggle; diagnostics sampling checks both
+at execution time. Hiding or disabling diagnostics cannot cancel normal status.
+After the observer runs, no repeating timer remains. Runtime fixture setup does not
+replace this callback. Diagnostic zoom gates describe configured thresholds; actual
+paint-path/fallback/port evidence describes the rendered frame.

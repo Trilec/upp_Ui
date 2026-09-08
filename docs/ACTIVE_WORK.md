@@ -1,61 +1,39 @@
 # ACTIVE WORK
 
-Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
-Recovery state only; Git history is implementation history.
-
-BASE: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
-TASK: **UIGRAPH-RC-PAN-PORT-DIAG-01 — validate final measured Graph corrections**
-STATUS: **SOURCE FIXES PUBLISHED — WINDOWS VALIDATION PENDING**
-CURRENT SOURCE CHECKPOINT: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
-
-## EXECUTION CONSOLIDATION BRANCH
+Remote branch is authoritative. Fetch before work/publish; never force-update main.
 
 BASE: `cc386585d0eb5287c0f096d01a70a79e7df42fd7` / `main`
-TASK: UIGRAPH-EXECUTION-CONSOLIDATION — retain 10k speed; clarify execution ownership.
+TASK: UIGRAPH-EXECUTION-CONSOLIDATION — keep 10k speed; remove competing execution paths.
 BRANCH: `performance/uigraph-execution-consolidation-20260908`
-TOUCHED: Ui/UiGraph implementation/header consolidation; Ui/Ui.upp; docs/08_UIGRAPH_GUIDE.md; prior LOD/render/pan tests.
-STATUS: Checkpoint 2 source-reviewed; Windows build/runtime validation pending.
-PUBLISHED: This checkpoint is the commit containing this entry; previous published checkpoint is `9d77e9e6d54400b2ee588249b14944647cb9e464`.
-VALIDATION: Full source diff reviewed; git diff --check passed. No local U++ toolchain.
-NEXT ACTION: Restore independent normal demo status observation and publish the final validation gate.
-Checkpoint 2 removes method/declaration alias macros and obsolete implementations,
-splits geometry/camera/paint/projection responsibilities and gives production spatial
-its canonical filename. All 195 retained active member bodies were compared after
-explicit alias/name normalisation; no unplanned body changes. Windows validation pending.
+TOUCHED: `Ui/UiGraph/UiNodeGraph*`, `Ui/Ui.upp`, render/pan regression tests,
+`examples/UiGraphDemo`, `docs/08_UIGRAPH_GUIDE.md`, this log and validator task.
+STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+PUBLISHED: Checkpoint 1 `9d77e9e6d54400b2ee588249b14944647cb9e464`;
+checkpoint 2 `866fedf0b76f50448feaf356b64b608bb7d0f6a5`.
+The final source/checkpoint is the commit containing this log (resolve with
+`git log -1 --format=%H -- docs/ACTIVE_WORK.md`); a commit cannot contain its own hash.
+VALIDATION: git diff --check; expanded public-header comparison; 195 retained active
+method-body comparisons after explicit name normalisation; Graph package/include
+membership; one spatial source; one demo viewport handler/one-shot observer;
+12 isolated C++ policy checks passed. Full U++/Windows build and runtime NOT RUN here.
+NEXT ACTION: Run `docs/UIGRAPH_EXECUTION_CONSOLIDATION_VALIDATE.md` on the latest branch.
+Do not merge into main until the platform gate passes.
 
-Checkpoint 1 centralises projected-size/visibility/edge-backend decisions, reports the
-selected paint path and fallback reason, and preflights Painter-required edges before
-micro drawing. Edge style resolution is reused across micro preflight/drawing. Tests
-cover middle pan, a rich neighbour, micro port visibility and custom edge thresholds.
-Public host API remains compatible; paint evidence getters are additive.
+## Published implementation
 
-The previous main release gate below remains pending; no new performance numbers
-are claimed. Do not merge this branch before Windows validation.
+1. Shared inline LOD and edge admission policy; explicit paint path/fallback evidence;
+   regression coverage for pan, rich-neighbour port visibility and Painter-only edges.
+   Micro preflight and drawing reuse resolved edge styles.
+2. Removed method/declaration alias macros and dead implementations. Geometry,
+   camera, live projection and paint responsibilities now have named source parts.
+   Scope-aware spatial has the sole canonical production filename. Public host API
+   remains source-compatible, with additive diagnostic getters.
+3. Normal status and optional diagnostics have one debounced viewport observer.
+   The runtime fixture wrapper no longer replaces viewport observation. Hiding or
+   disabling diagnostics does not suppress status; idle owns no repeating sampler.
 
-## PUBLISHED CORRECTIONS
-
-- `dc196091ba1452bc7bd2091124cc4391d22503a3`
-  - preserves aggregate `UiGraphPortRef` while admitting safe U++ guest relocation;
-  - regression forces `Vector<UiGraphPortRef>` growth and verifies node/string identity.
-
-- `a23bd32f3420b9695d2793c458e69024f95ca760`
-  - fixes measured L3 middle-pan regression;
-  - `InteractionMode::Pan` now remains on projected-micro paint;
-  - semantic drag/connect/route gestures still use rich rendering;
-  - pan-profile regressions require zero details/content work at overview LOD.
-
-- `2c6cf317e5b05b4b2519df7c36f23092d566f0be`
-  - fixes the remaining visible connection-circle defect;
-  - the affected glyph was the input port marker, not the edge Circle arrow;
-  - side port glyphs shift one visual radius outward and remain tangent to the
-    semantic node-boundary anchor;
-  - mirrored pixel regressions cover the full visible circle.
-
-- `b0496ba6adfa7dbebb87e72692bea469b96e7405`
-  - removes the repeating diagnostics ticker from UiGraphDemo;
-  - one `TimeCallback` now provides a true 200 ms replaceable debounce;
-  - idle owns no repeating profiler clock;
-  - settled diagnostics refresh also updates visible zoom/pan status.
+No new shapes, routes, scene graph, GPU work or cache redesign. The existing raster
+and style-preparation optimisations remain. File reduction is not a speed measurement.
 
 ## VALIDATED EVIDENCE BEFORE THE LAST THREE FIXES
 
@@ -77,64 +55,16 @@ The relocation repair was then validated and published at `dc196091...`.
 
 The style-preparation tranche is therefore closed unless new evidence regresses it.
 
-## ROOT CAUSES FROM THE LATEST MANUAL CAPTURE
+## Remaining release gate
 
-1. Middle pan:
-   geometry stayed ~6 ms while node paint rose to ~689 ms.
-   The micro renderer rejected all non-None interactions, so holding middle mouse
-   forced the rich renderer even though live projected geometry was successfully reused.
+The validator task covers Debug/Release Graph model, render, view, scale, pan and
+presentation tests plus UiGraphDemo. Compare 10k overview/middle-pan timings on the
+same machine/configuration against BASE; retain micro paint and zero rich detail/
+content work. Check reference visuals, hierarchy fit/selection, scope transitions,
+model switching, port circles, edge arrows and status with diagnostics on/off/hidden.
 
-2. Connection circle:
-   10k edges explicitly use `arrow=None`; the still-broken circle was the input
-   port glyph centred on the node boundary, not the previously fixed Circle arrow.
-
-3. Diagnostics:
-   the runtime wrapper replaced the original viewport/status callback and used a
-   repeating ticker as a pseudo one-shot debounce. Status could lag and continuous
-   interaction could wake diagnostics formatting every ~200 ms.
-
-## CURRENT WINDOWS GATE
-
-Build Debug + Release:
-- `UiGraphModelTests`;
-- `UiGraphScaleTests`;
-- `UiNodeGraphPanProfileTest`;
-- `UiNodeGraphPerformanceTest`;
-- `UiGraphRenderTests`;
-- `UiNodeGraphPresentationTest`;
-- `UiGraphViewTests`;
-- `UiGraphDemo`.
-
-Manual 10k:
-- at L3 ~0.20, middle-pan must remain responsive;
-- pan geometry should remain zero/near-zero while retained coverage is valid;
-- `details/ports=0` and `content/text=0` during overview middle-pan;
-- micro raster/direct fallback evidence remains present;
-- pan paint should be comparable to ordinary overview paint, not the old ~550–700 ms rich fallback.
-
-Manual visual:
-- input port circles are complete and tangent outside the node;
-- no C/quarter-circle clipping remains;
-- detailed connector AA and edge Circle arrow remain correct.
-
-Diagnostics:
-- zoom/status becomes current after ~200 ms of interaction quiet;
-- averages continue accumulating;
-- after interaction stops, wait at least 2 seconds, then measure two 10-second CPU
-  windows with Live profiling enabled;
-- compare against disabled baseline;
-- no continuing diagnostics sample/repaint activity should be observed.
-
-Still complete the previously unverified proximity matrix:
-- Yes/Enter;
-- No;
-- Escape;
-- Always for unambiguous non-replacement candidates;
-- explicit confirmation for replacement;
-- incompatible and ambiguous candidates do not silently connect.
-
-## NEXT ACTION
-
-Validate current `main` descendant. If all above passes, close the UiGraph RC gate.
-Do not reopen style/spatial/raster architecture without new measured evidence.
-
+Earlier main validation also left the proximity acceptance matrix pending: Yes/Enter,
+No, Escape, Always for unambiguous non-replacement candidates, explicit replacement
+confirmation, and no silent connection for incompatible/ambiguous candidates.
+Keep that release gate pending until its evidence is reported; do not silently mark
+it passed merely because spatial code was renamed.
