@@ -138,6 +138,14 @@ bool PaintEdgeDirect(Draw& w, const UiGraphEdge& edge,
     if(zoom < lod.edge_hide_zoom || points.GetCount() < 2)
         return true;
 
+    // Detailed connectors keep sub-pixel route coordinates and share one
+    // antialiased Painter backend. Mixing integer DrawLine for None/Open arrows
+    // with Painter for Circle/Diamond/Triangle made otherwise identical edges
+    // differ in apparent width and aliasing. The direct Draw path remains the
+    // overview/simplified backend where its lower cost is useful at scale.
+    if(!simplified && zoom >= lod.edge_simplify_zoom)
+        return false;
+
     int si = minmax((int)state, 0, 3);
     Color color = style.color[si];
     double detail = SmoothUnit(zoom, lod.edge_hide_zoom, lod.full_detail_zoom);

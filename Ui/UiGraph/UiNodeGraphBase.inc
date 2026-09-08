@@ -382,8 +382,15 @@ void PaintArrow(Painter& p, const Vector<Pointf>& points,
         return;
     }
     if(arrow == UiGraphArrowStyle::Circle) {
+        // The route endpoint is the node boundary. Centering the marker on that
+        // endpoint leaves half of it underneath the node, which is painted
+        // afterward and visually clips the circle. Keep the marker tangent to
+        // the endpoint instead: its forward edge touches the port while the
+        // complete marker remains on the connector side.
+        double radius = max(0.5, size * 0.45);
+        Pointf centre = tip - dir * radius;
         p.Begin();
-        p.Circle(tip, max(0.5, size * 0.45));
+        p.Circle(centre, radius);
         p.Fill(color);
         p.End();
         return;

@@ -79,6 +79,112 @@ bool Near(Pointf a, Pointf b, double eps = 1.5)
     return std::sqrt(dx * dx + dy * dy) <= eps;
 }
 
+int CountRedDominantPixels(const Image& image, Rect area)
+{
+    if(IsNull(image))
+        return 0;
+    area &= RectC(0, 0, image.GetWidth(), image.GetHeight());
+    int count = 0;
+    for(int y = area.top; y < area.bottom; y++)
+        for(int x = area.left; x < area.right; x++) {
+            const RGBA& p = image[y][x];
+            if(p.a != 0 && p.r > (int)p.g + 50 && p.r > (int)p.b + 50)
+                count++;
+        }
+    return count;
+}
+
+int CountAntialiasedRedPixels(const Image& image, Rect area, Color solid)
+{
+    if(IsNull(image))
+        return 0;
+    area &= RectC(0, 0, image.GetWidth(), image.GetHeight());
+    int count = 0;
+    for(int y = area.top; y < area.bottom; y++)
+        for(int x = area.left; x < area.right; x++) {
+            const RGBA& p = image[y][x];
+            bool red_dominant = p.a != 0 && p.r > (int)p.g + 40 && p.r > (int)p.b + 40;
+            bool exact = p.r == solid.GetR() && p.g == solid.GetG() && p.b == solid.GetB();
+            if(red_dominant && !exact)
+                count++;
+        }
+    return count;
+}
+
+void RunEdgeVisualConsistencyTest(TestCtx& t)
+{
+    UiGraphModel model;
+
+    UiGraphNode source = ImageNode("Edge source", Pointf(60, 80), UiGraphNodeShape::Rectangle);
+    source.size = Sizef(100, 60);
+    source.subtitle.Clear();
+    source.description.Clear();
+    UiGraphNode target = ImageNode("Edge target", Pointf(420, 80), UiGraphNodeShape::Rectangle);
+    target.size = Sizef(100, 60);
+    target.subtitle.Clear();
+    target.description.Clear();
+
+    UiGraphNodeRef source_ref = model.AddNode(source);
+    UiGraphNodeRef target_ref = model.AddNode(target);
+
+    UiGraphEdge edge;
+    edge.source = UiGraphPortRef{source_ref, "out"};
+    edge.target = UiGraphPortRef{target_ref, "in"};
+    edge.route = UiGraphRouteStyle::Straight;
+    edge.arrow = UiGraphArrowStyle::Circle;
+    edge.stroke = UiGraphStrokeStyle::Solid;
+    UiGraphEdgeRef edge_ref = model.AddEdge(edge);
+    t.Expect(edge_ref.IsValid(), "edge visual fixture creates a circle-marker connector");
+
+    UiNodeGraph graph;
+    graph.SetAutoFitOnFirstPaint(false);
+    graph.SetRect(0, 0, 640, 260);
+
+    UiNodeGraph::Style style = UiNodeGraph::StyleDefault();
+    style.show_grid = false;
+    style.node.metrics.shadow.enabled = false;
+    style.edge.arrow_size = 14.0;
+    const Color edge_color(220, 40, 40);
+    for(int i = 0; i < 4; i++) {
+        style.canvas_palette.face[i] = UiFill::Solid(White());
+        style.node.palette.face[i] = UiFill::Solid(White());
+        style.node.palette.frame[i] = Color(120, 130, 145);
+        style.edge.color[i] = edge_color;
+        style.edge.width[i] = 1.25;
+    }
+    graph.SetCustomStyle(style);
+    graph.SetModel(model);
+    graph.Layout();
+
+    ImageDraw circle_draw(640, 260);
+    circle_draw.DrawRect(0, 0, 640, 260, White());
+    graph.Paint(circle_draw);
+    Image circle_image = circle_draw;
+
+    Point target_tip = graph.WorldToScreen(Pointf(420, 110));
+    Rect upper = RectC(target_tip.x - 13, target_tip.y - 6, 6, 4);
+    Rect lower = RectC(target_tip.x - 13, target_tip.y + 3, 6, 4);
+    int tangent_pixels = CountRedDominantPixels(circle_image, upper)
+                       + CountRedDominantPixels(circle_image, lower);
+    t.Expect(tangent_pixels > 0,
+             "circle arrow marker is fully outside the target node instead of being clipped under it");
+
+    const UiGraphEdge* current = model.FindEdge(edge_ref);
+    if(current) {
+        UiGraphEdge no_arrow = *current;
+        no_arrow.arrow = UiGraphArrowStyle::None;
+        model.UpdateEdge(edge_ref, no_arrow);
+    }
+
+    ImageDraw aa_draw(640, 260);
+    aa_draw.DrawRect(0, 0, 640, 260, White());
+    graph.Paint(aa_draw);
+    Image aa_image = aa_draw;
+    Rect middle = RectC(200, target_tip.y - 4, 160, 9);
+    t.Expect(CountAntialiasedRedPixels(aa_image, middle, edge_color) > 0,
+             "full-detail ordinary connector uses the same antialiased sub-pixel Painter path as marker-bearing edges");
+}
+
 } // namespace
 
 int RunPresentationSuite()
@@ -221,6 +327,8 @@ int RunPresentationSuite()
              "large downward Bezier bias remains a smooth route through the authored midpoint");
     t.Expect(curve[1].x > curve[0].x && curve[curve.GetCount() - 2].x < curve.Top().x,
              "biased Bezier preserves outward source and inward target endpoint tangents");
+
+    RunEdgeVisualConsistencyTest(t);
 
     t.Expect(graph.GetLastPaintUsecs() >= 0 && graph.GetLastNodePaintUsecs() >= 0,
              "image proof retains normal Graph paint timing evidence");
