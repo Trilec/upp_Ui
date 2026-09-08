@@ -319,7 +319,8 @@ UiGraphDemo::UiGraphDemo()
             if(i < 0) {
                 UiGraphNodeStyle resolved = style;
                 ApplyDemoPreset(node, resolved);
-                i = scale_resolved_style_cache_.Add(key, resolved);
+                scale_resolved_style_cache_.Add(key, resolved);
+                i = scale_resolved_style_cache_.GetCount() - 1;
             }
             style = scale_resolved_style_cache_[i];
         }
