@@ -757,7 +757,11 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 else if(!IsNull(port->color))
                     frame = BlendGraphColor(frame, port->color, 0.22);
                 Point anchor = g.anchors[a];
-                Rect pr = RectC(anchor.x - port_radius, anchor.y - port_radius,
+                UiGraphPortSide side = ResolvePortSide(*port);
+                Pointf outward = SideVector(side);
+                Point visual_anchor(fround(anchor.x + outward.x * port_radius),
+                                    fround(anchor.y + outward.y * port_radius));
+                Rect pr = RectC(visual_anchor.x - port_radius, visual_anchor.y - port_radius,
                                 port_radius * 2 + 1, port_radius * 2 + 1);
                 PaintCachedPortMarker(w, pr, canvas, frame,
                                       active ? max(1.5, normal_stroke * 1.5) : normal_stroke);
