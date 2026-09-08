@@ -243,7 +243,7 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     // nodes below edge-label/detail scale. Rich/reference nodes, active gestures,
     // custom body/foreground/overlay hooks and non-direct arrow styles retain the
     // accepted renderer unchanged.
-    if(interaction_ != InteractionMode::None
+    if((interaction_ != InteractionMode::None && interaction_ != InteractionMode::Pan)
        || !marquee_preview_nodes_.IsEmpty()
        || zoom_ >= lod_policy_.edge_label_zoom
        || WhenPaintNodeBackground
