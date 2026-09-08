@@ -86,7 +86,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     auto refresh_diagnostics = [&d] {
         if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
             return;
-        d.RefreshDiagnostics();
+        d.SampleDiagnostics();
         String detail = AsString(d.edit_diagnostics.GetData());
         detail << Format("\nNode phases: surface=%.3f ms  details/ports=%.3f ms  content/text=%.3f ms  total=%.3f ms\n",
                          d.graph_.GetLastNodeSurfacePaintUsecs() / 1000.0,
