@@ -298,6 +298,7 @@ UiGraphDemo::UiGraphDemo()
     RegisterPropertyEditorWorkingRangeEditors(pe_factory);
 
     BuildHeader();
+    BuildAuthoringPanel();
     BuildPreview();
     BuildRightRail();
     BuildReferenceGraph();
@@ -1631,14 +1632,17 @@ void UiGraphDemo::Layout()
 {
     Size client = GetSize();
     const int pad = DPI(12), gap = DPI(10), header_h = DPI(72);
-    const int right_w = min(DPI(440), max(DPI(340), client.cx * 34 / 100));
+    const int left_w = DPI(132);
+    const int right_w = min(DPI(440), max(DPI(320), client.cx * 32 / 100));
     tc_header.SetRect(pad, pad, max(0, client.cx - 2 * pad), header_h);
 
     int top = pad + header_h + gap;
     int body_h = max(0, client.cy - top - pad);
-    int preview_w = max(0, client.cx - 3 * pad - right_w);
-    pnl_preview.SetRect(pad, top, preview_w, body_h);
-    pnl_right_rail.SetRect(pad + preview_w + gap, top, right_w, body_h);
+    int preview_w = max(0, client.cx - 2 * pad - left_w - right_w - 2 * gap);
+    pnl_authoring.SetRect(pad, top, left_w, body_h);
+    pnl_preview.SetRect(pad + left_w + gap, top, preview_w, body_h);
+    pnl_right_rail.SetRect(pad + left_w + gap + preview_w + gap, top, right_w, body_h);
+    LayoutAuthoringPanel();
 
     Size pr = pnl_preview.GetSize();
     graph_.SetRect(DPI(2), DPI(2), max(0, pr.cx - DPI(4)), max(0, pr.cy - DPI(34)));
