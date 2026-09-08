@@ -3,76 +3,113 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-TASK: **UiGraph authoring tranche + RC compile/validation closure**
+BASE: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
+TASK: **UIGRAPH-RC-PAN-PORT-DIAG-01 — validate final measured Graph corrections**
 STATUS: **SOURCE FIXES PUBLISHED — WINDOWS VALIDATION PENDING**
-CURRENT SOURCE CHECKPOINT: `dc196091ba1452bc7bd2091124cc4391d22503a3`
+CURRENT SOURCE CHECKPOINT: `b0496ba6adfa7dbebb87e72692bea469b96e7405`
 
-## CURRENT STATE
+## PUBLISHED CORRECTIONS
 
-The left UiGraphDemo authoring rail is published and remains the intended surface:
-- Undo / Redo;
-- eight canonical node-shape creation tools;
-- Straight / Bezier / Orthogonal route selection;
-- manual connection and proximity auto-connect share `ValidateConnection()`;
-- authoring controls disable in the 10k benchmark model.
+- `dc196091ba1452bc7bd2091124cc4391d22503a3`
+  - preserves aggregate `UiGraphPortRef` while admitting safe U++ guest relocation;
+  - regression forces `Vector<UiGraphPortRef>` growth and verifies node/string identity.
 
-Current graph work also includes:
-- resolved-style/profile work;
-- Circle marker clipping fix;
-- detailed connector Painter AA;
-- H2 proximity-port backend;
-- current LOD / profiling readout.
+- `a23bd32f3420b9695d2793c458e69024f95ca760`
+  - fixes measured L3 middle-pan regression;
+  - `InteractionMode::Pan` now remains on projected-micro paint;
+  - semantic drag/connect/route gestures still use rich rendering;
+  - pan-profile regressions require zero details/content work at overview LOD.
 
-Do not revert or bypass those descendants while validating the RC.
+- `2c6cf317e5b05b4b2519df7c36f23092d566f0be`
+  - fixes the remaining visible connection-circle defect;
+  - the affected glyph was the input port marker, not the edge Circle arrow;
+  - side port glyphs shift one visual radius outward and remain tangent to the
+    semantic node-boundary anchor;
+  - mirrored pixel regressions cover the full visible circle.
 
-## BLOCKER FIX PUBLISHED
+- `b0496ba6adfa7dbebb87e72692bea469b96e7405`
+  - removes the repeating diagnostics ticker from UiGraphDemo;
+  - one `TimeCallback` now provides a true 200 ms replaceable debounce;
+  - idle owns no repeating profiler clock;
+  - settled diagnostics refresh also updates visible zoom/pan status.
 
-Windows validation at `389359b2da66d9be1726382fb20520b6f1b325d6` exposed:
+## VALIDATED EVIDENCE BEFORE THE LAST THREE FIXES
 
-`Vector<UiGraphPortRef>::Reserve()` -> U++ `Relocate` static assertion.
+Gary validated Debug + Release at ancestor `389359b2...`:
+- UiGraphViewTests: 138/0;
+- UiNodeGraphInteractionStateTest: 30/0;
+- UiGraphRenderTests: 78/0;
+- UiNodeGraphPresentationTest: 21/0;
+- UiGraphDemo built in both configurations.
 
-Root cause:
-- `UiGraphPortRef` is an aggregate containing `UiGraphNodeRef` + `String`;
-- proximity queries now store it in `Vector<UiGraphPortRef>`;
-- it was neither trivially tagged nor admitted as a U++ guest type.
+The relocation repair was then validated and published at `dc196091...`.
 
-Repair in `dc196091ba1452bc7bd2091124cc4391d22503a3`:
-- preserve the public aggregate form and all `UiGraphPortRef{node, "port"}` call sites;
-- declare `is_upp_guest<UiGraphPortRef> = true`;
-- relocation therefore uses the normal move constructor/destructor rather than memcpy;
-- add a regression that stores a port ref, forces `Vector::Reserve` relocation, and verifies identity.
+10k L3 style preparation improved from the old ~480–620 ms bottleneck to:
+- style: 1.170 ms;
+- resolve: 0.958 ms;
+- scale: 0.212 ms;
+- nodes: 2.341 ms;
+- geometry: 3.490 ms.
 
-Do NOT replace this with `Moveable<UiGraphPortRef>`: that changes aggregate initialization.
+The style-preparation tranche is therefore closed unless new evidence regresses it.
 
-## NEXT WINDOWS GATE
+## ROOT CAUSES FROM THE LATEST MANUAL CAPTURE
 
-First prove the compile repair through an affected consumer:
-- UiDesigner `Tests` Debug.
+1. Middle pan:
+   geometry stayed ~6 ms while node paint rose to ~689 ms.
+   The micro renderer rejected all non-None interactions, so holding middle mouse
+   forced the rich renderer even though live projected geometry was successfully reused.
 
-Then run current upp_Ui:
+2. Connection circle:
+   10k edges explicitly use `arrow=None`; the still-broken circle was the input
+   port glyph centred on the node boundary, not the previously fixed Circle arrow.
+
+3. Diagnostics:
+   the runtime wrapper replaced the original viewport/status callback and used a
+   repeating ticker as a pseudo one-shot debounce. Status could lag and continuous
+   interaction could wake diagnostics formatting every ~200 ms.
+
+## CURRENT WINDOWS GATE
+
+Build Debug + Release:
 - `UiGraphModelTests`;
 - `UiGraphScaleTests`;
+- `UiNodeGraphPanProfileTest`;
 - `UiNodeGraphPerformanceTest`;
 - `UiGraphRenderTests`;
+- `UiNodeGraphPresentationTest`;
 - `UiGraphViewTests`;
-- `UiGraphTest`.
+- `UiGraphDemo`.
 
-After automated PASS, run UiGraphDemo manual acceptance:
-- Reference and 10k visual correctness;
-- hierarchy / selection / interaction;
-- authoring rail and Undo/Redo;
-- all three route modes;
-- proximity connect;
-- LOD transitions and zoom readout;
-- averaged profiling and idle settling;
-- `micro_rasters > 0 && <= 32`;
-- Reference -> 10k -> Reference -> 10k remains clean;
-- capture same-machine phase timings.
+Manual 10k:
+- at L3 ~0.20, middle-pan must remain responsive;
+- pan geometry should remain zero/near-zero while retained coverage is valid;
+- `details/ports=0` and `content/text=0` during overview middle-pan;
+- micro raster/direct fallback evidence remains present;
+- pan paint should be comparable to ordinary overview paint, not the old ~550–700 ms rich fallback.
 
-## CONTRACTS
+Manual visual:
+- input port circles are complete and tangent outside the node;
+- no C/quarter-circle clipping remains;
+- detailed connector AA and edge Circle arrow remain correct.
 
-- `UiGraphPortRef` remains aggregate-initializable public API.
-- No BLITZ/test workaround for production compile failures.
-- Reusable defects are fixed in upp_Ui.
-- Keep current H2 backend authoritative for compiled spatial implementation.
-- Diagnose measured profile bottlenecks before further performance architecture changes.
+Diagnostics:
+- zoom/status becomes current after ~200 ms of interaction quiet;
+- averages continue accumulating;
+- after interaction stops, wait at least 2 seconds, then measure two 10-second CPU
+  windows with Live profiling enabled;
+- compare against disabled baseline;
+- no continuing diagnostics sample/repaint activity should be observed.
+
+Still complete the previously unverified proximity matrix:
+- Yes/Enter;
+- No;
+- Escape;
+- Always for unambiguous non-replacement candidates;
+- explicit confirmation for replacement;
+- incompatible and ambiguous candidates do not silently connect.
+
+## NEXT ACTION
+
+Validate current `main` descendant. If all above passes, close the UiGraph RC gate.
+Do not reopen style/spatial/raster architecture without new measured evidence.
