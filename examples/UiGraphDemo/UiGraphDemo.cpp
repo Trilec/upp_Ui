@@ -1379,9 +1379,8 @@ void UiGraphDemo::SetDiagnosticsEnabled(bool on)
     diagnostics_enabled_ = on;
     btn_diag_enable.SetChecked(on);
 
-    // Diagnostics are observer-only. Never leave a periodic UI clock running:
-    // an idle Graph must not be repainted merely to refresh profiling controls.
-    diagnostics_ticker_.Stop();
+    // Diagnostics are observer-only. The one-shot sampler is the only
+    // diagnostics clock, so disabling profiling leaves no periodic wake-up.
     diagnostics_sample_tc_.Kill();
     if(on) {
         RefreshDiagnostics();
@@ -1447,9 +1446,9 @@ void UiGraphDemo::ScheduleDiagnosticsSample()
     if(!diagnostics_enabled_)
         return;
     Ptr<UiGraphDemo> self = this;
-    // Coalesce wheel/pan bursts and sample after the next GUI paint. This is
-    // one-shot work only: no periodic profiler clock survives idle.
-    diagnostics_sample_tc_.KillSet(1, [self] {
+    // Debounce wheel/pan bursts. Each new viewport event replaces this
+    // one-shot sample; no profiler clock survives once interaction is quiet.
+    diagnostics_sample_tc_.KillSet(200, [self] {
         if(self)
             self->SampleDiagnostics();
     });

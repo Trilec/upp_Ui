@@ -94,21 +94,23 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
                          d.graph_.GetLastNodeContentPaintUsecs() / 1000.0,
                          d.graph_.GetLastNodePaintUsecs() / 1000.0);
         d.edit_diagnostics.SetData(detail);
+        // Status is cheap camera/readout state. Keep it out of the measured
+        // gesture itself, but make sure the post-interaction snapshot shows the
+        // actual settled zoom/pan rather than a stale pre-runtime value.
+        d.UpdateStatus();
     };
 
-    d.diagnostics_ticker_.Stop();
-
-    // Debounced post-interaction sampling: each viewport/switch event merely
-    // restarts this timer. Continuous wheel/pan input therefore causes no
-    // diagnostics formatting or control repaint. After 200 ms of quiet, one
-    // snapshot is rendered, then the ticker stops again.
+    // Debounced post-interaction sampling: each viewport/switch event replaces
+    // one TimeCallback. Continuous wheel/pan input therefore performs no
+    // diagnostics formatting/control repaint, and idle owns no repeating clock.
     auto schedule_diagnostics = [&d, refresh_diagnostics] {
-        d.diagnostics_ticker_.Stop();
+        d.diagnostics_sample_tc_.Kill();
         if(!d.diagnostics_enabled_ || d.stk_right_pages.GetActivePage() != 3)
             return;
-        d.diagnostics_ticker_.Start(200, [&d, refresh_diagnostics] {
-            d.diagnostics_ticker_.Stop();
-            refresh_diagnostics();
+        Ptr<UiGraphDemo> self = &d;
+        d.diagnostics_sample_tc_.KillSet(200, [self, refresh_diagnostics] {
+            if(self)
+                refresh_diagnostics();
         });
     };
 
@@ -170,7 +172,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     };
 
     auto select_page = [&d, refresh_diagnostics](int page) {
-        d.diagnostics_ticker_.Stop();
+        d.diagnostics_sample_tc_.Kill();
         d.SelectPage(page);
         if(page == 0)
             d.SyncNodeEditor();
@@ -187,7 +189,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     d.btn_diag_enable.WhenAction = [&d, refresh_diagnostics] {
         const bool on = d.btn_diag_enable.IsChecked();
         d.diagnostics_enabled_ = on;
-        d.diagnostics_ticker_.Stop();
+        d.diagnostics_sample_tc_.Kill();
         if(on && d.stk_right_pages.GetActivePage() == 3)
             refresh_diagnostics();
         // When off, no pending sampler remains. The visible controls deliberately

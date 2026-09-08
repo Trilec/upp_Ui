@@ -208,7 +208,6 @@ private:
     UiLabel lbl_diag_paint, lbl_diag_geometry, lbl_diag_edges, lbl_diag_nodes, lbl_diag_switch;
     UiProgressBar bar_diag_paint, bar_diag_geometry, bar_diag_edges, bar_diag_nodes, bar_diag_switch;
     UiMultiEdit edit_diagnostics;
-    UiFrameTicker diagnostics_ticker_;
     TimeCallback diagnostics_sample_tc_;
 
     PropertyEditorFactory pe_factory;
