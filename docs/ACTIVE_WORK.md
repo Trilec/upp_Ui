@@ -3,102 +3,106 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `5948cea56d364429ba8aa8165f8bde984b0bfb75`
-TASK: **UIGRAPH-EDIT-HISTORY-01 — Undo/Redo + proximity auto-connect**
+BASE: `9efe164ea3725c4579e7600943fc01da17d7efc9`
+TASK: **UIGRAPH-AUTHOR-PALETTE-01 — left authoring rail**
 TOUCHED:
-- `Ui/UiGraph/UiNodeGraphBase.h`
-- `Ui/UiGraph/UiNodeGraphInteractionBase.inc`
-- `Ui/UiGraph/UiNodeGraphSpatial.cpp`
-- `Utilities/UiGraphViewTests/InteractionState.cpp`
-- `Utilities/UiNodeGraphInteractionStateTest/main.cpp`
 - `examples/UiGraphDemo/UiGraphDemo.h`
 - `examples/UiGraphDemo/UiGraphDemo.cpp`
 - `examples/UiGraphDemo/UiGraphDemoRuntime.cpp`
 - `examples/UiGraphDemo/UiGraphDemoCommands.cpp`
+- `examples/UiGraphDemo/UiGraphDemoAuthoring.cpp`
 - `examples/UiGraphDemo/UiGraphDemo.upp`
+- `Ui/UiGraph/UiNodeGraphSpatialH2.cpp`
 - `docs/ACTIVE_WORK.md`
 STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING**
 PUBLISHED: supervisor checkpoint pending squash/merge to `main`
-VALIDATION: full source/diff review + deterministic generic interaction coverage; Windows demo validation pending.
+VALIDATION: source/diff/package-membership review complete; Windows GUI validation pending.
 
-## PREVIOUS CHECKPOINTS
+## PUBLISHED CHECKPOINTS IN THIS SERIES
 
-- `cd587fa51a8323b84820c8e041e9f819cba32a09`: measured 10k style-prep optimisation;
-  platform performance validation still required.
-- `5948cea56d364429ba8aa8165f8bde984b0bfb75`: circle marker placement and
-  detailed connector AA consistency; platform visual validation still required.
+- `cd587fa51a8323b84820c8e041e9f819cba32a09`
+  - split 10k style preparation into resolver vs metric scaling;
+  - cache deterministic 10k demo preset resolution by role + preset.
+- `5948cea56d364429ba8aa8165f8bde984b0bfb75`
+  - fixed Circle marker clipping;
+  - unified detailed connector AA on Painter while preserving overview Direct Draw.
+- `9456272d73d79348a37c7ac56fe4fc89d39d48d4`
+  - added host-owned Undo/Redo command history;
+  - added validated post-drag proximity auto-connect.
+- `9efe164ea3725c4579e7600943fc01da17d7efc9`
+  - hotfix: mirrored new proximity methods into the H2 spatial backend actually compiled by `Ui.upp`.
+    The pre-H2 spatial source remains synchronized recovery source.
 
-## CURRENT IMPLEMENTATION
+## CURRENT AUTHORING RAIL
 
-Generic UiNodeGraph:
-- remains request-first; no hidden model undo stack;
-- Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z route to host-owned Undo/Redo events when installed;
-- exposes a bounded `QueryPortsNear(screen_point, radius_px)` using the existing retained
-  world spatial authority;
-- exposes read-only prepared port screen anchors;
-- proximity discovery does not bypass `UiGraphModel::ValidateConnection()`.
+UiGraphDemo now has a compact left rail built entirely from upp_Ui controls.
 
-UiGraphDemo host history:
-- bounded 64-command Undo/Redo history;
-- node drag/nudge commands preserve before/after positions;
-- route-edit commands preserve before/after waypoints;
-- connection commands preserve the created edge and any Single-multiplicity edges replaced;
-- delete commands preserve deleted nodes, original scopes and all incident/selected edges;
-- Undo of node deletion restores the node and its connections in one command;
-- Redo reapplies the command;
-- mode changes clear history so commands can never target the wrong bound model;
-- status text exposes Undo/Redo depth;
-- AddNode command kind is reserved for the next authoring-palette slice.
+History:
+- visible Undo and Redo tool buttons;
+- Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z remain available;
+- buttons enable/disable from the existing command stacks.
 
-Proximity auto-connect:
-- after a committed node move, checks ports within 20 final screen pixels;
-- uses retained spatial candidates, never a 10k node scan;
-- orientation/type/scope/multiplicity authority is exclusively `ValidateConnection()`;
-- same-node and other simultaneously moved-node candidates are ignored;
-- ambiguous candidates within 4 px of the best match do not auto-select;
-- a small Ui dialog defaults Enter to Yes and Escape/No to cancel;
-- the dialog can enable "Always connect unambiguous compatible ports";
-- silent Always mode is limited to non-replacement connections;
-- Single-port replacement always remains explicit and the dialog reports how many
-  existing connections will be replaced;
-- accepted proximity connections use the same Undoable connection command as manual gestures.
+Canonical node creation:
+- Rectangle;
+- Ellipse;
+- Diamond;
+- Triangle;
+- Hexagon;
+- Cloud;
+- Document;
+- Database.
 
-## CONTRACTS PRESERVED
+Each node tool:
+- uses a small antialiased shape icon;
+- creates one canonical UiGraphNode at the current viewport centre;
+- gives it Flow input/output ports;
+- records creation through the existing AddNode history command;
+- selects the new node for immediate Inspector editing.
 
-- UiGraphModel remains the sole semantic topology authority;
-- Undo/Redo is host command state, not duplicated inside the model;
-- connection compatibility/multiplicity rules are not duplicated in the demo;
-- one retained world spatial broad phase remains authoritative;
-- no 10k-wide proximity scans;
-- request-first interaction remains usable by other hosts unchanged.
+Connector authoring:
+- Straight;
+- Bezier;
+- Orthogonal route tools;
+- Bezier is the default;
+- the selected route is applied to both manual port drags and proximity auto-connect;
+- route tools do not create a second connection path: `ValidateConnection()` remains authoritative.
 
-## WINDOWS VALIDATION NEEDED
+Scale-mode safety:
+- the authoring rail is disabled in the 10k benchmark model;
+- history is already cleared on Reference/10k model switches.
 
-Build/run Debug + Release:
+Layout:
+- left authoring rail + central Graph + existing right Inspector/Style/Code/Diagnostics rail;
+- no node/edge child-Ctrl scaling changes were made to UiNodeGraph itself.
+
+## VALIDATION NEEDED
+
+Build Debug + Release:
 - `UiGraphViewTests`;
 - `UiNodeGraphInteractionStateTest`;
+- `UiGraphRenderTests`;
+- `UiNodeGraphPresentationTest`;
 - `UiGraphDemo`.
 
-Manual Reference-mode checks:
-- delete a connected node -> Ctrl+Z restores node + incident connectors -> Redo deletes again;
-- drag a node -> Ctrl+Z/Redo restores/reapplies position;
-- edit a connector route -> Ctrl+Z/Redo restores/reapplies route;
-- manually connect ports -> Undo removes it; Redo restores it;
-- Single multiplicity replacement -> Undo restores the previous connection;
-- move an unconnected compatible port within ~20 px of another compatible port:
-  - confirmation appears;
-  - Enter accepts;
-  - No/Escape cancels;
-  - Always applies only to future unambiguous non-replacement candidates;
-- incompatible or ambiguous nearby ports do not connect;
-- switching Reference/10k clears history and never replays against the other model.
+Manual Reference-mode:
+1. Create each of the eight node shapes and confirm canonical appearance.
+2. Undo/Redo node creation from both buttons and keyboard.
+3. Choose Straight, Bezier and Orthogonal, then drag output -> compatible input and confirm route.
+4. Delete a newly created connected node; Undo restores node + connectors; Redo removes them.
+5. Exercise 20 px proximity connect and confirmation/Always behavior.
+6. Confirm incompatible/ambiguous ports do not connect.
+7. Switch to 10k: authoring controls disabled, benchmark remains responsive.
+8. Return to Reference: history is empty and authoring controls re-enable.
+9. Recheck Circle marker and detailed connector AA.
+
+Performance:
+- capture 10k L3 `style / resolve / scale` after `cd587fa...`;
+- compare style/node preparation against the prior ~480–620 ms style baseline;
+- verify micro_rasters/cached_draws/path-cache evidence remains healthy;
+- verify Live profiling becomes idle.
 
 ## NEXT ACTION
 
-Build the left authoring palette on top of this command path:
-- canonical node-shape creation;
-- Straight / Bezier / Orthogonal connector tools;
-- visible Undo/Redo actions;
-- every created node enters the existing AddNode command history.
-
-Do not invent a second creation/connection mutation path for the palette.
+Run the consolidated Windows validation above.
+If the new style split still shows one dominant subphase, return that evidence before another
+performance optimisation. Do not reopen spatial/raster architecture without measured cause.
