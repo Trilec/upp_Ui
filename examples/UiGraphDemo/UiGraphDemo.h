@@ -165,6 +165,7 @@ private:
     VectorMap<UiGraphId, Image> reference_images_;
     VectorMap<String, UiGraphNodeStyle> custom_styles_;
     VectorMap<String, Value> face_recipes_;
+    VectorMap<String, UiGraphNodeStyle> scale_resolved_style_cache_;
 
     UiButton embedded_action_;
     UiToggle embedded_toggle_;
