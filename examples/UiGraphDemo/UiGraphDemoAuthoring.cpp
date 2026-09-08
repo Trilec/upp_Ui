@@ -267,7 +267,7 @@ void UiGraphDemo::CreatePaletteNode(UiGraphNodeShape shape, const String& title)
                            centre.y - node.size.cy * 0.5);
 
     UiGraphModel& model = graph_.Model();
-    UiGraphNodeRef ref = model.AddNodeToScope(UiGraphModel::RootScope(), node);
+    UiGraphNodeRef ref = model.AddNodeToScope(graph_.GetScope(), node);
     const UiGraphNode* created = model.FindNode(ref);
     if(!ref.IsValid() || !created)
         return;
