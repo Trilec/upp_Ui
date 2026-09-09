@@ -202,10 +202,15 @@ void PaintCachedPortMarker(Draw& w, const Rect& target,
         ib.SetKind(IMAGE_ALPHA);
         Fill(~ib, RGBAZero(), ib.GetLength());
         BufferPainter p(ib, MODE_ANTIALIASED);
+        const double diameter = max(1.0, (double)min(target.GetWidth(), target.GetHeight()) - 1.0);
+        const Pointf centre((target.GetWidth() - 1) * 0.5,
+                            (target.GetHeight() - 1) * 0.5);
+        const double radius = max(0.5, diameter * 0.5 - canonical_stroke * 0.5);
         p.Begin();
-        p.Ellipse(0.5, 0.5,
-                  max(1.0, target.GetWidth() - 1.0),
-                  max(1.0, target.GetHeight() - 1.0));
+        // Painter::Ellipse(x, y, rx, ry) is centre/radii, not x/y/width/height.
+        // A port marker is circular, so use the unambiguous centre/radius API and
+        // keep the complete stroked ring inside the cached raster.
+        p.Circle(centre, radius);
         if(!IsNull(canvas))
             p.Fill(canvas);
         p.Stroke(canonical_stroke, frame);
@@ -848,14 +853,14 @@ void UiNodeGraph::PaintGraphRich(Draw& w)
                 if(g.route_handle_hit.IsEmpty())
                     continue;
                 int radius = DPI(4);
-                Rect rr = RectC(g.route_handle.x - radius, g.route_handle.y - radius,
-                                radius * 2 + 1, radius * 2 + 1);
+                const double stroke = max(1.0, (double)DPI(1));
+                const double paint_radius = max(0.5, radius - stroke * 0.5);
                 hp.Begin();
-                hp.Ellipse(rr.left + 0.5, rr.top + 0.5,
-                           max(1.0, rr.GetWidth() - 1.0),
-                           max(1.0, rr.GetHeight() - 1.0));
+                // Route handles are circles centred on the prepared semantic
+                // midpoint. Do not reinterpret a Rect as Ellipse centre/radii.
+                hp.Circle(Pointf(g.route_handle.x, g.route_handle.y), paint_radius);
                 hp.Fill(Color(219, 234, 254));
-                hp.Stroke(max(1.0, (double)DPI(1)), blue);
+                hp.Stroke(stroke, blue);
                 hp.End();
             }
         });
