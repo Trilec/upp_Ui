@@ -1,77 +1,55 @@
 # ACTIVE WORK
 
-Remote branch is authoritative. Fetch before work/publish; never force-update main.
+BASE: `dee2cd060af281e34f9dc6f70a147fa34dfc6d26` / main
+TASK: UIGRAPH-PRESENTATION — audit node layout, port glyphs and designer-facing styling.
+BRANCH: main. Consolidation fast-forwarded from performance/uigraph-execution-consolidation-20260908 at Curt's explicit request.
+STATUS: MERGE COMPLETE; PRESENTATION AUDIT COMPLETE; RELEASE VALIDATION PARTIAL.
+TOUCHED THIS CHECKPOINT: docs/ACTIVE_WORK.md; docs/UIGRAPH_PRESENTATION_AUDIT.md.
+PUBLISHED: Consolidation and Gary's validation are on main at BASE.
+The documentation checkpoint is the commit containing this file.
+VALIDATION: Remote ancestry, branch diff and main ref verified. Gary's tested source
+12934211ded09895c5f519bf8e123dba15660b35 is unchanged by this documentation checkpoint.
+NEXT ACTION: Use docs/UIGRAPH_PRESENTATION_AUDIT.md. First correct port raster coordinates
+and strengthen visual tests; then agree the small shared layout/profile contract.
+No presentation fixes or new APIs have been implemented during this audit.
 
-BASE: `cc386585d0eb5287c0f096d01a70a79e7df42fd7` / `main`
-TASK: UIGRAPH-EXECUTION-CONSOLIDATION — keep 10k speed; remove competing execution paths.
-BRANCH: `performance/uigraph-execution-consolidation-20260908`
-TOUCHED: `Ui/UiGraph/UiNodeGraph*`, `Ui/Ui.upp`, render/pan regression tests,
-`examples/UiGraphDemo`, `docs/08_UIGRAPH_GUIDE.md`, this log and validator task.
-STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PARTIAL.
-PUBLISHED: Checkpoint 1 `9d77e9e6d54400b2ee588249b14944647cb9e464`;
-checkpoint 2 `866fedf0b76f50448feaf356b64b608bb7d0f6a5`.
-The final source/checkpoint is the commit containing this log (resolve with
-`git log -1 --format=%H -- docs/ACTIVE_WORK.md`); a commit cannot contain its own hash.
-VALIDATION: U++/Windows CLANGx64 Debug + Release passed for UiGraphModelTests,
-UiGraphViewTests, UiGraphRenderTests, UiGraphScaleTests, UiNodeGraphPanProfileTest,
-UiNodeGraphPerformanceTest, UiNodeGraphPresentationTest and UiGraphDemo. The
-execution-path gate reports `checks=8 failed=0` in both configurations. Release
-10k pan node paint improved from BASE `64.426/179.974 ms` (mid/overview) to
-`19.285/115.700 ms`; paint improved from `79.644/191.716 ms` to `33.533/130.306 ms`.
-At L3/zoom 0.20 the demo retained micro paint, with details/ports and content/text
-at zero. Current branch remains manually pending for the full diagnostics
-enabled/disabled/hidden status matrix, full reference visual interaction sweep and
-two-window baseline visual comparison.
-NEXT ACTION: Finish the remaining manual checks in
-`docs/UIGRAPH_EXECUTION_CONSOLIDATION_VALIDATE.md` before merging into main.
-Do not merge into main until the platform gate passes.
+## Accepted evidence
 
-## Published implementation
+Gary: E:\upp-18468\umk.exe, CLANGx64, GitHubOut.var.
+Debug + Release passed: UiGraphModelTests, UiGraphViewTests, UiGraphRenderTests,
+UiGraphScaleTests, UiNodeGraphPanProfileTest, UiNodeGraphPerformanceTest,
+UiNodeGraphPresentationTest and UiGraphDemo build.
+UIGRAPH_EXECUTION_PATH_SUMMARY: checks=8 failed=0 in both configurations.
 
-1. Shared inline LOD and edge admission policy; explicit paint path/fallback evidence;
-   regression coverage for pan, rich-neighbour port visibility and Painter-only edges.
-   Micro preflight and drawing reuse resolved edge styles.
-2. Removed method/declaration alias macros and dead implementations. Geometry,
-   camera, live projection and paint responsibilities now have named source parts.
-   Scope-aware spatial has the sole canonical production filename. Public host API
-   remains source-compatible, with additive diagnostic getters.
-3. Normal status and optional diagnostics have one debounced viewport observer.
-   The runtime fixture wrapper no longer replaces viewport observation. Hiding or
-   disabling diagnostics does not suppress status; idle owns no repeating sampler.
+Release baseline -> branch, same validator setup:
+- Mid pan node paint: 64.426 -> 19.285 ms; paint: 79.644 -> 33.533 ms.
+- Overview pan node paint: 179.974 -> 115.700 ms; paint: 191.716 -> 130.306 ms.
+- L3 at zoom 0.20: micro path, fallback none, details/ports=0, content/text=0.
+Curt also reports improved 10k pan and no geometry preparation during reusable pan.
+These samples do not imply a universal 60 fps guarantee.
 
-No new shapes, routes, scene graph, GPU work or cache redesign. The existing raster
-and style-preparation optimisations remain. File reduction is not a speed measurement.
+## Open presentation findings
 
-## VALIDATED EVIDENCE BEFORE THE LAST THREE FIXES
+- Quarter-circle port is still visible in Curt's latest screenshots. This supersedes
+  the earlier broad port-visual PASS; compilation/execution-path results remain valid.
+- PaintCachedPortMarker uses Painter::Ellipse as x/y/width/height although its
+  numeric overload takes centre/radii. Route-handle paint repeats the error.
+  Existing test only checks outside/inside pixel presence, not a complete ring.
+- Demo images/badges and graph text use the same content area without shared layout.
+- Compact mode forces centred titles; nonlinear font/icon scaling differs from body.
+- Shape-safe content fractions do not guarantee rounded silhouette containment.
+- Real child controls are resized/thresholded, not uniformly camera-scaled.
 
-Gary validated Debug + Release at ancestor `389359b2...`:
-- UiGraphViewTests: 138/0;
-- UiNodeGraphInteractionStateTest: 30/0;
-- UiGraphRenderTests: 78/0;
-- UiNodeGraphPresentationTest: 21/0;
-- UiGraphDemo built in both configurations.
+## Boundaries / remaining validation
 
-The relocation repair was then validated and published at `dc196091...`.
+Keep spatial authority, immutable live projection, micro caches and accepted style
+optimisations. Eight built-in shapes and three routes remain. No GPU, new scene
+graph, live C++ editor or general layout framework is required by these findings.
+The recommended small layout callback and profiles are proposals only.
 
-10k L3 style preparation improved from the old ~480–620 ms bottleneck to:
-- style: 1.170 ms;
-- resolve: 0.958 ms;
-- scale: 0.212 ms;
-- nodes: 2.341 ms;
-- geometry: 3.490 ms.
-
-The style-preparation tranche is therefore closed unless new evidence regresses it.
-
-## Remaining release gate
-
-The validator task covers Debug/Release Graph model, render, view, scale, pan and
-presentation tests plus UiGraphDemo. Compare 10k overview/middle-pan timings on the
-same machine/configuration against BASE; retain micro paint and zero rich detail/
-content work. Check reference visuals, hierarchy fit/selection, scope transitions,
-model switching, port circles, edge arrows and status with diagnostics on/off/hidden.
-
-Earlier main validation also left the proximity acceptance matrix pending: Yes/Enter,
-No, Escape, Always for unambiguous non-replacement candidates, explicit replacement
-confirmation, and no silent connection for incompatible/ambiguous candidates.
-Keep that release gate pending until its evidence is reported; do not silently mark
-it passed merely because spatial code was renamed.
+Full enabled/disabled/hidden status matrix, full baseline visual comparison and
+manual connection/proximity sweep remain open. Proximity includes Yes/Enter, No,
+Escape, Always for unambiguous non-replacement candidates, explicit replacement,
+and no silent connection for incompatible/ambiguous candidates.
+Main integration was explicitly authorised despite partial manual validation;
+do not interpret that as completion of the presentation release gate.
