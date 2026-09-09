@@ -1,17 +1,32 @@
 # ACTIVE WORK
 
-BASE: `dee2cd060af281e34f9dc6f70a147fa34dfc6d26` / main
+BASE: `97f50981b415f1e7123a36f6f8da9c3d4f4c95ff` / main
 TASK: UIGRAPH-PRESENTATION — audit node layout, port glyphs and designer-facing styling.
 BRANCH: main. Consolidation fast-forwarded from performance/uigraph-execution-consolidation-20260908 at Curt's explicit request.
 STATUS: MERGE COMPLETE; PRESENTATION AUDIT COMPLETE; RELEASE VALIDATION PARTIAL.
-TOUCHED THIS CHECKPOINT: docs/ACTIVE_WORK.md; docs/UIGRAPH_PRESENTATION_AUDIT.md.
-PUBLISHED: Consolidation and Gary's validation are on main at BASE.
+TOUCHED THIS CHECKPOINT: docs/ACTIVE_WORK.md; docs/UIGRAPH_PRESENTATION_AUDIT.md;
+docs/08_UIGRAPH_GUIDE.md.
+PUBLISHED: Consolidation/Gary validation at dee2cd060af281e34f9dc6f70a147fa34dfc6d26;
+initial presentation audit at 97f50981b415f1e7123a36f6f8da9c3d4f4c95ff.
 The documentation checkpoint is the commit containing this file.
 VALIDATION: Remote ancestry, branch diff and main ref verified. Gary's tested source
 12934211ded09895c5f519bf8e123dba15660b35 is unchanged by this documentation checkpoint.
 NEXT ACTION: Use docs/UIGRAPH_PRESENTATION_AUDIT.md. First correct port raster coordinates
 and strengthen visual tests; then agree the small shared layout/profile contract.
 No presentation fixes or new APIs have been implemented during this audit.
+
+## Presentation requirements clarified
+
+- Normal is the authored approximately 1:1 composition; enlargement preserves it.
+- Three simplification levels: LOD 1, LOD 2, LOD 3 (smallest).
+- Design matrix: eight stock shapes x Normal/LOD 1/LOD 2/LOD 3; production rendering.
+- Shared header/body/optional-footer regions and coordinated input/output labels.
+- Rich forms need suitable shape/space; no forced identical form in every silhouette.
+- Transfer indication is host-driven, bounded and LOD-aware; no idle clock or
+  geometry rebuilds for motion. Implement as a separate follow-up after layout.
+- Collapse is deferred for Curt's consideration.
+- These are design requirements/proposals; current diagnostic bands are unchanged.
+- Supervisor read order and implementation boundaries are in the presentation audit.
 
 ## Accepted evidence
 

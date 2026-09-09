@@ -444,3 +444,17 @@ at execution time. Hiding or disabling diagnostics cannot cancel normal status.
 After the observer runs, no repeating timer remains. Runtime fixture setup does not
 replace this callback. Diagnostic zoom gates describe configured thresholds; actual
 paint-path/fallback/port evidence describes the rendered frame.
+
+## 21. Presentation work in progress
+
+The agreed designer vocabulary is **Normal, LOD 1, LOD 2, LOD 3**: Normal is
+the authored composition and retains its arrangement/proportions when enlarged;
+LOD 1-3 are progressively simplified, with LOD 3 smallest.
+This is the target presentation contract, not a claim that today's internal
+micro/rich paths or diagnostic L0-L4 bands already implement four matching modes.
+Historical diagnostics and measurements retain their original labels.
+
+See [the presentation audit](UIGRAPH_PRESENTATION_AUDIT.md) for the proposed shared
+header/body/optional-footer layout, coordinated port-label lanes, eight-shape
+Design matrix and bounded host-driven transfer indication.
+Collapse is deferred. No new layout/animation API is implemented by this guidance.
