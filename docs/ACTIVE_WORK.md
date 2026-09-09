@@ -3,16 +3,16 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `689ac8d58364cd9689890f22122b22adeef78ea6`
+BASE: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`
 TASK: **UIGRAPH-PRESENTATION-RING-01 — correct port/route-handle circular raster geometry**
-BRANCH: `supervisor/uigraph-ellipse-raster-fix`
-STATUS: **IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING**
+BRANCH: `main`
+STATUS: **PUBLISHED — WINDOWS VALIDATION PENDING**
 TOUCHED:
 - `Ui/UiGraph/UiNodeGraphPaintRich.inc`
 - `Utilities/UiGraphRenderTests/Presentation.cpp`
 - `Utilities/UiNodeGraphPresentationTest/main.cpp`
 - `docs/ACTIVE_WORK.md`
-PUBLISHED: pending squash/merge to `main`
+PUBLISHED: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`
 VALIDATION: source/API review complete; Windows Debug/Release pending.
 
 ## ACCEPTED BASELINE
