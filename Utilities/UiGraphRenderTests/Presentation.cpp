@@ -111,6 +111,48 @@ int CountAntialiasedRedPixels(const Image& image, Rect area, Color solid)
     return count;
 }
 
+int CountBlueDominantPixels(const Image& image, Rect area)
+{
+    if(IsNull(image))
+        return 0;
+    area &= RectC(0, 0, image.GetWidth(), image.GetHeight());
+    int count = 0;
+    for(int y = area.top; y < area.bottom; y++)
+        for(int x = area.left; x < area.right; x++) {
+            const RGBA& p = image[y][x];
+            if(p.a != 0 && p.b > (int)p.r + 60 && p.b > (int)p.g + 60)
+                count++;
+        }
+    return count;
+}
+
+bool HasCompleteRedRing(const Image& image, Point centre, int radius)
+{
+    const int probe = 2;
+    return CountRedDominantPixels(image, RectC(centre.x - radius - probe, centre.y - probe,
+                                               probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountRedDominantPixels(image, RectC(centre.x + radius - probe, centre.y - probe,
+                                               probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountRedDominantPixels(image, RectC(centre.x - probe, centre.y - radius - probe,
+                                               probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountRedDominantPixels(image, RectC(centre.x - probe, centre.y + radius - probe,
+                                               probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountRedDominantPixels(image, RectC(centre.x - 1, centre.y - 1, 3, 3)) == 0;
+}
+
+bool HasCompleteBlueRing(const Image& image, Point centre, int radius)
+{
+    const int probe = 2;
+    return CountBlueDominantPixels(image, RectC(centre.x - radius - probe, centre.y - probe,
+                                                probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountBlueDominantPixels(image, RectC(centre.x + radius - probe, centre.y - probe,
+                                                probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountBlueDominantPixels(image, RectC(centre.x - probe, centre.y - radius - probe,
+                                                probe * 2 + 1, probe * 2 + 1)) > 0
+        && CountBlueDominantPixels(image, RectC(centre.x - probe, centre.y + radius - probe,
+                                                probe * 2 + 1, probe * 2 + 1)) > 0;
+}
+
 void RunEdgeVisualConsistencyTest(TestCtx& t)
 {
     UiGraphModel model;
@@ -189,10 +231,15 @@ void RunEdgeVisualConsistencyTest(TestCtx& t)
 void RunPortMarkerTangentTest(TestCtx& t)
 {
     UiGraphModel model;
+    const Color port_frame(220, 40, 40);
     UiGraphNode node = ImageNode("Port marker", Pointf(240, 90), UiGraphNodeShape::Rectangle);
     node.size = Sizef(120, 70);
     node.subtitle.Clear();
     node.description.Clear();
+    node.ports.Add(Port("top", UiGraphPortDirection::Input, UiGraphPortSide::Top));
+    node.ports.Add(Port("bottom", UiGraphPortDirection::Output, UiGraphPortSide::Bottom));
+    for(UiGraphPort& port : node.ports)
+        port.color = port_frame;
     UiGraphNodeRef ref = model.AddNode(node);
 
     UiNodeGraph graph;
@@ -202,30 +249,66 @@ void RunPortMarkerTangentTest(TestCtx& t)
     UiNodeGraph::Style style = UiNodeGraph::StyleDefault();
     style.show_grid = false;
     style.node.metrics.shadow.enabled = false;
-    style.node.port_radius = 4;
-    const Color port_frame(220, 40, 40);
     for(int i = 0; i < 4; i++) {
         style.canvas_palette.face[i] = UiFill::Solid(White());
         style.node.palette.face[i] = UiFill::Solid(White());
         style.node.palette.frame[i] = Color(120, 130, 145);
         style.node.port_frame[i] = port_frame;
     }
-    graph.SetCustomStyle(style);
     graph.SetModel(model);
-    graph.Layout();
 
-    ImageDraw draw(640, 260);
-    draw.DrawRect(0, 0, 640, 260, White());
-    graph.Paint(draw);
-    Image image = draw;
+    struct PortCase {
+        const char *id;
+        UiGraphPortSide side;
+    };
+    const PortCase cases[] = {
+        {"in", UiGraphPortSide::Left},
+        {"out", UiGraphPortSide::Right},
+        {"top", UiGraphPortSide::Top},
+        {"bottom", UiGraphPortSide::Bottom},
+    };
 
-    Point anchor = graph.WorldToScreen(Pointf(240, 125));
-    Rect outside = RectC(anchor.x - 9, anchor.y - 5, 7, 11);
-    Rect inside = RectC(anchor.x + 1, anchor.y - 5, 6, 11);
-    t.Expect(CountRedDominantPixels(image, outside) > 0,
-             "input port circle is fully visible on the connector side of the node boundary");
-    t.Expect(CountRedDominantPixels(image, inside) == 0,
-             "input port circle is tangent outside the node instead of overlapping/clipping into its body");
+    auto render_and_check = [&](int radius, const String& state_label) {
+        style.node.port_radius = radius;
+        graph.SetCustomStyle(style);
+        graph.Layout();
+
+        ImageDraw draw(640, 260);
+        draw.DrawRect(0, 0, 640, 260, White());
+        graph.Paint(draw);
+        Image image = draw;
+
+        for(const PortCase& pc : cases) {
+            Point anchor;
+            UiGraphPortRef port{ref, pc.id};
+            bool found = graph.GetPortScreenAnchor(port, anchor);
+            t.Expect(found, Format("%s %s port exposes its prepared semantic anchor",
+                                   state_label, pc.id));
+            if(!found)
+                continue;
+            Point centre = anchor;
+            if(pc.side == UiGraphPortSide::Left) centre.x -= radius;
+            else if(pc.side == UiGraphPortSide::Right) centre.x += radius;
+            else if(pc.side == UiGraphPortSide::Top) centre.y -= radius;
+            else centre.y += radius;
+            t.Expect(HasCompleteRedRing(image, centre, radius),
+                     Format("%s %s port paints a complete hollow ring on all four quadrants",
+                            state_label, pc.id));
+        }
+    };
+
+    const int radii[] = {3, 4, 6};
+    for(int radius : radii)
+        render_and_check(radius, Format("normal r=%d", radius));
+
+    graph.SelectNode(ref);
+    render_and_check(4, "selected");
+
+    Point hot_anchor;
+    if(graph.GetPortScreenAnchor(UiGraphPortRef{ref, "in"}, hot_anchor)) {
+        graph.MouseMove(hot_anchor, 0);
+        render_and_check(4, "hot");
+    }
 }
 
 } // namespace
@@ -354,6 +437,12 @@ int RunPresentationSuite()
     Rect handle = graph.GetEdgeRouteHandleRect(short_edge);
     t.Expect(!handle.IsEmpty() && handle.GetWidth() >= DPI(16) && handle.GetHeight() >= DPI(16),
              "short selected connector retains a practical midpoint hit target");
+
+    draw.DrawRect(0, 0, 900, 260, White());
+    graph.Paint(draw);
+    Image handle_image = draw;
+    t.Expect(HasCompleteBlueRing(handle_image, handle.CenterPoint(), DPI(4)),
+             "selected route handle paints a complete centred circular ring");
 
     Vector<Pointf> middle;
     middle.Add(Pointf(200, 220));
