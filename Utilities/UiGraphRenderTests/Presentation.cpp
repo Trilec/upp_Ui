@@ -232,6 +232,90 @@ void RunEdgeVisualConsistencyTest(TestCtx& t)
 }
 
 
+void RunArrowVocabularyTest(TestCtx& t)
+{
+    UiGraphModel model;
+
+    UiGraphNode source_tee = ImageNode("Tee source", Pointf(60, 40), UiGraphNodeShape::Rectangle);
+    source_tee.size = Sizef(100, 50);
+    source_tee.subtitle.Clear();
+    source_tee.description.Clear();
+    UiGraphNode target_tee = ImageNode("Tee target", Pointf(420, 40), UiGraphNodeShape::Rectangle);
+    target_tee.size = Sizef(100, 50);
+    target_tee.subtitle.Clear();
+    target_tee.description.Clear();
+
+    UiGraphNode source_square = ImageNode("Square source", Pointf(60, 140), UiGraphNodeShape::Rectangle);
+    source_square.size = Sizef(100, 50);
+    source_square.subtitle.Clear();
+    source_square.description.Clear();
+    UiGraphNode target_square = ImageNode("Square target", Pointf(420, 140), UiGraphNodeShape::Rectangle);
+    target_square.size = Sizef(100, 50);
+    target_square.subtitle.Clear();
+    target_square.description.Clear();
+
+    UiGraphNodeRef st = model.AddNode(source_tee);
+    UiGraphNodeRef tt = model.AddNode(target_tee);
+    UiGraphNodeRef ss = model.AddNode(source_square);
+    UiGraphNodeRef ts = model.AddNode(target_square);
+
+    UiGraphEdge tee;
+    tee.source = UiGraphPortRef{st, "out"};
+    tee.target = UiGraphPortRef{tt, "in"};
+    tee.route = UiGraphRouteStyle::Straight;
+    tee.arrow = UiGraphArrowStyle::Tee;
+    UiGraphEdgeRef tee_ref = model.AddEdge(tee);
+
+    UiGraphEdge square;
+    square.source = UiGraphPortRef{ss, "out"};
+    square.target = UiGraphPortRef{ts, "in"};
+    square.route = UiGraphRouteStyle::Straight;
+    square.arrow = UiGraphArrowStyle::Square;
+    UiGraphEdgeRef square_ref = model.AddEdge(square);
+
+    t.Expect(tee_ref.IsValid() && square_ref.IsValid(),
+             "Tee and Square marker fixture edges are accepted by the graph model");
+
+    UiNodeGraph graph;
+    graph.SetAutoFitOnFirstPaint(false);
+    graph.SetRect(0, 0, 640, 260);
+
+    UiNodeGraph::Style style = UiNodeGraph::StyleDefault();
+    style.show_grid = false;
+    style.node.metrics.shadow.enabled = false;
+    style.edge.arrow_size = 16.0;
+    const Color edge_color(220, 40, 40);
+    for(int i = 0; i < 4; i++) {
+        style.canvas_palette.face[i] = UiFill::Solid(White());
+        style.node.palette.face[i] = UiFill::Solid(White());
+        style.node.palette.frame[i] = Color(120, 130, 145);
+        style.node.port_frame[i] = White();
+        style.edge.color[i] = edge_color;
+        style.edge.width[i] = 1.25;
+    }
+    graph.SetCustomStyle(style);
+    graph.SetModel(model);
+    graph.Layout();
+
+    ImageDraw draw(640, 260);
+    draw.DrawRect(0, 0, 640, 260, White());
+    graph.Paint(draw);
+    Image image = draw;
+
+    Point tee_tip = graph.WorldToScreen(Pointf(420, 65));
+    int tee_upper = CountRedDominantPixels(image, RectC(tee_tip.x - 5, tee_tip.y - 12, 8, 8));
+    int tee_lower = CountRedDominantPixels(image, RectC(tee_tip.x - 5, tee_tip.y + 5, 8, 8));
+    int tee_back = CountRedDominantPixels(image, RectC(tee_tip.x - 15, tee_tip.y - 4, 9, 9));
+    t.Expect(tee_upper > 0 && tee_lower > 0 && tee_back < 12,
+             "Tee marker paints a transverse terminal bar without a filled block behind the endpoint");
+
+    Point square_tip = graph.WorldToScreen(Pointf(420, 165));
+    int square_body = CountRedDominantPixels(image, RectC(square_tip.x - 14, square_tip.y - 6, 11, 13));
+    t.Expect(square_body > 35,
+             "Square marker paints a filled terminal block tangent to the endpoint");
+}
+
+
 void RunPortMarkerTangentTest(TestCtx& t)
 {
     UiGraphModel model;
@@ -465,6 +549,7 @@ int RunPresentationSuite()
              "biased Bezier preserves outward source and inward target endpoint tangents");
 
     RunEdgeVisualConsistencyTest(t);
+    RunArrowVocabularyTest(t);
     RunPortMarkerTangentTest(t);
 
     t.Expect(graph.GetLastPaintUsecs() >= 0 && graph.GetLastNodePaintUsecs() >= 0,
