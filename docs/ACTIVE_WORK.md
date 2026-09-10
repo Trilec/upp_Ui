@@ -6,13 +6,13 @@ Recovery state only; Git history is implementation history.
 BASE: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`
 TASK: **UIGRAPH-PRESENTATION-RING-01 — correct port/route-handle circular raster geometry**
 BRANCH: `main`
-STATUS: **PUBLISHED — WINDOWS VALIDATION PENDING**
+STATUS: **PUBLISHED FIX + TEST REFINEMENT — WINDOWS VALIDATION PENDING**
 TOUCHED:
 - `Ui/UiGraph/UiNodeGraphPaintRich.inc`
 - `Utilities/UiGraphRenderTests/Presentation.cpp`
 - `Utilities/UiNodeGraphPresentationTest/main.cpp`
 - `docs/ACTIVE_WORK.md`
-PUBLISHED: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`
+PUBLISHED: source fix `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`; smallest-ring test refinement pending merge
 VALIDATION: source/API review complete; Windows Debug/Release pending.
 
 ## ACCEPTED BASELINE
@@ -56,8 +56,12 @@ Regression coverage now checks:
 - Several marker sizes (r=3,4,6) to exercise distinct raster-cache sizes.
 - Normal, selected and hot presentation.
 - Coloured ring coverage at left/right/top/bottom quadrants.
-- Hollow port centre.
+- Hollow port centre (centre pixel; surrounding antialiased pixels are allowed at the minimum 7x7 marker size).
 - Complete selected route-handle ring.
+
+## TEST REFINEMENT
+
+Gary's first Debug run reached 62 checks with 4 failures, all four being the normal r=3 port-ring cases. The production circle fix compiled and the execution-path suite remained 8/8. The failure came from the regression helper requiring an entirely empty 3x3 centre in a 7x7 antialiased ring. That is stricter than the visual contract. The helper now requires the actual centre pixel to remain hollow while retaining four-direction ring coverage.
 
 ## WINDOWS GATE
 
