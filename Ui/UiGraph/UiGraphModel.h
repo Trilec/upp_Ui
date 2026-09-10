@@ -199,11 +199,14 @@ enum class UiGraphRouteStyle : byte {
 
 enum class UiGraphArrowStyle : byte {
     Inherit = 0,
-    None,
-    Triangle,
-    Open,
-    Circle,
-    Diamond,
+    None = 1,
+    Triangle = 2,
+    Open = 3,
+    Circle = 4,
+    Diamond = 5,
+    // Append-only marker vocabulary: preserve the established wire values above.
+    Tee = 6,
+    Square = 7,
 };
 
 enum class UiGraphStrokeStyle : byte {
