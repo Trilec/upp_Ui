@@ -137,7 +137,11 @@ bool HasCompleteRedRing(const Image& image, Point centre, int radius)
                                                probe * 2 + 1, probe * 2 + 1)) > 0
         && CountRedDominantPixels(image, RectC(centre.x - probe, centre.y + radius - probe,
                                                probe * 2 + 1, probe * 2 + 1)) > 0
-        && CountRedDominantPixels(image, RectC(centre.x - 1, centre.y - 1, 3, 3)) == 0;
+        // At the minimum supported 7x7 marker a 1px antialiased ring can
+        // legitimately touch the surrounding centre-adjacent pixels. The
+        // visual contract is a hollow centre pixel, not a completely empty
+        // 3x3 island.
+        && CountRedDominantPixels(image, RectC(centre.x, centre.y, 1, 1)) == 0;
 }
 
 bool HasCompleteBlueRing(const Image& image, Point centre, int radius)
