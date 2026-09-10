@@ -3,10 +3,10 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `bb70fb940cf07627b381152daebb12e798a63e5c`
+BASE: `e283523c5a77f0da85a6442877685c819ab4e34d`
 TASK: **UIGRAPH-ARROW-VOCAB-01 — complete the core endpoint-marker set**
-BRANCH: `supervisor/uigraph-arrow-tee-square`
-STATUS: **IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING**
+BRANCH: `main`
+STATUS: **PUBLISHED — WINDOWS VALIDATION PENDING**
 
 TOUCHED:
 - `Ui/UiGraph/UiGraphModel.h`
@@ -87,6 +87,8 @@ Presentation tests:
 - Tee renders a transverse terminal bar rather than a filled block;
 - Square renders a filled tangent terminal block;
 - existing Circle/AA presentation checks remain.
+
+PUBLISHED: `e283523c5a77f0da85a6442877685c819ab4e34d`
 
 ## WINDOWS GATE
 
