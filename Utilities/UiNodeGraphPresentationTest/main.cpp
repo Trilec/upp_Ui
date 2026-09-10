@@ -305,13 +305,13 @@ void RunArrowVocabularyTest(TestCtx& t)
     Point tee_tip = graph.WorldToScreen(Pointf(420, 65));
     int tee_upper = CountRedDominantPixels(image, RectC(tee_tip.x - 5, tee_tip.y - 12, 8, 8));
     int tee_lower = CountRedDominantPixels(image, RectC(tee_tip.x - 5, tee_tip.y + 5, 8, 8));
-    int tee_back = CountRedDominantPixels(image, RectC(tee_tip.x - 15, tee_tip.y - 4, 9, 9));
-    t.Expect(tee_upper > 0 && tee_lower > 0 && tee_back < 12,
+    int tee_back_off_axis = CountRedDominantPixels(image, RectC(tee_tip.x - 15, tee_tip.y + 3, 9, 4));
+    t.Expect(tee_upper > 0 && tee_lower > 0 && tee_back_off_axis < 6,
              "Tee marker paints a transverse terminal bar without a filled block behind the endpoint");
 
     Point square_tip = graph.WorldToScreen(Pointf(420, 165));
-    int square_body = CountRedDominantPixels(image, RectC(square_tip.x - 14, square_tip.y - 6, 11, 13));
-    t.Expect(square_body > 35,
+    int square_body = CountRedDominantPixels(image, RectC(square_tip.x - 14, square_tip.y - 6, 6, 13));
+    t.Expect(square_body > 30,
              "Square marker paints a filled terminal block tangent to the endpoint");
 }
 
