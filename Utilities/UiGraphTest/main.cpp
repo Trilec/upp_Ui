@@ -213,7 +213,7 @@ static void RunValidationAndSerializationTests(TestCtx& t)
     edge.target = UiGraphPortRef{b, "in"};
     edge.title = "A to B";
     edge.route = UiGraphRouteStyle::Orthogonal;
-    edge.arrow = UiGraphArrowStyle::None;
+    edge.arrow = UiGraphArrowStyle::Square;
     edge.stroke = UiGraphStrokeStyle::Dotted;
     edge.waypoints << Pointf(150, 20) << Pointf(150, 80);
     t.Expect(model.AddEdge(edge).IsValid(), "Serializable edge is added");
@@ -235,7 +235,12 @@ static void RunValidationAndSerializationTests(TestCtx& t)
     t.Expect(copy.GetNode(a).icon_render_mode == UiIconRenderMode::MonoTint,
              "Node icon render mode survives serialization");
     t.Expect(copy.GetEdge(0).title == "A to B", "Edge metadata survives serialization");
-    t.Expect(copy.GetEdge(0).arrow == UiGraphArrowStyle::None, "Arrow override survives serialization");
+    t.Expect(copy.GetEdge(0).arrow == UiGraphArrowStyle::Square,
+             "Appended Square arrow override survives serialization without changing established wire values");
+    t.Expect((byte)UiGraphArrowStyle::Diamond == 5
+             && (byte)UiGraphArrowStyle::Tee == 6
+             && (byte)UiGraphArrowStyle::Square == 7,
+             "Arrow vocabulary keeps established wire values and appends Tee/Square");
     t.Expect(copy.GetEdge(0).stroke == UiGraphStrokeStyle::Dotted, "Stroke override survives serialization");
     t.Expect(copy.Validate().IsValid(), "Deserialized graph validates");
 }

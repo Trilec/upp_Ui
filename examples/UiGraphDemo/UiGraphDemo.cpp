@@ -190,6 +190,8 @@ String GraphDemoArrowName(UiGraphArrowStyle arrow)
     case UiGraphArrowStyle::Open:     return "Open";
     case UiGraphArrowStyle::Circle:   return "Circle";
     case UiGraphArrowStyle::Diamond:  return "Diamond";
+    case UiGraphArrowStyle::Tee:      return "Tee";
+    case UiGraphArrowStyle::Square:   return "Square";
     case UiGraphArrowStyle::Inherit:
     default:                          return "Inherit";
     }
@@ -202,6 +204,8 @@ UiGraphArrowStyle GraphDemoParseArrow(const String& value)
     if(value == "Open") return UiGraphArrowStyle::Open;
     if(value == "Circle") return UiGraphArrowStyle::Circle;
     if(value == "Diamond") return UiGraphArrowStyle::Diamond;
+    if(value == "Tee") return UiGraphArrowStyle::Tee;
+    if(value == "Square") return UiGraphArrowStyle::Square;
     return UiGraphArrowStyle::Inherit;
 }
 
@@ -531,6 +535,7 @@ void UiGraphDemo::BuildEdgeEditorModel()
     pe_model_edge.AddChoice("arrow", "Arrow", "Inherit", "Connector")
                  .AddChoice("Inherit", "Inherit").AddChoice("None", "None")
                  .AddChoice("Triangle", "Triangle").AddChoice("Open", "Open")
+                 .AddChoice("Tee", "Tee").AddChoice("Square", "Square")
                  .AddChoice("Circle", "Circle").AddChoice("Diamond", "Diamond");
     pe_model_edge.AddBoolean("directed", "Directed", true, "Connector");
 

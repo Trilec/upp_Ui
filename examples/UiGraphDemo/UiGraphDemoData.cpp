@@ -368,9 +368,11 @@ void UiGraphDemo::BuildReferenceGraph()
         edge.route = i % 3 == 0 ? UiGraphRouteStyle::Straight
                    : i % 3 == 1 ? UiGraphRouteStyle::Bezier
                                 : UiGraphRouteStyle::Orthogonal;
-        edge.arrow = i % 4 == 0 ? UiGraphArrowStyle::Open
-                   : i % 4 == 1 ? UiGraphArrowStyle::Triangle
-                   : i % 4 == 2 ? UiGraphArrowStyle::Circle
+        edge.arrow = i % 6 == 0 ? UiGraphArrowStyle::Open
+                   : i % 6 == 1 ? UiGraphArrowStyle::Triangle
+                   : i % 6 == 2 ? UiGraphArrowStyle::Tee
+                   : i % 6 == 3 ? UiGraphArrowStyle::Square
+                   : i % 6 == 4 ? UiGraphArrowStyle::Circle
                                 : UiGraphArrowStyle::Diamond;
         edge.stroke = i % 5 == 0 ? UiGraphStrokeStyle::Dashed : UiGraphStrokeStyle::Solid;
         if(i < 3)

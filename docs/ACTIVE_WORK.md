@@ -3,88 +3,116 @@
 Remote `main` is authoritative. Fetch before work/publish; never force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`
-TASK: **UIGRAPH-PRESENTATION-RING-01 — correct port/route-handle circular raster geometry**
-BRANCH: `main`
-STATUS: **PUBLISHED FIX + TEST REFINEMENT — WINDOWS VALIDATION PENDING**
+BASE: `bb70fb940cf07627b381152daebb12e798a63e5c`
+TASK: **UIGRAPH-ARROW-VOCAB-01 — complete the core endpoint-marker set**
+BRANCH: `supervisor/uigraph-arrow-tee-square`
+STATUS: **IMPLEMENTATION COMPLETE — WINDOWS VALIDATION PENDING**
+
 TOUCHED:
-- `Ui/UiGraph/UiNodeGraphPaintRich.inc`
+- `Ui/UiGraph/UiGraphModel.h`
+- `Ui/UiGraph/UiNodeGraphCore.inc`
+- `Utilities/UiGraphModelTests/UiGraphCore.cpp`
+- `Utilities/UiGraphTest/main.cpp`
 - `Utilities/UiGraphRenderTests/Presentation.cpp`
 - `Utilities/UiNodeGraphPresentationTest/main.cpp`
+- `examples/UiGraphDemo/UiGraphDemo.cpp`
+- `examples/UiGraphDemo/UiGraphDemoData.cpp`
+- `docs/08_UIGRAPH_GUIDE.md`
 - `docs/ACTIVE_WORK.md`
-PUBLISHED: source fix `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`; smallest-ring test refinement pending merge
-VALIDATION: source/API review complete; Windows Debug/Release pending.
 
 ## ACCEPTED BASELINE
 
-Eddie's execution consolidation is on main and remains authoritative:
+Eddie's execution consolidation remains authoritative:
 - one explicit implementation owner per UiNodeGraph responsibility;
 - one world spatial authority;
 - immutable live camera projection + exact settle;
-- separate Micro/Rich paint backends with shared admission/LOD policy;
-- 10k pan retains projected geometry and reports paint path/fallback reason;
-- one replaceable demo viewport observer, no repeating diagnostics clock.
+- Micro/Rich paint backends with shared admission/LOD policy;
+- no recovery/H2 execution aliases.
 
-Gary validated the consolidated dependency slice Debug + Release and
-`UIGRAPH_EXECUTION_PATH_SUMMARY checks=8 failed=0`.
+Port/route-handle raster correction:
+- source fix: `3ecd53a3c25cc32d4a8266299d844c1ef4717c2e`;
+- Gary's first Debug run compiled but exposed an over-strict 7x7 hollow-centre test;
+- test-only refinement: `bb70fb940cf07627b381152daebb12e798a63e5c`;
+- full Windows validation still needs to resume from that checkpoint.
 
-Do not restore old Base/H2/recovery implementations from pre-consolidation history.
+## ARROW VOCABULARY
 
-## ROOT CAUSE
+Core authored endpoint markers are now:
+- None;
+- Open;
+- Triangle;
+- Tee;
+- Square;
+- Circle;
+- Diamond.
 
-`Painter::Ellipse(double x, double y, double rx, double ry)` takes centre/radii.
+Existing wire values are frozen:
+- None=1;
+- Triangle=2;
+- Open=3;
+- Circle=4;
+- Diamond=5.
 
-Two rich-paint call sites incorrectly passed rectangle coordinates/dimensions:
-- cached node port marker;
-- selected route-handle marker.
+New values are append-only:
+- Tee=6;
+- Square=7.
 
-For a 9x9 port raster this placed the ellipse centre at 0.5/0.5 with radius ~8,
-leaving most of the ring outside the image. The old visual test only proved that
-some coloured pixels existed, so a clipped quarter-circle could pass.
+Tee:
+- transverse terminal bar;
+- sits immediately on the connector side of the semantic endpoint.
 
-## CURRENT IMPLEMENTATION
+Square:
+- filled terminal block;
+- forward face is tangent to the semantic endpoint.
 
-- Cached port marker now uses `Painter::Circle(centre, radius)`.
-- Centre derives from the cached raster dimensions.
-- Radius accounts for stroke so the complete ring fits the raster.
-- Selected route handle now uses `Painter::Circle` around the prepared route midpoint.
-- Semantic port anchors, hit rectangles, edge routes, spatial data and micro paint
-  are unchanged.
+Circle/Diamond/Triangle/Open behavior is unchanged.
+Complex marker combinations from larger graph libraries are intentionally not copied.
 
-Regression coverage now checks:
-- Left / Right / Top / Bottom side ports.
-- Several marker sizes (r=3,4,6) to exercise distinct raster-cache sizes.
-- Normal, selected and hot presentation.
-- Coloured ring coverage at left/right/top/bottom quadrants.
-- Hollow port centre (centre pixel; surrounding antialiased pixels are allowed at the minimum 7x7 marker size).
-- Complete selected route-handle ring.
+Filled/hollow marker state is a separate possible future style dimension; do not
+multiply the shape enum into duplicate filled/hollow variants.
 
-## TEST REFINEMENT
+## DEMO / TEST COVERAGE
 
-Gary's first Debug run reached 62 checks with 4 failures, all four being the normal r=3 port-ring cases. The production circle fix compiled and the execution-path suite remained 8/8. The failure came from the regression helper requiring an entirely empty 3x3 centre in a 7x7 antialiased ring. That is stricter than the visual contract. The helper now requires the actual centre pixel to remain hollow while retaining four-direction ring coverage.
+UiGraphDemo:
+- Inspector Arrow choice exposes Tee and Square;
+- parser/name/generated-code path supports both;
+- reference fixture cycles Open/Triangle/Tee/Square/Circle/Diamond.
+
+Model tests:
+- preserve established marker wire values;
+- verify Tee/Square appended values;
+- serialize/deserialize Square as a new authored value.
+
+Presentation tests:
+- Tee renders a transverse terminal bar rather than a filled block;
+- Square renders a filled tangent terminal block;
+- existing Circle/AA presentation checks remain.
 
 ## WINDOWS GATE
 
 Build/run Debug + Release:
+- `UiGraphModelTests`;
+- `UiGraphTest`;
 - `UiGraphRenderTests`;
 - `UiNodeGraphPresentationTest`;
 - `UiGraphDemo`.
 
 Required:
 - all automated checks PASS;
-- manually confirm the formerly clipped port glyph is a complete circle;
-- check input/output/top/bottom marker placement at normal zoom;
-- select a routed edge and confirm its midpoint handle is a complete centred circle;
-- no regression in edge Circle arrow (separate feature);
-- `git diff --check` PASS;
-- clean worktree.
+- radius-3/radius-4/radius-6 port-ring checks PASS after `bb70fb9...`;
+- visually inspect Tee and Square at normal/detail scale;
+- verify Open/Triangle/Circle/Diamond are unchanged;
+- inspector can switch an edge among all seven non-Inherit choices;
+- generated C++ reports `UiGraphArrowStyle::Tee` / `Square` correctly;
+- no 10k regression: dense fixture still authors `arrow=None`;
+- `git diff --check` PASS.
 
 ## NEXT ACTION
 
-After this small visual checkpoint passes:
+After the focused ring + arrow visual gate:
 1. implement the shared prepared node-content layout/profile contract;
-2. build the Design matrix from that production contract;
-3. transfer activity remains a separate later slice;
+2. build the 8-shape x Normal/LOD1/LOD2/LOD3 Design matrix from that same contract;
+3. transfer activity is a separate later slice;
 4. collapse remains deferred.
 
-Do not change execution/spatial/micro architecture for presentation work.
+Do not alter execution/spatial/micro architecture for presentation work.

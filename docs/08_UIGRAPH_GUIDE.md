@@ -206,6 +206,24 @@ Route geometry is adaptive in final pixels.
 The stock orthogonal lead is zero; a host may opt into a positive lead through
 edge style when it has a concrete presentation reason.
 
+### Endpoint markers
+
+The core authored marker vocabulary is:
+
+- None;
+- Open;
+- Triangle;
+- Tee;
+- Square;
+- Circle;
+- Diamond.
+
+These are presentation choices on the edge; they do not change topology or port
+semantics. Existing wire values are stable and new marker values are append-only.
+
+Filled/hollow presentation should be treated as a separate style dimension if it
+is added later rather than multiplying the shape enum into duplicate variants.
+
 ### Editing
 
 Route editing is request-first through `UiGraphEdgeRouteRequest`.
