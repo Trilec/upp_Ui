@@ -398,6 +398,25 @@ void PaintArrow(Painter& p, const Vector<Pointf>& points,
         p.End();
         return;
     }
+    if(arrow == UiGraphArrowStyle::Tee) {
+        double stroke = max(0.75, min(2.5, size * 0.18));
+        double half = size * 0.55;
+        Pointf centre = tip - dir * (stroke * 0.5);
+        StrokeSegment(p, centre - side * half, centre + side * half, stroke, color);
+        return;
+    }
+    if(arrow == UiGraphArrowStyle::Square) {
+        double half = max(0.5, size * 0.45);
+        Pointf front = tip;
+        Pointf back = tip - dir * (half * 2.0);
+        Vector<Pointf> square;
+        square << front + side * half
+               << front - side * half
+               << back - side * half
+               << back + side * half;
+        FillPath(p, square, color);
+        return;
+    }
 
     Vector<Pointf> shape;
     if(arrow == UiGraphArrowStyle::Diamond)
