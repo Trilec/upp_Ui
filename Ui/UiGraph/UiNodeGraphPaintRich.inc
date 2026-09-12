@@ -407,55 +407,42 @@ void UiNodeGraph::PaintNodeSurface(Draw& w, const UiGraphNode& node, const NodeG
 void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeometry& g,
                                 const UiGraphNodeStyle& style, UiGraphVisualState state)
 {
+    const UiGraphNodePresentation& p = g.presentation;
     int si = VisualStateIndex(state);
-    Font title_font = ScaleGraphFont(style.title_font, zoom_);
-    Font subtitle_font = ScaleGraphFont(style.subtitle_font, zoom_);
-    Font description_font = ScaleGraphFont(style.description_font, zoom_);
-    Font port_font = ScaleGraphFont(style.port_font, zoom_);
-    if(!g.icon.IsEmpty() && !IsNull(node.icon)) {
+    if(p.show_icon && !IsNull(node.icon)) {
         UiIconRenderMode mode = node.icon_render_mode == UiIconRenderMode::Auto ? style.icon_render_mode : node.icon_render_mode;
-        UiPaintStyledIcon(w, g.icon, node.icon, true, true, mode, style.palette.icon[si], node.enabled && IsEnabled());
+        UiPaintStyledIcon(w, p.icon, node.icon, true, true, mode, style.palette.icon[si], node.enabled && IsEnabled());
     }
-
-    Color face = ResolveFace(style.palette.face[si], White());
-    auto paint_one = [&](const String& text, const Rect& r, Font font, Color ink,
-                         UiAlign valign, UiAlign halign, double visibility) {
-        if(text.IsEmpty() || r.IsEmpty() || visibility <= 0.01)
-            return;
-        ink = BlendGraphColor(face, ink, visibility);
-        Size ts = GetTextSize(text, font);
+    auto text = [&](bool visible, const String& value, Rect r, Font font, Color ink, UiAlign align) {
+        if(!visible || value.IsEmpty() || r.IsEmpty()) return;
+        font = UiNodeGraphDetail::PresentationFont(font, zoom_);
+        // Font pixel rounding cannot draw into a neighbouring allocated region.
+        w.Clip(r);
+        Size ts = GetTextSize(value, font);
         if(ts.cx <= r.GetWidth()) {
-            Vector<String> lines; Vector<Size> sizes; lines.Add(text); sizes.Add(ts);
-            UiPaintStyledText(w, r, lines, sizes, halign, valign, font, ink, 0, false, 0, 0);
+            Vector<String> lines; Vector<Size> sizes; lines.Add(value); sizes.Add(ts);
+            UiPaintStyledText(w, r, lines, sizes, align, UiAlign::CENTER, font, ink, 0, false, 0, 0);
         }
-        else {
-            int y = r.top + max(0, (r.GetHeight() - font.GetHeight()) / 2);
-            DrawTextEllipsis(w, r.left, y, max(0, r.GetWidth()), text, "...", font, ink);
-        }
+        else
+            DrawTextEllipsis(w, r.left, r.top + max(0, (r.GetHeight() - font.GetHeight()) / 2),
+                             r.GetWidth(), value, "...", font, ink);
+        w.End();
     };
-
-    double title_floor = max(0.16, lod_policy_.title_zoom - 0.16);
-    double secondary_floor = max(title_floor, lod_policy_.secondary_text_zoom - 0.12);
-    double title_visibility = SmoothUnit(zoom_, title_floor, lod_policy_.title_zoom + 0.08);
-    double secondary_visibility = SmoothUnit(zoom_, secondary_floor,
-                                             lod_policy_.secondary_text_zoom + 0.08);
-    UiAlign title_align = g.compact ? UiAlign::CENTER : style.text_align_h;
-    paint_one(node.title, g.title, title_font, style.title_ink[si],
-              UiAlign::CENTER, title_align, title_visibility);
-    paint_one(node.subtitle, g.subtitle, subtitle_font, style.subtitle_ink[si],
-              UiAlign::CENTER, style.text_align_h, secondary_visibility);
-    if(!g.compact && style.show_description && !node.description.IsEmpty() && !g.description.IsEmpty()) {
-        Vector<String> lines; Vector<Size> sizes; UiBuildStyledTextLines(node.description, description_font, lines, sizes);
-        UiPaintStyledText(w, g.description, lines, sizes, style.text_align_h, UiAlign::TOP, description_font, style.description_ink[si], 0, false, 0, 0);
+    text(p.show_title, node.title, p.title, style.title_font, style.title_ink[si], p.text_align);
+    text(p.show_subtitle, node.subtitle, p.subtitle, style.subtitle_font, style.subtitle_ink[si], p.text_align);
+    if(p.show_description) {
+        Font font = UiNodeGraphDetail::PresentationFont(style.description_font, zoom_);
+        Vector<String> lines; Vector<Size> sizes; UiBuildStyledTextLines(node.description, font, lines, sizes);
+        w.Clip(p.description);
+        UiPaintStyledText(w, p.description, lines, sizes, p.text_align, UiAlign::TOP,
+                          font, style.description_ink[si], 0, false, 0, 0);
+        w.End();
     }
-    if(style.show_port_labels && !node.collapsed && zoom_ >= lod_policy_.port_label_zoom)
-        for(int i = g.port_labels.GetCount() - 1; i >= 0; --i) {
+    if(p.show_port_labels)
+        for(int i = 0; i < g.port_labels.GetCount(); i++) {
             const UiGraphPort* port = model_->FindPort(UiGraphPortRef{node.ref, g.port_labels.GetKey(i)});
-            if(!port) continue;
-            String label = PortLabel(*port, style.show_port_type); Vector<String> lines; Vector<Size> sizes;
-            lines.Add(label); sizes.Add(GetTextSize(label, port_font));
-            UiPaintStyledText(w, g.port_labels[i], lines, sizes, UiAlign::LEFT, UiAlign::CENTER,
-                              port_font, style.port_label_ink[si], 0, false, 0, 0);
+            if(port) text(true, PortLabel(*port, style.show_port_type), g.port_labels[i],
+                          style.port_font, style.port_label_ink[si], UiAlign::LEFT);
         }
 }
 
@@ -774,8 +761,8 @@ void UiNodeGraph::PaintGraphRich(Draw& w)
         }
 
         if(zoom_ >= lod_policy_.secondary_text_zoom && !g.micro && !custom
-           && style.show_header_band && !node->collapsed && g.header.GetHeight() > 0) {
-            Rect hr = g.header.Deflated(max(1, fround(2 * zoom_)), max(1, fround(2 * zoom_)));
+           && style.show_header_band && !node->collapsed && g.presentation.header.GetHeight() > 0) {
+            Rect hr = g.presentation.header.Deflated(max(1, fround(2 * zoom_)), max(1, fround(2 * zoom_)));
             PaintCachedRoundedFill(w, hr, style.header_face[si],
                                    max(0, fround(node->corner_radius * zoom_ * 0.55)));
         }
@@ -819,8 +806,6 @@ void UiNodeGraph::PaintGraphRich(Draw& w)
     last_node_details_paint_usecs_ = max<int64>(0, usecs() - details_started);
 
     int64 content_started = usecs();
-    double content_floor = UiNodeGraphDetail::ContentPaintFloor(lod_policy_);
-    double text_floor = UiNodeGraphDetail::TitlePaintFloor(lod_policy_);
     for(int i = 0; i < paint_nodes.GetCount(); i++) {
         const NodeGeometry& g = node_geometry_[paint_nodes[i]];
         const UiGraphNode* node = model_->FindNode(g.ref);
@@ -828,11 +813,24 @@ void UiNodeGraph::PaintGraphRich(Draw& w)
             continue;
         const UiGraphNodeStyle& style = node_styles[i];
         UiGraphVisualState state = node_states[i];
-        if(WhenPaintNodeContent && zoom_ >= content_floor && !g.content.IsEmpty())
-            WhenPaintNodeContent(w, *node, g.content, style, state);
-        if(zoom_ >= text_floor && (!g.title.IsEmpty() || !g.subtitle.IsEmpty() || !g.icon.IsEmpty()
-           || !g.description.IsEmpty() || !g.port_labels.IsEmpty()))
+        const UiGraphNodePresentation& p = g.presentation;
+        if(!g.micro && p.level != UiGraphPresentationLevel::Lod3) {
+            if(WhenPaintNodeContent && (p.show_media || p.show_badge || p.show_footer)) {
+                // Legacy content hook now receives its media slot. It may also use
+                // prepared badge/footer slots; graph-owned allocations are protected.
+                w.Clip(p.safe);
+                w.ExcludeClip(p.header);
+                w.ExcludeClip(p.control);
+                w.ExcludeClip(p.description);
+                for(int side = 0; side < 4; side++) w.ExcludeClip(p.port_lanes[side]);
+                if(!p.show_media) w.ExcludeClip(p.media);
+                if(!p.show_badge) w.ExcludeClip(p.badge);
+                if(!p.show_footer) w.ExcludeClip(p.footer);
+                WhenPaintNodeContent(w, *node, p.media, style, state);
+                w.End();
+            }
             PaintNodeText(w, *node, g, style, state);
+        }
         if(WhenPaintNodeOverlay && zoom_ >= lod_policy_.secondary_text_zoom)
             WhenPaintNodeOverlay(w, *node, g.surface, state);
         bool handled = false;

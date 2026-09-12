@@ -154,7 +154,9 @@ void RunShapeSafeControlTest(TestCtx& t, UiGraphNodeShape shape,
 {
     UiGraphModel model;
     UiGraphNode node = MakeNode(id, name, Pointf(100, 100), shape);
-    node.size = Sizef(260, 100);
+    // Dense title/subtitle/description/control content needs real capacity in
+    // a diamond/capsule; the prepared contract no longer overlaps those regions.
+    node.size = Sizef(520, 320);
     UiGraphNodeRef ref = model.AddNode(node);
 
     UiNodeGraph graph;

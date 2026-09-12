@@ -7,6 +7,17 @@ No production fixes or new presentation APIs were implemented in this audit.
 REQUIREMENTS UPDATE: Curt's subsequent clarification establishes Normal plus LOD 1/2/3,
 header/body/footer composition, optional transfer activity, and defers collapse.
 
+## Implementation update — 2026-09-12
+
+The port/route-handle fixes preceded UIGRAPH-PRESENTATION-LAYOUT-01. That checkpoint
+implements the shared prepared layout, bounded profile-request resolver, production
+paint/control/port-lane integration and demo media/badge allocation. See guide
+section 21 for the exact current API and migration from the old content rectangle.
+The findings below remain the historical rationale, not a list of wholly unfixed
+issues. Windows Debug validation is still required for the layout checkpoint.
+Design matrix, painted control proxies, transfer animation and collapse are not
+implemented by that checkpoint.
+
 ## What is being finished
 
 Keep the accepted CPU rendering, world spatial index, retained camera projection,

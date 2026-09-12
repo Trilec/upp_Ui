@@ -4,6 +4,8 @@
 
 using namespace Upp;
 
+#include "PresentationLayout.h"
+
 namespace {
 
 struct TestCtx {
@@ -467,8 +469,6 @@ int RunPresentationSuite()
             return;
         content_paints++;
         Rect area = content.Deflated(DPI(3));
-        int title_lane = min(area.GetHeight() / 3, DPI(24));
-        area.top = min(area.bottom, area.top + title_lane);
         Rect target = AspectFit(images[q], area);
         targets_inside = targets_inside && RectInside(content, target);
         if(!target.IsEmpty())
@@ -548,6 +548,7 @@ int RunPresentationSuite()
     t.Expect(curve[1].x > curve[0].x && curve[curve.GetCount() - 2].x < curve.Top().x,
              "biased Bezier preserves outward source and inward target endpoint tangents");
 
+    RunPreparedPresentationTests(t);
     RunEdgeVisualConsistencyTest(t);
     RunArrowVocabularyTest(t);
     RunPortMarkerTangentTest(t);

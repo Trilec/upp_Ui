@@ -34,6 +34,19 @@ inline bool ShowNodePorts(bool micro, double zoom, const UiNodeGraph::LodPolicy&
     return t * t * (3.0 - 2.0 * t) > 0.01;
 }
 
+inline UiGraphPresentationLevel PresentationLevel(int width, int height)
+{
+    if(IsMicroNode(width, height)) return UiGraphPresentationLevel::Lod3;
+    if(width < DPI(80) || height < DPI(48)) return UiGraphPresentationLevel::Lod2;
+    if(width < DPI(160) || height < DPI(96)) return UiGraphPresentationLevel::Lod1;
+    return UiGraphPresentationLevel::Normal;
+}
+
+inline Font PresentationFont(Font font, double zoom)
+{
+    return font.Height(max(1, fround(max(1, font.GetHeight()) * zoom)));
+}
+
 enum class EdgePaintBackend { Hidden, Direct, Painter };
 
 inline EdgePaintBackend ResolveEdgePaintBackend(const UiGraphEdge& edge,

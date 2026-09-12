@@ -9,6 +9,7 @@
 #include "UiNodeGraphCore.inc"
 #include "UiNodeGraphPaintRich.inc"
 #include "UiNodeGraphPaintMicro.inc"
+#include "UiNodeGraphPresentation.inc"
 #include "UiNodeGraphGeometry.inc"
 #include "UiNodeGraphCamera.inc"
 #include "UiNodeGraphHierarchy.inc"

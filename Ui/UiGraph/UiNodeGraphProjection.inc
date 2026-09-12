@@ -152,14 +152,23 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
 
         g.rect = project_rect(src.rect);
         g.surface = project_rect(src.surface);
-        g.content = project_rect(src.content);
         g.paint_bounds = project_rect(src.paint_bounds);
-        g.header = project_rect(src.header);
-        g.icon = project_rect(src.icon);
-        g.title = project_rect(src.title);
-        g.subtitle = project_rect(src.subtitle);
-        g.description = project_rect(src.description);
-        g.control = project_rect(src.control);
+        if(!src.micro) {
+            g.presentation = src.presentation;
+            g.presentation.safe = project_rect(src.presentation.safe);
+            g.presentation.header = project_rect(src.presentation.header);
+            g.presentation.title = project_rect(src.presentation.title);
+            g.presentation.subtitle = project_rect(src.presentation.subtitle);
+            g.presentation.icon = project_rect(src.presentation.icon);
+            g.presentation.badge = project_rect(src.presentation.badge);
+            g.presentation.body = project_rect(src.presentation.body);
+            g.presentation.media = project_rect(src.presentation.media);
+            g.presentation.description = project_rect(src.presentation.description);
+            g.presentation.control = project_rect(src.presentation.control);
+            g.presentation.footer = project_rect(src.presentation.footer);
+            for(int side = 0; side < 4; side++)
+                g.presentation.port_lanes[side] = project_rect(src.presentation.port_lanes[side]);
+        }
 
         ASSERT(g.hit_path.GetCount() == src.hit_path.GetCount());
         for(int q = 0; q < g.hit_path.GetCount(); q++)
@@ -209,14 +218,8 @@ void UiNodeGraph::CaptureLiveViewBaseline()
         dst.ref = src.ref;
         dst.rect = src.rect;
         dst.surface = src.surface;
-        dst.content = src.content;
         dst.paint_bounds = src.paint_bounds;
-        dst.header = src.header;
-        dst.icon = src.icon;
-        dst.title = src.title;
-        dst.subtitle = src.subtitle;
-        dst.description = src.description;
-        dst.control = src.control;
+        dst.presentation = src.presentation;
         dst.hit_path = clone(src.hit_path);
         dst.anchors = clone(src.anchors);
         dst.port_hits = clone(src.port_hits);
@@ -321,7 +324,11 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             int height = max(1, fround(g.rect.GetHeight() * cumulative));
             bool compact = UiNodeGraphDetail::IsCompactNode(width, height);
             bool micro = UiNodeGraphDetail::IsMicroNode(width, height);
-            if(compact != g.compact || micro != g.micro) {
+            const Rect& safe = g.presentation.safe;
+            auto level = UiNodeGraphDetail::PresentationLevel(
+                max(0, fround(safe.GetWidth() * cumulative)),
+                max(0, fround(safe.GetHeight() * cumulative)));
+            if(compact != g.compact || micro != g.micro || level != g.presentation.level) {
                 cancel_approximation();
                 return false;
             }
@@ -338,8 +345,21 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             const UiGraphNode* node = model_->FindNode(UiGraphNodeRef{id});
             if(!node)
                 continue;
+            Ctrl* child = GetNodeCtrl(node->ref);
             UiGraphNodeStyle node_style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
             double threshold = max(node_style.content_cell_min_zoom, lod_policy_.secondary_text_zoom);
+            if(child) {
+                const auto& p = live_baseline_nodes_[i].presentation;
+                Size minimum = child->GetMinSize();
+                bool visible = p.level == UiGraphPresentationLevel::Normal && !node->collapsed
+                    && next_zoom >= threshold && !p.control.IsEmpty()
+                    && fround(p.control.GetWidth() * cumulative) >= minimum.cx
+                    && fround(p.control.GetHeight() * cumulative) >= minimum.cy;
+                if(visible != p.show_control) {
+                    cancel_approximation();
+                    return false;
+                }
+            }
             if(GraphViewCrosses(state.exact_zoom, next_zoom, threshold)) {
                 cancel_approximation();
                 return false;

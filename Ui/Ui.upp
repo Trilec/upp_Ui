@@ -43,6 +43,7 @@ file
 	UiGraph/UiNodeGraph.cpp,
 	UiGraph/UiNodeGraphCore.inc,
 	UiGraph/UiNodeGraphGeometry.inc,
+	UiGraph/UiNodeGraphPresentation.inc,
 	UiGraph/UiNodeGraphPaint.inc,
 	UiGraph/UiNodeGraphPaintRich.inc,
 	UiGraph/UiNodeGraphPaintMicro.inc,

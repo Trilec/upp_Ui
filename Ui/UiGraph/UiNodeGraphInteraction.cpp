@@ -78,8 +78,15 @@ UiNodeGraph& UiNodeGraph::EndBatchUpdate()
     if(batch_update_depth_ <= 0)
         return *this;
     batch_update_depth_--;
-    if(batch_update_depth_ == 0)
+    if(batch_update_depth_ == 0) {
         FlushBatchModelChanges();
+        // A presentation-only invalidation has no model change record to flush.
+        if(geometry_dirty_) {
+            PrepareViewGeometry();
+            UpdateAttachedCtrls();
+            Refresh();
+        }
+    }
     return *this;
 }
 

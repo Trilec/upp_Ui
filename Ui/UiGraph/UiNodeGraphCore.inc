@@ -1420,7 +1420,7 @@ Ctrl* UiNodeGraph::GetNodeCtrl(UiGraphNodeRef node) const
 Rect UiNodeGraph::GetNodeCtrlRect(UiGraphNodeRef node) const
 {
     const NodeGeometry* geometry = FindNodeGeometry(node);
-    return geometry ? geometry->control : RectC(0, 0, 0, 0);
+    return geometry && geometry->presentation.show_control ? geometry->presentation.control : RectC(0, 0, 0, 0);
 }
 
 void UiNodeGraph::UpdateAttachedCtrls()
@@ -1435,12 +1435,11 @@ void UiNodeGraph::UpdateAttachedCtrls()
         const NodeGeometry* geometry = FindNodeGeometry(ref);
         if(!node || !geometry)
             return false;
-        UiGraphNodeStyle style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
         return node->visible && !node->collapsed
             && model_->GetNodeScope(ref) == GetScope()
-            && zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom)
-            && !geometry->control.IsEmpty()
-            && !(geometry->control & viewport).IsEmpty();
+            && geometry->presentation.show_control
+            && !geometry->presentation.control.IsEmpty()
+            && !(geometry->presentation.control & viewport).IsEmpty();
     };
 
     // First update only controls that were actually active. This is bounded by
@@ -1466,7 +1465,7 @@ void UiNodeGraph::UpdateAttachedCtrls()
             continue;
         }
         const NodeGeometry* geometry = FindNodeGeometry(ref);
-        ctrl->SetRect(geometry->control);
+        ctrl->SetRect(geometry->presentation.control);
         ctrl->Show();
     }
 
@@ -1491,7 +1490,7 @@ void UiNodeGraph::UpdateAttachedCtrls()
             continue;
         if(ctrl->GetParent() != this)
             Add(*ctrl);
-        ctrl->SetRect(node_geometry_[i].control);
+        ctrl->SetRect(node_geometry_[i].presentation.control);
         ctrl->Show();
         active_node_ctrls_.FindAdd(id);
     }

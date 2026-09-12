@@ -89,10 +89,7 @@ void UiNodeGraph::InvalidateGeometry() { geometry_dirty_ = true; }
 void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
 {
     UiGraphNodeStyle style = ResolveNodeStyle(node, GetNodeVisualState(node));
-    Font title_font = ScaleGraphFont(style.title_font, zoom_);
-    Font subtitle_font = ScaleGraphFont(style.subtitle_font, zoom_);
-    Font description_font = ScaleGraphFont(style.description_font, zoom_);
-    Font port_font = ScaleGraphFont(style.port_font, zoom_);
+    Font port_font = UiNodeGraphDetail::PresentationFont(style.port_font, zoom_);
     Point p = WorldToScreen(GetDisplayNodePosition(node));
     Size sz(max(1, fround(node.size.cx * zoom_)), max(1, fround(node.size.cy * zoom_)));
     if(node.shape == UiGraphNodeShape::Square || node.shape == UiGraphNodeShape::Circle) {
@@ -109,90 +106,10 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
     StyledMetrics metrics = ScaleNodeMetrics(style.metrics, zoom_);
     StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
     out.surface = UiStyledSurfaceRect(out.rect, metrics);
-    out.content = GetShapeSafeContentRect(node, UiStyledInnerRect(out.rect, metrics, skin), out.surface);
     out.hit_path = NodeShapePath(node, out.surface);
+    out.presentation.safe = GetShapeSafeContentRect(node, UiStyledInnerRect(out.rect, metrics, skin), out.surface);
 
-    Rect heading = out.content;
-    Ctrl* child = GetNodeCtrl(node.ref);
-    bool use_child = child && !node.collapsed && !out.content.IsEmpty()
-                  && zoom_ >= max(style.content_cell_min_zoom, lod_policy_.secondary_text_zoom);
-    if(use_child) {
-        int gap = ScaleMetric(style.content_cell_gap, zoom_);
-        Size child_min = child->GetMinSize();
-        double child_scale = min(1.0, max(0.45, GraphTextScale(zoom_)));
-        child_min.cx = max(1, fround(child_min.cx * child_scale));
-        child_min.cy = max(1, fround(child_min.cy * child_scale));
-        int reserve = ScaleMetric(style.content_cell_reserve, zoom_);
-        if(style.content_cell_side == UiAlign::LEFT || style.content_cell_side == UiAlign::RIGHT) {
-            reserve = max(reserve, max(0, child_min.cx));
-            reserve = min(reserve, max(0, out.content.GetWidth() - gap));
-            if(style.content_cell_side == UiAlign::LEFT) {
-                out.control = Rect(out.content.left, out.content.top, out.content.left + reserve, out.content.bottom);
-                heading.left = min(heading.right, out.control.right + gap);
-            }
-            else {
-                out.control = Rect(out.content.right - reserve, out.content.top, out.content.right, out.content.bottom);
-                heading.right = max(heading.left, out.control.left - gap);
-            }
-        }
-        else {
-            reserve = max(reserve, max(0, child_min.cy));
-            reserve = min(reserve, max(0, out.content.GetHeight() - gap));
-            if(style.content_cell_side == UiAlign::TOP) {
-                out.control = Rect(out.content.left, out.content.top, out.content.right, out.content.top + reserve);
-                heading.top = min(heading.bottom, out.control.bottom + gap);
-            }
-            else {
-                out.control = Rect(out.content.left, out.content.bottom - reserve, out.content.right, out.content.bottom);
-                heading.bottom = max(heading.top, out.control.top - gap);
-            }
-        }
-    }
-
-    int header_h = out.compact
-                 ? heading.GetHeight()
-                 : min(heading.GetHeight(), max(0, ScaleMetric(style.header_height, zoom_)));
-    out.header = Rect(heading.left, heading.top, heading.right, heading.top + header_h);
-    Rect text_lane = out.header;
-    bool have_icon = zoom_ >= lod_policy_.icon_zoom
-                  && !out.micro && style.show_icon && !IsNull(node.icon) && !out.header.IsEmpty();
-    if(have_icon) {
-        Size authored = node.icon_size.cx > 0 && node.icon_size.cy > 0 ? node.icon_size : style.icon_size;
-        Size icon_size = ScaleGraphIcon(authored, zoom_);
-        icon_size.cx = min(icon_size.cx, max(0, out.header.GetWidth()));
-        icon_size.cy = min(icon_size.cy, max(0, out.header.GetHeight()));
-        int gap = max(1, fround(style.icon_text_gap * GraphTextScale(zoom_)));
-        if(style.icon_side == UiAlign::RIGHT) {
-            out.icon = RectC(out.header.right - icon_size.cx, out.header.top + (out.header.GetHeight() - icon_size.cy) / 2, icon_size.cx, icon_size.cy);
-            text_lane.right = max(text_lane.left, out.icon.left - gap);
-        }
-        else {
-            out.icon = RectC(out.header.left, out.header.top + (out.header.GetHeight() - icon_size.cy) / 2, icon_size.cx, icon_size.cy);
-            text_lane.left = min(text_lane.right, out.icon.right + gap);
-        }
-    }
-
-    double title_floor = max(0.16, lod_policy_.title_zoom - 0.16);
-    double secondary_floor = max(title_floor, lod_policy_.secondary_text_zoom - 0.12);
-    int title_h = zoom_ < title_floor || node.title.IsEmpty()
-                ? 0 : max(1, GetTextSize(node.title, title_font).cy);
-    int subtitle_h = zoom_ < secondary_floor || node.subtitle.IsEmpty()
-                   ? 0 : max(1, GetTextSize(node.subtitle, subtitle_font).cy);
-    int title_gap = title_h > 0 && subtitle_h > 0 ? max(1, fround(style.title_subtitle_gap * GraphTextScale(zoom_))) : 0;
-    int text_top = text_lane.top + max(0, (text_lane.GetHeight() - title_h - title_gap - subtitle_h) / 2);
-    if(title_h > 0) {
-        out.title = Rect(text_lane.left, text_top, text_lane.right, min(text_lane.bottom, text_top + title_h));
-        text_top = out.title.bottom + title_gap;
-    }
-    if(subtitle_h > 0)
-        out.subtitle = Rect(text_lane.left, text_top, text_lane.right, min(text_lane.bottom, text_top + subtitle_h));
-    if(zoom_ >= lod_policy_.full_detail_zoom && !out.compact && style.show_description
-       && !node.description.IsEmpty() && heading.bottom > out.header.bottom) {
-        int top = min(heading.bottom, out.header.bottom + ScaleMetric(style.subtitle_description_gap, zoom_));
-        int min_h = GetTextSize("Ag", description_font).cy;
-        if(heading.bottom - top >= min_h)
-            out.description = Rect(heading.left, top, heading.right, heading.bottom);
-    }
+    BuildNodePresentation(node, style, out);
 
     Vector<int> side_ports[4];
     for(int i = 0; i < node.ports.GetCount(); i++) {
@@ -237,17 +154,20 @@ void UiNodeGraph::BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out)
                 out.port_hits.Add(port.id, hit_rect);
                 out.paint_bounds |= hit_rect;
             }
-            if(zoom_ >= lod_policy_.port_label_zoom && style.show_port_labels) {
+            if(out.presentation.show_port_labels) {
+                const Rect& lane = out.presentation.port_lanes[si];
                 String label = PortLabel(port, style.show_port_type);
                 Size tsz = GetTextSize(label, port_font);
-                int gap = max(1, fround(style.port_label_gap * max(0.45, zoom_)));
-                Rect lr;
-                if(si == 0) lr = RectC(anchor.x + gap, anchor.y - tsz.cy / 2, tsz.cx, tsz.cy);
-                else if(si == 1) lr = RectC(anchor.x - gap - tsz.cx, anchor.y - tsz.cy / 2, tsz.cx, tsz.cy);
-                else if(si == 2) lr = RectC(anchor.x - tsz.cx / 2, anchor.y + gap, tsz.cx, tsz.cy);
-                else lr = RectC(anchor.x - tsz.cx / 2, anchor.y - gap - tsz.cy, tsz.cx, tsz.cy);
-                out.port_labels.Add(port.id, lr);
-                out.paint_bounds |= lr;
+                // Distinct slots within the reserved lane; omit labels that cannot fit.
+                Rect slot = vertical
+                    ? Rect(lane.left, lane.top + lane.GetHeight() * n / count,
+                           lane.right, lane.top + lane.GetHeight() * (n + 1) / count)
+                    : Rect(lane.left + lane.GetWidth() * n / count, lane.top,
+                           lane.left + lane.GetWidth() * (n + 1) / count, lane.bottom);
+                if(slot.GetHeight() >= tsz.cy && slot.GetWidth() >= tsz.cx)
+                    out.port_labels.Add(port.id, slot);
+                else
+                    out.presentation.fits = false;
             }
         }
     }

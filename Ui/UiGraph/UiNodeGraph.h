@@ -80,6 +80,32 @@ enum class UiGraphVisualState : byte {
     Disabled,
 };
 
+// Runtime presentation, independent of serialized model/style and renderer LOD.
+enum class UiGraphPresentationLevel : byte { Normal, Lod1, Lod2, Lod3 };
+enum class UiGraphPresentationProfile : byte { Standard, Centred, MediaCard };
+
+// Authored device units at zoom 1 (use DPI at the call site). The host requests
+// slots, never arbitrary rectangles. Geometry clamps allocations to the silhouette.
+struct UiGraphPresentationRequest {
+    UiGraphPresentationProfile profile = UiGraphPresentationProfile::Standard;
+    int badge_height = 0;
+    int footer_height = 0;
+    int media_min_height = 0;
+};
+
+struct UiGraphNodePresentation {
+    UiGraphPresentationLevel level = UiGraphPresentationLevel::Lod3;
+    UiGraphPresentationProfile profile = UiGraphPresentationProfile::Standard;
+    UiAlign text_align = UiAlign::LEFT;
+    Rect safe, header, title, subtitle, icon, badge, body, media, description, control, footer;
+    // Physical sides: left, right, top, bottom. Port direction/identity is unchanged.
+    Rect port_lanes[4];
+    bool fits = true;
+    bool show_title = false, show_subtitle = false, show_icon = false;
+    bool show_badge = false, show_media = false, show_description = false;
+    bool show_control = false, show_footer = false, show_port_labels = false;
+};
+
 struct UiGraphNodeStyle : Moveable<UiGraphNodeStyle> {
     StyledPalette palette;
     StyledMetrics metrics;
@@ -292,6 +318,14 @@ public:
     UiNodeGraph& EndBatchUpdate();
     bool IsBatchUpdating() const { return batch_update_depth_ > 0; }
 
+    // Changing callback captures/profile inputs requires explicit invalidation.
+    // Callback runs only during exact rich preparation; never mutate the graph there.
+    Event<const UiGraphNode&, const UiGraphNodeStyle&, UiGraphPresentationRequest&>
+        WhenResolveNodePresentation;
+    void InvalidateNodePresentation();
+    // Read-only snapshot of already prepared geometry; does not prepare in Paint.
+    bool GetNodePresentation(UiGraphNodeRef node, UiGraphNodePresentation& result) const;
+
     UiNodeGraph& SetNodeCtrl(UiGraphNodeRef node, Ctrl& ctrl);
     UiNodeGraph& ClearNodeCtrl(UiGraphNodeRef node);
     void ClearNodeCtrls();
@@ -450,8 +484,8 @@ public:
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
           UiGraphVisualState, bool&> WhenPaintNodeBackground;
     // Retained custom content layer, painted after the node body/ports and before
-    // Graph-owned title/subtitle text. `Rect` is the already-computed shape-safe
-    // content region, so thumbnails/mini-charts need no child Ctrl and no model field.
+    // Graph-owned title/subtitle text. Rect is the allocated media slot, clipped
+    // by Graph. GetNodePresentation exposes other prepared slots without preparing.
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
           UiGraphVisualState> WhenPaintNodeContent;
     Event<Draw&, const UiGraphNode&, const Rect&, const UiGraphNodeStyle&,
@@ -487,14 +521,8 @@ private:
         UiGraphNodeRef ref;
         Rect rect;
         Rect surface;
-        Rect content;
         Rect paint_bounds;
-        Rect header;
-        Rect icon;
-        Rect title;
-        Rect subtitle;
-        Rect description;
-        Rect control;
+        UiGraphNodePresentation presentation;
         Vector<Pointf> hit_path;
         VectorMap<String, Point> anchors;
         VectorMap<String, Rect> port_hits;
@@ -711,6 +739,8 @@ private:
     Rect GetSelectionDamage() const;
     void RefreshDamage(Rect damage);
 
+    void BuildNodePresentation(const UiGraphNode& node, const UiGraphNodeStyle& style,
+                               NodeGeometry& out);
     void BuildNodeGeometry(const UiGraphNode& node, NodeGeometry& out);
     void BuildEdgeGeometry(const UiGraphEdge& edge, EdgeGeometry& out);
     const NodeGeometry* FindNodeGeometry(UiGraphNodeRef ref) const;

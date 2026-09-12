@@ -463,7 +463,7 @@ After the observer runs, no repeating timer remains. Runtime fixture setup does 
 replace this callback. Diagnostic zoom gates describe configured thresholds; actual
 paint-path/fallback/port evidence describes the rendered frame.
 
-## 21. Presentation work in progress
+## 21. Node presentation
 
 The agreed designer vocabulary is **Normal, LOD 1, LOD 2, LOD 3**: Normal is
 the authored composition and retains its arrangement/proportions when enlarged;
@@ -475,4 +475,70 @@ Historical diagnostics and measurements retain their original labels.
 See [the presentation audit](UIGRAPH_PRESENTATION_AUDIT.md) for the proposed shared
 header/body/optional-footer layout, coordinated port-label lanes, eight-shape
 Design matrix and bounded host-driven transfer indication.
-Collapse is deferred. No new layout/animation API is implemented by this guidance.
+Collapse and animation remain deferred. The layout contract below is implemented;
+the earlier audit is historical design guidance.
+
+### Prepared layout contract (UIGRAPH-PRESENTATION-LAYOUT-01)
+
+`UiGraphNodePresentation` now owns node-content allocation. `NodeGeometry` contains
+one result; the former competing content/title/control rectangles were removed.
+`UiNodeGraphPresentation.inc::BuildNodePresentation` runs from exact rich node
+preparation. Micro geometry keeps an empty LOD 3 result and skips the host resolver.
+Compatible live projection transforms the result without running layout again.
+Presentation-level or native-control activation changes reject approximate reuse.
+
+The result contains `safe`, `header`, `title`, `subtitle`, `icon`, `badge`, `body`,
+`media`, `description`, `control`, `footer`, four physical-side `port_lanes`, a
+`level`, `text_align`, `profile`, `fits`, and explicit `show_*` flags. `safe`,
+`header` and `body` are parent regions; leaf regions are disjoint. Hidden leaves
+remain reserved. `fits=false` reports insufficient requested space; it is not a
+text-width guarantee (titles may ellipsize). Empty micro results do not assess
+Normal capacity. Native-control minimum-size failure also sets `fits=false`.
+
+The eight stock silhouettes use their actual prepared outline to validate the
+initial capacity estimate, with the resolved paint radius for canonical Rectangle.
+Unsafe rectangles shrink conservatively. This is a bounded interior, not a maximal
+packing solution. Custom shapes must honor their declared rectangular content
+capacity; arbitrary host-painted silhouettes are not geometrically introspected.
+
+`UiGraphPresentationRequest` offers three runtime profiles:
+
+- `Standard`: authored header height and resolved text alignment.
+- `Centred`: the same allocation with centred title/subtitle alignment.
+- `MediaCard`: a compact authored header based on text/icon height, leaving body
+  space for media. It does not move the header as zoom changes.
+
+Requests can reserve authored `badge_height`, `footer_height` and declare
+`media_min_height`. Use DPI-adjusted units at zoom 1. The optional
+`WhenResolveNodePresentation(node, style, request)` supplies these values during
+exact preparation. It cannot supply arbitrary rectangles or change topology.
+Call `InvalidateNodePresentation()` after changing callback captures or replacing
+the callback; this participates in existing batch/geometry invalidation. Do not
+mutate the graph or invalidate recursively inside the resolver.
+
+`GetNodePresentation(ref, result)` copies an already-prepared result and returns
+false for unprepared nodes. It never prepares geometry, making it safe inside
+`WhenPaintNodeContent`. That existing paint hook now receives the **media slot**,
+not the old whole-content rectangle. Remove any independently guessed title lane.
+It may also use visible badge/footer slots from the result. Graph clips the hook
+to safe content and excludes stock text/header, native controls and port lanes.
+Respect `show_*`; the host still owns its images/status values. Background,
+foreground and overlay extension hooks retain their separate existing contracts.
+
+Node fonts/icons and slot dimensions now scale linearly with the authored view;
+font pixel rounding cannot change region ownership. Native child internals are
+not camera-scaled: a child activates only at Normal, above its configured zoom
+gate, and when its allocated slot meets its actual minimum size. The reserved
+slot survives suppression. `GetNodeCtrlRect` reports active-eligible geometry;
+use `GetNodePresentation` to inspect a hidden reservation. Painted control proxies
+are a follow-up, not implemented by this change.
+
+The initial presentation decision uses projected safe size: below 38x26 pixels
+LOD 3, below DPI(80)xDPI(48) LOD 2, below DPI(160)xDPI(96) LOD 1, otherwise Normal
+(either deficient dimension reduces the level). Existing configured title/content/
+icon/port-label gates remain additional visibility limits. These defaults are a
+starting policy, not a renaming of diagnostic L0-L4 or Micro/Rich backends.
+
+The reference demo exercises real allocated badges/media. No Design matrix page,
+animation or collapse feature is added. Build the future four-row Rectangle proof
+from these prepared results and production paint, then extend it to eight shapes.

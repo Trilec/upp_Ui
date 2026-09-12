@@ -127,13 +127,15 @@ void RunChildControlLod(TestCtx& t)
              "embedded child receives geometry at authored 1:1 zoom");
 
     graph.SetZoom(0.45, Point(0, 0));
-    Rect reduced = graph.GetNodeCtrlRect(ref);
-    t.Expect(!reduced.IsEmpty(),
-             "embedded child remains allocated at the lower detail threshold");
-    t.Expect(!full.IsEmpty() && !reduced.IsEmpty()
-             && reduced.GetWidth() < full.GetWidth()
-             && reduced.GetHeight() < full.GetHeight(),
-             "embedded child allocation shrinks with graph zoom");
+    UiGraphNodePresentation reduced;
+    graph.GetNodePresentation(ref, reduced);
+    t.Expect(!reduced.control.IsEmpty() && graph.GetNodeCtrlRect(ref).IsEmpty()
+             && !reduced.show_control,
+             "reduced presentation reserves the child slot but suppresses unusable native controls");
+    t.Expect(!full.IsEmpty() && !reduced.control.IsEmpty()
+             && reduced.control.GetWidth() < full.GetWidth()
+             && reduced.control.GetHeight() < full.GetHeight(),
+             "reserved child allocation scales uniformly with graph zoom");
 
     graph.SetZoom(0.30, Point(0, 0));
     Rect hidden = graph.GetNodeCtrlRect(ref);

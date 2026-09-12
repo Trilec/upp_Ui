@@ -256,50 +256,40 @@ void UiGraphDemo::BuildReferenceGraph()
     model.Clear();
     reference_images_.Clear();
 
-    // Demo-owned retained content. Generic node.data supplies an optional
-    // presentation tag without adding a Graph-domain tag field. Thumbnails stay
-    // demo-owned and use the same shape-safe content hook; neither feature needs
-    // one child Ctrl per node.
+    // Requests are authored once in exact preparation. The media/tag painter
+    // consumes the resulting slots; it never invents another title lane.
+    graph_.WhenResolveNodePresentation = [=](const UiGraphNode& node,
+                                            const UiGraphNodeStyle&, UiGraphPresentationRequest& request) {
+        if(scale_mode_) return;
+        if(!GraphDemoNodeTag(node).IsEmpty()) request.badge_height = DPI(13);
+        if(reference_images_.Find(node.ref.id) >= 0) {
+            request.profile = UiGraphPresentationProfile::MediaCard;
+            request.media_min_height = DPI(20);
+        }
+    };
     graph_.WhenPaintNodeContent = [=](Draw& w, const UiGraphNode& node, const Rect& content,
                                        const UiGraphNodeStyle& style, UiGraphVisualState state) {
-        if(scale_mode_ || content.IsEmpty())
-            return;
-
-        const double zoom = graph_.GetZoom();
+        if(scale_mode_) return;
+        UiGraphNodePresentation p;
+        if(!graph_.GetNodePresentation(node.ref, p)) return;
         int si = minmax((int)state, 0, 3);
         String tag = GraphDemoNodeTag(node);
-        if(!tag.IsEmpty() && zoom >= 0.52) {
-            int tag_px = max(6, fround(DPI(8) * min(1.0, max(0.72, zoom))));
-            Font tag_font = GraphDemoMono(tag_px, true);
-            Size ts = GetTextSize(tag, tag_font);
-            Rect badge = RectC(content.left + DPI(3), content.top + DPI(3),
-                               ts.cx + DPI(12), ts.cy + DPI(5));
-            Color node_face = style.palette.face[si].IsSolid()
-                            ? style.palette.face[si].color : SColorPaper();
-            Color frame = style.palette.frame[si];
-            Color tag_face = Blend(node_face, frame, 18);
-            Color tag_ink = node.role == UiGraphNodeRole::Alert
-                          ? frame : style.subtitle_ink[si];
-            w.DrawRect(badge, tag_face);
-            DrawFrame(w, badge, frame);
-            w.DrawText(badge.left + DPI(6),
-                       badge.top + (badge.GetHeight() - tag_font.GetHeight()) / 2,
-                       tag, tag_font, tag_ink);
+        if(p.show_badge && !tag.IsEmpty()) {
+            Font font = GraphDemoMono(max(1, fround(DPI(8) * graph_.GetZoom())), true);
+            Color face = style.palette.face[si].IsSolid() ? style.palette.face[si].color : SColorPaper();
+            w.Clip(p.badge);
+            w.DrawRect(p.badge, Blend(face, style.palette.frame[si], 18));
+            DrawTextEllipsis(w, p.badge.left, p.badge.top,
+                             p.badge.GetWidth(), tag, "...", font, style.subtitle_ink[si]);
+            w.End();
         }
-
-        if(zoom < 0.42)
-            return;
         int q = reference_images_.Find(node.ref.id);
-        if(q < 0 || reference_images_[q].IsEmpty())
-            return;
-        Rect area = content.Deflated(DPI(4));
-        int title_lane = min(area.GetHeight() / 2,
-                             max(DPI(15), fround(DPI(44) * min(1.0, zoom))));
-        area.top = min(area.bottom, area.top + title_lane);
-        Rect target = GraphDemoAspectFit(reference_images_[q], area);
-        if(!target.IsEmpty())
-            w.DrawImage(target, reference_images_[q]);
+        if(p.show_media && q >= 0 && !reference_images_[q].IsEmpty()) {
+            Rect target = GraphDemoAspectFit(reference_images_[q], content);
+            if(!target.IsEmpty()) w.DrawImage(target, reference_images_[q]);
+        }
     };
+    graph_.InvalidateNodePresentation();
 
     static const UiGraphNodeShape shapes[] = {
         UiGraphNodeShape::Rectangle,
@@ -441,6 +431,8 @@ void UiGraphDemo::BuildReferenceGraph()
     reference_action_node_ = refs[10];
     reference_toggle_node_ = refs[11];
     AttachReferenceControls();
+    // Image lookup is a captured layout input populated after AddNode.
+    graph_.InvalidateNodePresentation();
 }
 
 void UiGraphDemo::AttachReferenceControls()
