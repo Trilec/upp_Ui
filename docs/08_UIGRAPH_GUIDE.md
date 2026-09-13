@@ -468,13 +468,11 @@ paint-path/fallback/port evidence describes the rendered frame.
 The agreed designer vocabulary is **Normal, LOD 1, LOD 2, LOD 3**: Normal is
 the authored composition and retains its arrangement/proportions when enlarged;
 LOD 1-3 are progressively simplified, with LOD 3 smallest.
-This is the target presentation contract, not a claim that today's internal
-micro/rich paths or diagnostic L0-L4 bands already implement four matching modes.
-Historical diagnostics and measurements retain their original labels.
+These prepared levels are separate from Micro/Rich execution and diagnostic
+L0-L4 bands. Historical diagnostics retain their original labels.
 
-See [the presentation audit](UIGRAPH_PRESENTATION_AUDIT.md) for the proposed shared
-header/body/optional-footer layout, coordinated port-label lanes, eight-shape
-Design matrix and bounded host-driven transfer indication.
+See [the presentation audit closure](UIGRAPH_PRESENTATION_AUDIT.md) for resolved
+layout/matrix findings and the accepted capacity and control policies.
 Collapse and animation remain deferred. The layout contract below is implemented;
 the earlier audit is historical design guidance.
 
@@ -539,6 +537,12 @@ LOD 3, below DPI(80)xDPI(48) LOD 2, below DPI(160)xDPI(96) LOD 1, otherwise Norm
 icon/port-label gates remain additional visibility limits. These defaults are a
 starting policy, not a renaming of diagnostic L0-L4 or Micro/Rich backends.
 
-The reference demo exercises real allocated badges/media. No Design matrix page,
-animation or collapse feature is added. Build the future four-row Rectangle proof
-from these prepared results and production paint, then extend it to eight shapes.
+`examples/UiGraphDesignMatrix` exercises all eight shapes in four production
+camera rows (1.00, 0.55, 0.32, 0.13). Shared selectors cover Standard, Centred,
+MediaCard and native-control capacity with compact/spacious authored sizes.
+Each cell reports actual prepared level, projected dimensions, capacity and
+shown/hidden features. Expected rows are reference labels, not forced LODs.
+Scroll both axes; Reset cameras restores the reference zooms. Select a shape and
+Compare 1x / 1.5x to inspect enlargement of identical spacious authored content.
+No presentation rectangles are invented in the example; callbacks consume the
+production result. Transfer animation and collapse remain deferred.

@@ -32,6 +32,8 @@ void RunPreparedPresentationTests(Test& t)
     node.title = "Title";
     node.subtitle = "Subtitle";
     node.description = "Description";
+    node.icon = ICON_DESIGN_WIDGETS_48();
+    node.icon_size = Size(DPI(18), DPI(18));
     node.position = Pointf(40, 40);
     node.size = Sizef(DPI(480), DPI(360));
     node.corner_radius = DPI(50);
@@ -124,6 +126,8 @@ void RunPreparedPresentationTests(Test& t)
     graph.SetZoom(0.04, Point(0, 0));
     before = resolutions;
     content_calls = 0;
+    graph.InvalidateNodePresentation();
+    t.Expect(resolutions == before, "exact micro invalidation skips the rich presentation resolver");
     ImageDraw draw(DPI(1200), DPI(900));
     graph.Paint(draw);
     graph.GetNodePresentation(ref, tiny);
@@ -164,6 +168,86 @@ void RunPreparedPresentationTests(Test& t)
     graph.GetNodePresentation(ref, large);
     t.Expect(large.text_align == UiAlign::CENTER && valid(large),
              "centred profile uses the same bounded allocation contract");
+
+    // Sweep the complete shape/profile matrix through real camera sizes. The
+    // thresholds are exercised rather than copied into a preview/test allocator.
+    bool matrix_safe = true, matrix_levels = true, matrix_progression = true;
+    bool matrix_enlargement = true, stress_safe = true, line_boxes_fit = true;
+    const UiGraphPresentationProfile profiles[] = { UiGraphPresentationProfile::Standard,
+        UiGraphPresentationProfile::Centred, UiGraphPresentationProfile::MediaCard };
+    graph.Model().Clear();
+    for(auto profile : profiles) {
+        graph.WhenResolveNodePresentation = [profile](const UiGraphNode&, const UiGraphNodeStyle&,
+                                                      UiGraphPresentationRequest& r) {
+            r.profile = profile;
+            r.badge_height = DPI(12); r.footer_height = DPI(14); r.media_min_height = DPI(12);
+        };
+        for(auto shape : shapes) {
+            UiGraphNode value = clone(node);
+            value.shape = shape;
+            value.size = Sizef(DPI(640), DPI(480));
+            value.position = Pointf(0, 0);
+            auto r = graph.Model().AddNode(value);
+            int seen = 0;
+            UiGraphNodePresentation base;
+            for(double z : { 0.04, 0.08, 0.13, 0.20, 0.30, 0.42, 0.55, 0.75, 1.0, 1.5, 2.0 }) {
+                graph.SetZoom(z, Point(0, 0));
+                graph.SetPan(Pointf(0, 0));
+                graph.InvalidateNodePresentation();
+                UiGraphNodePresentation p;
+                matrix_safe &= graph.GetNodePresentation(r, p) && valid(p);
+                seen |= 1 << (int)p.level;
+                auto measured = [&](Font f) { return f.Height(max(1, fround(max(1, f.GetHeight()) * z))).GetCy(); };
+                line_boxes_fit &= (!p.show_title || p.title.GetHeight() >= measured(style.node.title_font))
+                    && (!p.show_subtitle || p.subtitle.GetHeight() >= measured(style.node.subtitle_font))
+                    && (!p.show_description || p.description.GetHeight() >= measured(style.node.description_font));
+                bool full = p.level == UiGraphPresentationLevel::Normal;
+                bool secondary = full || p.level == UiGraphPresentationLevel::Lod1;
+                matrix_progression &= (!p.show_footer || full) && (!p.show_description || full)
+                    && (!p.show_subtitle || secondary) && (!p.show_badge || secondary)
+                    && (!p.show_port_labels || secondary)
+                    && (p.level != UiGraphPresentationLevel::Lod3
+                        || !(p.show_title || p.show_media || p.show_icon || p.show_control));
+                if(z == 1.0) base = p;
+                if(z > 1.0) {
+                    const Rect a[] = { base.header, base.title, base.subtitle, base.badge,
+                        base.media, base.footer, base.port_lanes[0], base.port_lanes[1], base.icon };
+                    const Rect b[] = { p.header, p.title, p.subtitle, p.badge,
+                        p.media, p.footer, p.port_lanes[0], p.port_lanes[1], p.icon };
+                    matrix_enlargement &= p.level == base.level && p.text_align == base.text_align;
+                    for(int i = 0; i < 9; i++) {
+                        matrix_enlargement &= a[i].IsEmpty() == b[i].IsEmpty();
+                        if(a[i].IsEmpty() || b[i].IsEmpty()) continue;
+                        matrix_enlargement &= abs((b[i].left - p.safe.left) - z * (a[i].left - base.safe.left)) <= 6
+                            && abs((b[i].top - p.safe.top) - z * (a[i].top - base.safe.top)) <= 6
+                            && abs(b[i].GetWidth() - z * a[i].GetWidth()) <= 6
+                            && abs(b[i].GetHeight() - z * a[i].GetHeight()) <= 6;
+                    }
+                }
+            }
+            matrix_levels &= seen == 15;
+            graph.Model().RemoveNode(r);
+            value.size = Sizef(DPI(260), DPI(170));
+            r = graph.Model().AddNode(value);
+            for(double z : { 1.0, 0.55, 0.32, 0.13 }) {
+                graph.SetZoom(z, Point(0, 0));
+                graph.InvalidateNodePresentation();
+                UiGraphNodePresentation p;
+                stress_safe &= graph.GetNodePresentation(r, p) && valid(p);
+            }
+            graph.Model().RemoveNode(r);
+        }
+    }
+    t.Expect(line_boxes_fit, "visible stock text slots contain measured Windows line boxes at every matrix scale");
+    t.Expect(stress_safe, "compact matrix capacity failures retain contained non-overlapping leaves at all reference zooms");
+    t.Expect(matrix_safe, "8 shapes x 3 profiles x 11 projected sizes keep all leaf slots contained and disjoint");
+    t.Expect(matrix_levels, "every canonical shape/profile reaches all four levels through actual projected sizes");
+    t.Expect(matrix_progression, "full matrix feature progression suppresses secondary and rich micro content coherently");
+    t.Expect(matrix_enlargement, "all shape/profile Normal layouts retain proportional regions and alignment at 1.5x and 2x");
+    // Restore a rich node for the impossible-request test below.
+    graph.SetZoom(1, Point(0, 0));
+    ref = graph.Model().AddNode(node);
+
     graph.WhenResolveNodePresentation = [](const UiGraphNode&, const UiGraphNodeStyle&,
                                           UiGraphPresentationRequest& r) { r.badge_height = DPI(10000); };
     graph.InvalidateNodePresentation();

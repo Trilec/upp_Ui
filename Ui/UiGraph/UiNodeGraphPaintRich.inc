@@ -424,7 +424,7 @@ void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeom
             UiPaintStyledText(w, r, lines, sizes, align, UiAlign::CENTER, font, ink, 0, false, 0, 0);
         }
         else
-            DrawTextEllipsis(w, r.left, r.top + max(0, (r.GetHeight() - font.GetHeight()) / 2),
+            DrawTextEllipsis(w, r.left, r.top + max(0, (r.GetHeight() - ts.cy) / 2),
                              r.GetWidth(), value, "...", font, ink);
         w.End();
     };
@@ -433,10 +433,16 @@ void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeom
     if(p.show_description) {
         Font font = UiNodeGraphDetail::PresentationFont(style.description_font, zoom_);
         Vector<String> lines; Vector<Size> sizes; UiBuildStyledTextLines(node.description, font, lines, sizes);
-        w.Clip(p.description);
-        UiPaintStyledText(w, p.description, lines, sizes, p.text_align, UiAlign::TOP,
-                          font, style.description_ink[si], 0, false, 0, 0);
-        w.End();
+        if(lines.GetCount() == 1) {
+            text(true, node.description, p.description, style.description_font,
+                 style.description_ink[si], p.text_align);
+        }
+        else {
+            w.Clip(p.description);
+            UiPaintStyledText(w, p.description, lines, sizes, p.text_align, UiAlign::TOP,
+                              font, style.description_ink[si], 0, false, 0, 0);
+            w.End();
+        }
     }
     if(p.show_port_labels)
         for(int i = 0; i < g.port_labels.GetCount(); i++) {

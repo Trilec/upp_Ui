@@ -15,26 +15,27 @@ const char *PresentationLevelName(UiGraphPresentationLevel level)
     }
 }
 
-String FeatureSummary(const UiGraphNodePresentation& p)
+String FeatureSummary(const UiGraphNodePresentation& p, bool visible)
 {
     String out;
     auto add = [&](bool on, const char *name) {
-        if(!on)
+        if(on != visible)
             return;
         if(!out.IsEmpty())
-            out << "  ";
+            out << " ";
         out << name;
     };
-    add(p.show_title, "title");
-    add(p.show_subtitle, "subtitle");
-    add(p.show_icon, "icon");
-    add(p.show_badge, "badge");
-    add(p.show_media, "media");
-    add(p.show_description, "description");
-    add(p.show_footer, "footer");
-    add(p.show_port_labels, "port labels");
+    add(p.show_control, "C");
+    add(p.show_title, "T");
+    add(p.show_subtitle, "S");
+    add(p.show_icon, "I");
+    add(p.show_badge, "B");
+    add(p.show_media, "M");
+    add(p.show_description, "D");
+    add(p.show_footer, "F");
+    add(p.show_port_labels, "P");
     if(out.IsEmpty())
-        out = "silhouette only";
+        out = visible ? "silhouette only" : "none";
     return out;
 }
 
@@ -53,105 +54,50 @@ UiGraphPort MatrixPort(const char *id, const char *title,
 
 } // namespace
 
-class UiGraphDesignMatrix : public TopWindow {
+
+const UiGraphNodeShape shapes[] = { UiGraphNodeShape::Rectangle, UiGraphNodeShape::Ellipse,
+    UiGraphNodeShape::Diamond, UiGraphNodeShape::Triangle, UiGraphNodeShape::Hexagon,
+    UiGraphNodeShape::Cloud, UiGraphNodeShape::Document, UiGraphNodeShape::Database };
+const char *shape_names[] = { "Rectangle", "Ellipse", "Diamond", "Triangle", "Hexagon",
+                             "Cloud", "Document", "Database" };
+const double row_zooms[] = { 1.0, 0.55, 0.32, 0.13 };
+const char *row_names[] = { "Normal", "LOD 1", "LOD 2", "LOD 3" };
+
+// Each cell is an ordinary production graph. Only the enclosing demo UI is laid
+// out here; every node-content rectangle comes from GetNodePresentation.
+class MatrixCell : public Ctrl {
+    struct MatrixButton : Button {
+        Size GetMinSize() const override { return Size(DPI(72), DPI(24)); }
+    } child;
+    UiNodeGraph graph;
+    UiGraphNodeRef ref;
+    UiLabel evidence;
+    String expected;
 public:
-    typedef UiGraphDesignMatrix CLASSNAME;
-
-    UiGraphDesignMatrix()
-    {
-        Title("UiGraph Design Matrix — Rectangle proof");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1380), DPI(860));
-
-        Add(header_);
-        Add(btn_reset_);
-        Add(btn_close_);
-
-        header_.SetTitle("UiGraph Design Matrix — Rectangle proof")
-               .SetSubTitle("Same authored Rectangle, same production presentation contract; only projected size changes")
-               .SetMedia(ICON_DESIGN_WIDGETS_48())
-               .SetMediaSide(UiAlign::LEFT)
-               .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
-               .SetMediaAutoFit(true)
-               .ShowTitleLine(false)
-               .SetContentInset(DPI(8));
-
-        btn_reset_.SetText("Reset 1:1 matrix");
-        btn_close_.SetText("Close");
-        btn_reset_.WhenAction = [=] { ResetViews(); };
-        btn_close_.WhenAction = [=] { Close(); };
-
-        UiNodeGraph *graphs[] = { &graph_normal_, &graph_lod1_, &graph_lod2_, &graph_lod3_ };
-        UiLabel *labels[] = { &lbl_normal_, &lbl_lod1_, &lbl_lod2_, &lbl_lod3_ };
-        for(int i = 0; i < 4; i++) {
-            Add(*labels[i]);
-            Add(*graphs[i]);
-            labels[i]->SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-            ConfigureRow(*graphs[i], refs_[i], kZooms_[i]);
-            graphs[i]->WhenViewport = [=] { SyncLabels(); };
-        }
-
-        SyncLabels();
+    MatrixCell() {
+        Add(graph); Add(evidence);
+        evidence.SetAlign(UiAlign::LEFT, UiAlign::TOP);
+        graph.WhenViewport = [=] { Sync(); };
     }
-
-    void Layout() override
-    {
-        Size client = GetSize();
-        const int pad = DPI(12);
-        const int gap = DPI(8);
-        const int header_h = DPI(72);
-        const int action_h = DPI(30);
-        const int action_gap = DPI(6);
-
-        header_.SetRect(pad, pad, max(0, client.cx - 2 * pad), header_h);
-        btn_close_.SetRect(max(pad, client.cx - pad - DPI(74)),
-                           pad + (header_h - action_h) / 2,
-                           DPI(74), action_h);
-        btn_reset_.SetRect(max(pad, client.cx - pad - DPI(74) - action_gap - DPI(138)),
-                           pad + (header_h - action_h) / 2,
-                           DPI(138), action_h);
-
-        int top = pad + header_h + gap;
-        int body_h = max(0, client.cy - top - pad);
-        int label_w = min(DPI(360), max(DPI(250), client.cx * 28 / 100));
-        int graph_x = pad + label_w + gap;
-        int graph_w = max(0, client.cx - graph_x - pad);
-
-        UiNodeGraph *graphs[] = { &graph_normal_, &graph_lod1_, &graph_lod2_, &graph_lod3_ };
-        UiLabel *labels[] = { &lbl_normal_, &lbl_lod1_, &lbl_lod2_, &lbl_lod3_ };
-        const int weights[] = { 4, 3, 2, 2 };
-        const int weight_total = 11;
-        int usable_h = max(0, body_h - gap * 3);
-        int y = top;
-        int remaining_h = usable_h;
-        int remaining_weight = weight_total;
-
-        for(int i = 0; i < 4; i++) {
-            int row_h = i == 3 ? remaining_h
-                               : remaining_weight > 0 ? usable_h * weights[i] / weight_total : 0;
-            row_h = max(0, row_h);
-            labels[i]->SetRect(pad, y, label_w, row_h);
-            graphs[i]->SetRect(graph_x, y, graph_w, row_h);
-            if(refs_[i].IsValid())
-                graphs[i]->CenterOnNode(refs_[i]);
-            y += row_h + gap;
-            remaining_h = max(0, remaining_h - row_h);
-            remaining_weight -= weights[i];
-        }
-        SyncLabels();
+    void Layout() override {
+        evidence.SetRect(6, 2, max(0, GetSize().cx - 12), DPI(116));
+        graph.SetRect(0, DPI(120), GetSize().cx, max(0, GetSize().cy - DPI(120)));
+        if(ref.IsValid()) graph.CenterOnNode(ref);
+        Sync();
     }
-
-private:
-    static constexpr double kZooms_[4] = { 1.00, 0.55, 0.32, 0.13 };
-    static constexpr UiGraphPresentationLevel kExpected_[4] = {
-        UiGraphPresentationLevel::Normal,
-        UiGraphPresentationLevel::Lod1,
-        UiGraphPresentationLevel::Lod2,
-        UiGraphPresentationLevel::Lod3,
-    };
-
-    void ConfigureRow(UiNodeGraph& graph, UiGraphNodeRef& ref, double zoom)
-    {
+    void Sync() {
+        UiGraphNodePresentation p;
+        if(!graph.GetNodePresentation(ref, p)) return;
+        const UiGraphNode *n = graph.Model().FindNode(ref);
+        if(!n) return;
+        String capacity = p.safe.IsEmpty() ? "not assessed (micro)" : p.fits ? "fits" : "CAPACITY LIMITED";
+        evidence.SetText(Format("%s / expected %s\nactual %s | %.2f x | %d x %d px\n%s\nshown: %s\nhidden: %s",
+            n->title, expected, PresentationLevelName(p.level), graph.GetZoom(),
+            fround(n->size.cx * graph.GetZoom()), fround(n->size.cy * graph.GetZoom()),
+            capacity, FeatureSummary(p, true), FeatureSummary(p, false)));
+    }
+    void Configure(int shape, int scenario, bool spacious, double zoom, const char *row) {
+        expected = row;
         graph.SetAutoFitOnFirstPaint(false)
              .SetEditable(false)
              .EnableInternalMutation(false);
@@ -183,12 +129,14 @@ private:
         }
         graph.SetCustomStyle(style);
 
-        graph.WhenResolveNodePresentation = [](const UiGraphNode&, const UiGraphNodeStyle&,
+        graph.WhenResolveNodePresentation = [scenario](const UiGraphNode&, const UiGraphNodeStyle&,
                                                UiGraphPresentationRequest& request) {
-            request.profile = UiGraphPresentationProfile::MediaCard;
-            request.badge_height = DPI(14);
+            request.profile = scenario == 1 ? UiGraphPresentationProfile::Centred
+                            : scenario == 2 ? UiGraphPresentationProfile::MediaCard
+                                            : UiGraphPresentationProfile::Standard;
+            request.badge_height = scenario >= 2 ? DPI(14) : 0;
             request.footer_height = DPI(14);
-            request.media_min_height = DPI(20);
+            request.media_min_height = scenario == 2 ? DPI(20) : 0;
         };
 
         UiNodeGraph *owner = &graph;
@@ -213,8 +161,8 @@ private:
                 w.DrawRect(media, Color(219, 234, 254));
                 int inset = max(1, fround(DPI(3) * zoom));
                 Rect inner = media.Deflated(inset, inset);
-                if(!inner.IsEmpty())
-                    DrawTextEllipsis(w, inner.left, inner.top + max(0, (inner.GetHeight() - small.GetHeight()) / 2),
+                if(inner.GetHeight() >= small.GetCy())
+                    DrawTextEllipsis(w, inner.left, inner.top + max(0, (inner.GetHeight() - small.GetCy()) / 2),
                                      inner.GetWidth(), "prepared media slot", "...", small, Color(55, 92, 140));
             }
             if(p.show_footer && !p.footer.IsEmpty()) {
@@ -226,12 +174,12 @@ private:
         };
 
         UiGraphNode node;
-        node.title = "Rectangle";
+        node.title = shape_names[shape];
         node.subtitle = "shared presentation";
         node.description = "One prepared layout owns text, media, badge, footer and port labels.";
         node.position = Pointf(0, 0);
-        node.size = Sizef(DPI(260), DPI(170));
-        node.shape = UiGraphNodeShape::Rectangle;
+        node.size = spacious ? Sizef(DPI(480), DPI(360)) : Sizef(DPI(260), DPI(170));
+        node.shape = shapes[shape];
         node.role = UiGraphNodeRole::Accent;
         node.corner_radius = DPI(10);
         node.icon = ICON_DESIGN_WIDGETS_48();
@@ -239,58 +187,111 @@ private:
         node.ports.Add(MatrixPort("in", "Input", UiGraphPortDirection::Input, UiGraphPortSide::Left));
         node.ports.Add(MatrixPort("out", "Output", UiGraphPortDirection::Output, UiGraphPortSide::Right));
 
+        graph.ClearNodeCtrl(ref);
         graph.Model().Clear();
         ref = graph.Model().AddNode(node);
+        if(scenario == 3) {
+            child.SetLabel("Run");
+            graph.SetNodeCtrl(ref, child);
+        }
         graph.SetZoom(zoom);
         graph.InvalidateNodePresentation();
+
+        Layout();
     }
-
-    void ResetViews()
-    {
-        UiNodeGraph *graphs[] = { &graph_normal_, &graph_lod1_, &graph_lod2_, &graph_lod3_ };
-        for(int i = 0; i < 4; i++) {
-            graphs[i]->BeginViewUpdate();
-            graphs[i]->SetZoom(kZooms_[i]);
-            if(refs_[i].IsValid())
-                graphs[i]->CenterOnNode(refs_[i]);
-            graphs[i]->EndViewUpdate();
-        }
-        SyncLabels();
-    }
-
-    void SyncLabels()
-    {
-        UiNodeGraph *graphs[] = { &graph_normal_, &graph_lod1_, &graph_lod2_, &graph_lod3_ };
-        UiLabel *labels[] = { &lbl_normal_, &lbl_lod1_, &lbl_lod2_, &lbl_lod3_ };
-        const char *row_names[] = { "NORMAL", "LOD 1", "LOD 2", "LOD 3" };
-
-        for(int i = 0; i < 4; i++) {
-            UiGraphNodePresentation p;
-            bool prepared = refs_[i].IsValid() && graphs[i]->GetNodePresentation(refs_[i], p);
-            const UiGraphNode *node = refs_[i].IsValid() ? graphs[i]->Model().FindNode(refs_[i]) : nullptr;
-            int width = node ? max(1, fround(node->size.cx * graphs[i]->GetZoom())) : 0;
-            int height = node ? max(1, fround(node->size.cy * graphs[i]->GetZoom())) : 0;
-            String actual = prepared ? PresentationLevelName(p.level) : "not prepared";
-            String features = prepared ? FeatureSummary(p) : String("-");
-            String fit = prepared ? (p.fits ? "fits" : "capacity limited") : "";
-            String match = prepared && p.level == kExpected_[i] ? "OK" : "CHECK";
-            labels[i]->SetText(Format("%s   [%s]\nzoom %.2f  ·  projected %d × %d px\nprepared %s  ·  %s\n%s",
-                                      row_names[i], match, graphs[i]->GetZoom(), width, height,
-                                      actual, fit, features));
-        }
-    }
-
-private:
-    UiTitleCard header_;
-    UiButton btn_reset_, btn_close_;
-
-    UiLabel lbl_normal_, lbl_lod1_, lbl_lod2_, lbl_lod3_;
-    UiNodeGraph graph_normal_, graph_lod1_, graph_lod2_, graph_lod3_;
-    UiGraphNodeRef refs_[4];
 };
 
-constexpr double UiGraphDesignMatrix::kZooms_[4];
-constexpr UiGraphPresentationLevel UiGraphDesignMatrix::kExpected_[4];
+class UiGraphDesignMatrix : public TopWindow {
+    Label heading, help, legend;
+    DropList scenario, authored, selected_shape;
+    Button reset, compare;
+    Ctrl viewport, sheet;
+    ScrollBar horizontal, vertical;
+    Array<MatrixCell> cells;
+    int column_width = 0;
+    int sheet_height = 0;
+
+    void Scroll() {
+        sheet.SetRect(-horizontal.Get(), -vertical.Get(), column_width * 8, sheet_height);
+    }
+    void Arrange() {
+        if(cells.GetCount() != 32) return; // Frame insertion can trigger Layout during construction.
+        bool spacious = authored.GetIndex() == 1;
+        column_width = DPI(spacious ? 520 : 340);
+        int y = 0;
+        for(int row = 0; row < 4; row++) {
+            int h = DPI(150) + fround(DPI(spacious ? 360 : 170) * row_zooms[row]);
+            for(int col = 0; col < 8; col++)
+                cells[row * 8 + col].SetRect(col * column_width, y, column_width - DPI(8), h);
+            y += h + DPI(8);
+        }
+        sheet_height = y;
+        horizontal.SetTotal(column_width * 8);
+        vertical.SetTotal(sheet_height);
+        Scroll();
+    }
+    void Configure() {
+        for(int row = 0; row < 4; row++)
+            for(int col = 0; col < 8; col++)
+                cells[row * 8 + col].Configure(col, scenario.GetIndex(), authored.GetIndex() == 1,
+                                              row_zooms[row], row_names[row]);
+        Arrange();
+    }
+    void Compare() {
+        TopWindow window;
+        MatrixCell normal, enlarged;
+        int shape = selected_shape.GetIndex();
+        window.Title(String(shape_names[shape]) + " — Normal composition: 1.00x / 1.50x");
+        window.Sizeable().Zoomable();
+        window.SetRect(0, 0, DPI(1320), DPI(760));
+        window.Add(normal.LeftPos(0, DPI(540)).VSizePos());
+        window.Add(enlarged.HSizePos(DPI(548), 0).VSizePos());
+        // Spacious authored content is identical in both views. Constrained
+        // shapes may still report capacity limits; enlargement never repairs it.
+        normal.Configure(shape, scenario.GetIndex(), true, 1.0, "Normal");
+        enlarged.Configure(shape, scenario.GetIndex(), true, 1.5, "Normal enlarged");
+        window.OpenMain();
+        window.Run();
+    }
+public:
+    UiGraphDesignMatrix() {
+        Title("UiGraph Design Matrix — eight production shapes");
+        Sizeable().Zoomable();
+        SetRect(0, 0, DPI(1500), DPI(980));
+        Add(heading); Add(help); Add(legend); Add(scenario); Add(authored); Add(selected_shape); Add(reset); Add(compare);
+        heading.SetLabel("UiGraph / production Design Matrix").SetFont(SansSerif(22).Bold());
+        help.SetLabel("Columns: eight shapes. Rows: Normal / LOD 1 / LOD 2 / LOD 3. Scroll both axes; wheel inside a cell changes its real camera.");
+        legend.SetLabel("Features: T title   S subtitle   I icon   B badge   M media   D description   F footer   P port labels   C native control. Micro capacity is not assessed.");
+        scenario.Add("Standard / text").Add("Centred / text").Add("MediaCard / badge + media + footer").Add("Standard / native control capacity");
+        scenario.SetIndex(2);
+        authored.Add("Authored 260 x 170 / capacity stress").Add("Authored 480 x 360 / spacious");
+        authored.SetIndex(0);
+        for(const char *name : shape_names) selected_shape.Add(name);
+        selected_shape.SetIndex(0);
+        reset.SetLabel("Reset cameras"); compare.SetLabel("Compare 1x / 1.5x");
+        scenario.WhenAction = authored.WhenAction = reset.WhenAction = [=] { Configure(); };
+        compare.WhenAction = [=] { Compare(); };
+        Add(viewport); viewport.Add(sheet);
+        viewport.AddFrame(horizontal.Horz()); viewport.AddFrame(vertical);
+        horizontal.WhenScroll = vertical.WhenScroll = [=] { Scroll(); };
+        for(int i = 0; i < 32; i++) sheet.Add(cells.Add());
+        Configure();
+    }
+    void Layout() override {
+        int w = GetSize().cx;
+        heading.SetRect(DPI(12), DPI(6), w - DPI(24), DPI(30));
+        scenario.SetRect(DPI(12), DPI(42), DPI(300), DPI(28));
+        authored.SetRect(DPI(322), DPI(42), DPI(290), DPI(28));
+        selected_shape.SetRect(DPI(622), DPI(42), DPI(135), DPI(28));
+        compare.SetRect(DPI(767), DPI(42), DPI(155), DPI(28));
+        reset.SetRect(DPI(932), DPI(42), DPI(125), DPI(28));
+        help.SetRect(DPI(12), DPI(76), w - DPI(24), DPI(24));
+        legend.SetRect(DPI(12), DPI(100), w - DPI(24), DPI(24));
+        viewport.SetRect(DPI(12), DPI(130), max(0, w - DPI(24)), max(0, GetSize().cy - DPI(142)));
+        horizontal.SetPage(viewport.GetSize().cx); vertical.SetPage(viewport.GetSize().cy);
+        Arrange();
+    }
+};
 
 GUI_APP_MAIN
 {

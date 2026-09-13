@@ -86,6 +86,12 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
 
     const double z = max(0.01, zoom_);
     auto px = [&](int v) { return max(0, fround(max(0, v) * z)); };
+    // GetHeight is the requested em height, not the Windows line box. Reserve
+    // the measured authored line and allow final-pixel font rounding so glyphs
+    // (especially descenders) cannot be clipped by their own presentation slot.
+    auto line_height = [&](Font font) {
+        return max(px(font.GetCy()), UiNodeGraphDetail::PresentationFont(font, z).GetCy());
+    };
     int gap = px(style.content_cell_gap);
     Rect available = p.safe;
     // Take requested space once. Suppression below never reallocates freed space.
@@ -127,7 +133,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     // change title alignment or move the media into the header.
     int header_height = style.header_height;
     if(request.profile == UiGraphPresentationProfile::MediaCard)
-        header_height = max(style.title_font.GetHeight() + style.subtitle_font.GetHeight()
+        header_height = max(style.title_font.GetCy() + style.subtitle_font.GetCy()
                             + style.title_subtitle_gap + style.content_cell_gap,
                             style.show_icon && !IsNull(node.icon) ? style.icon_size.cy : 0);
     p.header = take(available, px(header_height), UiAlign::TOP);
@@ -141,8 +147,8 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             p.icon = RectC(lane.left, lane.top + (lane.GetHeight() - px(size.cy)) / 2, lane.GetWidth(), px(size.cy));
         else p.fits = false;
     }
-    int th = node.title.IsEmpty() ? 0 : px(max(1, style.title_font.GetHeight()));
-    int sh = node.subtitle.IsEmpty() ? 0 : px(max(1, style.subtitle_font.GetHeight()));
+    int th = node.title.IsEmpty() ? 0 : line_height(style.title_font);
+    int sh = node.subtitle.IsEmpty() ? 0 : line_height(style.subtitle_font);
     int tg = th && sh ? px(style.title_subtitle_gap) : 0;
     int top = text.top + max(0, (text.GetHeight() - th - tg - sh) / 2);
     if(th && top + th <= text.bottom) p.title = Rect(text.left, top, text.right, top + th);
@@ -162,7 +168,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             p.fits = false;
     }
     if(style.show_description && !node.description.IsEmpty())
-        p.description = take(available, px(max(1, style.description_font.GetHeight())), UiAlign::TOP);
+        p.description = take(available, line_height(style.description_font), UiAlign::TOP);
     p.media = available;
     if(request.media_min_height > 0 && p.media.GetHeight() < px(request.media_min_height))
         p.fits = false;
