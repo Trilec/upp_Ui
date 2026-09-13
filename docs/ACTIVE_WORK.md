@@ -2,11 +2,11 @@
 
 Remote main is authoritative. Fetch before work/publish; do not force-update main.
 
-BASE: `7798f5f9ee6d9c4c6da6a962cd380da00c63d2da` / main
+BASE: `81bd7b53cfbf531bc2e2e406f7677186aaa23bb0` / main
 TASK: UIGRAPH-DESIGN-MATRIX-RECT-01 — Rectangle four-row production presentation proof
-STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING
-BRANCH: `supervisor/uigraph-design-matrix-rectangle-proof6`
-PUBLISHED: pending squash/merge to main
+STATUS: PUBLISHED — PLATFORM VALIDATION PENDING
+BRANCH: main
+PUBLISHED: `81bd7b53cfbf531bc2e2e406f7677186aaa23bb0`
 NEXT ACTION: quick Debug-only build/launch of the new design-matrix example, then expand the proven row mechanism to the remaining seven canonical shapes.
 
 ## ACCEPTED FOUNDATION
