@@ -2,92 +2,99 @@
 
 Remote main is authoritative. Fetch before work/publish; do not force-update main.
 
-BASE: `40ff7c974934b077616f2e5cd85fdd8bb7e57c8b` / main
-TASK: UIGRAPH-PRESENTATION-LAYOUT-01 — shared prepared node presentation contract
+BASE: `7798f5f9ee6d9c4c6da6a962cd380da00c63d2da` / main
+TASK: UIGRAPH-DESIGN-MATRIX-RECT-01 — Rectangle four-row production presentation proof
 STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING
-BRANCH: main
-PUBLISHED: This checkpoint is the commit containing this recovery record.
-NEXT ACTION: Gary runs the focused Debug gate below; Curt inspects Reference content.
+BRANCH: `supervisor/uigraph-design-matrix-rectangle-proof6`
+PUBLISHED: pending squash/merge to main
+NEXT ACTION: quick Debug-only build/launch of the new design-matrix example, then expand the proven row mechanism to the remaining seven canonical shapes.
+
+## ACCEPTED FOUNDATION
+
+Eddie's shared presentation contract at `7798f5f9ee6d9c4c6da6a962cd380da00c63d2da`
+is the source of truth:
+- one prepared `UiGraphNodePresentation` owns regions, level, visibility and capacity;
+- Standard/Centred/MediaCard profiles;
+- bounded request callback + explicit invalidation + read-only getter;
+- rich paint consumes prepared regions;
+- live camera projection projects prepared regions without layout work;
+- micro preparation skips the presentation callback and preserves the 10k fast path.
+
+No UiNodeGraph production source is changed by this checkpoint.
 
 ## TOUCHED
 
-- Ui/Ui.upp
-- Ui/UiGraph/UiNodeGraph.h
-- Ui/UiGraph/UiNodeGraph.cpp
-- Ui/UiGraph/UiNodeGraphPresentation.inc (new exact allocation owner)
-- Ui/UiGraph/UiNodeGraphGeometry.inc
-- Ui/UiGraph/UiNodeGraphLod.h
-- Ui/UiGraph/UiNodeGraphPaintRich.inc
-- Ui/UiGraph/UiNodeGraphCore.inc
-- Ui/UiGraph/UiNodeGraphProjection.inc
-- Ui/UiGraph/UiNodeGraphInteraction.cpp
-- examples/UiGraphDemo/UiGraphDemoData.cpp
-- Utilities/UiGraphRenderTests/PresentationLayout.h (new shared structural tests)
-- Utilities/UiGraphRenderTests/{Presentation,DetailLod,RenderLod}.cpp
-- Utilities/UiGraphRenderTests/UiGraphRenderTests.upp
-- Utilities/UiNodeGraphPresentationTest/main.cpp
-- Utilities/UiNodeGraphDetailLodTest/main.cpp
-- Utilities/UiNodeGraphRenderLodTest/main.cpp
-- docs/08_UIGRAPH_GUIDE.md
-- docs/UIGRAPH_PRESENTATION_AUDIT.md
+- examples/UiGraphDesignMatrix/UiGraphDesignMatrix.upp (new)
+- examples/UiGraphDesignMatrix/main.cpp (new)
 - docs/ACTIVE_WORK.md
 
-## IMPLEMENTED
+## RECTANGLE PROOF
 
-One UiGraphNodePresentation in NodeGeometry replaces independent content/title/
-control rectangles. It owns shape-safe capacity, header/body parents, disjoint
-text/icon/media/badge/control/footer leaves, port lanes, level and show flags.
-Exact preparation resolves Standard/Centred/MediaCard requests. Hidden slots are
-reserved; Normal enlargement preserves composition. Font/icon sizing is linear.
-The production outline bounds stock content, including resolved Rectangle radius.
-Insufficient capacity is reported with fits=false rather than overlapping leaves.
+A dedicated design-matrix example now shows the SAME authored Rectangle through four
+independent production UiNodeGraph views. The rows differ only by camera zoom:
 
-WhenResolveNodePresentation supplies bounded authored slot requests. Hosts call
-InvalidateNodePresentation after changing captures; batches defer until EndBatch.
-GetNodePresentation reads already prepared results, including inside content paint.
-WhenPaintNodeContent now receives the media slot, not the former whole-content
-rectangle. Graph clips it away from stock text/controls/port lanes. Demo badge/media
-callbacks exercise this contract; guessed title lanes were removed from fixtures.
+- Normal: 1.00x
+- LOD 1: 0.55x
+- LOD 2: 0.32x
+- LOD 3: 0.13x
 
-Live projection copies/projects the result, rejecting presentation/control visibility
-boundaries. Reusable pan performs no layout. Micro geometry skips the new resolver
-and retains empty rich allocations; micro projection skips rich rectangle work.
-No spatial authority, endpoint/route semantics, micro cache or backend was replaced.
+The authored node is identical in all four rows:
+- Rectangle silhouette;
+- title + subtitle + description;
+- icon;
+- input/output ports and labels;
+- MediaCard presentation request;
+- badge, media minimum and footer reservations.
 
-Native controls need real minimum-size capacity and Normal eligibility. Reduced
-presentation retains their reservation but hides the live child. Old tests updated
-to this deliberate contract; dense-shape control fixtures now author enough space.
+Each row uses normal UiNodeGraph preparation/paint. There is no preview-only renderer,
+no copied layout logic and no hand-authored presentation rectangles.
 
-## VALIDATION
+The content callback consumes `GetNodePresentation()` and paints only the prepared
+badge/media/footer slots. Row readouts report:
+- expected row;
+- actual prepared presentation level;
+- current zoom;
+- projected node size;
+- capacity (`fits` / capacity-limited);
+- currently visible features.
 
-Source review and git diff --check: PASS.
-Linux G++ C++17 syntax-only checks (VIRTUALGUI headers): PASS for changed graph/
-interaction, aggregate Presentation/DetailLod/RenderLod, standalone Presentation,
-and demo data translation units. No linking or GUI runtime pass is claimed.
-Headers: ultimatepp b3a6106a7a0daf642a0d6740ac0e7015f08875bb;
-Animation 4a01b6f4e2a9f122ea1a93457b62a4054d01f970.
-Windows UMK/CLANGx64 and GUI are unavailable in the implementation environment.
+Rows display `[OK]` when the actual prepared level matches the intended matrix row.
+The views remain zoomable for inspection; Reset restores the canonical four zooms.
 
-Required Windows gate — DEBUG ONLY:
-1. Build/run UiGraphRenderTests.
-2. Build/run UiNodeGraphPresentationTest.
-3. Build/run UiGraphViewTests (projection and batch completion changed).
-4. Build UiGraphDemo; launch and leave running for Curt.
-Expect zero failures, including UIGRAPH_EXECUTION_PATH_SUMMARY checks=8 failed=0.
-Check Reference images/tags/title separation, selected ports unchanged, attached
-controls at useful size, and a brief Reference/10k middle-pan smoke check.
-No Release or exhaustive timing matrix is required for this checkpoint.
-Report exact tested SHA, toolchain, command/results and failures. Minor build/test
-fix-ups are allowed; stop for architectural changes or performance regressions.
+This structure is intentionally ready for the full matrix: later checkpoints add the
+other seven canonical shapes to the same four production rows instead of inventing a
+new matrix renderer.
 
-## DELIBERATE LIMITATIONS / NEXT
+## PLATFORM GATE — KEEP IT FAST
 
-No Rectangle Design matrix slice yet. First validate production layout, then add
-four rows using the same production renderer/result and extend to all eight shapes.
-No automatic content reflow, maximal polygon packing or native-control proxy/scaling
-engine. Media/badge/footer content is host-owned. Custom painted shapes must honor
-their declared content capacity. Collapse and transfer animation remain deferred.
-Existing diagnostic L0-L4 and Micro/Rich names are unchanged; the new numerical
-presentation levels are separate, and configured zoom gates still limit visibility.
-Earlier port/arrow fixes are retained. Their historical Windows evidence must not
-be mistaken for runtime validation of this new layout checkpoint.
+DEBUG ONLY.
+
+1. Build `examples/UiGraphDesignMatrix`.
+2. Launch it and leave it running for Curt.
+3. Confirm all four left-side row readouts say `[OK]` at Reset state.
+4. Confirm the visible progression is sensible:
+   - Normal shows the richest authored composition;
+   - LOD 1 simplifies without moving to an unrelated composition;
+   - LOD 2 keeps only the useful reduced identity/detail;
+   - LOD 3 is the cheapest silhouette identity.
+5. `git diff --check` PASS.
+
+No Release build.
+No full test matrix.
+No 10k benchmark for this demo-only checkpoint.
+
+If the example fails to compile, fix only a local example/API-usage mistake. Stop and
+report if validation suggests a production presentation-contract change is required.
+
+## NEXT
+
+After this Rectangle proof is visually accepted:
+1. expand the same four rows to Rectangle / Ellipse / Diamond / Triangle / Hexagon /
+   Cloud / Document / Database;
+2. label each cell with actual projected size/capacity evidence;
+3. include one enlarged Normal sample proving authored composition is preserved above
+   1:1;
+4. use the matrix to tune presentation thresholds/profile defaults only where evidence
+   shows a real capacity problem.
+
+Transfer animation remains a separate later slice. Collapse remains deferred.
