@@ -1,0 +1,14 @@
+description "UiGraph production presentation design matrix";
+
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui;
+
+file
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
