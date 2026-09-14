@@ -1,0 +1,15 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui,
+	Utilities/PropertyEditor;
+
+file
+	UiRangeSegmentsDemo.h,
+	UiRangeSegmentsDemo.cpp,
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
