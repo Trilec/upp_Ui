@@ -23,6 +23,7 @@ private:
     void BuildDataModel();
     void ConfigureEditors();
     void ConnectEvents();
+    void ApplyTheme();
 
     void SelectPage(int page);
     void ApplyProjection();
@@ -47,28 +48,28 @@ private:
     UiToolButton help_;
     UiToolButton exit_;
 
-    Ctrl preview_;
+    UiPanel preview_;
     UiRangeSegments ranges_;
     UiLabel caption_;
 
-    Ctrl right_;
+    UiPanel right_;
     UiBoxLayout tools_;
     UiToolButton inspector_mode_;
     UiToolButton overrides_mode_;
     UiToolButton data_mode_;
     UiToolButton code_mode_;
     UiStack pages_;
-    Ctrl inspector_page_;
-    Ctrl overrides_page_;
-    Ctrl data_page_;
-    Ctrl code_page_;
+    UiPanel inspector_page_;
+    UiPanel overrides_page_;
+    UiPanel data_page_;
+    UiPanel code_page_;
     PropertyEditor inspector_;
     PropertyEditor overrides_;
     PropertyEditor data_;
     UiMultiEdit code_;
     UiToolButton copy_;
 
-    PropertyValueEditorFactory factory_;
+    PropertyEditorFactory factory_;
     PropertyEditorModel inspector_model_;
     PropertyEditorModel override_model_;
     PropertyEditorModel data_model_;

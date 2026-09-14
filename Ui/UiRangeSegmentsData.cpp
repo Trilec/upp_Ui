@@ -71,6 +71,16 @@ UiRangeSegments& UiRangeSegments::ShowEndpointValues(bool on)
     return *this;
 }
 
+UiRangeSegments& UiRangeSegments::ShowValuesOnInteraction(bool on)
+{
+    if(show_values_on_interaction_ != on) {
+        show_values_on_interaction_ = on;
+        RefreshLayout();
+        Refresh();
+    }
+    return *this;
+}
+
 UiRangeSegments& UiRangeSegments::ShowDividers(bool on)
 {
     if(show_dividers_ != on) {

@@ -99,6 +99,7 @@ void UiRangeSegments::Paint(Draw& w)
         }
     }
 
+    const bool show_values = !show_values_on_interaction_ || dragging_;
     for(int i = 0; i < g.boundaries.GetCount(); i++) {
         StyledState st = base_state;
         if(base_state != ST_DISABLED) {
@@ -110,11 +111,11 @@ void UiRangeSegments::Paint(Draw& w)
                 st = ST_HOT;
         }
         PaintBoundaryThumb(w, i, g, st);
-        if(show_boundary_values_)
+        if(show_values && show_boundary_values_)
             PaintValueLabel(w, FormatValueLabel(GetBoundaryValue(i)), g.boundaries[i], true, style);
     }
 
-    if(show_endpoint_values_) {
+    if(show_values && show_endpoint_values_) {
         int pmin = ValueToPos(min_, g.content);
         int pmax = ValueToPos(max_, g.content);
         if(dir_ == UiDirection::H) {

@@ -152,26 +152,39 @@ UiRangeSegments::Style UiRangeSegments::ResolveThemeStyle() const
     s.thumb_metrics.frame_enabled = true;
     s.thumb_metrics.frame_width = max(1, s.thumb_metrics.frame_width);
 
+    const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+    const Color value_face = dark ? Color(31, 41, 55) : White();
+    const Color value_frame = dark ? Color(75, 85, 99) : Color(203, 213, 225);
+    const Color value_ink = dark ? Color(229, 231, 235) : Color(17, 24, 39);
     for(int st = 0; st < 4; st++) {
-        s.value_palette.face[st] = slider.thumb_palette.face[st];
-        s.value_palette.frame[st] = slider.thumb_palette.frame[st];
-        s.value_palette.ink[st] = slider.track_palette.ink[st];
+        s.value_palette.face[st] = UiFill::Solid(value_face);
+        s.value_palette.frame[st] = value_frame;
+        s.value_palette.ink[st] = value_ink;
     }
+    s.value_palette.face[ST_DISABLED] = UiFill::Solid(dark ? Color(55, 65, 81) : Color(241, 245, 249));
+    s.value_palette.ink[ST_DISABLED] = dark ? Color(156, 163, 175) : Color(148, 163, 184);
 
     Color primary = slider.track_palette.ink[ST_NORMAL];
     if(IsNull(primary))
         primary = s.series[0];
-    Color track = FaceColor(slider.track_palette, ST_NORMAL, Color(229, 231, 235));
     UiThemeContext context = UiTheme::GetContext();
 
     if(role_ != UiRole::Standard) {
-        static const int tonal_mix[MAX_SERIES_COLORS] =
-            { 0, 34, 64, 94, 124, 154, 184, 212 };
-        static const int subtle_mix[MAX_SERIES_COLORS] =
-            { 132, 148, 164, 180, 196, 210, 224, 236 };
-        const int *mix = role_ == UiRole::Subtle ? subtle_mix : tonal_mix;
-        for(int i = 0; i < MAX_SERIES_COLORS; i++)
-            s.series[i] = Blend(primary, track, mix[i]);
+        if(role_ == UiRole::Alert) {
+            const Color orange = dark ? Color(251, 146, 60) : Color(234, 88, 12);
+            static const int alert_mix[MAX_SERIES_COLORS] =
+                { 0, 28, 56, 84, 112, 140, 168, 196 };
+            for(int i = 0; i < MAX_SERIES_COLORS; i++)
+                s.series[i] = Blend(primary, orange, alert_mix[i]);
+        }
+        else {
+            const Color dark_grey = Color(71, 85, 105);
+            const Color light_grey = dark ? Color(148, 163, 184) : Color(203, 213, 225);
+            static const int subtle_mix[MAX_SERIES_COLORS] =
+                { 0, 16, 32, 48, 64, 80, 92, 100 };
+            for(int i = 0; i < MAX_SERIES_COLORS; i++)
+                s.series[i] = Blend(dark_grey, light_grey, subtle_mix[i]);
+        }
         s.series_count = MAX_SERIES_COLORS;
     }
     else {

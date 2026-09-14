@@ -196,10 +196,12 @@ public:
     UiRangeSegments& ShowLabels(bool on = true);
     UiRangeSegments& ShowBoundaryValues(bool on = true);
     UiRangeSegments& ShowEndpointValues(bool on = true);
+    UiRangeSegments& ShowValuesOnInteraction(bool on = true);
     UiRangeSegments& ShowDividers(bool on = true);
     bool AreLabelsShown() const { return show_labels_; }
     bool AreBoundaryValuesShown() const { return show_boundary_values_; }
     bool AreEndpointValuesShown() const { return show_endpoint_values_; }
+    bool AreValuesShownOnInteraction() const { return show_values_on_interaction_; }
     bool AreDividersShown() const { return show_dividers_; }
 
     UiRangeSegments& SetValueDisplay(ValueDisplay display);
@@ -287,6 +289,7 @@ private:
     bool show_labels_ = true;
     bool show_boundary_values_ = true;
     bool show_endpoint_values_ = true;
+    bool show_values_on_interaction_ = false;
     bool show_dividers_ = true;
 
     int selected_segment_ = -1;

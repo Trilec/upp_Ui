@@ -95,6 +95,7 @@ UiRangeSegmentsDemo::UiRangeSegmentsDemo()
     BuildDataModel();
     ConfigureEditors();
     ConnectEvents();
+    ApplyTheme();
     SelectPage(0);
     ApplyProjection();
 }
@@ -117,7 +118,7 @@ void UiRangeSegmentsDemo::Layout()
     int caption_h = DPI(54);
     int area_h = max(0, ps.cy - caption_h);
     int rw = min(max(DPI(90), (int)InspectorValue("width", 650)), max(0, ps.cx - DPI(28)));
-    int rh = min(max(DPI(70), (int)InspectorValue("height", 110)), max(0, area_h - DPI(28)));
+    int rh = min(max(DPI(70), (int)InspectorValue("height", 220)), max(0, area_h - DPI(28)));
     ranges_.SetRect(max(0, (ps.cx - rw) / 2), max(0, (area_h - rh) / 2), rw, rh);
     caption_.SetRect(0, max(0, ps.cy - caption_h), ps.cx, caption_h);
 
@@ -204,13 +205,14 @@ void UiRangeSegmentsDemo::BuildInspector()
     inspector_model_.AddBoolean("show_labels", "Segment labels", true, "Presentation");
     inspector_model_.AddBoolean("show_boundary_values", "Boundary values", true, "Presentation");
     inspector_model_.AddBoolean("show_endpoint_values", "Endpoint values", true, "Presentation");
+    inspector_model_.AddBoolean("show_values_on_interaction", "Values while moving", true, "Presentation");
     inspector_model_.AddBoolean("show_dividers", "Divider lines", true, "Presentation");
 
     inspector_model_.AddChoice("role", "Role", "Standard", "Theme")
                     .AddChoice("Standard", "Standard").AddChoice("Subtle", "Subtle")
                     .AddChoice("Accent", "Accent").AddChoice("Alert", "Alert");
     inspector_model_.AddNumericInt("width", "Preview width", 650, 90, 900, 1, "Layout").SetUnit("px");
-    inspector_model_.AddNumericInt("height", "Preview height", 110, 70, 600, 1, "Layout").SetUnit("px");
+    inspector_model_.AddNumericInt("height", "Preview height", 220, 70, 600, 1, "Layout").SetUnit("px");
     inspector_model_.AddBoolean("enabled", "Enabled", true, "Behaviour");
 
     inspector_model_.SetGroupSubtitle("Domain", "one fixed scalar range; boundary edits never move its endpoints");
@@ -253,7 +255,7 @@ void UiRangeSegmentsDemo::BuildDataModel()
 {
     data_model_.Clear(false);
     data_segment_count_ = ranges_.GetSegmentCount();
-    UiRangeSegments::Geometry g = ranges_.GetGeometry(Size(640, 110));
+    UiRangeSegments::Geometry g = ranges_.GetGeometry(Size(640, 220));
     double domain = max(1.0, ranges_.GetMax() - ranges_.GetMin());
 
     for(int i = 0; i < data_segment_count_; i++) {
@@ -496,6 +498,7 @@ void UiRangeSegmentsDemo::ApplyProjection()
            .ShowLabels((bool)InspectorValue("show_labels", true))
            .ShowBoundaryValues((bool)InspectorValue("show_boundary_values", true))
            .ShowEndpointValues((bool)InspectorValue("show_endpoint_values", true))
+           .ShowValuesOnInteraction((bool)InspectorValue("show_values_on_interaction", true))
            .ShowDividers((bool)InspectorValue("show_dividers", true));
 
     if(count != ranges_.GetSegmentCount()) {
@@ -537,7 +540,30 @@ void UiRangeSegmentsDemo::ToggleTheme()
     UiThemeContext context = UiTheme::GetContext();
     context.mode = context.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
     UiTheme::Set(context);
+    Ctrl::SwapDarkLight();
+    ApplyTheme();
     ApplyProjection();
+}
+
+void UiRangeSegmentsDemo::ApplyTheme()
+{
+    const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+    UiTitleCard::Style header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
+    header_style.title_line = false;
+    header_.SetCustomStyle(header_style);
+    preview_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+    right_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+    inspector_page_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+    overrides_page_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+    data_page_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+    code_page_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+    caption_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+    theme_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    help_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Subtle));
+    exit_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
+    inspector_.SetPaletteMode(dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+    overrides_.SetPaletteMode(dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+    data_.SetPaletteMode(dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
 }
 
 void UiRangeSegmentsDemo::UpdateGeneratedCode()
@@ -558,6 +584,7 @@ void UiRangeSegmentsDemo::UpdateGeneratedCode()
     out << "      .ShowLabels(" << (ranges_.AreLabelsShown() ? "true" : "false") << ")\n";
     out << "      .ShowBoundaryValues(" << (ranges_.AreBoundaryValuesShown() ? "true" : "false") << ")\n";
     out << "      .ShowEndpointValues(" << (ranges_.AreEndpointValuesShown() ? "true" : "false") << ")\n";
+    out << "      .ShowValuesOnInteraction(" << (ranges_.AreValuesShownOnInteraction() ? "true" : "false") << ")\n";
     out << "      .ShowDividers(" << (ranges_.AreDividersShown() ? "true" : "false") << ");\n\n";
 
     out << "Vector<UiRangeSegment> segments;\n";
