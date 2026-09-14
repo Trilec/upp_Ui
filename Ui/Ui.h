@@ -38,6 +38,7 @@
     - 2026-09: added UiChartRing as the proportional multi-value chart control.
     - 2026-09: exposed UiGeometry as the screen-space adaptive geometry contract.
     - 2026-09: added UiShapePath and UiShapes as the shared authored-shape layer.
+    - 2026-09: added UiRangeSegments for labelled multi-boundary scalar ranges.
 */
 
 #include <CtrlCore/CtrlCore.h>   // Core widgets + TopWindow
@@ -93,6 +94,7 @@
 #include <Ui/UiChartRing.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
+#include <Ui/UiRangeSegments.h>
 #include <Ui/UiRangeSliderEdit.h>
 #include <Ui/UiMatrixSelector.h>
 #include <Ui/UiColorMatrix.h>
