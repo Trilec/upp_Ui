@@ -1,5 +1,12 @@
 # UIGRAPH-EXECUTION-CONSOLIDATION — Windows validation task
 
+> **HISTORICAL VALIDATION RECORD.** This task belongs to the September 8 execution
+> consolidation checkpoint and its named branch/SHA. Do not use it as current
+> implementation or recovery guidance. Current UiGraph architecture lives in
+> `08_UIGRAPH_GUIDE.md`, retained node-layout/cache design in
+> `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`, and current recovery/validation state in
+> `ACTIVE_WORK.md`.
+
 OBJECTIVE: Validate the latest published consolidation without losing 10k speed.
 REPO/PATH: Trilec/upp_Ui; run from the local repository root.
 BRANCH: performance/uigraph-execution-consolidation-20260908
