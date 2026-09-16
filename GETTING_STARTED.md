@@ -23,6 +23,22 @@ Read the canonical guides first:
 - `docs/02_UI_THEME_GUIDE.md`
 - `docs/03_UI_MODEL_GUIDE.md`
 - `docs/04_UI_DEMO_GUIDE.md`
+- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md`
+- `docs/06_UI_SCALE_AND_LOD_GUIDE.md`
+- `docs/07_UI_DRAWING_GUIDE.md`
+- `docs/08_UIGRAPH_GUIDE.md`
+- `docs/09_UIDOC_GUIDE.md`
+
+For UiGraph node presentation/layout work, also read:
+
+- `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
+- `docs/UIGRAPH_PRESENTATION_AUDIT.md`
+- `docs/ACTIVE_WORK.md`
+
+The current UiGraph rule is deliberate: retained node layout lives in the prepared
+`NodeGeometry` state and is the cache consumed by paint, controls and compatible
+camera projection. Do not introduce a second per-node layout cache or runtime JSON
+layout compiler.
 
 ## Running demos in TheIDE
 
@@ -36,6 +52,11 @@ Recommended first demos:
 
 - `examples/UiLabelDemo`
 - `examples/UiButtonDemo`
+
+For Graph presentation/layout development, `examples/UiGraphDesignMatrix` is the
+current production-backed Presentation Studio/diagnostic example. It is evolving
+toward the V4 focused retained-layout authoring workflow documented in the Graph
+architecture guides.
 
 ## Building demos from CLI (umk)
 
@@ -63,8 +84,10 @@ Notes:
 - Prefer U++ containers and ownership patterns (`Vector`, `Array`, `One<>`, `Ptr<>`).
 - Prefer data-only `Style` structs and keep behaviour in the control.
 - Keep headers self-documenting: intention, usage, and non-obvious constraints.
+- For retained high-scale views, keep one geometry/layout authority and reuse
+  prepared state rather than layering parallel caches.
 
 ## Next steps
 
-Read the guide set in `docs/` for deeper architecture, theme, model, and demo
-guidance.
+Read the guide set in `docs/` for deeper architecture, theme, model, demo, scale,
+drawing, Graph and document guidance.
