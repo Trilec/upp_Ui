@@ -37,11 +37,16 @@ The canonical, portable documentation set lives in `docs/`:
 - `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and override layout
 - `docs/06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD
 - `docs/07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/final-pixel geometry and shapes
-- `docs/08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing and hierarchy
+- `docs/08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing, retained node layout and hierarchy
+- `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained UiGraph node-layout/cache and template direction
+- `docs/UIGRAPH_PRESENTATION_AUDIT.md` — historical presentation-audit disposition and current evolution
 - `docs/09_UIDOC_GUIDE.md` — document model/view/reuse architecture
 
 Start with `00_UPP_CODING_GUIDE.md`, then read the controls guide before
-touching any control or demo. For drawing/shape work, read 07; for dense views/LOD, read 06.
+touching any control or demo. For drawing/shape work, read 07; for dense views/LOD,
+read 06. For UiGraph presentation/layout work, read 08 and
+`UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` before changing production geometry or the
+Presentation Studio.
 
 The repository-wide geometry rule is deliberate: **normal controls can use
 `UiShapes`; dense scenes such as Graph may go directly to `UiGeometry`.**
