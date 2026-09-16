@@ -53,6 +53,7 @@ private:
     void ToggleTheme();
     void ExportJson();
     void ImportJson();
+    bool RunSelectorProjectionSmoke(String& error);
 
 private:
     StudioDocument document_;

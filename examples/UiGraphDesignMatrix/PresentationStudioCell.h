@@ -41,6 +41,12 @@ public:
     void SetSampleResolution(int resolution_px, Sizef authored);
     int SuppressedCount() const { return suppressed_count_; }
 
+    int GetTemplateIndex() const { return template_index_; }
+    Sizef GetAuthoredSize() const { return authored_size_; }
+    int GetPortInputCount() const { return port_inputs_; }
+    int GetPortOutputCount() const { return port_outputs_; }
+    bool IsStudioSelected() const { return selected_; }
+
     void Paint(Draw& w) override;
     void Layout() override;
 
@@ -55,6 +61,7 @@ private:
     Array<StudioFeatureChip> chips_;
 
     StudioFeatureSet requested_;
+    Sizef authored_size_;
     int shape_index_ = 0;
     int lod_index_ = 0;
     int template_index_ = 0;

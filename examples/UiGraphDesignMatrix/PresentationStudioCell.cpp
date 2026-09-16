@@ -17,7 +17,7 @@ UiGraphPort StudioMatrixPort(const String& id, const String& title,
     return port;
 }
 
-void DrawFrame(Draw& w, Rect r, Color color, int width = 1)
+void StudioDrawFrame(Draw& w, Rect r, Color color, int width = 1)
 {
     if(r.IsEmpty() || width <= 0)
         return;
@@ -35,7 +35,7 @@ void DrawPill(Draw& w, int& x, int y, const String& text, Color ink, Color frame
     int width = ts.cx + DPI(10);
     Rect r = RectC(x, y, width, DPI(18));
     w.DrawRect(r, face);
-    DrawFrame(w, r, frame);
+    StudioDrawFrame(w, r, frame);
     w.DrawText(r.left + DPI(5), r.top + max(0, (r.GetHeight() - ts.cy) / 2), text, font, ink);
     x += width + DPI(4);
 }
@@ -133,7 +133,7 @@ void StudioFeatureChip::Paint(Draw& w)
         face = Blend(face, dark ? White() : Black(), dark ? 22 : 12);
     Rect r = GetSize();
     w.DrawRect(r, face);
-    DrawFrame(w, r, frame);
+    StudioDrawFrame(w, r, frame);
     Font font = SansSerifZ(max(1, DPI(5))).Bold();
     Size ts = GetTextSize(tag_, font);
     w.DrawText(max(0, (r.GetWidth() - ts.cx) / 2), max(0, (r.GetHeight() - ts.cy) / 2), tag_, font, ink);
@@ -170,7 +170,7 @@ void StudioMatrixCell::Paint(Draw& w)
     Color face = dark ? Color(29, 37, 48) : White();
     Color frame = selected_ ? Color(12, 127, 211) : (dark ? Color(52, 64, 78) : Color(216, 224, 233));
     w.DrawRect(GetSize(), face);
-    DrawFrame(w, Rect(GetSize()), frame, selected_ ? DPI(2) : 1);
+    StudioDrawFrame(w, Rect(GetSize()), frame, selected_ ? DPI(2) : 1);
 
     const Color meta_face = dark ? Color(23, 30, 39) : Color(248, 250, 252);
     const Color meta_frame = dark ? Color(52, 64, 78) : Color(216, 224, 233);
@@ -270,10 +270,10 @@ void StudioMatrixCell::BuildGraph(Sizef authored, int port_preset)
     UiGraphNode node;
     node.title = requested_.Get(StudioFeature::Title) ? String(kStudioShapeNames[shape_index_]) : String();
     node.subtitle = requested_.Get(StudioFeature::Subtitle)
-                  ? (template_index_ == 3 ? "Process agent" : template_index_ == 4 ? "Content asset" : template_index_ == 6 ? "Graph operator" : "UiGraph node")
+                  ? String(template_index_ == 3 ? "Process agent" : template_index_ == 4 ? "Content asset" : template_index_ == 6 ? "Graph operator" : "UiGraph node")
                   : String();
     node.description = requested_.Get(StudioFeature::Description)
-                     ? (template_index_ == 4 ? "Harbour wide shot · selected take" : "Concise context without opening the inspector.")
+                     ? String(template_index_ == 4 ? "Harbour wide shot · selected take" : "Concise context without opening the inspector.")
                      : String();
     node.position = Pointf(0, 0);
     node.size = authored;
@@ -319,12 +319,12 @@ void StudioMatrixCell::BuildGraph(Sizef authored, int port_preset)
         request.badge_height = requested_.Get(StudioFeature::Badge) ? DPI(14) : 0;
         request.footer_height = requested_.Get(StudioFeature::Footer) ? DPI(14) : 0;
         int content_min = 0;
-        if(requested_.Get(StudioFeature::Media))      content_min = max(content_min, DPI(34));
-        if(requested_.Get(StudioFeature::Fields))     content_min = max(content_min, DPI(38));
-        if(requested_.Get(StudioFeature::Status))     content_min = max(content_min, DPI(18));
-        if(requested_.Get(StudioFeature::Progress))   content_min = max(content_min, DPI(24));
-        if(requested_.Get(StudioFeature::Actions))    content_min = max(content_min, DPI(18));
-        if(requested_.Get(StudioFeature::PortSummary))content_min = max(content_min, DPI(14));
+        if(requested_.Get(StudioFeature::Media))       content_min = max(content_min, DPI(34));
+        if(requested_.Get(StudioFeature::Fields))      content_min = max(content_min, DPI(38));
+        if(requested_.Get(StudioFeature::Status))      content_min = max(content_min, DPI(18));
+        if(requested_.Get(StudioFeature::Progress))    content_min = max(content_min, DPI(24));
+        if(requested_.Get(StudioFeature::Actions))     content_min = max(content_min, DPI(18));
+        if(requested_.Get(StudioFeature::PortSummary)) content_min = max(content_min, DPI(14));
         request.media_min_height = content_min;
     };
 
@@ -475,6 +475,7 @@ void StudioMatrixCell::Configure(int shape_index, int lod_index, const StudioFea
     lod_index_ = minmax(lod_index, 0, STUDIO_LOD_COUNT - 1);
     template_index_ = minmax(template_index, 0, STUDIO_TEMPLATE_COUNT - 1);
     requested_ = requested;
+    authored_size_ = authored;
     selected_ = selected;
     resolution_px_ = max(1, resolution_px);
     sample_zoom_ = minmax((double)resolution_px_ / max(1.0, authored.cx), 0.03, 4.0);
@@ -488,6 +489,7 @@ void StudioMatrixCell::Configure(int shape_index, int lod_index, const StudioFea
 
 void StudioMatrixCell::SetSampleResolution(int resolution_px, Sizef authored)
 {
+    authored_size_ = authored;
     resolution_px_ = max(1, resolution_px);
     sample_zoom_ = minmax((double)resolution_px_ / max(1.0, authored.cx), 0.03, 4.0);
     projected_h_ = max(1, fround(authored.cy * sample_zoom_));

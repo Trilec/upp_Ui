@@ -79,6 +79,16 @@ UiGraphPresentationStudio::UiGraphPresentationStudio()
     ConnectEvents();
     ApplyShellStyles();
     ConfigureFromDocument();
+
+#ifdef _DEBUG
+    String smoke_error;
+    if(!RunSelectorProjectionSmoke(smoke_error)) {
+        LOG("UIGRAPH_STUDIO_SELECTOR_SMOKE FAIL: " << smoke_error);
+        ASSERT(false);
+    }
+    else
+        LOG("UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0");
+#endif
 }
 
 void UiGraphPresentationStudio::Paint(Draw& w)
@@ -272,23 +282,21 @@ void UiGraphPresentationStudio::LayoutToolbar()
 
 void UiGraphPresentationStudio::ConnectEvents()
 {
-    template_.WhenAction = [=] {
-        int index = template_.GetSelection();
+    template_.WhenSelect = [=](int index) {
         if(index < 0 || index >= STUDIO_TEMPLATE_COUNT)
             return;
         document_.active_template = kStudioTemplates[index].id;
         ConfigureCells();
         SyncThresholdEditor();
     };
-    shape_filter_.WhenAction = [=] { SetShapeFilter(shape_filter_.GetSelection()); };
-    authored_.WhenAction = [=] {
-        int index = authored_.GetSelection();
+    shape_filter_.WhenSelect = [=](int index) { SetShapeFilter(index); };
+    authored_.WhenSelect = [=](int index) {
         document_.authored_size = index == 0 ? "compact" : index == 2 ? "spacious" : "reference";
         ConfigureCells();
     };
-    ports_.WhenAction = [=] {
+    ports_.WhenSelect = [=](int index) {
         static const char *ids[] = { "none", "1x1", "3x2", "4x4" };
-        int index = minmax(ports_.GetSelection(), 0, 3);
+        index = minmax(index, 0, 3);
         document_.port_preset = ids[index];
         ConfigureCells();
     };
@@ -350,18 +358,58 @@ int UiGraphPresentationStudio::SampleResolution(int shape, int lod) const
     StudioThresholdSet t = EffectiveThresholds(shape);
     if(lod == 0) return fround((t.normal + STUDIO_RESOLUTION_MAX) * 0.5);
     if(lod == 1) return fround((t.lod1 + t.normal) * 0.5);
-    if(lod == 2) return fround((t.lod2 + t.lod1) * 0.5);
-    return fround((STUDIO_RESOLUTION_MIN + t.lod2) * 0.5);
+    if(lod == 2) return fround(t.lod2 + (t.lod1 - t.lod2) * 0.95);
+    return fround(min((STUDIO_RESOLUTION_MIN + t.lod2) * 0.5, 36.0));
 }
 
 void UiGraphPresentationStudio::ConfigureFromDocument()
 {
-    template_.Select(ActiveTemplateIndex());
-    shape_filter_.Select(shape_filter_index_);
-    authored_.Select(document_.authored_size == "compact" ? 0 : document_.authored_size == "spacious" ? 2 : 1);
-    ports_.Select(document_.port_preset == "none" ? 0 : document_.port_preset == "3x2" ? 2 : document_.port_preset == "4x4" ? 3 : 1);
+    template_.SetDataSilently(ActiveTemplateIndex());
+    shape_filter_.SetDataSilently(shape_filter_index_);
+    authored_.SetDataSilently(document_.authored_size == "compact" ? 0 : document_.authored_size == "spacious" ? 2 : 1);
+    ports_.SetDataSilently(document_.port_preset == "none" ? 0 : document_.port_preset == "3x2" ? 2 : document_.port_preset == "4x4" ? 3 : 1);
     SyncThresholdEditor();
     ConfigureCells();
+}
+
+bool UiGraphPresentationStudio::RunSelectorProjectionSmoke(String& error)
+{
+    String failure;
+    if(cells_.GetCount() != STUDIO_SHAPE_COUNT * STUDIO_LOD_COUNT)
+        failure = "matrix cell catalogue is incomplete";
+
+    if(failure.IsEmpty()) {
+        template_.Select(0);
+        if(document_.active_template != "minimal" || cells_[0].GetTemplateIndex() != 0)
+            failure = "template selection did not reconfigure matrix cells";
+    }
+
+    if(failure.IsEmpty()) {
+        authored_.Select(0);
+        Sizef authored = cells_[0].GetAuthoredSize();
+        if(abs(authored.cx - DPI(220)) > 0.01 || abs(authored.cy - DPI(145)) > 0.01)
+            failure = "authored-size selection did not reach matrix cells";
+    }
+
+    if(failure.IsEmpty()) {
+        ports_.Select(3);
+        if(cells_[0].GetPortInputCount() != 4 || cells_[0].GetPortOutputCount() != 4)
+            failure = "port preset selection did not rebuild matrix topology";
+    }
+
+    if(failure.IsEmpty()) {
+        shape_filter_.Select(3);
+        if(shape_filter_index_ != 3 || selected_shape_index_ != 2 || !cells_[2].IsStudioSelected())
+            failure = "shape selection did not update matrix selection/filter state";
+    }
+
+    document_ = StudioMakeDefaultDocument();
+    selected_shape_index_ = -1;
+    shape_filter_index_ = 0;
+    ConfigureFromDocument();
+
+    error = failure;
+    return failure.IsEmpty();
 }
 
 void UiGraphPresentationStudio::ConfigureCells()
