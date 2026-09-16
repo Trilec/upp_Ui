@@ -143,6 +143,11 @@ separate rendering concern.
 - Avoid "mutate silently, notify afterward" APIs. Use request-first mutation
   when a command/undo/validation layer exists.
 - Do not let hover/pressed visuals masquerade as committed selection.
+- In retained high-scale views, prefer storing evaluated layout in the retained
+  geometry record that consumes it rather than creating a `layout result -> second
+  per-item cache` pipeline. Shared template definitions may be cached once; prepared
+  per-item geometry should remain a single authority. UiGraph's concrete rule is
+  documented in `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
 
 ## Assertions and error handling
 
@@ -188,6 +193,7 @@ separate rendering concern.
 7. `06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD;
 8. `07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/geometry/shape architecture;
 9. `08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing and hierarchy;
-10. `09_UIDOC_GUIDE.md` — document model/view/reuse architecture.
+10. `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained Graph node-layout/cache and template direction;
+11. `09_UIDOC_GUIDE.md` — document model/view/reuse architecture.
 
 When this guide and an older document conflict, current code and this guide win.
