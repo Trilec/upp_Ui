@@ -1,4 +1,4 @@
-description "UiGraph production presentation design matrix";
+description "UiGraph interactive presentation studio and LOD policy matrix";
 
 uses
 	Core,
@@ -8,6 +8,12 @@ uses
 	Ui;
 
 file
+	PresentationStudioPolicy.h,
+	PresentationStudioPolicy.cpp,
+	PresentationStudioCell.h,
+	PresentationStudioCell.cpp,
+	PresentationStudio.h,
+	PresentationStudio.cpp,
 	main.cpp;
 
 mainconfig
