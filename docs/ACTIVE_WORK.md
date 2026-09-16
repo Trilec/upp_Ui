@@ -3,132 +3,148 @@
 Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `3fd8a5cd171a5ffbb0bb4ec8b23e6c5a4b8e6a23`
-TASK: **UIGRAPH-NODE-LAYOUT-CORE-01 — unify presentation allocation inside node geometry preparation**
+BASE: `3af1ddbeb51134c1a47b75596424a4cf665667fc`
+TASK: **UIGRAPH-NODE-LAYOUT-CORE-02 — retained section-aware node layout**
 BRANCH: `main`
-STATUS: **SOURCE COMPLETE — WINDOWS DEBUG VALIDATION PENDING**
-PUBLISHED: `09c8de77cc1e0a60e8504fb33b65009c3d74bb8c`
-NEXT ACTION: focused Debug presentation tests + Design Matrix build, then implement Studio V4 against this geometry-owned layout path.
+STATUS: **SOURCE IMPLEMENTED — WINDOWS DEBUG VALIDATION PENDING**
+PUBLISHED: pending until this source checkpoint is attached to `main`
+NEXT ACTION: focused Debug `UiGraphRenderTests` + `UiGraphDesignMatrix`; then wire Presentation Studio V4 to the retained layout regions rather than the old matrix sampling model.
 
-## DECISION
+## CORE DECISION
 
-Do NOT introduce a public `UiGraphLayout` subsystem or a second layout cache.
+Node layout is not a second subsystem/cache after geometry.
 
-The existing architecture already has the correct cache owner:
-- `NodeGeometry` is the retained prepared geometry record;
-- `NodeGeometry.presentation` stores the finished `UiGraphNodePresentation` rectangles;
-- exact preparation computes them;
-- compatible camera projection reuses/projects them;
-- reusable middle-pan performs no presentation/layout preparation;
-- Micro preparation skips rich presentation allocation entirely.
+`NodeGeometry.presentation` is the retained node-layout cache:
+- exact node geometry preparation owns it;
+- it stores the prepared rectangles consumed by paint/attached controls;
+- compatible live pan/zoom projects the same retained rectangles;
+- Micro preparation keeps skipping rich presentation/layout work;
+- no runtime JSON compiler or Ctrl layout tree is introduced.
 
-Node layout therefore belongs inside the existing node-geometry preparation path.
+The small internal `NodeLayout` cursor remains only an allocation primitive used while exact rich geometry is prepared.
 
-## INTERNAL NODE LAYOUT
+## SECTION-AWARE RETAINED LAYOUT
 
-`UiNodeGraphPresentation.inc` now contains one tiny internal `NodeLayout` rectangle cursor.
-It is an implementation helper only, not a public graph/layout framework.
+`UiGraphNodePresentation` now represents an explicit retained layout hierarchy:
+- `safe`
+- `header`
+- `body`
+  - `body_left`
+  - `body_main`
+  - `body_right`
+- `footer`
+- `overlay`
+- `center`
+- leaf slots: title / subtitle / icon / badge / description / media / control
+- physical port label lanes: left / right / top / bottom
 
-Properties:
-- stack/value object;
-- no heap allocation;
-- no Ctrl children;
-- no virtual dispatch;
-- no independent cache;
-- no Paint-time work;
-- only integer rectangle arithmetic;
-- nested composition by constructing another `NodeLayout` over an allocated slot.
+`overlay` and `center` intentionally overlap `body_main`; they are composition regions, not sibling reservations.
 
-Core operations are intentionally minimal:
-- `Take(amount, side [, gap])`
-- `Remaining()`
-- static `Center(rect, size)`
-- `fits` state
+## BODY MODES
 
-This replaces the private ad-hoc `take` lambda and centralises the rectangle allocation mechanism without creating another authority.
+Added structural body-mode metadata:
+- `Stack`
+- `Centered`
+- `Media`
+- `KeyValue`
+- `Fields`
+- `PortRows`
+- `FlowTags`
 
-## CURRENT PRODUCTION INTEGRATION
+These modes do not create heavy runtime engines. They describe how a host/template intends to use `body_main`; specialised row/tag/field painters remain bounded inside the prepared region.
 
-The same internal `NodeLayout` now allocates:
-- port-label lanes;
-- badge/footer reservations;
-- header region;
-- nested header icon lane;
-- centred title/subtitle group;
-- control slot;
-- description slot;
-- remaining media/body region.
+This covers the concrete families discussed with Curt:
+- media card: title + media body + overlay state icons + wrapping footer/tag content;
+- central controller/hub: centred body content + icon/title/subtitle + external state/focus decoration;
+- summary/key-value nodes: structured two/three-column rows + footer summary;
+- status/process nodes: title/subtitle + progress/status content;
+- parameter/operator nodes: body fields/controls plus labelled side lanes;
+- Blueprint-style port catalogue nodes: labelled output/input rows without turning every row into a Ctrl.
 
-The prepared result is still written directly into `NodeGeometry.presentation`.
-No cache/invalidation semantics change.
+## PORT-LANE OWNERSHIP
 
-No changes to:
-- spatial ownership;
-- routes/edges;
-- Micro/Rich backend ownership;
-- production LOD thresholds;
-- current LOD visibility policy;
-- model semantics;
-- host request callback authority.
+Default behaviour remains backward compatible: labelled left/right lanes reserve full node height.
 
-## WHY THIS MATTERS
+A presentation request may now bind either labelled side lane to `Body` only:
+- `left_port_lane_body_only`
+- `right_port_lane_body_only`
 
-This creates the low-level execution primitive needed for future presentation templates without turning graph nodes into Ctrl layout trees.
+Body-only lanes participate in `body_left` / `body_right` and no longer steal width from Header/Footer.
+Explicit `body_left_width` / `body_right_width` reservations may be larger than the label demand; the lane shares the reserved body column.
 
-Future template authoring should define WHAT regions/slots a node wants and how they are composed; exact node geometry preparation should execute that definition through this same internal rectangle allocator and cache only the finished `UiGraphNodePresentation` result.
+Top/bottom lane semantics are unchanged in this tranche.
 
-Do not add a second per-node layout cache. If template definitions later need preprocessing, cache/compile the TEMPLATE definition once, never duplicate prepared per-node geometry.
+## PERFORMANCE CONTRACT
 
-## STUDIO V4 DIRECTION
+No second per-node cache is added.
 
-After validation, rebuild the Presentation Studio authoring model around four independent concepts:
+Compatible camera motion continues to project prepared geometry rather than relayout. The live-projection path now projects all new retained regions:
+- body_left
+- body_main
+- body_right
+- overlay
+- center
 
-1. persistent specimen/camera size;
-2. LOD transition thresholds;
-3. per-LOD feature policy;
-4. template/node layout.
+Therefore enlarging/shrinking within a compatible LOD/visibility interval remains a transform of cached layout, not a new layout pass.
 
-Moving `UiRangeSegments` boundaries must NOT resize the specimen cameras.
-Feature policy should support Inherit / Force On / Force Off, subject only to real shape capacity.
+Do not build a fine-grained dependency graph yet. Preferred rule remains:
+- retain everything;
+- invalidate narrowly where practical;
+- replay a small section when necessary;
+- rely on camera projection for compatible scaling;
+- exact rebuild only when structural/LOD/capacity inputs really change.
 
-Template editing should remain constrained and fast rather than becoming a full general UI Designer. Likely concepts:
-- nested sections/regions;
-- Top / Bottom / Left / Right / Fill / Center;
-- inset/gap;
-- named slots such as Title, Subtitle, Icon, Badge, Status, Progress, Description, Media, Fields, Controls, Actions, PortSummary, Footer;
-- Subtitle may be positioned as an overline/kicker by template layout rather than requiring another feature enum.
+## CURRENT LIMITS / NEXT CORE STEP
 
-Built-in starting templates remain:
-Minimal, Identity, Summary, Status, Media, Parameter, Operator.
+This tranche establishes the retained section vocabulary and projection contract. It does NOT yet implement arbitrary drag/drop slot reassignment or per-feature Inherit/Force-On/Force-Off.
 
-Production definitions should compile as ordinary C++ with UMK/CLANG. JSON may remain a Studio/session/export representation but must not become a runtime layout compiler requirement.
+Next production tranche should add a compact template/slot description that maps named features into these retained regions without adding a general-purpose UI layout tree. That description should compile as normal C++/UMK code. JSON, if retained in Studio, is design/session interchange only.
+
+## TEST COVERAGE ADDED
+
+`UiGraphRenderTests/PresentationLayout.h` adds checks that:
+- `KeyValue` body-mode metadata survives preparation;
+- BodyLeft/Main/Right are retained;
+- body-only labelled left/right lanes share BodyLeft/BodyRight;
+- Header keeps more width than BodyMain when side lanes are body-only;
+- overlay/center map to BodyMain;
+- compatible middle-pan projects all new retained regions without a geometry/layout rebuild.
+
+Existing matrix/shape/capacity/text-line-box tests remain authoritative.
 
 ## WINDOWS DEBUG GATE
 
 DEBUG ONLY.
 
 1. Fetch/pull current `main`.
-2. Build and run `UiGraphRenderTests`.
-   Existing prepared-presentation checks must remain PASS, especially:
-   - region containment/non-overlap;
-   - measured Windows text line boxes;
-   - Normal enlargement stability;
-   - all 8 canonical shapes / 3 profiles / real projected sizes;
-   - reusable middle-pan performs no resolver/layout work;
-   - batched invalidation refreshes once;
-   - Micro skips rich presentation callbacks.
-3. Build `examples/UiGraphDesignMatrix`.
-4. Confirm Debug startup still reports:
+2. Build/run `UiGraphRenderTests`.
+3. Existing prepared-presentation tests plus new section-aware checks must PASS.
+4. Build `examples/UiGraphDesignMatrix`.
+5. Confirm Debug startup still reports:
    `UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0`
-5. Launch and leave the Studio running for Curt.
-6. `git diff --check` PASS.
+6. Launch and leave Studio running for Curt.
+7. `git diff --check` PASS.
 
 No Release build.
-No 10k benchmark unless a regression is observed.
-No Studio V4 implementation in this validation pass.
+No broad aggregate suite unless this focused gate exposes a shared API/compile problem.
+No 10k benchmark unless a measured regression appears.
 
-## BRANCH HYGIENE
+## STUDIO V4 DIRECTION AFTER GATE
+
+Replace the current matrix authoring model with a focused selected-node/template editor:
+- one selected shape/template;
+- four persistent Normal / LOD1 / LOD2 / LOD3 previews;
+- preview cameras independent from LOD threshold editing;
+- `UiRangeSegments` edits transition thresholds only;
+- feature policy becomes Inherit / Force On / Force Off subject to real capacity;
+- right-side builder edits region/slot placement and body mode;
+- Reset Cameras is explicit;
+- Min/Max LOD editor range becomes adjustable.
+
+Built-in starting templates remain:
+Minimal, Identity, Summary, Status, Media, Parameter, Operator.
+
+## BRANCH / CHECKPOINT HYGIENE
 
 Do not create proof/final/published branches for this work.
-Continue deleting obsolete supervisor branches after content-equivalence review.
-Steady state should be `main` plus only genuinely unfinished/unpublished work.
+Steady state remains `main` plus only genuinely unfinished/unpublished branches after content-equivalence review.

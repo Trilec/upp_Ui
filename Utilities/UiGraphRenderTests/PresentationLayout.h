@@ -244,10 +244,52 @@ void RunPreparedPresentationTests(Test& t)
     t.Expect(matrix_levels, "every canonical shape/profile reaches all four levels through actual projected sizes");
     t.Expect(matrix_progression, "full matrix feature progression suppresses secondary and rich micro content coherently");
     t.Expect(matrix_enlargement, "all shape/profile Normal layouts retain proportional regions and alignment at 1.5x and 2x");
-    // Restore a rich node for the impossible-request test below.
+
+    // Section-aware retained layout: labelled side lanes may belong only to Body,
+    // while Header/Footer keep their full content width. Body mode is retained as
+    // authoring metadata and overlay/center intentionally share BodyMain.
     graph.SetZoom(1, Point(0, 0));
     ref = graph.Model().AddNode(node);
+    graph.WhenResolveNodePresentation = [](const UiGraphNode&, const UiGraphNodeStyle&,
+                                          UiGraphPresentationRequest& r) {
+        r.profile = UiGraphPresentationProfile::Standard;
+        r.body_mode = UiGraphNodeBodyMode::KeyValue;
+        r.footer_height = DPI(18);
+        r.body_left_width = DPI(44);
+        r.body_right_width = DPI(48);
+        r.left_port_lane_body_only = true;
+        r.right_port_lane_body_only = true;
+    };
+    graph.InvalidateNodePresentation();
+    UiGraphNodePresentation sectioned;
+    graph.GetNodePresentation(ref, sectioned);
+    bool sectioned_ok = sectioned.body_mode == UiGraphNodeBodyMode::KeyValue
+        && !sectioned.header.IsEmpty() && !sectioned.body.IsEmpty()
+        && !sectioned.body_left.IsEmpty() && !sectioned.body_main.IsEmpty()
+        && !sectioned.body_right.IsEmpty()
+        && sectioned.port_lanes[0] == sectioned.body_left
+        && sectioned.port_lanes[1] == sectioned.body_right
+        && sectioned.overlay == sectioned.body_main
+        && sectioned.center == sectioned.body_main
+        && sectioned.header.GetWidth() > sectioned.body_main.GetWidth();
+    t.Expect(sectioned_ok,
+             "retained node layout exposes body columns, body-only port lanes and overlay/center regions");
 
+    int section_serial = graph.GetGeometryBuildSerial();
+    UiGraphNodePresentation before_pan = sectioned;
+    graph.MiddleDown(Point(300, 260), 0);
+    graph.MouseMove(Point(311, 267), 0);
+    graph.MiddleUp(Point(311, 267), 0);
+    graph.GetNodePresentation(ref, sectioned);
+    t.Expect(section_serial == graph.GetGeometryBuildSerial()
+             && sectioned.body_main == before_pan.body_main.Offseted(11, 7)
+             && sectioned.body_left == before_pan.body_left.Offseted(11, 7)
+             && sectioned.overlay == before_pan.overlay.Offseted(11, 7),
+             "compatible camera pan projects retained node-layout regions without relayout");
+
+    // Restore a rich node for the impossible-request test below.
+    graph.SetPan(Pointf(0, 0));
+    graph.SetZoom(1, Point(0, 0));
     graph.WhenResolveNodePresentation = [](const UiGraphNode&, const UiGraphNodeStyle&,
                                           UiGraphPresentationRequest& r) { r.badge_height = DPI(10000); };
     graph.InvalidateNodePresentation();

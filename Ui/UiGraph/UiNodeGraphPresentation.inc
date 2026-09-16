@@ -1,10 +1,10 @@
-// Exact node presentation allocation. No paint, timers, model state or caches.
+// Exact retained node-layout allocation. No paint, timers or model mutation.
 // Included once by UiNodeGraph.cpp; compatible camera changes project this result.
 namespace Upp {
 namespace {
 
 // NodeLayout is deliberately an internal geometry-preparation helper, not a
-// second retained object. NodeGeometry/UiGraphNodePresentation remain the single
+// second retained object. NodeGeometry/UiGraphNodePresentation are the single
 // cache and invalidation authority. This cursor only performs cheap rectangle
 // arithmetic while exact rich node geometry is being prepared.
 struct NodeLayout {
@@ -95,10 +95,17 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
                                       const UiGraphNodeStyle& style, NodeGeometry& out)
 {
     UiGraphNodePresentation& p = out.presentation;
+    // Preserve only the geometry-owned safe input. Everything else is the
+    // retained output of this exact layout pass.
+    Rect safe = p.safe;
+    p = UiGraphNodePresentation();
+    p.safe = safe;
+
     UiGraphPresentationRequest request;
     if(WhenResolveNodePresentation)
         WhenResolveNodePresentation(node, style, request);
     p.profile = request.profile;
+    p.body_mode = request.body_mode;
     p.text_align = request.profile == UiGraphPresentationProfile::Centred
                  ? UiAlign::CENTER : style.text_align_h;
 
@@ -164,31 +171,38 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     const int gap = px(style.content_cell_gap);
     NodeLayout root(p.safe, gap);
 
-    // Reserve label lanes even when labels are suppressed. They cannot compete
-    // with title/media or one another, and semantic anchors remain unchanged.
+    // Measure port-label demand once. Top/bottom lanes and the default full-height
+    // left/right lanes retain the established behaviour. A host may instead bind
+    // a labelled left/right lane to Body; that lane then participates in BodyLeft
+    // or BodyRight rather than stealing width from Header/Footer.
+    int port_widths[4] = {}, port_counts[4] = {};
     if(style.show_port_labels) {
-        int widths[4] = {}, counts[4] = {};
         for(const UiGraphPort& port : node.ports) {
             if(!port.visible) continue;
             UiGraphPortSide side = ResolvePortSide(port);
             int si = side == UiGraphPortSide::Left ? 0 : side == UiGraphPortSide::Right ? 1
                    : side == UiGraphPortSide::Top ? 2 : 3;
             Size ts = GetTextSize(PortLabel(port, style.show_port_type), style.port_font);
-            widths[si] = max(widths[si], si < 2 ? ts.cx : ts.cy);
-            counts[si]++;
+            port_widths[si] = max(port_widths[si], si < 2 ? ts.cx : ts.cy);
+            port_counts[si]++;
         }
+
         UiAlign sides[] = { UiAlign::LEFT, UiAlign::RIGHT, UiAlign::TOP, UiAlign::BOTTOM };
-        for(int si = 0; si < 4; si++)
-            if(counts[si])
-                p.port_lanes[si] = root.Take(px(widths[si] + style.port_label_gap), sides[si]);
+        for(int si = 0; si < 4; si++) {
+            if(!port_counts[si])
+                continue;
+            bool body_only = si == 0 ? request.left_port_lane_body_only
+                           : si == 1 ? request.right_port_lane_body_only : false;
+            if(!body_only)
+                p.port_lanes[si] = root.Take(px(port_widths[si] + style.port_label_gap), sides[si]);
+        }
     }
 
     p.badge = root.Take(px(request.badge_height), UiAlign::TOP);
     p.footer = root.Take(px(request.footer_height), UiAlign::BOTTOM);
 
-    // Allocate the authored header at every level. Header composition uses the
-    // same tiny NodeLayout cursor over a nested rectangle; no Ctrl/layout tree is
-    // created and the result is retained in NodeGeometry.presentation.
+    // Header is an outer retained section. Its own contents reflow locally and
+    // do not move Body/Footer merely because title/subtitle/icon visibility changes.
     int header_height = style.header_height;
     if(request.profile == UiGraphPresentationProfile::MediaCard)
         header_height = max(style.title_font.GetCy() + style.subtitle_font.GetCy()
@@ -226,20 +240,50 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     if(!root.fits || !header.fits)
         p.fits = false;
 
+    // Body is a retained parent section. BodyLeft/Main/Right are its structural
+    // columns; complex content such as fields, key/value rows, port rows or tags
+    // stays within BodyMain and may paint its own cheap internal rows.
     p.body = root.Remaining();
+    NodeLayout body(p.body, gap);
+    int left_width = px(request.body_left_width);
+    int right_width = px(request.body_right_width);
+    if(style.show_port_labels && port_counts[0] && request.left_port_lane_body_only)
+        left_width = max(left_width, px(port_widths[0] + style.port_label_gap));
+    if(style.show_port_labels && port_counts[1] && request.right_port_lane_body_only)
+        right_width = max(right_width, px(port_widths[1] + style.port_label_gap));
+
+    if(left_width > 0)
+        p.body_left = body.Take(left_width, UiAlign::LEFT);
+    if(right_width > 0)
+        p.body_right = body.Take(right_width, UiAlign::RIGHT);
+    if(style.show_port_labels && port_counts[0] && request.left_port_lane_body_only)
+        p.port_lanes[0] = p.body_left;
+    if(style.show_port_labels && port_counts[1] && request.right_port_lane_body_only)
+        p.port_lanes[1] = p.body_right;
+
+    p.body_main = body.Remaining();
+    // Overlay and Center deliberately overlap BodyMain: they are composition
+    // regions, not sibling allocations. They enable media badges/hub content
+    // without introducing another layout/cache tree.
+    p.overlay = p.body_main;
+    p.center = p.body_main;
+    if(!body.fits)
+        p.fits = false;
+
+    NodeLayout content(p.body_main, gap);
     Ctrl* child = GetNodeCtrl(node.ref);
     if(child) {
         Size minimum = child->GetMinSize();
         int minimum_axis = style.content_cell_side == UiAlign::LEFT || style.content_cell_side == UiAlign::RIGHT
                          ? minimum.cx : minimum.cy;
-        p.control = root.Take(px(max(style.content_cell_reserve, minimum_axis)), style.content_cell_side);
+        p.control = content.Take(px(max(style.content_cell_reserve, minimum_axis)), style.content_cell_side);
         if(p.control.GetWidth() < minimum.cx || p.control.GetHeight() < minimum.cy)
             p.fits = false;
     }
     if(style.show_description && !node.description.IsEmpty())
-        p.description = root.Take(line_height(style.description_font), UiAlign::TOP);
-    p.media = root.Remaining();
-    if(!root.fits)
+        p.description = content.Take(line_height(style.description_font), UiAlign::TOP);
+    p.media = content.Remaining();
+    if(!content.fits)
         p.fits = false;
 
     if(request.media_min_height > 0 && p.media.GetHeight() < px(request.media_min_height))

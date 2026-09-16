@@ -162,6 +162,11 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
             g.presentation.icon = project_rect(src.presentation.icon);
             g.presentation.badge = project_rect(src.presentation.badge);
             g.presentation.body = project_rect(src.presentation.body);
+            g.presentation.body_left = project_rect(src.presentation.body_left);
+            g.presentation.body_main = project_rect(src.presentation.body_main);
+            g.presentation.body_right = project_rect(src.presentation.body_right);
+            g.presentation.overlay = project_rect(src.presentation.overlay);
+            g.presentation.center = project_rect(src.presentation.center);
             g.presentation.media = project_rect(src.presentation.media);
             g.presentation.description = project_rect(src.presentation.description);
             g.presentation.control = project_rect(src.presentation.control);
