@@ -7,7 +7,7 @@ BASE: `3af1ddbeb51134c1a47b75596424a4cf665667fc`
 TASK: **UIGRAPH-NODE-LAYOUT-CORE-02 — retained section-aware node layout**
 BRANCH: `main`
 STATUS: **SOURCE IMPLEMENTED — WINDOWS DEBUG VALIDATION PENDING**
-PUBLISHED: pending until this source checkpoint is attached to `main`
+PUBLISHED: `98d92187e288fc076655207a30da0fe64b083eb9`
 NEXT ACTION: focused Debug `UiGraphRenderTests` + `UiGraphDesignMatrix`; then wire Presentation Studio V4 to the retained layout regions rather than the old matrix sampling model.
 
 ## CORE DECISION
