@@ -6,6 +6,24 @@ This project is experimental and iterating quickly. The goal of this file is to 
 
 ## Unreleased
 
+- UiGraph retained node layout: `NodeGeometry.presentation` is now explicitly the
+  single retained node-layout result/cache rather than the output of a separate
+  layout subsystem. Rich exact preparation owns Header / Body / Footer,
+  BodyLeft / BodyMain / BodyRight, Overlay / Center, leaf slots and physical
+  port-label lanes; compatible live pan/zoom projects those retained regions
+  without relayout. Added structural body modes (`Stack`, `Centered`, `Media`,
+  `KeyValue`, `Fields`, `PortRows`, `FlowTags`) and body-scoped left/right labelled
+  port lanes so labels need not consume Header/Footer width.
+- UiGraph presentation authoring direction: production templates will be small
+  shared C++/UMK definitions mapping features into the retained node-layout
+  regions. No runtime JSON layout compiler or second per-node cache is planned.
+  Presentation Studio V4 will separate persistent preview camera size, LOD
+  transition thresholds, per-LOD feature policy and template layout; moving a
+  `UiRangeSegments` threshold must not resize preview specimens.
+- UiGraph architecture documentation: added
+  `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` and reconciled the canonical Graph,
+  scale/LOD, presentation-audit, range-segments, README and recovery guidance with
+  the retained-layout approach.
 - Documentation architecture: consolidated tranche-specific scale/render/Graph/
   ring/geometry/UiDoc notes into the canonical 00–09 guide set. Current design
   now lives in Large-scale Views & LOD, Drawing & Geometry, UiGraph and UiDoc
