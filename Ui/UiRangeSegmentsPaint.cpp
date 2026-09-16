@@ -5,44 +5,11 @@
 namespace Upp {
 namespace {
 
-double ClampRangeValue(double v, double lo, double hi)
+double ClampRangePaintValue(double v, double lo, double hi)
 {
     if(v < lo) return lo;
     if(v > hi) return hi;
     return v;
-}
-
-Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
-{
-    const UiFill& f = p.face[st];
-    return f.IsSolid() && !IsNull(f.color) ? f.color : fallback;
-}
-
-Color PaletteInk(const StyledPalette& p, StyledState st, Color fallback)
-{
-    Color c = p.ink[st];
-    return IsNull(c) ? fallback : c;
-}
-
-Color ContrastInk(Color c)
-{
-    if(IsNull(c))
-        return SColorText();
-    int luminance = c.GetR() * 299 + c.GetG() * 587 + c.GetB() * 114;
-    return luminance >= 150000 ? Color(17, 24, 39) : White();
-}
-
-void PaintRectFrame(Draw& w, Rect r, Color c, int width)
-{
-    if(r.IsEmpty() || IsNull(c) || width <= 0)
-        return;
-    width = min(width, min(r.GetWidth(), r.GetHeight()) / 2);
-    if(width <= 0)
-        return;
-    w.DrawRect(r.left, r.top, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.bottom - width, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
-    w.DrawRect(r.right - width, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
 }
 
 } // namespace
@@ -81,7 +48,7 @@ int UiRangeSegments::ValueToPos(double value, const Rect& track) const
     int length = dir_ == UiDirection::H ? track.GetWidth() : track.GetHeight();
     if(length <= 0 || max_ <= min_)
         return 0;
-    double t = (ClampRangeValue(value, min_, max_) - min_) / (max_ - min_);
+    double t = (ClampRangePaintValue(value, min_, max_) - min_) / (max_ - min_);
     if(reversed_)
         t = 1.0 - t;
     return clamp(fround(t * length), 0, length);
@@ -92,7 +59,7 @@ double UiRangeSegments::PosToValue(int pos, const Rect& track) const
     int length = dir_ == UiDirection::H ? track.GetWidth() : track.GetHeight();
     if(length <= 0 || max_ <= min_)
         return min_;
-    double t = ClampRangeValue((double)pos / length, 0.0, 1.0);
+    double t = ClampRangePaintValue((double)pos / length, 0.0, 1.0);
     if(reversed_)
         t = 1.0 - t;
     return NormalizeValue(min_ + t * (max_ - min_));
@@ -115,7 +82,7 @@ UiRangeSegments::Geometry UiRangeSegments::BuildGeometry(Size size) const
     auto EdgePos = [&](double value) {
         if(length <= 0 || max_ <= min_)
             return 0;
-        double t = (ClampRangeValue(value, min_, max_) - min_) / (max_ - min_);
+        double t = (ClampRangePaintValue(value, min_, max_) - min_) / (max_ - min_);
         if(reversed_)
             t = 1.0 - t;
         return clamp(fround(t * length), 0, length);
@@ -199,7 +166,7 @@ Color UiRangeSegments::ResolvePaletteColor(int index) const
     const Style& s = GetEffectiveStyle();
     int count = clamp(s.series_count, 1, MAX_SERIES_COLORS);
     if(palette_mode_ == PaletteMode::Gradient && segments_.GetCount() > 1 && count > 1) {
-        double t = ClampRangeValue((double)index / max(1, segments_.GetCount() - 1), 0.0, 1.0);
+        double t = ClampRangePaintValue((double)index / max(1, segments_.GetCount() - 1), 0.0, 1.0);
         double p = t * (count - 1);
         int a = clamp((int)floor(p), 0, count - 1);
         int b = min(count - 1, a + 1);

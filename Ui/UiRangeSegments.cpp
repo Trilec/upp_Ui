@@ -4,49 +4,6 @@
 #include <cmath>
 
 namespace Upp {
-namespace {
-
-double ClampRangeValue(double v, double lo, double hi)
-{
-    if(v < lo) return lo;
-    if(v > hi) return hi;
-    return v;
-}
-
-Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
-{
-    const UiFill& f = p.face[st];
-    return f.IsSolid() && !IsNull(f.color) ? f.color : fallback;
-}
-
-Color PaletteInk(const StyledPalette& p, StyledState st, Color fallback)
-{
-    Color c = p.ink[st];
-    return IsNull(c) ? fallback : c;
-}
-
-Color ContrastInk(Color c)
-{
-    if(IsNull(c))
-        return SColorText();
-    int luminance = c.GetR() * 299 + c.GetG() * 587 + c.GetB() * 114;
-    return luminance >= 150000 ? Color(17, 24, 39) : White();
-}
-
-void PaintRectFrame(Draw& w, Rect r, Color c, int width)
-{
-    if(r.IsEmpty() || IsNull(c) || width <= 0)
-        return;
-    width = min(width, min(r.GetWidth(), r.GetHeight()) / 2);
-    if(width <= 0)
-        return;
-    w.DrawRect(r.left, r.top, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.bottom - width, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
-    w.DrawRect(r.right - width, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
-}
-
-} // namespace
 
 const UiRangeSegments::Style& UiRangeSegments::StyleDefault()
 {

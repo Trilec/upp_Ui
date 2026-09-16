@@ -537,7 +537,7 @@ public:
         };
 
         UiGraphNode node;
-        node.title = requested.title ? kShapeNames[shape_index] : String();
+        node.title = requested.title ? String(kShapeNames[shape_index]) : String();
         node.subtitle = requested.subtitle ? "Subtitle" : String();
         node.description = requested.description ? "One prepared layout owns this presentation." : String();
         node.position = Pointf(0, 0);
@@ -742,14 +742,14 @@ public:
         Rect r = GetSize();
         const int margin = DPI(10);
         const int gap = DPI(8);
-        header_.SetRect(margin, DPI(6), max(0, r.cx - 2 * margin), DPI(46));
-        toolbar_.SetRect(margin, DPI(58), max(0, r.cx - 2 * margin), DPI(36));
-        threshold_panel_.SetRect(margin, DPI(100), max(0, r.cx - 2 * margin), DPI(98));
-        legend_panel_.SetRect(margin, DPI(204), max(0, r.cx - 2 * margin), DPI(30));
+        header_.SetRect(margin, DPI(6), max(0, r.GetWidth() - 2 * margin), DPI(46));
+        toolbar_.SetRect(margin, DPI(58), max(0, r.GetWidth() - 2 * margin), DPI(36));
+        threshold_panel_.SetRect(margin, DPI(100), max(0, r.GetWidth() - 2 * margin), DPI(98));
+        legend_panel_.SetRect(margin, DPI(204), max(0, r.GetWidth() - 2 * margin), DPI(30));
         int top = DPI(240);
-        int body_h = max(0, r.cy - top - margin);
+        int body_h = max(0, r.GetHeight() - top - margin);
         lod_view_.SetRect(margin, top, DPI(88), body_h);
-        viewport_.SetRect(margin + DPI(88) + gap, top, max(0, r.cx - (margin * 2 + DPI(88) + gap)), body_h);
+        viewport_.SetRect(margin + DPI(88) + gap, top, max(0, r.GetWidth() - (margin * 2 + DPI(88) + gap)), body_h);
         horizontal_.SetPage(viewport_.GetSize().cx);
         vertical_.SetPage(viewport_.GetSize().cy);
         LayoutToolbar();
@@ -812,7 +812,9 @@ private:
         threshold_panel_.Add(copy_from_); threshold_panel_.Add(btn_copy_thresholds_);
         threshold_panel_.Add(btn_copy_features_); threshold_panel_.Add(btn_copy_all_);
         threshold_panel_.Add(btn_apply_all_); threshold_panel_.Add(btn_reset_shape_);
-        threshold_title_.SetText("LOD Threshold Editor").SetFont(SansSerifZ(DPI(10)).Bold());
+        UiLabel::Style threshold_title_style = UiLabel::StyleDefault();
+        threshold_title_style.font = SansSerifZ(DPI(10)).Bold();
+        threshold_title_.SetCustomStyle(threshold_title_style).SetText("LOD Threshold Editor");
         threshold_help_.SetText("Drag stops to choose the proposed transition points. Matrix rows sample just below those boundaries.");
         btn_global_.SetText("Global thresholds").SetCheckable().SetChecked(true);
         btn_shape_override_.SetText("Per-shape override").SetCheckable();
@@ -1178,7 +1180,11 @@ private:
     {
         int ti = ActiveTemplateIndex();
         ShapePolicy reset = MakeShapePolicy(ti, selected_shape_index_);
-        ActivePolicy().shapes[selected_shape_index_] = reset;
+        ShapePolicy& selected = ActivePolicy().shapes[selected_shape_index_];
+        selected.shape = pick(reset.shape);
+        selected.threshold_override = reset.threshold_override;
+        selected.thresholds = reset.thresholds;
+        selected.lod = pick(reset.lod);
         threshold_shape_mode_ = false;
         btn_global_.SetChecked(true);
         btn_shape_override_.SetChecked(false);

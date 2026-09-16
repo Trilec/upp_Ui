@@ -4,7 +4,7 @@
 namespace Upp {
 namespace {
 
-double ClampRangeValue(double v, double lo, double hi)
+double ClampRangeModelValue(double v, double lo, double hi)
 {
     if(v < lo) return lo;
     if(v > hi) return hi;
@@ -179,7 +179,7 @@ UiRangeSegments& UiRangeSegments::SplitSegment(int index, double ratio, const St
 {
     if(index < 0 || index >= segments_.GetCount())
         return *this;
-    ratio = ClampRangeValue(ratio, 0.01, 0.99);
+    ratio = ClampRangeModelValue(ratio, 0.01, 0.99);
     UiRangeSegment& left = segments_[index];
     double old_span = left.span;
     double left_span = old_span * ratio;
@@ -287,7 +287,7 @@ UiRangeSegments& UiRangeSegments::SetBoundaryValues(const Vector<double>& values
         double hi = max_ - effective_min * remaining_segments;
         if(lo > hi)
             lo = hi;
-        double v = ClampRangeValue(NormalizeValue(values[i]), lo, hi);
+        double v = ClampRangeModelValue(NormalizeValue(values[i]), lo, hi);
         boundaries[i] = v;
         previous = v;
     }
@@ -304,12 +304,12 @@ UiRangeSegments& UiRangeSegments::SetBoundaryValues(const Vector<double>& values
 
 double UiRangeSegments::NormalizeValue(double value) const
 {
-    double v = ClampRangeValue(value, min_, max_);
+    double v = ClampRangeModelValue(value, min_, max_);
     if(step_ > 0.0) {
         double k = (v - min_) / step_;
         v = min_ + std::floor(k + 0.5) * step_;
     }
-    return ClampRangeValue(v, min_, max_);
+    return ClampRangeModelValue(v, min_, max_);
 }
 
 bool UiRangeSegments::SetBoundaryValueInternal(int index, double value,
@@ -326,7 +326,7 @@ bool UiRangeSegments::SetBoundaryValueInternal(int index, double value,
     if(lo > hi)
         lo = hi = (left_start + right_end) * 0.5;
 
-    double nv = ClampRangeValue(NormalizeValue(value), lo, hi);
+    double nv = ClampRangeModelValue(NormalizeValue(value), lo, hi);
     double before = GetBoundaryValue(index);
     if(fabs(nv - before) < 1e-12)
         return false;
