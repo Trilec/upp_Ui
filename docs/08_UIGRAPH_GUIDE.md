@@ -7,7 +7,8 @@ Read with:
 
 - `03_UI_MODEL_GUIDE.md` — model/view ownership;
 - `06_UI_SCALE_AND_LOD_GUIDE.md` — large-scale view architecture;
-- `07_UI_DRAWING_GUIDE.md` — final-pixel geometry and rendering.
+- `07_UI_DRAWING_GUIDE.md` — final-pixel geometry and rendering;
+- `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained node-layout/cache architecture.
 
 ## 1. Scope
 
@@ -44,6 +45,7 @@ scheduling, retries, spawning and domain behavior.
 - gestures;
 - retained spatial index;
 - prepared projected geometry;
+- retained node layout;
 - LOD;
 - attached visible child controls;
 - profiling evidence.
@@ -187,6 +189,7 @@ Live interaction may reuse retained prepared geometry:
 - middle-pan translates projected geometry while retained coverage is valid;
 - wheel zoom projects prepared geometry about the pointer while LOD/coverage
   constraints remain compatible;
+- retained node-layout regions are transformed with the rest of `NodeGeometry`;
 - quiet after the gesture triggers one exact settle rebuild;
 - unsafe coverage/LOD boundary triggers exact fallback immediately.
 
@@ -352,6 +355,7 @@ Graph exposes observer-only evidence including:
 The important contracts are structural:
 
 - live reusable camera movement does not rebuild geometry every event;
+- compatible camera motion projects retained node-layout regions rather than relayout;
 - micro nodes do not return to rich details/content;
 - fit/overview stays bounded;
 - hit testing uses spatial candidates;
@@ -371,6 +375,10 @@ The reference demo is executable documentation, not another model authority.
 - demo-only style callbacks must not accidentally force conservative full-scene
   renderer paths.
 
+The Presentation Studio must use production node-layout geometry. It must not
+invent a parallel demo-only allocator or make preview-camera size synonymous with
+LOD thresholds.
+
 ## 18. Acceptance surface
 
 The Graph regression family covers:
@@ -384,6 +392,7 @@ The Graph regression family covers:
 - model switching;
 - route editing;
 - presentation/detail/render LOD;
+- retained node-layout containment/projection;
 - selection/interaction state;
 - 10k performance evidence.
 
@@ -398,9 +407,10 @@ Do not put into UiGraph:
 - one child Ctrl per normal node;
 - nested UiNodeGraph controls as the primary hierarchy mechanism;
 - a second model/topology authority;
+- a second per-node layout cache;
+- runtime JSON layout compilation as a production requirement;
 - a private curve-quality/sample-count system;
 - a GPU dependency merely to compensate for avoidable CPU work.
-
 
 ## 20. Execution ownership and source map
 
@@ -413,6 +423,7 @@ boundary; it does not indicate a second implementation or a runtime backend.
 | --- | --- |
 | Lifetime, styles, notifications, attached controls | `UiNodeGraphCore.inc` |
 | Exact node/edge preparation, anchors and geometry LOD | `UiNodeGraphGeometry.inc`: `PrepareViewGeometry`, `BuildViewNodeGeometry`, `BuildNodeGeometry` |
+| Retained rich node-layout allocation and visibility | `UiNodeGraphPresentation.inc`: `BuildNodePresentation` |
 | World-space queries and scope filtering | `UiNodeGraphSpatial.cpp` |
 | Programmatic camera and batched view updates | `UiNodeGraphCamera.inc` |
 | Live pan/zoom projection and settle | `UiNodeGraphProjection.inc`: `ProjectLiveView`, `SettleLiveViewProjection` |
@@ -463,86 +474,134 @@ After the observer runs, no repeating timer remains. Runtime fixture setup does 
 replace this callback. Diagnostic zoom gates describe configured thresholds; actual
 paint-path/fallback/port evidence describes the rendered frame.
 
-## 21. Node presentation
+## 21. Retained node presentation/layout
 
-The agreed designer vocabulary is **Normal, LOD 1, LOD 2, LOD 3**: Normal is
-the authored composition and retains its arrangement/proportions when enlarged;
-LOD 1-3 are progressively simplified, with LOD 3 smallest.
-These prepared levels are separate from Micro/Rich execution and diagnostic
-L0-L4 bands. Historical diagnostics retain their original labels.
+The agreed designer vocabulary remains **Normal, LOD 1, LOD 2, LOD 3**. Normal is
+the authored composition; LOD 1-3 are progressively simplified, with LOD 3
+smallest. These prepared levels are separate from Micro/Rich execution and
+historical diagnostic L0-L4 bands.
 
-See [the presentation audit closure](UIGRAPH_PRESENTATION_AUDIT.md) for resolved
-layout/matrix findings and the accepted capacity and control policies.
-Collapse and animation remain deferred. The layout contract below is implemented;
-the earlier audit is historical design guidance.
+The current architecture is documented in detail in
+`UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`. The key rule is:
 
-### Prepared layout contract (UIGRAPH-PRESENTATION-LAYOUT-01)
+> `NodeGeometry.presentation` is the retained node-layout result/cache.
 
-`UiGraphNodePresentation` now owns node-content allocation. `NodeGeometry` contains
-one result; the former competing content/title/control rectangles were removed.
-`UiNodeGraphPresentation.inc::BuildNodePresentation` runs from exact rich node
-preparation. Micro geometry keeps an empty LOD 3 result and skips the host resolver.
-Compatible live projection transforms the result without running layout again.
-Presentation-level or native-control activation changes reject approximate reuse.
+There is no second `UiGraphLayout` cache after geometry. Exact rich node preparation
+allocates the retained layout; paint, attached controls and compatible camera
+projection consume that same result. Micro preparation keeps an empty/simplified
+presentation and skips rich layout/resolver work.
 
-The result contains `safe`, `header`, `title`, `subtitle`, `icon`, `badge`, `body`,
-`media`, `description`, `control`, `footer`, four physical-side `port_lanes`, a
-`level`, `text_align`, `profile`, `fits`, and explicit `show_*` flags. `safe`,
-`header` and `body` are parent regions; leaf regions are disjoint. Hidden leaves
-remain reserved. `fits=false` reports insufficient requested space; it is not a
-text-width guarantee (titles may ellipsize). Empty micro results do not assess
-Normal capacity. Native-control minimum-size failure also sets `fits=false`.
+### Current section structure
 
-The eight stock silhouettes use their actual prepared outline to validate the
-initial capacity estimate, with the resolved paint radius for canonical Rectangle.
-Unsafe rectangles shrink conservatively. This is a bounded interior, not a maximal
-packing solution. Custom shapes must honor their declared rectangular content
-capacity; arbitrary host-painted silhouettes are not geometrically introspected.
+`UiGraphNodePresentation` retains:
 
-`UiGraphPresentationRequest` offers three runtime profiles:
+```text
+safe
+├── header
+├── body
+│   ├── body_left
+│   ├── body_main
+│   └── body_right
+├── footer
+├── overlay
+└── center
+```
 
-- `Standard`: authored header height and resolved text alignment.
-- `Centred`: the same allocation with centred title/subtitle alignment.
-- `MediaCard`: a compact authored header based on text/icon height, leaving body
-  space for media. It does not move the header as zoom changes.
+Current leaf slots include title, subtitle, icon, badge, media, description,
+control, footer and four physical port-label lanes. `overlay` and `center`
+intentionally overlap `body_main` as composition regions; they are not competing
+sibling allocations.
 
-Requests can reserve authored `badge_height`, `footer_height` and declare
-`media_min_height`. Use DPI-adjusted units at zoom 1. The optional
-`WhenResolveNodePresentation(node, style, request)` supplies these values during
-exact preparation. It cannot supply arbitrary rectangles or change topology.
-Call `InvalidateNodePresentation()` after changing callback captures or replacing
-the callback; this participates in existing batch/geometry invalidation. Do not
-mutate the graph or invalidate recursively inside the resolver.
+The structural body modes are:
 
-`GetNodePresentation(ref, result)` copies an already-prepared result and returns
-false for unprepared nodes. It never prepares geometry, making it safe inside
-`WhenPaintNodeContent`. That existing paint hook now receives the **media slot**,
-not the old whole-content rectangle. Remove any independently guessed title lane.
-It may also use visible badge/footer slots from the result. Graph clips the hook
-to safe content and excludes stock text/header, native controls and port lanes.
-Respect `show_*`; the host still owns its images/status values. Background,
-foreground and overlay extension hooks retain their separate existing contracts.
+- `Stack`;
+- `Centered`;
+- `Media`;
+- `KeyValue`;
+- `Fields`;
+- `PortRows`;
+- `FlowTags`.
 
-Node fonts/icons and slot dimensions now scale linearly with the authored view;
-font pixel rounding cannot change region ownership. Native child internals are
-not camera-scaled: a child activates only at Normal, above its configured zoom
-gate, and when its allocated slot meets its actual minimum size. The reserved
-slot survives suppression. `GetNodeCtrlRect` reports active-eligible geometry;
-use `GetNodePresentation` to inspect a hidden reservation. Painted control proxies
-are a follow-up, not implemented by this change.
+These are authoring metadata, not heavy runtime layout engines. Specialised rows,
+tags, fields, media and port-row content remain bounded inside `body_main`.
 
-The initial presentation decision uses projected safe size: below 38x26 pixels
-LOD 3, below DPI(80)xDPI(48) LOD 2, below DPI(160)xDPI(96) LOD 1, otherwise Normal
-(either deficient dimension reduces the level). Existing configured title/content/
-icon/port-label gates remain additional visibility limits. These defaults are a
-starting policy, not a renaming of diagnostic L0-L4 or Micro/Rich backends.
+### Side port lanes
 
-`examples/UiGraphDesignMatrix` exercises all eight shapes in four production
-camera rows (1.00, 0.55, 0.32, 0.13). Shared selectors cover Standard, Centred,
-MediaCard and native-control capacity with compact/spacious authored sizes.
-Each cell reports actual prepared level, projected dimensions, capacity and
-shown/hidden features. Expected rows are reference labels, not forced LODs.
-Scroll both axes; Reset cameras restores the reference zooms. Select a shape and
-Compare 1x / 1.5x to inspect enlargement of identical spacious authored content.
-No presentation rectangles are invented in the example; callbacks consume the
-production result. Transfer animation and collapse remain deferred.
+Left/right labelled port lanes may retain the legacy full-safe-height reservation
+or be constrained to Body. Body-only lanes share `body_left` / `body_right` and do
+not reduce Header/Footer width. Semantic port anchors remain on the node silhouette
+and are independent from label-lane presentation.
+
+Top/bottom lane behaviour is unchanged by the current retained-layout tranche.
+
+### Layout caching and scaling
+
+The layout result is retained in `NodeGeometry`; it is not calculated and then
+copied into another cache. Compatible camera movement projects the retained region
+rectangles along with the rest of prepared node geometry.
+
+The performance rule is deliberately coarse:
+
+- paint-only state should not cause layout work;
+- local section changes should eventually replay only the affected Header/Body/
+  Footer section when practical;
+- shape/safe-region/structural changes may replay the root layout;
+- compatible camera scaling projects cached layout rather than relayout;
+- do not create a fine-grained dependency graph until measurement justifies it.
+
+Fine-grained per-section dirty/revision updates are a **planned next step**, not a
+current implementation claim.
+
+### Template direction
+
+The starting presentation intents remain:
+
+- Minimal;
+- Identity;
+- Summary;
+- Status;
+- Media;
+- Parameter;
+- Operator.
+
+They are not LOD levels. The next production layer should define them as small
+shared C++ template/slot descriptions mapping features into retained sections/body
+modes. One immutable template definition may serve many nodes; prepared nodes retain
+only evaluated geometry.
+
+Feature placement must remain template-owned rather than hard-wired. An Icon may
+appear in Header, Center or Overlay; Subtitle may be below Title or above it as an
+overline; Media may fill BodyMain while state icons occupy Overlay.
+
+Production template definitions compile normally with UMK/CLANG. JSON is optional
+Studio/session interchange or an offline source for generated C++; it is not a
+required runtime layout compiler.
+
+### Presentation Studio direction
+
+The V3 wide matrix remains useful diagnostic history, but it is not the final
+authoring model.
+
+V4 should keep four independent persistent previews for Normal/LOD1/LOD2/LOD3 and
+separate:
+
+1. preview/camera size;
+2. LOD transition thresholds;
+3. per-LOD feature policy;
+4. template/node layout.
+
+Dragging `UiRangeSegments` must change transition thresholds without resizing the
+preview specimens. When a threshold crosses a fixed specimen size, the specimen's
+actual LOD/policy changes while its camera stays put.
+
+Feature policy should evolve toward `Inherit / Force On / Force Off`, still subject
+to genuine shape/capacity limits. The builder should edit region/slot placement,
+body mode, alignment and eventual Stable/Reflow behaviour against the production
+retained-layout path.
+
+`GetNodePresentation(ref, result)` remains a read-only snapshot of already prepared
+retained layout and never prepares geometry. Native child controls remain active
+only when the current policy/LOD/slot capacity permits them.
+
+See `UIGRAPH_PRESENTATION_AUDIT.md` for the historical audit disposition and
+`ACTIVE_WORK.md` for current validation/recovery status.
