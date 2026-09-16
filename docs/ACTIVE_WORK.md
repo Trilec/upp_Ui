@@ -3,165 +3,149 @@
 Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `57f26b7297442a9e0718e179550daa9de1c7a18e` / main
-TASK: **UIGRAPH-LOD-POLICY-EDITOR-01 — interactive production matrix authoring**
-STATUS: **SOURCE CHECKPOINT PUBLISHED — DEBUG VALIDATION PENDING**
-BRANCH: `main`
-PUBLISHED: `57f26b7297442a9e0718e179550daa9de1c7a18e`
-NEXT ACTION: one focused Debug build/launch of `examples/UiGraphDesignMatrix`; fix compile/API mistakes only, then visually tune the editor shell if needed.
+BASE: `04ba9ec9d3e9b53080b92a8578a4564463cf995b`
+TASK: **UIGRAPH-PRESENTATION-STUDIO-V3 — port approved HTML matrix into U++**
+BRANCH: `supervisor/uigraph-presentation-studio-v3-main`
+STATUS: **SOURCE COMPLETE — DEBUG VALIDATION PENDING**
+PUBLISHED: pending merge to `main`
+NEXT ACTION: focused Debug build/launch of `examples/UiGraphDesignMatrix`, then Curt visual acceptance.
 
 ## ACCEPTED FOUNDATION
 
-Eddie's presentation work remains authoritative:
-- one prepared `UiGraphNodePresentation` owns layout/visibility/capacity;
-- Standard / Centred / MediaCard production profiles;
-- bounded request callback, explicit invalidation and read-only getter;
+Preserve Eddie's production presentation/execution architecture:
+- one prepared `UiGraphNodePresentation` owns production layout/visibility/capacity;
+- bounded `WhenResolveNodePresentation` request seam;
 - rich paint consumes prepared regions;
-- live projection reuses prepared regions;
-- Micro preparation skips rich presentation callbacks and preserves the 10k fast path;
-- full eight-shape structural matrix validation and measured Windows text-line correction at `2ca63ac5c8665d1aabadd0c5de541e23a0f69c62`.
+- live camera projection reuses prepared regions;
+- Micro preparation skips rich presentation callbacks and retains the 10k fast path;
+- one world spatial authority and current Micro/Rich execution ownership remain unchanged.
 
-The production renderer/LOD selection has NOT been silently rewritten by this editor checkpoint.
-The editor authors proposed policy and renders it through the existing production graph so mismatches remain visible.
+This Studio checkpoint does **not** modify production UiGraph source or silently make proposed Studio policy authoritative inside `UiNodeGraph`.
 
-## CURRENT EDITOR CHECKPOINT
+## IMPLEMENTED VISUAL CONTRACT
 
-`examples/UiGraphDesignMatrix` is now a compact LOD policy editor based on the approved matrix concept.
+The reference is the approved `uigraph_presentation_studio_matrix_v3.html` concept.
+The U++ implementation follows its compact engineering-tool structure using repository controls and the production `UiNodeGraph` renderer.
 
-Shell / viewing:
-- Label-demo style `UiTitleCard` header;
-- light/dark theme toggle;
-- compact toolbar + threshold editor + legend + fixed LOD rail;
-- horizontally scrollable eight-shape matrix;
-- concise cell metadata instead of the previous multi-line documentation blocks.
+Shell:
+- `UiTitleCard` header: `UiGraph / Presentation Studio` / `Design · Compare · Tune · Export`;
+- polished light/dark theme support;
+- template, shape, authored-size and port-topology selectors via `UiDropdown`;
+- `UiRangeSegments` as the real LOD resolution editor;
+- compact feature legend, fixed left LOD rail and horizontally scrollable shape matrix;
+- Copy JSON / Import / Export actions.
 
-Presentation templates:
+Built-in templates:
 1. Minimal
-2. Compact
-3. Standard
-4. Status Card
-5. Media Card
-6. Parameter Node
+2. Identity
+3. Summary
+4. Status
+5. Media
+6. Parameter
+7. Operator
 
-The templates are intentionally separate from LOD. Each template owns editable per-shape/per-LOD requested feature state.
+These names describe information intent rather than amount of detail; LOD remains a separate axis.
+
+Shapes:
+- Rectangle, Ellipse, Diamond, Triangle, Hexagon, Cloud, Document, Database.
 
 Authored-size scenarios:
-- 260 x 170 capacity stress;
-- 360 x 240 reference;
-- 480 x 360 spacious.
+- Compact 220x145
+- Reference 260x170
+- Spacious 320x210
 
-Port topology scenarios:
-- no ports;
-- 1 input / 1 output;
-- 3 inputs / 2 outputs;
-- 4 inputs / 4 outputs.
+Port scenarios:
+- None
+- 1 IN / 1 OUT
+- 3 IN / 2 OUT
+- 4 IN / 4 OUT
 
-The cells use real semantic ports plus real incoming/outgoing production edges from off-screen helper nodes so dense port behaviour is inspectable rather than implied.
+Cells use real semantic ports plus real production edges from helper nodes so connectivity is rendered rather than implied.
 
-## FEATURE TAGS
+## FEATURE VOCABULARY
 
-Each shape/LOD cell has clickable requested-feature tags:
-- `TLE` title
-- `SUB` subtitle
-- `ICO` icon
-- `BGE` badge
-- `MED` media
-- `DES` description
-- `FOOT` footer
-- `PLAB` port labels
-- `CONT` native control
+`StudioFeature` is a stable editor-side bitmask vocabulary:
+- `TLE` Title
+- `SUB` Subtitle
+- `ICO` Icon
+- `BGE` Badge
+- `STA` Status
+- `PRG` Progress
+- `DES` Description
+- `MED` Media
+- `FLD` Fields / parameter rows
+- `CONT` Interactive controls
+- `ACT` Actions / buttons
+- `PLAB` Individual port labels
+- `PSUM` Port summary
+- `FOOT` Footer
 
-Tag state is diagnostic:
-- green = requested and production currently shows it;
-- red = deliberately disabled by authored policy;
-- amber = requested, but current production LOD/capacity suppresses it.
+Feature chips are interactive per template + shape + LOD:
+- green = requested and currently visible through production presentation;
+- red = disabled by authored policy;
+- amber = requested but suppressed by current production LOD/capacity.
 
-This is deliberate. The matrix is an authoring/diagnostic tool, not a second renderer.
-A request that production cannot currently satisfy remains visible as amber rather than being faked by the demo.
+Studio-specific examples such as status/progress/fields/actions are painted only inside production-prepared content slots; they do not create a second node renderer or new application semantics in `UiGraphModel`.
 
-## LOD THRESHOLD EDITOR
+## LOD RESOLUTION EDITOR
 
-The editor uses the production `UiRangeSegments` control.
+`UiRangeSegments` domain: 32..300 final-pixel resolution, step 1, minimum segment span 8.
+Default boundaries: Normal 160px, LOD1 80px, LOD2 48px.
+The reversed visual axis matches the HTML: 300px on the left -> 32px on the right.
 
-Default proposed boundaries are:
-- Normal: 56%
-- LOD 1: 33%
-- LOD 2: 13%
-- below 13%: LOD 3
+Thresholds are authored:
+- globally per template; or
+- as an explicit per-shape override selected from the shape headers/filter.
 
-The range bar visually runs Normal -> LOD 1 -> LOD 2 -> LOD 3.
-Boundary labels show the descending percentages from the HTML design concept.
+The matrix rows sample the midpoint of each authored range while still reporting the **actual** production `UiGraphPresentationLevel`, so disagreements between proposed policy and production remain visible.
 
-Thresholds can be authored:
-- globally per presentation template; or
-- as an explicit per-shape override.
+## PERSISTENCE
 
-The selected shape can copy:
-- thresholds only;
-- feature policy only;
-- all settings from another shape.
+`StudioDocument` uses `schema_version: 2` because the catalogue/feature vocabulary supersedes the earlier six-template editor schema.
 
-`Apply to all` propagates the current threshold policy.
-`Reset shape` restores template defaults for the selected shape.
-
-For this checkpoint, thresholds define the representative camera samples used by the matrix rows:
-- Normal row: 1.00x;
-- LOD 1 row: just below the authored Normal threshold;
-- LOD 2 row: just below the authored LOD 1 threshold;
-- LOD 3 row: just below the authored LOD 2 threshold.
-
-The cell metadata still reports the ACTUAL production `UiGraphPresentationLevel`.
-This lets the user see where proposed policy and today's production thresholds differ before promoting policy into core source.
-
-## EXPORT / IMPORT
-
-The editor owns a versioned JSON policy document (`schema_version: 1`).
-
-It persists:
-- active presentation template;
-- authored-size scenario;
-- port topology preset;
-- all six template policies;
-- global thresholds for every template;
+JSON stores:
+- active template;
+- authored-size and port preset;
+- all seven built-in templates;
+- global thresholds;
 - per-shape threshold overrides;
-- all eight shapes;
-- all four LOD feature policies;
-- explicit boolean feature intent using human-readable names.
+- eight shapes x four LOD requested feature masks using human-readable keys.
 
 Actions:
-- `Copy JSON` copies the complete pretty JSON document;
-- `Export...` writes `uigraph_lod_policy.json` (or chosen path);
-- `Import...` validates schema/catalogue shape before applying it.
+- Copy JSON to clipboard;
+- Export to JSON;
+- Import + validate catalogue/schema before applying.
 
-This JSON is the durable bridge for later promotion of accepted matrix decisions into production defaults, tests, another editor session, or AI-assisted source changes.
+## SOURCE ORGANISATION
 
-## DELIBERATE BOUNDARY
+The previous 1289-line example monolith is split into ordinary example `.h/.cpp` units:
+- `PresentationStudioPolicy.*`
+- `PresentationStudioCell.*`
+- `PresentationStudio.*`
+- small `main.cpp`
 
-This checkpoint does NOT yet make exported thresholds/features globally authoritative inside `UiNodeGraph`.
-That is intentional until Curt has used the editor to decide what the desired policies actually are.
+This is intentionally conventional example organisation; no change is made to UiNodeGraph's accepted single-TU `.inc` implementation architecture.
 
-Requested features are projected into existing production inputs where possible (authored title/subtitle/icon/description, presentation badge/media/footer requests, port-label style, attached native control). Production remains free to suppress them according to its current level/capacity rules; amber tags expose those gaps.
+## DELIBERATE HTML/U++ DIFFERENCE
 
-This avoids changing stable renderer semantics before the editor has produced real design evidence.
-
-Template reservation metrics (for example richer parameter/control-slot recipes) remain the next policy-schema extension if the interactive matrix proves they are needed. Do not duplicate arbitrary application data into `UiGraphModel`.
+The HTML keeps shape-column headers CSS-sticky during vertical matrix scrolling. The first U++ checkpoint keeps the left LOD rail fixed and the shape header row inside the scrolled sheet. This avoids adding bespoke z-order/overlay machinery before the first Windows visual pass. Revisit only if Curt finds vertical header loss materially harms comparison.
 
 ## FAST WINDOWS GATE
 
 DEBUG ONLY.
 
 1. Build `examples/UiGraphDesignMatrix`.
-2. If it compiles, launch it and leave it running for Curt.
+2. Launch it and leave it running for Curt.
 3. Smoke only:
-   - light/dark toggle;
-   - drag the three LOD boundaries;
-   - switch Global / Per-shape threshold scope;
-   - click one feature chip and confirm green/red/amber feedback changes;
-   - select Media Card and Parameter Node;
-   - select 1x1 and 3x2 port presets;
-   - Copy JSON produces readable `schema_version: 1` policy;
-   - Export then Import one JSON file and confirm the editor restores.
-4. Run `UiGraphRenderTests` Debug only if the demo source required a production/API fix.
-5. `git diff --check` PASS.
+   - light/dark theme;
+   - switch all seven templates;
+   - drag all three `UiRangeSegments` boundaries;
+   - select a shape header and verify per-shape threshold editing / Use global;
+   - toggle at least one feature chip and observe green/red/amber state;
+   - switch 1x1 -> 4x4 ports;
+   - switch Compact / Reference / Spacious;
+   - Copy JSON contains `schema_version: 2` and the 14 feature names;
+   - Export then Import restores state.
+4. `git diff --check` PASS.
 
-STOP on the first real compile/API failure and report it. Do not run Release or the full aggregate suite for this editor checkpoint.
+Production graph source is untouched in this checkpoint, so no Release build, 10k benchmark or broad aggregate suite is required unless the demo compile exposes a real production/API problem.
