@@ -1,6 +1,77 @@
 // Exact node presentation allocation. No paint, timers, model state or caches.
 // Included once by UiNodeGraph.cpp; compatible camera changes project this result.
 namespace Upp {
+namespace {
+
+// NodeLayout is deliberately an internal geometry-preparation helper, not a
+// second retained object. NodeGeometry/UiGraphNodePresentation remain the single
+// cache and invalidation authority. This cursor only performs cheap rectangle
+// arithmetic while exact rich node geometry is being prepared.
+struct NodeLayout {
+    Rect area;
+    int gap = 0;
+    bool fits = true;
+
+    NodeLayout() = default;
+    NodeLayout(Rect r, int g = 0) : area(r), gap(max(0, g)) {}
+
+    const Rect& Remaining() const { return area; }
+
+    Rect Take(int amount, UiAlign side, int gap_after = -1)
+    {
+        amount = max(0, amount);
+        if(gap_after < 0)
+            gap_after = gap;
+        else
+            gap_after = max(0, gap_after);
+        if(amount <= 0 || area.IsEmpty())
+            return Rect();
+
+        bool horizontal = side == UiAlign::LEFT || side == UiAlign::RIGHT;
+        bool vertical = side == UiAlign::TOP || side == UiAlign::BOTTOM;
+        if(!horizontal && !vertical) {
+            fits = false;
+            return Rect();
+        }
+
+        int extent = horizontal ? area.GetWidth() : area.GetHeight();
+        if(amount > extent) {
+            fits = false;
+            return Rect();
+        }
+
+        Rect slot = area;
+        if(side == UiAlign::LEFT) {
+            slot.right = slot.left + amount;
+            area.left = min(area.right, slot.right + gap_after);
+        }
+        else if(side == UiAlign::RIGHT) {
+            slot.left = slot.right - amount;
+            area.right = max(area.left, slot.left - gap_after);
+        }
+        else if(side == UiAlign::TOP) {
+            slot.bottom = slot.top + amount;
+            area.top = min(area.bottom, slot.bottom + gap_after);
+        }
+        else {
+            slot.top = slot.bottom - amount;
+            area.bottom = max(area.top, slot.top - gap_after);
+        }
+        return slot;
+    }
+
+    static Rect Center(Rect r, Size size)
+    {
+        if(r.IsEmpty() || size.cx < 0 || size.cy < 0
+           || size.cx > r.GetWidth() || size.cy > r.GetHeight())
+            return Rect();
+        return RectC(r.left + (r.GetWidth() - size.cx) / 2,
+                     r.top + (r.GetHeight() - size.cy) / 2,
+                     size.cx, size.cy);
+    }
+};
+
+} // namespace
 
 void UiNodeGraph::InvalidateNodePresentation()
 {
@@ -86,28 +157,12 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
 
     const double z = max(0.01, zoom_);
     auto px = [&](int v) { return max(0, fround(max(0, v) * z)); };
-    // GetHeight is the requested em height, not the Windows line box. Reserve
-    // the measured authored line and allow final-pixel font rounding so glyphs
-    // (especially descenders) cannot be clipped by their own presentation slot.
     auto line_height = [&](Font font) {
         return max(px(font.GetCy()), UiNodeGraphDetail::PresentationFont(font, z).GetCy());
     };
-    int gap = px(style.content_cell_gap);
-    Rect available = p.safe;
-    // Take requested space once. Suppression below never reallocates freed space.
-    auto take = [&](Rect& area, int amount, UiAlign side) {
-        Rect slot;
-        int extent = side == UiAlign::LEFT || side == UiAlign::RIGHT
-                   ? area.GetWidth() : area.GetHeight();
-        if(amount <= 0 || area.IsEmpty()) return slot;
-        if(amount > extent) { p.fits = false; return slot; }
-        slot = area;
-        if(side == UiAlign::LEFT) { slot.right = slot.left + amount; area.left = min(area.right, slot.right + gap); }
-        else if(side == UiAlign::RIGHT) { slot.left = slot.right - amount; area.right = max(area.left, slot.left - gap); }
-        else if(side == UiAlign::TOP) { slot.bottom = slot.top + amount; area.top = min(area.bottom, slot.bottom + gap); }
-        else { slot.top = slot.bottom - amount; area.bottom = max(area.top, slot.top - gap); }
-        return slot;
-    };
+
+    const int gap = px(style.content_cell_gap);
+    NodeLayout root(p.safe, gap);
 
     // Reserve label lanes even when labels are suppressed. They cannot compete
     // with title/media or one another, and semantic anchors remain unchanged.
@@ -124,52 +179,69 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
         }
         UiAlign sides[] = { UiAlign::LEFT, UiAlign::RIGHT, UiAlign::TOP, UiAlign::BOTTOM };
         for(int si = 0; si < 4; si++)
-            if(counts[si]) p.port_lanes[si] = take(available, px(widths[si] + style.port_label_gap), sides[si]);
+            if(counts[si])
+                p.port_lanes[si] = root.Take(px(widths[si] + style.port_label_gap), sides[si]);
     }
-    p.badge = take(available, px(request.badge_height), UiAlign::TOP);
-    p.footer = take(available, px(request.footer_height), UiAlign::BOTTOM);
 
-    // Allocate the authored header at every level; hiding subtitle/icon cannot
-    // change title alignment or move the media into the header.
+    p.badge = root.Take(px(request.badge_height), UiAlign::TOP);
+    p.footer = root.Take(px(request.footer_height), UiAlign::BOTTOM);
+
+    // Allocate the authored header at every level. Header composition uses the
+    // same tiny NodeLayout cursor over a nested rectangle; no Ctrl/layout tree is
+    // created and the result is retained in NodeGeometry.presentation.
     int header_height = style.header_height;
     if(request.profile == UiGraphPresentationProfile::MediaCard)
         header_height = max(style.title_font.GetCy() + style.subtitle_font.GetCy()
                             + style.title_subtitle_gap + style.content_cell_gap,
                             style.show_icon && !IsNull(node.icon) ? style.icon_size.cy : 0);
-    p.header = take(available, px(header_height), UiAlign::TOP);
-    Rect text = p.header;
+    p.header = root.Take(px(header_height), UiAlign::TOP);
+
+    NodeLayout header(p.header, px(style.icon_text_gap));
     if(style.show_icon && !IsNull(node.icon)) {
         Size size = node.icon_size.cx > 0 && node.icon_size.cy > 0 ? node.icon_size : style.icon_size;
-        int old_gap = gap; gap = px(style.icon_text_gap);
-        Rect lane = take(text, px(size.cx), style.icon_side == UiAlign::RIGHT ? UiAlign::RIGHT : UiAlign::LEFT);
-        gap = old_gap;
-        if(px(size.cy) <= lane.GetHeight())
-            p.icon = RectC(lane.left, lane.top + (lane.GetHeight() - px(size.cy)) / 2, lane.GetWidth(), px(size.cy));
-        else p.fits = false;
+        Rect lane = header.Take(px(size.cx),
+                                style.icon_side == UiAlign::RIGHT ? UiAlign::RIGHT : UiAlign::LEFT);
+        Rect centered = NodeLayout::Center(lane, Size(lane.GetWidth(), px(size.cy)));
+        if(centered.IsEmpty() && !lane.IsEmpty())
+            p.fits = false;
+        else
+            p.icon = centered;
     }
+
+    Rect text = header.Remaining();
     int th = node.title.IsEmpty() ? 0 : line_height(style.title_font);
     int sh = node.subtitle.IsEmpty() ? 0 : line_height(style.subtitle_font);
     int tg = th && sh ? px(style.title_subtitle_gap) : 0;
-    int top = text.top + max(0, (text.GetHeight() - th - tg - sh) / 2);
-    if(th && top + th <= text.bottom) p.title = Rect(text.left, top, text.right, top + th);
-    else if(th) p.fits = false;
-    top += th + tg;
-    if(sh && top + sh <= text.bottom) p.subtitle = Rect(text.left, top, text.right, top + sh);
-    else if(sh) p.fits = false;
+    int total_text_h = th + tg + sh;
+    Rect group = total_text_h ? NodeLayout::Center(text, Size(text.GetWidth(), total_text_h)) : Rect();
+    if(total_text_h && group.IsEmpty())
+        p.fits = false;
+    else if(total_text_h) {
+        NodeLayout lines(group, tg);
+        if(th) p.title = lines.Take(th, UiAlign::TOP);
+        if(sh) p.subtitle = lines.Take(sh, UiAlign::TOP, 0);
+        if(!lines.fits) p.fits = false;
+    }
 
-    p.body = available; // Parent allocation; leaf slots below are disjoint.
+    if(!root.fits || !header.fits)
+        p.fits = false;
+
+    p.body = root.Remaining();
     Ctrl* child = GetNodeCtrl(node.ref);
     if(child) {
         Size minimum = child->GetMinSize();
         int minimum_axis = style.content_cell_side == UiAlign::LEFT || style.content_cell_side == UiAlign::RIGHT
                          ? minimum.cx : minimum.cy;
-        p.control = take(available, px(max(style.content_cell_reserve, minimum_axis)), style.content_cell_side);
+        p.control = root.Take(px(max(style.content_cell_reserve, minimum_axis)), style.content_cell_side);
         if(p.control.GetWidth() < minimum.cx || p.control.GetHeight() < minimum.cy)
             p.fits = false;
     }
     if(style.show_description && !node.description.IsEmpty())
-        p.description = take(available, line_height(style.description_font), UiAlign::TOP);
-    p.media = available;
+        p.description = root.Take(line_height(style.description_font), UiAlign::TOP);
+    p.media = root.Remaining();
+    if(!root.fits)
+        p.fits = false;
+
     if(request.media_min_height > 0 && p.media.GetHeight() < px(request.media_min_height))
         p.fits = false;
     if(request.profile == UiGraphPresentationProfile::MediaCard && p.media.IsEmpty())
