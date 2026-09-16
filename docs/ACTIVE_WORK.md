@@ -3,131 +3,132 @@
 Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `7ad86d003b5974ad7c4fe1abe8b5985c95a22bc8`
-TASK: **UIGRAPH-PRESENTATION-STUDIO-V3-FIX01 — selector propagation + representative LOD sampling**
+BASE: `3fd8a5cd171a5ffbb0bb4ec8b23e6c5a4b8e6a23`
+TASK: **UIGRAPH-NODE-LAYOUT-CORE-01 — unify presentation allocation inside node geometry preparation**
 BRANCH: `main`
-STATUS: **SOURCE FIX PUBLISHED — WINDOWS DEBUG / VISUAL VALIDATION PENDING**
-PUBLISHED: commit containing this recovery record
-NEXT ACTION: focused Debug build/launch of `examples/UiGraphDesignMatrix`; confirm selector propagation, LOD2/LOD3 distinction and schema-v2 import/export, then finish remote branch cleanup.
+STATUS: **SOURCE COMPLETE — WINDOWS DEBUG VALIDATION PENDING**
+PUBLISHED: `09c8de77cc1e0a60e8504fb33b65009c3d74bb8c`
+NEXT ACTION: focused Debug presentation tests + Design Matrix build, then implement Studio V4 against this geometry-owned layout path.
 
-## ACCEPTED FOUNDATION
+## DECISION
 
-Preserve Eddie's production presentation/execution architecture:
-- one prepared `UiGraphNodePresentation` owns production layout/visibility/capacity;
-- bounded `WhenResolveNodePresentation` request seam;
-- rich paint consumes prepared regions;
-- live camera projection reuses prepared regions;
-- Micro preparation skips rich presentation callbacks and retains the 10k fast path;
-- one world spatial authority and current Micro/Rich execution ownership remain unchanged.
+Do NOT introduce a public `UiGraphLayout` subsystem or a second layout cache.
 
-The Presentation Studio remains an authoring/diagnostic example. It does not silently make Studio thresholds/features authoritative inside production `UiNodeGraph`.
+The existing architecture already has the correct cache owner:
+- `NodeGeometry` is the retained prepared geometry record;
+- `NodeGeometry.presentation` stores the finished `UiGraphNodePresentation` rectangles;
+- exact preparation computes them;
+- compatible camera projection reuses/projects them;
+- reusable middle-pan performs no presentation/layout preparation;
+- Micro preparation skips rich presentation allocation entirely.
 
-## PRESENTATION STUDIO V3
+Node layout therefore belongs inside the existing node-geometry preparation path.
 
-Reference: approved `uigraph_presentation_studio_matrix_v3.html` concept.
+## INTERNAL NODE LAYOUT
 
-Templates:
-1. Minimal
-2. Identity
-3. Summary
-4. Status
-5. Media
-6. Parameter
-7. Operator
+`UiNodeGraphPresentation.inc` now contains one tiny internal `NodeLayout` rectangle cursor.
+It is an implementation helper only, not a public graph/layout framework.
 
-Shapes: Rectangle, Ellipse, Diamond, Triangle, Hexagon, Cloud, Document, Database.
-Authored sizes: Compact 220x145, Reference 260x170, Spacious 320x210.
-Ports: None, 1 IN / 1 OUT, 3 IN / 2 OUT, 4 IN / 4 OUT.
+Properties:
+- stack/value object;
+- no heap allocation;
+- no Ctrl children;
+- no virtual dispatch;
+- no independent cache;
+- no Paint-time work;
+- only integer rectangle arithmetic;
+- nested composition by constructing another `NodeLayout` over an allocated slot.
 
-Feature vocabulary:
-`TLE SUB ICO BGE STA PRG DES MED FLD CONT ACT PLAB PSUM FOOT`.
-Green = requested+visible; red = disabled; amber = requested but production/capacity suppresses it.
+Core operations are intentionally minimal:
+- `Take(amount, side [, gap])`
+- `Remaining()`
+- static `Center(rect, size)`
+- `fits` state
 
-LOD editor:
-- `UiRangeSegments` domain 32..300 final-pixel resolution;
-- defaults Normal 160px / LOD1 80px / LOD2 48px;
-- global per-template thresholds plus explicit per-shape overrides;
-- cell metadata always reports actual production `UiGraphPresentationLevel`.
+This replaces the private ad-hoc `take` lambda and centralises the rectangle allocation mechanism without creating another authority.
 
-Persistence:
-- `StudioDocument` schema version 2;
-- Copy JSON / Export / Import;
-- stores all seven templates, all eight shapes, four LOD feature masks and threshold overrides.
+## CURRENT PRODUCTION INTEGRATION
 
-## FIX01 — ROOT CAUSE AND CHANGES
+The same internal `NodeLayout` now allocates:
+- port-label lanes;
+- badge/footer reservations;
+- header region;
+- nested header icon lane;
+- centred title/subtitle group;
+- control slot;
+- description slot;
+- remaining media/body region.
 
-Gary's first Windows smoke found selector text changed while the matrix did not.
-Root cause: `UiDropdown` commits selection through `WhenSelect`; the Studio incorrectly subscribed to inherited `WhenAction`, which `UiDropdown` does not fire for selection commits.
+The prepared result is still written directly into `NodeGeometry.presentation`.
+No cache/invalidation semantics change.
 
-Fixed:
-- Template, Shape, Authored Size and Ports now subscribe to `UiDropdown::WhenSelect(int)`;
-- `ConfigureFromDocument()` uses `SetDataSilently()` so document restore/import does not recursively fire selector callbacks;
-- Debug startup runs an internal four-part selector->matrix projection smoke:
-  1. template selection changes matrix template state;
-  2. authored-size selection reaches matrix cells;
-  3. port selection rebuilds 4x4 topology;
-  4. shape selection reaches matrix selection/filter state;
-- expected Debug log on success: `UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0`.
+No changes to:
+- spatial ownership;
+- routes/edges;
+- Micro/Rich backend ownership;
+- production LOD thresholds;
+- current LOD visibility policy;
+- model semantics;
+- host request callback authority.
 
-Gary's local CLANG fixes are folded into source:
-- local frame helper renamed `StudioDrawFrame` to avoid ambiguity;
-- two conditional text expressions construct `String` explicitly.
+## WHY THIS MATTERS
 
-LOD representative sampling is also corrected:
-- LOD2 samples close to the upper edge of its authored band so retained detail is easier to judge;
-- LOD3 samples at <=36px when the band permits it, so the default row actually crosses production's current Micro threshold instead of frequently showing a second LOD2 specimen.
+This creates the low-level execution primitive needed for future presentation templates without turning graph nodes into Ctrl layout trees.
 
-This changes only Studio sampling, not production LOD thresholds or renderer semantics.
-If LOD2 still lacks useful identity after this correction, treat that as design evidence for a separate production-policy decision rather than faking it in the Studio.
+Future template authoring should define WHAT regions/slots a node wants and how they are composed; exact node geometry preparation should execute that definition through this same internal rectangle allocator and cache only the finished `UiGraphNodePresentation` result.
 
-## SOURCE ORGANISATION
+Do not add a second per-node layout cache. If template definitions later need preprocessing, cache/compile the TEMPLATE definition once, never duplicate prepared per-node geometry.
 
-Studio example remains split into normal `.h/.cpp` units:
-- `PresentationStudioPolicy.*`
-- `PresentationStudioCell.*`
-- `PresentationStudio.*`
-- small `main.cpp`.
+## STUDIO V4 DIRECTION
 
-Do not use this as a reason to refactor UiNodeGraph's accepted single-TU `.inc` organisation during presentation closure.
+After validation, rebuild the Presentation Studio authoring model around four independent concepts:
 
-## FAST WINDOWS GATE
+1. persistent specimen/camera size;
+2. LOD transition thresholds;
+3. per-LOD feature policy;
+4. template/node layout.
+
+Moving `UiRangeSegments` boundaries must NOT resize the specimen cameras.
+Feature policy should support Inherit / Force On / Force Off, subject only to real shape capacity.
+
+Template editing should remain constrained and fast rather than becoming a full general UI Designer. Likely concepts:
+- nested sections/regions;
+- Top / Bottom / Left / Right / Fill / Center;
+- inset/gap;
+- named slots such as Title, Subtitle, Icon, Badge, Status, Progress, Description, Media, Fields, Controls, Actions, PortSummary, Footer;
+- Subtitle may be positioned as an overline/kicker by template layout rather than requiring another feature enum.
+
+Built-in starting templates remain:
+Minimal, Identity, Summary, Status, Media, Parameter, Operator.
+
+Production definitions should compile as ordinary C++ with UMK/CLANG. JSON may remain a Studio/session/export representation but must not become a runtime layout compiler requirement.
+
+## WINDOWS DEBUG GATE
 
 DEBUG ONLY.
 
-1. `git fetch origin --prune && git checkout main && git pull --ff-only`.
-2. Build `examples/UiGraphDesignMatrix`.
-3. Launch and leave running for Curt.
-4. Confirm Debug log: `UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0`.
-5. Smoke:
-   - Template visibly changes matrix (Minimal -> Operator);
-   - Shape filter visibly changes shown matrix column;
-   - Authored Size visibly rebuilds specimens;
-   - Ports visibly changes 1x1 -> 4x4 topology;
-   - LOD2 and LOD3 are not accidentally the same production level at default Reference sampling;
-   - light/dark;
-   - drag all three LOD boundaries;
-   - feature chip green/red/amber interaction;
-   - Copy JSON has schema_version 2 and 14 feature keys;
-   - Export then Import restores state.
+1. Fetch/pull current `main`.
+2. Build and run `UiGraphRenderTests`.
+   Existing prepared-presentation checks must remain PASS, especially:
+   - region containment/non-overlap;
+   - measured Windows text line boxes;
+   - Normal enlargement stability;
+   - all 8 canonical shapes / 3 profiles / real projected sizes;
+   - reusable middle-pan performs no resolver/layout work;
+   - batched invalidation refreshes once;
+   - Micro skips rich presentation callbacks.
+3. Build `examples/UiGraphDesignMatrix`.
+4. Confirm Debug startup still reports:
+   `UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0`
+5. Launch and leave the Studio running for Curt.
 6. `git diff --check` PASS.
 
-No Release, 10k benchmark or broad suite unless this focused gate exposes a production/API problem.
+No Release build.
+No 10k benchmark unless a regression is observed.
+No Studio V4 implementation in this validation pass.
 
-## REMOTE BRANCH CLEANUP
+## BRANCH HYGIENE
 
-Gary reduced remote branches from 20 to 10 but retained nine supervisor branches because simple ancestry checks reported commits not reachable from main.
-Do not keep them merely because squash/merge history makes ancestry non-linear.
-For each retained branch compare its actual tree/diff against current `origin/main`; preserve only genuinely unpublished content.
-
-Retained list to resolve:
-- `supervisor/uigraph-arrow-published`
-- `supervisor/uigraph-arrow-tee-square`
-- `supervisor/uigraph-design-matrix-rectangle-proof6`
-- `supervisor/uigraph-ellipse-published`
-- `supervisor/uigraph-ellipse-raster-fix`
-- `supervisor/uigraph-presentation-studio-published`
-- `supervisor/uigraph-presentation-studio-v3`
-- `supervisor/uigraph-presentation-studio-v3-main`
-- `supervisor/uigraph-ring-test-small`
-
-Desired steady state: `origin/main` plus only a branch containing genuinely unfinished/unpublished work. Delete merged/duplicated proof, published, validation and temporary branches after verifying their content is already represented on main.
+Do not create proof/final/published branches for this work.
+Continue deleting obsolete supervisor branches after content-equivalence review.
+Steady state should be `main` plus only genuinely unfinished/unpublished work.
