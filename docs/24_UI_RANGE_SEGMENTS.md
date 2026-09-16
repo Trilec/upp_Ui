@@ -79,6 +79,31 @@ left and a low/micro value on the right.
 Resize, DPI changes, direction changes and reverse presentation never mutate the
 semantic scalar values.
 
+## UiGraph LOD authoring use
+
+In the UiGraph Presentation Studio, `UiRangeSegments` is a **threshold editor**.
+It must not own or modify preview-camera size.
+
+A Studio preview keeps its current projected size while the segment boundaries
+move. If a threshold crosses that fixed projected size, the preview changes its
+actual Normal/LOD1/LOD2/LOD3 policy; the specimen itself does not jump to a new
+camera scale.
+
+The control's outer endpoints remain fixed during direct boundary dragging by
+design. A host that needs editable LOD Min/Max should expose explicit Min/Max
+fields and call `SetRange(min, max)`; this changes the scalar editing domain, not
+the preview camera.
+
+For UiGraph specifically, keep these concepts independent:
+
+1. preview/camera size;
+2. LOD transition thresholds edited by `UiRangeSegments`;
+3. per-LOD feature policy;
+4. retained node/template layout.
+
+See `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` and `08_UIGRAPH_GUIDE.md` for the
+production retained-layout and Studio V4 direction.
+
 ## Colour policy
 
 Each segment can provide an explicit colour. `Null` uses the control palette.
