@@ -10,7 +10,8 @@ Read with:
 
 - `03_UI_MODEL_GUIDE.md` — semantic model ownership and mutation;
 - `07_UI_DRAWING_GUIDE.md` — final-pixel drawing and geometry;
-- `08_UIGRAPH_GUIDE.md` — the current dense-scene reference implementation.
+- `08_UIGRAPH_GUIDE.md` — the current dense-scene reference implementation;
+- `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — Graph's retained node-layout/cache model.
 
 ## 1. Core rule: logical size is not live visual size
 
@@ -249,6 +250,27 @@ remain synchronous/exact unless their public contract explicitly says otherwise.
 This retained-scene/camera split is also the correct boundary for any future GPU
 backend.
 
+### Retained layout is prepared geometry
+
+For dense spatial views, do not create a separate `layout result -> cache copy`
+pipeline when the retained geometry record can own the prepared layout directly.
+
+UiNodeGraph now treats `NodeGeometry.presentation` this way: the prepared node
+section/slot rectangles are the retained cache consumed by paint, attached controls
+and compatible camera projection.
+
+The generic lesson is:
+
+- retain the evaluated layout with the prepared geometry that uses it;
+- keep template/layout definitions shared rather than copied per item;
+- project retained regions when camera changes are structurally compatible;
+- invalidate/replay only the smallest useful section when layout inputs change;
+- do not build a second per-item layout cache or a fine-grained dependency graph
+  without measured evidence.
+
+For Graph's concrete Header/Body/Footer, BodyLeft/Main/Right, Overlay/Center and
+body-mode contract, see `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
+
 ## 11. Dirty regions and hit testing
 
 Paint and hit testing should use the same retained broad-phase authority.
@@ -297,6 +319,7 @@ UiNodeGraph demonstrates the complete dense-scene pattern:
 - 10,000-node deterministic fixture;
 - retained world spatial hash;
 - bounded prepared node/edge population;
+- retained section-aware node layout as part of `NodeGeometry`;
 - projected-micro nodes keep direct geometry semantics, with native ellipse drawing and
   bounded exact-raster reuse for repeated retained polygon silhouettes;
 - dynamic/high-uniqueness micro styles fall back to direct drawing after a small local cache cap;
@@ -306,8 +329,9 @@ UiNodeGraph demonstrates the complete dense-scene pattern:
 - one exact geometry settle after reusable live camera movement;
 - profiling counters for candidates, prepared, painted, micro-raster reuse, geometry and phase work.
 
-The lesson is generic; Graph-specific topology and editing are documented in
-`08_UIGRAPH_GUIDE.md`.
+The lesson is generic; Graph-specific topology, node layout and editing are
+documented in `08_UIGRAPH_GUIDE.md` and
+`UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
 
 ## 15. Idle means idle
 
@@ -352,11 +376,12 @@ Before publishing a large-data control, answer:
 7. Which presentation details disappear as projected pixels shrink?
 8. Does explicit geometry use the shared final-pixel contract?
 9. Can pan/zoom/scroll reuse retained preparation?
-10. Does Paint perform layout, model work, loading or allocation that can move
+10. Is evaluated layout retained with prepared geometry, or is it redundantly copied into a second cache?
+11. Does Paint perform layout, model work, loading or allocation that can move
     outside Paint?
-11. Do hit tests use the same bounded broad phase?
-12. Does the view become truly idle when nothing changes?
-13. Can diagnostics prove all of the above without changing behavior?
+12. Do hit tests use the same bounded broad phase?
+13. Does the view become truly idle when nothing changes?
+14. Can diagnostics prove all of the above without changing behavior?
 
 If those answers are clear, a timeline, graph, tree, gallery or another
 large-scale view can share the same architecture without copying UiNodeGraph
