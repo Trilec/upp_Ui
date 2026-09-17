@@ -3,12 +3,27 @@
 Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
 Recovery state only; Git history is implementation history.
 
-CURRENT MAIN AT HANDOVER: `f12a255441361bf2f057b74753638146067d1420`
-TASK: **UIGRAPH-NODE-LAYOUT-TEMPLATE-03 — shared templates over retained node layout**
-BRANCH: `main`
-STATUS: **SOURCE PUBLISHED — WINDOWS DEBUG VALIDATION + DESIGN REFINEMENT PENDING**
-PUBLISHED: `f12a255441361bf2f057b74753638146067d1420` (`UIGRAPH: evaluate shared templates into retained node layout`)
-NEXT ACTION: validate current source on Windows, then refine the template/content/LOD separation before building Presentation Studio V4.
+BASE: `6aa66e52ad509f9d032d4a20feaadbd1af2d2d1c` / `main`
+TASK: **UIGRAPH-NODE-COMPONENT-01 — identified components and reduced representations**
+TOUCHED: `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md`, `docs/ACTIVE_WORK.md`
+STATUS: **DESIGN SAVED — PRODUCTION IMPLEMENTATION IN PROGRESS**
+PUBLISHED: this documentation checkpoint; locate via `git log -- docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md`.
+VALIDATION: no new source in this checkpoint. Existing source `f12a255441361bf2f057b74753638146067d1420` still awaits Windows Debug validation.
+NEXT ACTION: implement a bounded production slice with identified text/icon components,
+existing-data bindings, independent alignment/LOD and a production-rendered specimen.
+Do not report the wider contract as implemented before its source/tests exist.
+
+## COMPONENT CONTRACT
+
+Read `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` before extending the template.
+The user accepted this direction and authorized immediate implementation. Keep
+Windows validation explicitly pending rather than inventing a prior pass.
+
+Separate node size, structure, identified data-bound components, LOD inclusion and
+pixel-sized representation. On may mean a supported bar/dot, not readable glyphs.
+Keep fixed reservations by default. A proxy still participates; Stable/Reflow is
+about policy exclusion, not about a glyph changing into a bar. Micro hints require
+a native bounded path, including direct-to-overview entry; no rich callback fallback.
 
 ## READ FIRST
 
