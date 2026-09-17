@@ -142,6 +142,18 @@ struct UiGraphNodePresentation {
     // Physical sides: left, right, top, bottom. Port direction/identity is unchanged.
     Rect port_lanes[4];
 
+    // Optional, bounded component-addressed output. WithDeepCopy keeps public
+    // snapshots and live baselines independent; legacy nodes allocate no vector.
+    WithDeepCopy<Vector<UiGraphNodeComponentPresentation>> components;
+    String template_error;
+
+    const UiGraphNodeComponentPresentation* FindComponent(const String& id) const
+    {
+        for(const auto& component : components)
+            if(component.id == id) return &component;
+        return nullptr;
+    }
+
     bool fits = true;
     bool show_title = false, show_subtitle = false, show_icon = false;
     bool show_badge = false, show_media = false, show_description = false;
@@ -809,6 +821,8 @@ private:
 
     void PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeometry& geometry,
                        const UiGraphNodeStyle& style, UiGraphVisualState state);
+    void PaintNodeComponents(Draw& w, const UiGraphNodePresentation& presentation,
+                             const UiGraphNodeStyle& style, UiGraphVisualState state);
     void PaintConnectionPreview(Painter& p);
     void PaintMarquee(Draw& w) const;
 

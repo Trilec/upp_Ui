@@ -14,6 +14,7 @@ file
     RenderLod.cpp,
     PatternedPaint.cpp,
     Presentation.cpp,
+    Components.cpp,
     PresentationLayout.h,
     ExecutionPath.cpp;
 

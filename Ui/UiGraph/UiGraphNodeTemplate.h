@@ -92,6 +92,14 @@ constexpr byte UIGRAPH_NODE_LOD2       = 1u << 2;
 constexpr byte UIGRAPH_NODE_LOD3       = 1u << 3;
 constexpr byte UIGRAPH_NODE_LOD_ALL    = 0x0f;
 
+// Inclusion is independent of the representation that fits in projected pixels.
+enum class UiGraphNodeLodOverride : byte { Inherit, On, Off };
+enum class UiGraphNodeSmallMode : byte { Hidden, Bar, BarThenDot, Dot };
+enum class UiGraphNodeComponentRepresentation : byte { Hidden, Text, Icon, Bar, Dot };
+enum class UiGraphNodeComponentReason : byte {
+    None, PolicyOff, MissingData, InvalidData, NoSpace, TooSmall
+};
+
 struct UiGraphNodeSlotRule {
     UiGraphNodeSlotFeature feature = UiGraphNodeSlotFeature::Title;
     UiGraphNodeSlotRegion region = UiGraphNodeSlotRegion::Header;
@@ -104,10 +112,72 @@ struct UiGraphNodeSlotRule {
     int gap_after = -1; // -1 = use the node content gap
     byte lod_mask = UIGRAPH_NODE_LOD_ALL;
 
+    // Empty id preserves the existing production-owned feature slot. An id opts
+    // into the repeatable Text/Icon path; identity and binding survive reorder.
+    String id;
+    String data_key; // empty = existing node field selected by feature
+    UiAlign align_h = UiAlign::LEFT;
+    UiAlign align_v = UiAlign::CENTER;
+    UiGraphNodeSmallMode small = UiGraphNodeSmallMode::Hidden;
+    Color ink = Null; // inherit current visual-state ink from the feature role
+    int font_height = 0; // authored height; 0 = feature style font
+    int readable_min_px = 9; // final device pixels, not a zoom threshold
+    byte force_on = 0;
+    byte force_off = 0;
+
+    bool IsComponent() const { return !id.IsEmpty(); }
+    bool IsText() const
+    {
+        return feature == UiGraphNodeSlotFeature::Title
+            || feature == UiGraphNodeSlotFeature::Subtitle
+            || feature == UiGraphNodeSlotFeature::Description;
+    }
+
     bool Allows(UiGraphPresentationLevel level) const
     {
-        return (lod_mask & UiGraphNodeLodBit(level)) != 0;
+        byte bit = UiGraphNodeLodBit(level);
+        return !(force_off & bit) && ((lod_mask | force_on) & bit);
     }
+
+    UiGraphNodeSlotRule& BindData(const String& key) { data_key = key; return *this; }
+    UiGraphNodeSlotRule& Align(UiAlign h, UiAlign v = UiAlign::CENTER)
+    { align_h = h; align_v = v; return *this; }
+    UiGraphNodeSlotRule& Small(UiGraphNodeSmallMode mode) { small = mode; return *this; }
+    UiGraphNodeSlotRule& Ink(Color color) { ink = color; return *this; }
+    UiGraphNodeSlotRule& FontHeight(int height) { font_height = height; return *this; }
+    UiGraphNodeSlotRule& Lod(bool normal, bool lod1, bool lod2, bool lod3)
+    {
+        lod_mask = byte((normal ? 1 : 0) | (lod1 ? 2 : 0) | (lod2 ? 4 : 0) | (lod3 ? 8 : 0));
+        force_on = force_off = 0;
+        return *this;
+    }
+    UiGraphNodeSlotRule& Override(UiGraphPresentationLevel level, UiGraphNodeLodOverride value)
+    {
+        byte bit = UiGraphNodeLodBit(level);
+        force_on &= ~bit;
+        force_off &= ~bit;
+        if(value == UiGraphNodeLodOverride::On) force_on |= bit;
+        if(value == UiGraphNodeLodOverride::Off) force_off |= bit;
+        return *this;
+    }
+};
+
+// Prepared records are bounded by MAX_SLOTS. They live ONLY in the owning
+// NodeGeometry.presentation; no binding lookup, text measurement or resampling
+// happens while painting them. Empty legacy presentations allocate no records.
+struct UiGraphNodeComponentPresentation : Moveable<UiGraphNodeComponentPresentation> {
+    String id;
+    UiGraphNodeSlotFeature feature = UiGraphNodeSlotFeature::Title;
+    UiGraphNodeSlotRegion region = UiGraphNodeSlotRegion::Header;
+    UiGraphNodeComponentRepresentation representation = UiGraphNodeComponentRepresentation::Hidden;
+    UiGraphNodeComponentReason reason = UiGraphNodeComponentReason::None;
+    Rect slot;
+    Rect footprint;
+    WString text; // prepared single line, including ellipsis where needed
+    Font font;
+    Image image; // already scaled; no cold raster preparation in Paint
+    Color ink = Null;
+    bool tint_icon = false;
 };
 
 // Shared immutable-at-use template description. The fixed slot array is
@@ -187,6 +257,19 @@ struct UiGraphNodeTemplate {
         return *this;
     }
 
+    // Construction and edits remain ordinary C++ data. Validate after editing
+    // public fields and before use; the evaluator also rejects malformed input.
+    int FindComponent(const String& id) const
+    {
+        if(id.IsEmpty()) return -1;
+        for(int i = 0; i < min<int>(slot_count, MAX_SLOTS); i++)
+            if(slots[i].id == id) return i;
+        return -1;
+    }
+
+    bool Validate(String& error) const;
+    bool AddComponent(const UiGraphNodeSlotRule& rule, String& error);
+
     UiGraphNodeTemplate& AddSlot(UiGraphNodeSlotFeature feature,
                                  UiGraphNodeSlotRegion region,
                                  UiGraphNodeSlotPlacement placement,
@@ -199,6 +282,7 @@ struct UiGraphNodeTemplate {
         if(slot_count >= MAX_SLOTS)
             return *this;
         UiGraphNodeSlotRule& slot = slots[slot_count++];
+        slot = UiGraphNodeSlotRule();
         slot.feature = feature;
         slot.region = region;
         slot.placement = placement;
@@ -209,6 +293,59 @@ struct UiGraphNodeTemplate {
         return *this;
     }
 };
+
+inline bool UiGraphNodeTemplate::Validate(String& error) const
+{
+    error.Clear();
+    if(slot_count > MAX_SLOTS) { error = "Template exceeds slot capacity"; return false; }
+    if(header_height < -1 || footer_height < 0 || content_left_width < 0
+       || content_right_width < 0 || overlay_left_width < 0 || overlay_right_width < 0) {
+        error = "Negative structural reservation";
+        return false;
+    }
+    for(int i = 0; i < slot_count; i++) {
+        const auto& r = slots[i];
+        if((int)r.feature >= (int)UiGraphNodeSlotFeature::Count
+           || (int)r.region > (int)UiGraphNodeSlotRegion::Footer
+           || (int)r.placement > (int)UiGraphNodeSlotPlacement::Center
+           || (int)r.flow > (int)UiGraphNodeSlotFlow::Reflow
+           || r.extent < 0 || r.gap_after < -1
+           || ((r.lod_mask | r.force_on | r.force_off) & ~UIGRAPH_NODE_LOD_ALL)
+           || (r.force_on & r.force_off)) {
+            error = "Invalid slot rule";
+            return false;
+        }
+        if(!r.IsComponent()) continue;
+        if((!r.IsText() && r.feature != UiGraphNodeSlotFeature::Icon)
+           || (!r.IsText() && !r.data_key.IsEmpty())
+           || (r.align_h != UiAlign::LEFT && r.align_h != UiAlign::CENTER && r.align_h != UiAlign::RIGHT)
+           || (r.align_v != UiAlign::TOP && r.align_v != UiAlign::CENTER && r.align_v != UiAlign::BOTTOM)
+           || (int)r.small > (int)UiGraphNodeSmallMode::Dot
+           || r.font_height < 0 || r.readable_min_px < 1) {
+            error = "Unsupported component binding, alignment or representation: " + r.id;
+            return false;
+        }
+        for(int j = 0; j < i; j++)
+            if(slots[j].id == r.id) {
+                error = "Duplicate component id: " + r.id;
+                return false;
+            }
+    }
+    return true;
+}
+
+inline bool UiGraphNodeTemplate::AddComponent(const UiGraphNodeSlotRule& rule, String& error)
+{
+    if(rule.id.IsEmpty()) { error = "Component id is required"; return false; }
+    if(!Validate(error)) return false;
+    if(slot_count >= MAX_SLOTS) { error = "Template exceeds slot capacity"; return false; }
+    // Validate a candidate first: a rejected addition never modifies the template.
+    UiGraphNodeTemplate candidate = *this;
+    candidate.slots[candidate.slot_count++] = rule;
+    if(!candidate.Validate(error)) return false;
+    *this = candidate;
+    return true;
+}
 
 const UiGraphNodeTemplate& UiGraphBuiltinNodeTemplate(UiGraphNodeTemplateKind kind);
 const char* UiGraphNodeTemplateName(UiGraphNodeTemplateKind kind);

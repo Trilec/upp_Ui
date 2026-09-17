@@ -154,7 +154,9 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
         g.surface = project_rect(src.surface);
         g.paint_bounds = project_rect(src.paint_bounds);
         if(!src.micro) {
-            g.presentation = src.presentation;
+            // Non-geometric prepared values remain unchanged on a compatible
+            // camera frame. Do not deep-copy the component vector every pan.
+            ASSERT(g.presentation.components.GetCount() == src.presentation.components.GetCount());
             g.presentation.safe = project_rect(src.presentation.safe);
             g.presentation.header = project_rect(src.presentation.header);
             g.presentation.title = project_rect(src.presentation.title);
@@ -162,17 +164,24 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
             g.presentation.icon = project_rect(src.presentation.icon);
             g.presentation.badge = project_rect(src.presentation.badge);
             g.presentation.body = project_rect(src.presentation.body);
-            g.presentation.body_left = project_rect(src.presentation.body_left);
-            g.presentation.body_main = project_rect(src.presentation.body_main);
-            g.presentation.body_right = project_rect(src.presentation.body_right);
+            g.presentation.content = project_rect(src.presentation.content);
+            g.presentation.content_left = project_rect(src.presentation.content_left);
+            g.presentation.content_main = project_rect(src.presentation.content_main);
+            g.presentation.content_right = project_rect(src.presentation.content_right);
             g.presentation.overlay = project_rect(src.presentation.overlay);
-            g.presentation.center = project_rect(src.presentation.center);
+            g.presentation.overlay_left = project_rect(src.presentation.overlay_left);
+            g.presentation.overlay_main = project_rect(src.presentation.overlay_main);
+            g.presentation.overlay_right = project_rect(src.presentation.overlay_right);
             g.presentation.media = project_rect(src.presentation.media);
             g.presentation.description = project_rect(src.presentation.description);
             g.presentation.control = project_rect(src.presentation.control);
             g.presentation.footer = project_rect(src.presentation.footer);
             for(int side = 0; side < 4; side++)
                 g.presentation.port_lanes[side] = project_rect(src.presentation.port_lanes[side]);
+            for(int q = 0; q < g.presentation.components.GetCount(); q++) {
+                g.presentation.components[q].slot = project_rect(src.presentation.components[q].slot);
+                g.presentation.components[q].footprint = project_rect(src.presentation.components[q].footprint);
+            }
         }
 
         ASSERT(g.hit_path.GetCount() == src.hit_path.GetCount());
@@ -325,6 +334,14 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         }
         for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
             const NodeGeometry& g = live_baseline_nodes_[i];
+            // Component glyphs/rasters and proxy decisions are prepared at an
+            // exact pixel scale. Preserve cheap translation, but settle a scale
+            // change exactly until component-boundary reuse is validated.
+            // This opt-in restriction does not affect legacy template nodes.
+            if(!g.presentation.components.IsEmpty() && abs(cumulative - 1.0) > 1e-9) {
+                cancel_approximation();
+                return false;
+            }
             int width = max(1, fround(g.rect.GetWidth() * cumulative));
             int height = max(1, fround(g.rect.GetHeight() * cumulative));
             bool compact = UiNodeGraphDetail::IsCompactNode(width, height);

@@ -1,192 +1,103 @@
 # ACTIVE WORK
 
-Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
-Recovery state only; Git history is implementation history.
+Remote `main` is authoritative. Fetch before work/publish; never force-update it.
+This is recovery state, not a replacement for Git history.
 
-BASE: `6aa66e52ad509f9d032d4a20feaadbd1af2d2d1c` / `main`
-TASK: **UIGRAPH-NODE-COMPONENT-01 — identified components and reduced representations**
-TOUCHED: `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md`, `docs/ACTIVE_WORK.md`
-STATUS: **DESIGN SAVED — PRODUCTION IMPLEMENTATION IN PROGRESS**
-PUBLISHED: this documentation checkpoint; locate via `git log -- docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md`.
-VALIDATION: no new source in this checkpoint. Existing source `f12a255441361bf2f057b74753638146067d1420` still awaits Windows Debug validation.
-NEXT ACTION: implement a bounded production slice with identified text/icon components,
-existing-data bindings, independent alignment/LOD and a production-rendered specimen.
-Do not report the wider contract as implemented before its source/tests exist.
-
-## COMPONENT CONTRACT
-
-Read `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` before extending the template.
-The user accepted this direction and authorized immediate implementation. Keep
-Windows validation explicitly pending rather than inventing a prior pass.
-
-Separate node size, structure, identified data-bound components, LOD inclusion and
-pixel-sized representation. On may mean a supported bar/dot, not readable glyphs.
-Keep fixed reservations by default. A proxy still participates; Stable/Reflow is
-about policy exclusion, not about a glyph changing into a bar. Micro hints require
-a native bounded path, including direct-to-overview entry; no rich callback fallback.
+BASE: `77912445a5a1881672bb587f161d55d42a9008d8` / `main`
+TASK: **UIGRAPH-NODE-COMPONENT-01A — identified Text/Icon slots and first production editor**
+TOUCHED: `Ui/Ui.upp`; `Ui/UiGraph/{UiGraphNodeTemplate.h,UiNodeGraph.h,UiNodeGraphPresentation.inc,UiNodeGraphPaintRich.inc,UiNodeGraphProjection.inc}`; `Utilities/UiGraphRenderTests/{main.cpp,UiGraphRenderTests.upp,PresentationLayout.h,Components.cpp}`; `examples/UiGraphComponentStudio/`; this file and `docs/UIGRAPH_NODE_COMPONENTS.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 01A only.
+PUBLISHED: the source commit containing this update; recover with `git log -1 --format=%H -- examples/UiGraphComponentStudio/main.cpp` and inspect current main.
+VALIDATION: complete touched-source review and `git diff --check`; Windows/U++ builds and GUI execution NOT run in the implementation environment. Regression tests added, not claimed passing.
+NEXT ACTION: Gary's focused Windows Debug gate below. Then native Micro hints and the next bounded authoring slice. The wider component contract remains PARTIAL.
 
 ## READ FIRST
 
-1. `docs/ACTIVE_WORK.md`
-2. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
-3. `docs/08_UIGRAPH_GUIDE.md`
-4. `Ui/UiGraph/UiGraphNodeTemplate.h`
-5. `Ui/UiGraph/UiGraphNodeTemplate.cpp`
-6. `Ui/UiGraph/UiNodeGraphPresentation.inc`
+1. This file.
+2. `docs/UIGRAPH_NODE_COMPONENTS.md` — actual implemented API, demo and limitations.
+3. `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` — accepted wider direction; API sketches are not all implemented.
+4. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
+5. `Ui/UiGraph/UiGraphNodeTemplate.h` and current complete presentation/paint/projection source.
+6. `docs/08_UIGRAPH_GUIDE.md` for wider graph ownership. Its older section-layout examples must not override the current Content/Overlay contract.
 
-Current remote source overrides chat memory and old SHAs.
+The component design contract was already saved by `77912445a5a1881672bb587f161d55d42a9008d8`. Do not recreate or replace it with an older chat attachment.
 
-## RETAINED CACHE DECISION
+## WHAT 01A IMPLEMENTS
 
-Node layout is part of `NodeGeometry`; the evaluated retained layout is the cache.
-There is no second per-node layout cache, runtime JSON compiler, or one-Ctrl-per-node
-layout tree. Compatible live camera motion projects the retained geometry.
+- Named components extend the SAME fixed-capacity template slot array. Empty IDs retain the existing production feature path.
+- Unique template-local IDs, validation with non-mutating failed additions, repeated Text/Icon roles, existing node-field and typed text `node.data` bindings.
+- Per-component horizontal/vertical alignment, optional ink/font height, per-level Inherit/On/Off overrides and Stable/Reflow.
+- Retained text/icon output, measured text-footprint bars and dot proxies in the non-Micro production renderer. Paint does not resolve bindings, measure named text or rescale named icons.
+- Optional bounded component records inside `NodeGeometry.presentation`, not a second layout cache. Public snapshots have deep-copy array ownership.
+- Compatible pan projects those records without allocation/re-layout. Named-component wheel scaling takes an explicit exact fallback pending a validated component-boundary reuse policy. Existing unnamed nodes retain their existing wheel path.
+- `examples/UiGraphComponentStudio`: four real `UiNodeGraph` views of one model/template; independently persistent cameras; actual-level diagnostics; selected-component region/placement/alignment/proxy/flow/ink/font editor; LOD policy table; reorder; title-data editing; shape choice; authored-size expansion. Layout uses UiBoxLayout and Ui controls.
 
-## CURRENT STRUCTURAL HIERARCHY
+## BASELINE BREAKS FOUND AND REPAIRED
 
-The hierarchy is structural only. It must not be confused with which semantic
-feature is placed into a region:
+The earlier template checkpoint had NOT completed migration of all callers/build membership:
+
+- `UiNodeGraphProjection.inc` still projected removed `body_left/body_main/body_right/center` members.
+- `PresentationLayout.h` still used those retired fields and asserted the old overlay geometry.
+- `Ui/Ui.upp` omitted `UiGraphNodeTemplate.cpp` and its header.
+
+These are repaired against the accepted Content/Overlay hierarchy. No retired aliases are restored and no tests are disabled.
+
+## RETAINED ARCHITECTURE / STRUCTURE
+
+`NodeGeometry.presentation` remains the one evaluated layout result.
 
 ```text
-Node / Safe Area
-|
-+-- Header                         optional
-|
-+-- Body
-|   |
-|   +-- Content                   same Body extent
-|   |   +-- Left
-|   |   +-- Main
-|   |   +-- Right
-|   |
-|   +-- Overlay                   same Body extent; does not consume Content
-|       +-- Left
-|       +-- Main
-|       +-- Right
-|
-+-- Footer                         optional
+Node / Safe
+  Header (optional)
+  Body
+    Content -> Left / Main / Right
+    Overlay -> Left / Main / Right
+  Footer (optional)
 ```
 
-`Content` and `Overlay` are sibling layers over the same Body. Each has independent
-Left/Main/Right columns. Overlay does not reduce Content capacity.
+Content and Overlay independently span Body. Overlay does not consume Content.
+Labelled port lanes can reserve full safe sides or Body Content columns. Port IDs and semantic silhouette anchors remain graph topology, not arbitrary components.
 
-Left/right labelled port lanes may reserve full node-safe width or be tied to the
-Body Content Left/Right columns, depending on template policy. Port anchors remain
-semantic geometry at the silhouette boundary.
+Templates place semantic content; regions do not dictate Title/Icon/etc. roles.
+LOD inclusion is distinct from the representation that fits in final pixels.
+A visible bar/dot still participates. Off+Stable reserves; Off+Reflow releases its slot. Structural bands/columns remain fixed reservations in 01A.
 
-## TEMPLATE LAYER NOW IMPLEMENTED
+Do not add a second per-node layout cache, per-node Ctrl trees, a runtime JSON compiler, a demo-only allocator, or an unmeasured fine-grained dependency engine.
 
-`UiGraphNodeTemplate.h/.cpp` provide a small shared C++ template description.
-Built-in template kinds:
+## EXPLICITLY NOT IMPLEMENTED BY 01A
 
-- Minimal
-- Identity
-- Summary
-- Status
-- Media
-- Parameter
-- Operator
+- Native physical-Micro component hints. Micro still skips rich presentation entirely; its empty rich output is labelled in the demo. Do NOT enable rich callbacks at Micro to hide this gap.
+- Image pyramids, progress/field/tag/action component renderers, regional auto-collapse, proxy fade/hysteresis or general auto-font fitting.
+- Drag/drop region diagrams, full Studio V4 migration, save/open JSON or production C++ export.
+- User-editable LOD thresholds. The new specimen uses the existing production resolver; it does not invent a second set of thresholds.
+- Optimised wheel projection of prepared named glyphs/rasters across compatible component thresholds.
 
-A template owns structural defaults plus ordered slot rules. Slot rule dimensions:
+The existing `UiGraphDesignMatrix` remains available. Its selector smoke is still required; the new small editor is not claimed to replace all its functionality.
 
-- feature;
-- target region;
-- placement: Fill / Top / Bottom / Left / Right / Center;
-- authored extent;
-- LOD visibility mask;
-- flow: Stable / Reflow;
-- gap.
+## FOCUSED WINDOWS DEBUG GATE / GARY
 
-The fixed slot array is intentional: no dynamic per-node layout tree. Built-in or
-custom C++ template definitions are shared; only evaluated rectangles are retained
-in each prepared `NodeGeometry`.
+Repo: `E:\apps\github\upp_Ui`, branch `main`.
+Fetch/pull current main. Confirm the supervisor's published 01A SHA is an ancestor of tested HEAD, not necessarily identical to it. Source ancestor `f12a255441361bf2f057b74753638146067d1420` is also required.
 
-Legacy `Standard/Centred/MediaCard` request/profile behaviour remains available when
-no template is selected, so the migration is additive rather than destructive.
+Use the established `E:\upp-18468\umk.exe`, `CLANGx64` method and current local nests. Exact example commands and manual checks are in `docs/UIGRAPH_NODE_COMPONENTS.md`.
 
-## CRITICAL DESIGN SEPARATION — DO NOT CONFLATE
+Debug only:
+1. Build/run `Utilities/UiGraphRenderTests` (now seven suites, including Components).
+2. Build `examples/UiGraphDesignMatrix`; retain its Debug selector/startup smoke.
+3. Build/run `examples/UiGraphComponentStudio`; inspect actual production previews.
+4. `git diff --check`.
 
-There are three separate concerns:
+Report exact HEAD, build/test PASS/FAIL, test summary, first real blocker, demo PID if launched, and clean worktree YES/NO.
+Minor mechanical CLANG fixes may be reviewed/committed/published. Stop on architecture, ownership, template-policy or nonlocal behavioural failures; report rather than redesign.
+No Release, broad suite or 10k benchmark unless this focused gate exposes a reason.
 
-1. **STRUCTURE** — Header / Body(Content+Overlay)/Footer and their columns.
-2. **CONTENT PLACEMENT** — which semantic thing (Title, Subtitle, Icon, Media,
-   Status, Progress, Fields, Tags, Control, etc.) occupies which structural region
-   and with what placement/alignment/flow.
-3. **LOD POLICY** — at Normal/LOD1/LOD2/LOD3 whether that semantic feature remains
-   present, hidden, forced, inherited, and whether hiding it preserves or reflows
-   its reservation.
+## NEXT IMPLEMENTATION BOUNDARY
 
-The current source implements the structural template/slot machinery, but the
-semantic feature vocabulary is still intentionally limited to production-owned
-slots (`Title`, `Subtitle`, `Icon`, `Badge`, `Media`, `Description`, `Control`,
-`Footer`). Domain-rich concepts such as Status, Progress, Fields, Tags and Actions
-currently ride through host-painted content rather than all being first-class slot
-features.
+After Debug validation, implement a bounded native Micro hint contract with direct-overview/zoom-out parity and no rich resolver, glyph shaping, embedded controls or image processing during paint. Keep output in the existing prepared scene and reuse the accepted template/layout authority.
 
-**This is the next design question.** Before expanding enums mechanically, decide
-which semantic features deserve first-class reusable slot identity versus which are
-content rendered inside a structural region/body mode.
+Then evolve the visible editor against the SAME production component definitions: region diagrams, component add/remove/bindings, measured proxy diagnostics, and eventually C++ output. Preserve explicit camera reset and the independence of node size, camera, thresholds, inclusion and representation.
 
-Do not encode rules such as “Description always belongs in ContentMain” or “Icon
-always belongs in Header”. Templates must own placement. Likewise LOD is not a
-layout layer; it is policy applied to semantic slots in the chosen structural
-layout.
+## WORKFLOW
 
-## PRESENTATION STUDIO V4 DIRECTION
-
-The supplied mockup direction is the current UI target:
-
-- one selected Template / Node shape / connector style;
-- four persistent Normal / LOD1 / LOD2 / LOD3 previews;
-- left/middle visual diagrams for Node Region and Node Overlay;
-- explicit hierarchy/visibility table;
-- right-side styling/property inspector;
-- `UiRangeSegments` edits LOD transition thresholds only and must not resize the
-  specimen cameras;
-- layout builder edits structural region + slot placement separately from LOD
-  enable/disable policy;
-- preview zoom remains independently user-controlled;
-- production C++ template output; JSON only optional Studio/session interchange.
-
-Likely UI mental model:
-- Structure tree on rows;
-- semantic feature chips attached to the relevant structural row;
-- four LOD columns control visibility/flow policy;
-- separate slot editor changes *where/how* a selected feature is placed.
-
-Do not let the Studio become a full general UiDesigner.
-
-## PERFORMANCE CONTRACT
-
-Retain everything useful; invalidate narrowly; replay a small region where useful;
-project retained layout for compatible camera changes. Do not build a fine-grained
-dependency graph without measurement. Stable/Reflow already belongs to slot rules;
-coarse Header/Body/Footer invalidation can be added later if profiling justifies it.
-
-## VALIDATION / GARY ROLE
-
-Gary validates on Windows; supervisor owns architecture and main coding.
-
-Focused Debug gate for the current template checkpoint:
-
-1. fetch/pull current `main`;
-2. confirm `f12a255441361bf2f057b74753638146067d1420` is an ancestor;
-3. build/run `UiGraphRenderTests`;
-4. build `examples/UiGraphDesignMatrix`;
-5. confirm selector smoke remains green;
-6. quick visual smoke only;
-7. `git diff --check`;
-8. report first real blocker; minor mechanical CLANG fixes may be published after review.
-
-No Release/broad suite/10k benchmark unless the focused gate exposes a shared or
-performance-sensitive issue.
-
-## GITHUB / WORKFLOW
-
-Remote `main` is source of truth. Refresh first. Use complete touched files and the
-relevant callers/tests/.upp membership. Diagnose before editing. Publish small
-coherent checkpoints directly without leaving proof/final/published branches.
-Review full diff and verify remote contains the published SHA.
-
-Gary handles compile/runtime validation and minor fixups; he is not the architecture
-authority.
+REFRESH -> INSPECT -> IMPLEMENT -> REVIEW -> PUBLISH -> VERIFY -> VALIDATE.
+Full touched files and relevant callers/headers/tests/.upp first. Small coherent changes; publish recoverable source checkpoints. Refresh main before publishing and carry only our changes when it advances. No force pushes or leftover proof/final/published branches. Remote commit/tree verification is required after the write.

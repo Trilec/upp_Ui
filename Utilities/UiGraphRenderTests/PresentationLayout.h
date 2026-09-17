@@ -247,7 +247,7 @@ void RunPreparedPresentationTests(Test& t)
 
     // Section-aware retained layout: labelled side lanes may belong only to Body,
     // while Header/Footer keep their full content width. Body mode is retained as
-    // authoring metadata and overlay/center intentionally share BodyMain.
+    // authoring metadata; Content and Overlay independently span the whole Body.
     graph.SetZoom(1, Point(0, 0));
     ref = graph.Model().AddNode(node);
     graph.WhenResolveNodePresentation = [](const UiGraphNode&, const UiGraphNodeStyle&,
@@ -255,8 +255,10 @@ void RunPreparedPresentationTests(Test& t)
         r.profile = UiGraphPresentationProfile::Standard;
         r.body_mode = UiGraphNodeBodyMode::KeyValue;
         r.footer_height = DPI(18);
-        r.body_left_width = DPI(44);
-        r.body_right_width = DPI(48);
+        r.content_left_width = DPI(44);
+        r.content_right_width = DPI(48);
+        r.overlay_left_width = DPI(20);
+        r.overlay_right_width = DPI(24);
         r.left_port_lane_body_only = true;
         r.right_port_lane_body_only = true;
     };
@@ -265,15 +267,17 @@ void RunPreparedPresentationTests(Test& t)
     graph.GetNodePresentation(ref, sectioned);
     bool sectioned_ok = sectioned.body_mode == UiGraphNodeBodyMode::KeyValue
         && !sectioned.header.IsEmpty() && !sectioned.body.IsEmpty()
-        && !sectioned.body_left.IsEmpty() && !sectioned.body_main.IsEmpty()
-        && !sectioned.body_right.IsEmpty()
-        && sectioned.port_lanes[0] == sectioned.body_left
-        && sectioned.port_lanes[1] == sectioned.body_right
-        && sectioned.overlay == sectioned.body_main
-        && sectioned.center == sectioned.body_main
-        && sectioned.header.GetWidth() > sectioned.body_main.GetWidth();
+        && !sectioned.content_left.IsEmpty() && !sectioned.content_main.IsEmpty()
+        && !sectioned.content_right.IsEmpty()
+        && sectioned.port_lanes[0] == sectioned.content_left
+        && sectioned.port_lanes[1] == sectioned.content_right
+        && sectioned.content == sectioned.body
+        && sectioned.overlay == sectioned.body
+        && !sectioned.overlay_left.IsEmpty() && !sectioned.overlay_right.IsEmpty()
+        && sectioned.overlay_main.GetWidth() > sectioned.content_main.GetWidth()
+        && sectioned.header.GetWidth() > sectioned.content_main.GetWidth();
     t.Expect(sectioned_ok,
-             "retained node layout exposes body columns, body-only port lanes and overlay/center regions");
+             "retained layout exposes independent Content/Overlay columns and body-only port lanes");
 
     int section_serial = graph.GetGeometryBuildSerial();
     UiGraphNodePresentation before_pan = sectioned;
@@ -282,9 +286,14 @@ void RunPreparedPresentationTests(Test& t)
     graph.MiddleUp(Point(311, 267), 0);
     graph.GetNodePresentation(ref, sectioned);
     t.Expect(section_serial == graph.GetGeometryBuildSerial()
-             && sectioned.body_main == before_pan.body_main.Offseted(11, 7)
-             && sectioned.body_left == before_pan.body_left.Offseted(11, 7)
-             && sectioned.overlay == before_pan.overlay.Offseted(11, 7),
+             && sectioned.content_main == before_pan.content_main.Offseted(11, 7)
+             && sectioned.content_left == before_pan.content_left.Offseted(11, 7)
+             && sectioned.content == before_pan.content.Offseted(11, 7)
+             && sectioned.content_right == before_pan.content_right.Offseted(11, 7)
+             && sectioned.overlay == before_pan.overlay.Offseted(11, 7)
+             && sectioned.overlay_left == before_pan.overlay_left.Offseted(11, 7)
+             && sectioned.overlay_main == before_pan.overlay_main.Offseted(11, 7)
+             && sectioned.overlay_right == before_pan.overlay_right.Offseted(11, 7),
              "compatible camera pan projects retained node-layout regions without relayout");
 
     // Restore a rich node for the impossible-request test below.

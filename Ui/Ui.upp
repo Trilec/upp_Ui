@@ -38,6 +38,8 @@ file
 	UiGraph/UiGraph.h,
 	UiGraph/UiGraphModel.h,
 	UiGraph/UiGraphModel.cpp,
+	UiGraph/UiGraphNodeTemplate.h,
+	UiGraph/UiGraphNodeTemplate.cpp,
 	UiGraph/UiNodeGraph.h,
 	UiGraph/UiNodeGraphLod.h,
 	UiGraph/UiNodeGraph.cpp,
