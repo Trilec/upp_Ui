@@ -63,8 +63,8 @@
     - 2026-09: added a private live-camera projection seam for wheel zoom and
       middle-pan while preserving synchronous public SetZoom/SetPan semantics.
     - 2026-09: made retained node presentation explicitly section-aware so
-      NodeGeometry owns Header/Body/Footer, body columns and overlay/centre
-      regions as the single prepared node-layout cache.
+      NodeGeometry owns Header/Body/Footer and Body Content/Overlay columns as
+      the single prepared node-layout cache.
 */
 
 #include <CtrlCore/CtrlCore.h>
@@ -73,6 +73,7 @@
 #include <Ui/UiDraw.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiGraph/UiGraphModel.h>
+#include <Ui/UiGraph/UiGraphNodeTemplate.h>
 
 namespace Upp {
 
@@ -83,55 +84,64 @@ enum class UiGraphVisualState : byte {
     Disabled,
 };
 
-// Runtime presentation, independent of serialized model/style and renderer LOD.
-enum class UiGraphPresentationLevel : byte { Normal, Lod1, Lod2, Lod3 };
 enum class UiGraphPresentationProfile : byte { Standard, Centred, MediaCard };
 
-// Body mode is structural authoring metadata. The retained layout still contains
-// plain prepared Rects; complex row/tag/field content paints inside BodyMain.
-enum class UiGraphNodeBodyMode : byte {
-    Stack = 0,
-    Centered,
-    Media,
-    KeyValue,
-    Fields,
-    PortRows,
-    FlowTags,
-};
-
-// Authored device units at zoom 1 (use DPI at the call site). The host requests
-// slots, never arbitrary rectangles. Geometry clamps allocations to the silhouette.
+// Authored device units at zoom 1 (use DPI at the call site). Legacy fields keep
+// the existing profile path valid. node_template/template_kind opt into the shared
+// C++ template evaluator. A custom pointer is borrowed only for the synchronous
+// exact preparation call and is never retained in NodeGeometry.
 struct UiGraphPresentationRequest {
     UiGraphPresentationProfile profile = UiGraphPresentationProfile::Standard;
     UiGraphNodeBodyMode body_mode = UiGraphNodeBodyMode::Stack;
+    UiGraphNodeTemplateKind template_kind = UiGraphNodeTemplateKind::Legacy;
+    const UiGraphNodeTemplate* node_template = nullptr;
+
     int badge_height = 0;
     int footer_height = 0;
     int media_min_height = 0;
-    // Optional body columns are authored layout regions, not controls. A labelled
-    // side-port lane can be constrained to the body and shares that reservation.
-    int body_left_width = 0;
-    int body_right_width = 0;
+
+    // Legacy/custom section reservations. Body contains two sibling layers:
+    // Content and Overlay; each independently owns Left/Main/Right columns.
+    int content_left_width = 0;
+    int content_right_width = 0;
+    int overlay_left_width = 0;
+    int overlay_right_width = 0;
     bool left_port_lane_body_only = false;
     bool right_port_lane_body_only = false;
 };
 
 // Retained node-layout result. NodeGeometry owns exactly one of these; paint,
-// attached controls and live camera projection consume it directly. Parent
-// regions may contain child regions by design; leaf slots remain non-overlapping.
+// attached controls and live camera projection consume it directly.
+//
+// Node / Safe
+// ├── Header (optional)
+// ├── Body
+// │   ├── Content -> Left / Main / Right
+// │   └── Overlay -> Left / Main / Right
+// └── Footer (optional)
+//
+// Content and Overlay overlap by design; their columns are independent.
 struct UiGraphNodePresentation {
     UiGraphPresentationLevel level = UiGraphPresentationLevel::Lod3;
     UiGraphPresentationProfile profile = UiGraphPresentationProfile::Standard;
+    UiGraphNodeTemplateKind template_kind = UiGraphNodeTemplateKind::Legacy;
     UiGraphNodeBodyMode body_mode = UiGraphNodeBodyMode::Stack;
     UiAlign text_align = UiAlign::LEFT;
+
     Rect safe;
     Rect header;
     Rect body;
-    Rect body_left, body_main, body_right;
-    Rect overlay, center;
+    Rect content;
+    Rect content_left, content_main, content_right;
+    Rect overlay;
+    Rect overlay_left, overlay_main, overlay_right;
+
     Rect title, subtitle, icon, badge;
     Rect media, description, control, footer;
+
     // Physical sides: left, right, top, bottom. Port direction/identity is unchanged.
     Rect port_lanes[4];
+
     bool fits = true;
     bool show_title = false, show_subtitle = false, show_icon = false;
     bool show_badge = false, show_media = false, show_description = false;
@@ -350,7 +360,7 @@ public:
     UiNodeGraph& EndBatchUpdate();
     bool IsBatchUpdating() const { return batch_update_depth_ > 0; }
 
-    // Changing callback captures/profile inputs requires explicit invalidation.
+    // Changing callback captures/profile/template inputs requires explicit invalidation.
     // Callback runs only during exact rich preparation; never mutate the graph there.
     Event<const UiGraphNode&, const UiGraphNodeStyle&, UiGraphPresentationRequest&>
         WhenResolveNodePresentation;
@@ -1001,4 +1011,3 @@ private:
 } // namespace Upp
 
 #endif
-
