@@ -3,153 +3,175 @@
 Remote `main` is authoritative. Fetch before work/publish; do not force-update `main`.
 Recovery state only; Git history is implementation history.
 
-BASE: `3af1ddbeb51134c1a47b75596424a4cf665667fc`
-TASK: **UIGRAPH-NODE-LAYOUT-CORE-02 — retained section-aware node layout**
+CURRENT MAIN AT HANDOVER: `f12a255441361bf2f057b74753638146067d1420`
+TASK: **UIGRAPH-NODE-LAYOUT-TEMPLATE-03 — shared templates over retained node layout**
 BRANCH: `main`
-TOUCHED: `Ui/UiGraph/UiNodeGraph.h`, `UiNodeGraphPresentation.inc`, `UiNodeGraphProjection.inc`, `Utilities/UiGraphRenderTests/PresentationLayout.h`, and UiGraph architecture/recovery docs.
-STATUS: **SOURCE IMPLEMENTED + CANONICAL DOCS RECONCILED — WINDOWS DEBUG VALIDATION PENDING**
-PUBLISHED: implementation `98d92187e288fc076655207a30da0fe64b083eb9`; documentation follows on `main`.
-VALIDATION: source review/tests added; Windows CLANG Debug gate not yet reported for CORE-02.
-NEXT ACTION: focused Debug `UiGraphRenderTests` + `UiGraphDesignMatrix`; then implement the shared C++ template/slot layer and Presentation Studio V4 against the retained layout authority.
+STATUS: **SOURCE PUBLISHED — WINDOWS DEBUG VALIDATION + DESIGN REFINEMENT PENDING**
+PUBLISHED: `f12a255441361bf2f057b74753638146067d1420` (`UIGRAPH: evaluate shared templates into retained node layout`)
+NEXT ACTION: validate current source on Windows, then refine the template/content/LOD separation before building Presentation Studio V4.
 
 ## READ FIRST
 
 1. `docs/ACTIVE_WORK.md`
-2. `docs/08_UIGRAPH_GUIDE.md`
-3. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
-4. `docs/UIGRAPH_PRESENTATION_AUDIT.md`
-5. `docs/06_UI_SCALE_AND_LOD_GUIDE.md`
+2. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
+3. `docs/08_UIGRAPH_GUIDE.md`
+4. `Ui/UiGraph/UiGraphNodeTemplate.h`
+5. `Ui/UiGraph/UiGraphNodeTemplate.cpp`
+6. `Ui/UiGraph/UiNodeGraphPresentation.inc`
 
-Current source and these canonical docs override remembered chat/old handovers.
+Current remote source overrides chat memory and old SHAs.
 
-## CORE DECISION
+## RETAINED CACHE DECISION
 
-Node layout is part of retained node geometry, not a second runtime subsystem.
+Node layout is part of `NodeGeometry`; the evaluated retained layout is the cache.
+There is no second per-node layout cache, runtime JSON compiler, or one-Ctrl-per-node
+layout tree. Compatible live camera motion projects the retained geometry.
 
-`NodeGeometry.presentation` is the retained node-layout result/cache:
-- exact rich geometry preparation owns it;
-- paint and attached controls consume it directly;
-- compatible live pan/zoom projects the same retained rectangles;
-- Micro preparation skips rich layout/resolver work;
-- no second per-node layout cache;
-- no runtime JSON layout compiler;
-- no `Ctrl` layout tree per ordinary node.
+## CURRENT STRUCTURAL HIERARCHY
 
-The internal `NodeLayout` cursor is only cheap rectangle arithmetic during exact
-preparation. It is not another retained authority.
+The hierarchy is structural only. It must not be confused with which semantic
+feature is placed into a region:
 
-## IMPLEMENTED RETAINED STRUCTURE
+```text
+Node / Safe Area
+|
++-- Header                         optional
+|
++-- Body
+|   |
+|   +-- Content                   same Body extent
+|   |   +-- Left
+|   |   +-- Main
+|   |   +-- Right
+|   |
+|   +-- Overlay                   same Body extent; does not consume Content
+|       +-- Left
+|       +-- Main
+|       +-- Right
+|
++-- Footer                         optional
+```
 
-`UiGraphNodePresentation` now retains:
+`Content` and `Overlay` are sibling layers over the same Body. Each has independent
+Left/Main/Right columns. Overlay does not reduce Content capacity.
 
-- `safe`
-- `header`
-- `body`
-  - `body_left`
-  - `body_main`
-  - `body_right`
-- `footer`
-- `overlay`
-- `center`
-- existing leaf slots and physical port-label lanes.
+Left/right labelled port lanes may reserve full node-safe width or be tied to the
+Body Content Left/Right columns, depending on template policy. Port anchors remain
+semantic geometry at the silhouette boundary.
 
-`overlay` / `center` intentionally overlap `body_main` as composition regions.
+## TEMPLATE LAYER NOW IMPLEMENTED
 
-Body modes:
-`Stack`, `Centered`, `Media`, `KeyValue`, `Fields`, `PortRows`, `FlowTags`.
+`UiGraphNodeTemplate.h/.cpp` provide a small shared C++ template description.
+Built-in template kinds:
 
-Left/right labelled port lanes can remain full-height or be body-only. Body-only
-lanes share `body_left` / `body_right`, preserving Header/Footer width. Top/bottom
-lane semantics are unchanged in this tranche.
+- Minimal
+- Identity
+- Summary
+- Status
+- Media
+- Parameter
+- Operator
+
+A template owns structural defaults plus ordered slot rules. Slot rule dimensions:
+
+- feature;
+- target region;
+- placement: Fill / Top / Bottom / Left / Right / Center;
+- authored extent;
+- LOD visibility mask;
+- flow: Stable / Reflow;
+- gap.
+
+The fixed slot array is intentional: no dynamic per-node layout tree. Built-in or
+custom C++ template definitions are shared; only evaluated rectangles are retained
+in each prepared `NodeGeometry`.
+
+Legacy `Standard/Centred/MediaCard` request/profile behaviour remains available when
+no template is selected, so the migration is additive rather than destructive.
+
+## CRITICAL DESIGN SEPARATION — DO NOT CONFLATE
+
+There are three separate concerns:
+
+1. **STRUCTURE** — Header / Body(Content+Overlay)/Footer and their columns.
+2. **CONTENT PLACEMENT** — which semantic thing (Title, Subtitle, Icon, Media,
+   Status, Progress, Fields, Tags, Control, etc.) occupies which structural region
+   and with what placement/alignment/flow.
+3. **LOD POLICY** — at Normal/LOD1/LOD2/LOD3 whether that semantic feature remains
+   present, hidden, forced, inherited, and whether hiding it preserves or reflows
+   its reservation.
+
+The current source implements the structural template/slot machinery, but the
+semantic feature vocabulary is still intentionally limited to production-owned
+slots (`Title`, `Subtitle`, `Icon`, `Badge`, `Media`, `Description`, `Control`,
+`Footer`). Domain-rich concepts such as Status, Progress, Fields, Tags and Actions
+currently ride through host-painted content rather than all being first-class slot
+features.
+
+**This is the next design question.** Before expanding enums mechanically, decide
+which semantic features deserve first-class reusable slot identity versus which are
+content rendered inside a structural region/body mode.
+
+Do not encode rules such as “Description always belongs in ContentMain” or “Icon
+always belongs in Header”. Templates must own placement. Likewise LOD is not a
+layout layer; it is policy applied to semantic slots in the chosen structural
+layout.
+
+## PRESENTATION STUDIO V4 DIRECTION
+
+The supplied mockup direction is the current UI target:
+
+- one selected Template / Node shape / connector style;
+- four persistent Normal / LOD1 / LOD2 / LOD3 previews;
+- left/middle visual diagrams for Node Region and Node Overlay;
+- explicit hierarchy/visibility table;
+- right-side styling/property inspector;
+- `UiRangeSegments` edits LOD transition thresholds only and must not resize the
+  specimen cameras;
+- layout builder edits structural region + slot placement separately from LOD
+  enable/disable policy;
+- preview zoom remains independently user-controlled;
+- production C++ template output; JSON only optional Studio/session interchange.
+
+Likely UI mental model:
+- Structure tree on rows;
+- semantic feature chips attached to the relevant structural row;
+- four LOD columns control visibility/flow policy;
+- separate slot editor changes *where/how* a selected feature is placed.
+
+Do not let the Studio become a full general UiDesigner.
 
 ## PERFORMANCE CONTRACT
 
-Retained layout is the cache; do not calculate it and then duplicate it elsewhere.
+Retain everything useful; invalidate narrowly; replay a small region where useful;
+project retained layout for compatible camera changes. Do not build a fine-grained
+dependency graph without measurement. Stable/Reflow already belongs to slot rules;
+coarse Header/Body/Footer invalidation can be added later if profiling justifies it.
 
-Compatible camera motion projects the retained result. Preferred incremental rule:
-- retain everything useful;
-- invalidate narrowly where practical;
-- replay a small section when needed;
-- project cached layout while structure/LOD/capacity remain compatible;
-- exact rebuild only when required.
+## VALIDATION / GARY ROLE
 
-Do **not** build a fine-grained dependency graph yet. Per-section dirty/revision
-updates are planned direction, not current implementation evidence.
+Gary validates on Windows; supervisor owns architecture and main coding.
 
-## DESIGN COVERAGE
+Focused Debug gate for the current template checkpoint:
 
-The retained regions/body modes are intended to cover:
-- media card: Header title + Media BodyMain + Overlay state icons + wrapping tags;
-- central controller/hub: Center icon/title/subtitle with external focus/ring decoration;
-- summary/key-value cards: structured rows + Footer summary;
-- status/process cards: subtitle/title + status/progress;
-- parameter/operator nodes: fields/controls plus side lanes;
-- Blueprint-style port catalogues: labelled typed port rows without one Ctrl per row.
-
-Edge colour/activity remains edge styling. Future active-flow emphasis should reuse
-prepared edge routes, not enter node layout.
-
-## NEXT PRODUCTION LAYER
-
-Add a compact shared **C++ template/slot description** mapping named features into
-the retained regions/body modes.
-
-Requirements:
-- normal UMK/CLANG compilation;
-- one immutable/shared template definition for many nodes;
-- no per-node copied template tree;
-- feature placement is template-owned (Icon may be Header/Center/Overlay etc.);
-- eventual Stable/Reflow section policy;
-- arbitrary slot placement only through this production mechanism;
-- JSON optional for Studio/session interchange or generated C++ only.
-
-Starting presentation intents remain:
-Minimal, Identity, Summary, Status, Media, Parameter, Operator.
-These are not LOD levels.
-
-## STUDIO V4 DIRECTION
-
-Replace the current wide matrix authoring model with a focused selected-node/template
-workbench after the core gate passes:
-- one selected shape/template;
-- four persistent Normal / LOD1 / LOD2 / LOD3 previews;
-- preview cameras independent from LOD thresholds;
-- `UiRangeSegments` edits transition thresholds only;
-- adjustable Min/Max threshold domain;
-- feature policy: Inherit / Force On / Force Off subject to capacity;
-- right-side builder edits region/slot placement, body mode, alignment and later
-  Stable/Reflow behaviour;
-- explicit Reset Cameras;
-- production C++ template output;
-- no demo-only parallel allocator.
-
-## TEST COVERAGE ADDED
-
-`Utilities/UiGraphRenderTests/PresentationLayout.h` checks:
-- `KeyValue` body-mode retention;
-- BodyLeft/Main/Right allocation;
-- body-only left/right labelled lanes;
-- Header width not consumed by body-only lanes;
-- Overlay/Center mapping to BodyMain;
-- compatible middle-pan projection of new retained regions without layout rebuild.
-
-Existing shape/profile/capacity/text-line-box/Micro tests remain authoritative.
-
-## WINDOWS DEBUG GATE
-
-DEBUG ONLY:
 1. fetch/pull current `main`;
-2. build/run `UiGraphRenderTests`;
-3. build `examples/UiGraphDesignMatrix`;
-4. confirm `UIGRAPH_STUDIO_SELECTOR_SMOKE checks=4 failed=0`;
-5. launch/leave Studio running for Curt;
-6. `git diff --check` PASS.
+2. confirm `f12a255441361bf2f057b74753638146067d1420` is an ancestor;
+3. build/run `UiGraphRenderTests`;
+4. build `examples/UiGraphDesignMatrix`;
+5. confirm selector smoke remains green;
+6. quick visual smoke only;
+7. `git diff --check`;
+8. report first real blocker; minor mechanical CLANG fixes may be published after review.
 
-No Release, broad aggregate suite or 10k benchmark unless the focused gate exposes
-a shared compile/API/performance problem.
+No Release/broad suite/10k benchmark unless the focused gate exposes a shared or
+performance-sensitive issue.
 
-## BRANCH HYGIENE
+## GITHUB / WORKFLOW
 
-Do not create proof/final/published branches for this work.
-Steady state is `main` plus only genuinely unfinished/unpublished branches after
-content-equivalence review. Continue deleting obsolete supervisor branches.
+Remote `main` is source of truth. Refresh first. Use complete touched files and the
+relevant callers/tests/.upp membership. Diagnose before editing. Publish small
+coherent checkpoints directly without leaving proof/final/published branches.
+Review full diff and verify remote contains the published SHA.
+
+Gary handles compile/runtime validation and minor fixups; he is not the architecture
+authority.
