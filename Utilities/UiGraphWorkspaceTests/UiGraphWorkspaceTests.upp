@@ -1,0 +1,9 @@
+description "UiGraph workspace document and authoring transaction tests";
+noblitz;
+uses
+    Core,
+    Utilities/UiGraphWorkspace;
+file
+    main.cpp;
+mainconfig
+    "CONSOLE" = "";

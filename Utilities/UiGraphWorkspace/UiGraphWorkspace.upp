@@ -1,0 +1,10 @@
+description "UiGraph authoring document, transactions, JSON and C++ export (not runtime layout)";
+noblitz;
+uses
+    Core,
+    Ui;
+file
+    UiGraphWorkspace.h,
+    WorkspaceDocument.cpp,
+    WorkspaceJson.cpp,
+    WorkspaceCode.cpp;
