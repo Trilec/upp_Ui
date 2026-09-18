@@ -1,103 +1,87 @@
 # ACTIVE WORK
 
-Remote `main` is authoritative. Fetch before work/publish; never force-update it.
-This is recovery state, not a replacement for Git history.
+Remote main is authoritative. Refresh before work/publish. Never force-push.
 
-BASE: `77912445a5a1881672bb587f161d55d42a9008d8` / `main`
-TASK: **UIGRAPH-NODE-COMPONENT-01A — identified Text/Icon slots and first production editor**
-TOUCHED: `Ui/Ui.upp`; `Ui/UiGraph/{UiGraphNodeTemplate.h,UiNodeGraph.h,UiNodeGraphPresentation.inc,UiNodeGraphPaintRich.inc,UiNodeGraphProjection.inc}`; `Utilities/UiGraphRenderTests/{main.cpp,UiGraphRenderTests.upp,PresentationLayout.h,Components.cpp}`; `examples/UiGraphComponentStudio/`; this file and `docs/UIGRAPH_NODE_COMPONENTS.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 01A only.
-PUBLISHED: the source commit containing this update; recover with `git log -1 --format=%H -- examples/UiGraphComponentStudio/main.cpp` and inspect current main.
-VALIDATION: complete touched-source review and `git diff --check`; Windows/U++ builds and GUI execution NOT run in the implementation environment. Regression tests added, not claimed passing.
-NEXT ACTION: Gary's focused Windows Debug gate below. Then native Micro hints and the next bounded authoring slice. The wider component contract remains PARTIAL.
+BASE: `d9754c76d7be0b37d951653f3f643c3e3963782a` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-02 — V6 authoring workspace and production components**
+TOUCHED: this file; `docs/UIGRAPH_NODE_WORKSPACE.md`
+STATUS: **PARTIAL — direction recorded; source implementation in progress**
+PUBLISHED: documentation checkpoint containing this update; inspect current remote main.
+VALIDATION: Gary reported Windows Debug PASS at d9754c7 (details below). This checkpoint has no source changes.
+NEXT ACTION: implement the coherent production/workspace slices below and publish
+with current recovery state. Do not report planned capabilities as implemented.
 
-## READ FIRST
+## Read first
 
-1. This file.
-2. `docs/UIGRAPH_NODE_COMPONENTS.md` — actual implemented API, demo and limitations.
-3. `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` — accepted wider direction; API sketches are not all implemented.
-4. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
-5. `Ui/UiGraph/UiGraphNodeTemplate.h` and current complete presentation/paint/projection source.
-6. `docs/08_UIGRAPH_GUIDE.md` for wider graph ownership. Its older section-layout examples must not override the current Content/Overlay contract.
+1. `docs/UIGRAPH_NODE_WORKSPACE.md` — current accepted V6 workspace direction.
+2. `docs/UIGRAPH_NODE_COMPONENTS.md` — implemented 01A API and boundaries.
+3. `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` — wider accepted component contract.
+4. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained layout authority.
+5. Current complete source, callers, tests and .upp membership.
 
-The component design contract was already saved by `77912445a5a1881672bb587f161d55d42a9008d8`. Do not recreate or replace it with an older chat attachment.
+The latest user request replaces the four-preview authoring UI with one main live
+preview plus explicit LOD jump/reset controls and colour-coded region/overlay
+editors. Old four-preview documentation is historical UI guidance, not authority.
 
-## WHAT 01A IMPLEMENTS
+## Last Windows validation — validator-provided evidence
 
-- Named components extend the SAME fixed-capacity template slot array. Empty IDs retain the existing production feature path.
-- Unique template-local IDs, validation with non-mutating failed additions, repeated Text/Icon roles, existing node-field and typed text `node.data` bindings.
-- Per-component horizontal/vertical alignment, optional ink/font height, per-level Inherit/On/Off overrides and Stable/Reflow.
-- Retained text/icon output, measured text-footprint bars and dot proxies in the non-Micro production renderer. Paint does not resolve bindings, measure named text or rescale named icons.
-- Optional bounded component records inside `NodeGeometry.presentation`, not a second layout cache. Public snapshots have deep-copy array ownership.
-- Compatible pan projects those records without allocation/re-layout. Named-component wheel scaling takes an explicit exact fallback pending a validated component-boundary reuse policy. Existing unnamed nodes retain their existing wheel path.
-- `examples/UiGraphComponentStudio`: four real `UiNodeGraph` views of one model/template; independently persistent cameras; actual-level diagnostics; selected-component region/placement/alignment/proxy/flow/ink/font editor; LOD policy table; reorder; title-data editing; shape choice; authored-size expansion. Layout uses UiBoxLayout and Ui controls.
+Gary tested `d9754c76d7be0b37d951653f3f643c3e3963782a`:
+- Required d9754c7 and f12a255 ancestry PASS.
+- UiGraphRenderTests Debug build/runtime PASS.
+- UIGRAPH_COMPONENT_SUMMARY checks=21 failed=0.
+- UIGRAPH_EXECUTION_PATH_SUMMARY checks=8 failed=0.
+- UIGRAPH_RENDER_TESTS_SUMMARY suites=7 failed_suites=0.
+- UiGraphDesignMatrix Debug build PASS; selector smoke checks=4 failed=0.
+- UiGraphComponentStudio Debug build PASS; four previews rendered, no obvious
+  clipping or crash in visual startup inspection.
+- git diff --check PASS; clean worktree; only origin/main; no source fixes.
 
-## BASELINE BREAKS FOUND AND REPAIRED
+Title-edit interaction was interrupted by a physical Escape stopping the Windows
+UI helper. No application failure was observed, but that interaction is not a
+completed acceptance PASS. Historical demo PIDs are not recovery authority.
 
-The earlier template checkpoint had NOT completed migration of all callers/build membership:
+## Implementation direction
 
-- `UiNodeGraphProjection.inc` still projected removed `body_left/body_main/body_right/center` members.
-- `PresentationLayout.h` still used those retired fields and asserted the old overlay geometry.
-- `Ui/Ui.upp` omitted `UiGraphNodeTemplate.cpp` and its header.
+Evolve `examples/UiGraphComponentStudio` into the single Node Design Workspace.
+Retire the old DesignMatrix Studio at the replacement source checkpoint; preserve
+unrelated graph demos and automated rendering/performance coverage.
 
-These are repaired against the accepted Content/Overlay hierarchy. No retired aliases are restored and no tests are disabled.
+Use the attached V6 HTML as visual guidance: left family/shape/palette management,
+central live thresholds and region/overlay/production preview, lower wide
+hierarchy/placement/LOD table, right actual PropertyEditor with Inspector / Style
+Overrides / generated C++ modes. Native DND must route every surface through one
+validated add/move/reorder operation. Named selection is shared across surfaces.
 
-## RETAINED ARCHITECTURE / STRUCTURE
+Authoring families have a base design and explicit optional shape overrides.
+JSON is versioned authoring interchange; generated shared C++ template/style
+factories use the same validated definitions as the production preview.
 
-`NodeGeometry.presentation` remains the one evaluated layout result.
+Painted components are not arbitrary real controls. Only supported component
+families are enabled. Embedded controls use the existing explicit host binding
+and useful-scale activation contract; no per-node Ctrl trees.
 
-```text
-Node / Safe
-  Header (optional)
-  Body
-    Content -> Left / Main / Right
-    Overlay -> Left / Main / Right
-  Footer (optional)
-```
+## Current production boundary
 
-Content and Overlay independently span Body. Overlay does not consume Content.
-Labelled port lanes can reserve full safe sides or Body Content columns. Port IDs and semantic silhouette anchors remain graph topology, not arbitrary components.
+01A implements named repeated Text/Icon slots, typed existing-data text bindings,
+per-slot alignment/ink/font height/LOD overrides/Stable-Reflow, prepared rich bars
+and dots, retained component output, pan reuse and exact named-component wheel
+fallback. It does NOT yet implement native physical-Micro hints, rich collection
+components, DND, JSON/code export or the V6 shell. Source code overrides this
+summary when subsequent checkpoints advance main.
 
-Templates place semantic content; regions do not dictate Title/Icon/etc. roles.
-LOD inclusion is distinct from the representation that fits in final pixels.
-A visible bar/dot still participates. Off+Stable reserves; Off+Reflow releases its slot. Structural bands/columns remain fixed reservations in 01A.
+`NodeGeometry.presentation` remains the single evaluated layout cache. Body has
+sibling Content and Overlay layers, each with L/M/R columns. Port anchors remain
+semantic silhouette geometry. No retired body_left/body_main/center aliases.
+No parallel demo allocator, runtime JSON compiler or per-node UI layout tree.
 
-Do not add a second per-node layout cache, per-node Ctrl trees, a runtime JSON compiler, a demo-only allocator, or an unmeasured fine-grained dependency engine.
+## Checkpoint / validation discipline
 
-## EXPLICITLY NOT IMPLEMENTED BY 01A
+Publish only coherent reviewed source. Each publish updates BASE/TASK/TOUCHED/
+STATUS/PUBLISHED/VALIDATION/NEXT ACTION here. Verify remote commit and branch after
+writes. Fresh-fetch main before publishing; preserve concurrent work.
 
-- Native physical-Micro component hints. Micro still skips rich presentation entirely; its empty rich output is labelled in the demo. Do NOT enable rich callbacks at Micro to hide this gap.
-- Image pyramids, progress/field/tag/action component renderers, regional auto-collapse, proxy fade/hysteresis or general auto-font fitting.
-- Drag/drop region diagrams, full Studio V4 migration, save/open JSON or production C++ export.
-- User-editable LOD thresholds. The new specimen uses the existing production resolver; it does not invent a second set of thresholds.
-- Optimised wheel projection of prepared named glyphs/rasters across compatible component thresholds.
-
-The existing `UiGraphDesignMatrix` remains available. Its selector smoke is still required; the new small editor is not claimed to replace all its functionality.
-
-## FOCUSED WINDOWS DEBUG GATE / GARY
-
-Repo: `E:\apps\github\upp_Ui`, branch `main`.
-Fetch/pull current main. Confirm the supervisor's published 01A SHA is an ancestor of tested HEAD, not necessarily identical to it. Source ancestor `f12a255441361bf2f057b74753638146067d1420` is also required.
-
-Use the established `E:\upp-18468\umk.exe`, `CLANGx64` method and current local nests. Exact example commands and manual checks are in `docs/UIGRAPH_NODE_COMPONENTS.md`.
-
-Debug only:
-1. Build/run `Utilities/UiGraphRenderTests` (now seven suites, including Components).
-2. Build `examples/UiGraphDesignMatrix`; retain its Debug selector/startup smoke.
-3. Build/run `examples/UiGraphComponentStudio`; inspect actual production previews.
-4. `git diff --check`.
-
-Report exact HEAD, build/test PASS/FAIL, test summary, first real blocker, demo PID if launched, and clean worktree YES/NO.
-Minor mechanical CLANG fixes may be reviewed/committed/published. Stop on architecture, ownership, template-policy or nonlocal behavioural failures; report rather than redesign.
-No Release, broad suite or 10k benchmark unless this focused gate exposes a reason.
-
-## NEXT IMPLEMENTATION BOUNDARY
-
-After Debug validation, implement a bounded native Micro hint contract with direct-overview/zoom-out parity and no rich resolver, glyph shaping, embedded controls or image processing during paint. Keep output in the existing prepared scene and reuse the accepted template/layout authority.
-
-Then evolve the visible editor against the SAME production component definitions: region diagrams, component add/remove/bindings, measured proxy diagnostics, and eventually C++ output. Preserve explicit camera reset and the independence of node size, camera, thresholds, inclusion and representation.
-
-## WORKFLOW
-
-REFRESH -> INSPECT -> IMPLEMENT -> REVIEW -> PUBLISH -> VERIFY -> VALIDATE.
-Full touched files and relevant callers/headers/tests/.upp first. Small coherent changes; publish recoverable source checkpoints. Refresh main before publishing and carry only our changes when it advances. No force pushes or leftover proof/final/published branches. Remote commit/tree verification is required after the write.
+Gary validates latest main with required checkpoint ancestry. Debug only:
+UiGraphRenderTests, focused workspace tests and the current native workspace.
+Minor mechanical CLANG fixes may be reviewed/committed/published; no architecture
+redesign, disabled tests or rich-Micro shortcuts. New checkpoints remain platform
+validation pending until actual compile/runtime evidence is supplied.
