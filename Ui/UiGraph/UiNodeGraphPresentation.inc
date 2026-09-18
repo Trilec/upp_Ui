@@ -1,7 +1,12 @@
+#include "UiGraphNodeComponent.h"
+
 // Exact retained node-layout allocation. No paint, timers or model mutation.
 // Included once by UiNodeGraph.cpp; compatible camera changes project this result.
 namespace Upp {
 namespace {
+using UiNodeGraphDetail::ResolvedNodeComponent;
+using UiNodeGraphDetail::ResolveNodeComponent;
+using UiNodeGraphDetail::PrepareNodeComponent;
 
 // NodeLayout is deliberately an internal geometry-preparation helper, not a
 // second retained object. NodeGeometry/UiGraphNodePresentation are the single
@@ -134,166 +139,6 @@ NodeLayout& TemplateRegionLayout(UiGraphNodeSlotRegion region,
     }
 }
 
-// Named components use the same region cursors as legacy features. This helper
-// resolves source/metrics only during exact rich preparation, never in Paint.
-struct ResolvedNodeComponent {
-    UiGraphNodeComponentReason reason = UiGraphNodeComponentReason::None;
-    WString text;
-    Font base_font;
-    Image icon;
-    Size authored_size = Size(0, 0);
-};
-
-ResolvedNodeComponent ResolveNodeComponent(const UiGraphNodeSlotRule& rule,
-                                          const UiGraphNode& node,
-                                          const UiGraphNodeStyle& style)
-{
-    ResolvedNodeComponent value;
-    if(rule.feature == UiGraphNodeSlotFeature::Icon) {
-        value.icon = node.icon;
-        value.authored_size = node.icon_size.cx > 0 && node.icon_size.cy > 0
-                            ? node.icon_size : style.icon_size;
-        if(IsNull(value.icon)) value.reason = UiGraphNodeComponentReason::MissingData;
-        return value;
-    }
-
-    String text;
-    if(rule.data_key.IsEmpty()) {
-        switch(rule.feature) {
-        case UiGraphNodeSlotFeature::Title: text = node.title; break;
-        case UiGraphNodeSlotFeature::Subtitle: text = node.subtitle; break;
-        case UiGraphNodeSlotFeature::Description: text = node.description; break;
-        default: break;
-        }
-    }
-    else if(IsValueMap(node.data)) {
-        ValueMap data = node.data;
-        int i = data.Find(rule.data_key);
-        if(i < 0 || IsNull(data.GetValue(i)))
-            value.reason = UiGraphNodeComponentReason::MissingData;
-        else if(IsString(data.GetValue(i)))
-            text = (String)data.GetValue(i);
-        else
-            value.reason = UiGraphNodeComponentReason::InvalidData;
-    }
-    else
-        value.reason = IsNull(node.data) ? UiGraphNodeComponentReason::MissingData
-                                        : UiGraphNodeComponentReason::InvalidData;
-
-    value.text = text.ToWString();
-    // This first component renderer is single-line. Domain formatting belongs
-    // to the binding producer; no hidden conversion of arbitrary Value objects.
-    for(int i = 0; i < value.text.GetCount(); i++)
-        if(value.text[i] == '\n' || value.text[i] == '\r' || value.text[i] == '\t')
-            value.text.Set(i, ' ');
-    if(value.text.IsEmpty() && value.reason == UiGraphNodeComponentReason::None)
-        value.reason = UiGraphNodeComponentReason::MissingData;
-    value.base_font = rule.feature == UiGraphNodeSlotFeature::Title ? style.title_font
-                    : rule.feature == UiGraphNodeSlotFeature::Subtitle ? style.subtitle_font
-                    : style.description_font;
-    if(rule.font_height > 0) value.base_font.Height(rule.font_height);
-    if(value.reason == UiGraphNodeComponentReason::None)
-        value.authored_size = GetTextSize(value.text, value.base_font);
-    return value;
-}
-
-Rect AlignNodeComponent(Rect slot, Size size, UiAlign h, UiAlign v)
-{
-    size.cx = min(size.cx, slot.GetWidth());
-    size.cy = min(size.cy, slot.GetHeight());
-    if(slot.IsEmpty() || size.cx <= 0 || size.cy <= 0) return Rect();
-    int x = h == UiAlign::RIGHT ? slot.right - size.cx
-          : h == UiAlign::CENTER ? slot.left + (slot.GetWidth() - size.cx) / 2 : slot.left;
-    int y = v == UiAlign::BOTTOM ? slot.bottom - size.cy
-          : v == UiAlign::CENTER ? slot.top + (slot.GetHeight() - size.cy) / 2 : slot.top;
-    return RectC(x, y, size.cx, size.cy);
-}
-
-void PrepareNodeComponent(const UiGraphNodeSlotRule& rule,
-                          const ResolvedNodeComponent& value, double zoom,
-                          const UiGraphNode& node, const UiGraphNodeStyle& style,
-                          UiGraphNodeComponentPresentation& out)
-{
-    using Rep = UiGraphNodeComponentRepresentation;
-    using Reason = UiGraphNodeComponentReason;
-    const Rect slot = out.slot;
-    if(slot.IsEmpty()) { out.reason = Reason::NoSpace; return; }
-    double width = max(0, value.authored_size.cx) * zoom;
-    double height = max(0, value.authored_size.cy) * zoom;
-    UiAlign h = rule.placement == UiGraphNodeSlotPlacement::Center ? UiAlign::CENTER : rule.align_h;
-    UiAlign v = rule.placement == UiGraphNodeSlotPlacement::Center ? UiAlign::CENTER : rule.align_v;
-    Size natural(max(0, fround(width)), max(0, fround(height)));
-
-    if(rule.IsText()) {
-        Font font = UiNodeGraphDetail::PresentationFont(value.base_font, zoom);
-        if(height >= rule.readable_min_px && font.GetCy() <= slot.GetHeight()) {
-            WString text = value.text;
-            Size measured = GetTextSize(text, font);
-            if(measured.cx > slot.GetWidth()) {
-                WString ellipsis = String("...").ToWString();
-                if(GetTextSize(ellipsis, font).cx <= slot.GetWidth()) {
-                    // Prepare at most log2(length) measurements, not one per
-                    // character and not one per repaint. Keep Unicode code units.
-                    int lo = 0, hi = text.GetCount();
-                    while(lo < hi) {
-                        int mid = lo + (hi - lo + 1) / 2;
-                        if(GetTextSize(text.Left(mid) + ellipsis, font).cx <= slot.GetWidth()) lo = mid;
-                        else hi = mid - 1;
-                    }
-                    text = text.Left(lo) + ellipsis;
-                    measured = GetTextSize(text, font);
-                }
-                else
-                    measured.cx = slot.GetWidth() + 1;
-            }
-            if(measured.cx <= slot.GetWidth() && measured.cy <= slot.GetHeight()) {
-                out.text = text;
-                out.font = font;
-                out.footprint = AlignNodeComponent(slot, measured, h, v);
-                out.representation = Rep::Text;
-                return;
-            }
-        }
-    }
-    else {
-        double fit = min(1.0, min(slot.GetWidth() / max(1.0, width),
-                                  slot.GetHeight() / max(1.0, height)));
-        Size size(max(0, fround(width * fit)), max(0, fround(height * fit)));
-        if(min(size.cx, size.cy) >= rule.readable_min_px) {
-            out.footprint = AlignNodeComponent(slot, size, h, v);
-            out.image = CachedRescale(value.icon, out.footprint.GetSize());
-            auto mode = node.icon_render_mode == UiIconRenderMode::Auto
-                      ? style.icon_render_mode : node.icon_render_mode;
-            out.tint_icon = mode == UiIconRenderMode::MonoTint;
-            out.representation = Rep::Icon;
-            return;
-        }
-    }
-
-    // No permanent one-pixel mark for subpixel authored content. A proxy uses
-    // the measured content footprint, not the full Fill allocation.
-    if(rule.small == UiGraphNodeSmallMode::Hidden || width < 0.75 || height < 0.75) {
-        out.reason = Reason::TooSmall;
-        return;
-    }
-    Size size;
-    if(rule.small == UiGraphNodeSmallMode::Dot
-       || (rule.small == UiGraphNodeSmallMode::BarThenDot && min(natural.cx, slot.GetWidth()) < 4)) {
-        int side = min(2, min(min(natural.cx, natural.cy), min(slot.GetWidth(), slot.GetHeight())));
-        size = Size(side, side);
-        out.representation = Rep::Dot;
-    }
-    else {
-        size = Size(min(natural.cx, slot.GetWidth()),
-                    min(slot.GetHeight(), max(1, fround(height * 0.22))));
-        out.representation = Rep::Bar;
-    }
-    out.footprint = AlignNodeComponent(slot, size, h, v);
-    if(out.footprint.IsEmpty()) {
-        out.representation = Rep::Hidden;
-        out.reason = Reason::TooSmall;
-    }
-}
 
 } // namespace
 
@@ -326,10 +171,11 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     p.safe = safe;
 
     UiGraphPresentationRequest request;
-    if(WhenResolveNodePresentation)
+    const UiGraphNodeTemplate* node_template = FindNodeTemplateClass(node);
+    if(!node_template && !out.micro && WhenResolveNodePresentation)
         WhenResolveNodePresentation(node, style, request);
-
-    const UiGraphNodeTemplate* node_template = request.node_template;
+    if(!node_template) node_template = request.node_template;
+    if(out.micro && (!node_template || !node_template->micro_hints)) return;
     if(!node_template && request.template_kind != UiGraphNodeTemplateKind::Legacy)
         node_template = &UiGraphBuiltinNodeTemplate(request.template_kind);
 
@@ -395,7 +241,9 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
         }
         p.safe = best;
     }
-    p.level = UiNodeGraphDetail::PresentationLevel(p.safe.GetWidth(), p.safe.GetHeight());
+    if(node_template) p.lod_widths = node_template->lod_widths;
+    p.level = p.lod_widths.enabled ? p.lod_widths.Resolve(out.rect.GetWidth())
+            : UiNodeGraphDetail::PresentationLevel(p.safe.GetWidth(), p.safe.GetHeight());
     if(p.safe.IsEmpty()) { p.fits = false; return; }
 
     const double z = max(0.01, zoom_);
@@ -410,7 +258,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     // Measure labelled-port demand once. The template/legacy policy decides
     // whether left/right labels consume the whole safe area or Content columns.
     int port_widths[4] = {}, port_counts[4] = {};
-    if(style.show_port_labels) {
+    if(style.show_port_labels && !out.micro) {
         for(const UiGraphPort& port : node.ports) {
             if(!port.visible) continue;
             UiGraphPortSide side = ResolvePortSide(port);
@@ -427,7 +275,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     const bool right_body_ports = node_template ? node_template->right_port_lane_body_only
                                                 : request.right_port_lane_body_only;
 
-    if(style.show_port_labels) {
+    if(style.show_port_labels && !out.micro) {
         UiAlign sides[] = { UiAlign::LEFT, UiAlign::RIGHT, UiAlign::TOP, UiAlign::BOTTOM };
         for(int si = 0; si < 4; si++) {
             if(!port_counts[si])
@@ -534,7 +382,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     if(style.show_port_labels && port_counts[1] && right_body_ports)
         p.port_lanes[1] = p.content_right;
 
-    Ctrl* child = GetNodeCtrl(node.ref);
+    Ctrl* child = out.micro ? nullptr : GetNodeCtrl(node.ref);
 
     if(node_template) {
         NodeLayout header_layout(p.header, gap);
@@ -570,9 +418,11 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             }
         };
 
+        int micro_primitives = 0;
         for(int i = 0; i < node_template->slot_count; i++) {
             const UiGraphNodeSlotRule& rule = node_template->slots[i];
             const int fi = (int)rule.feature;
+            if(out.micro && !rule.IsComponent()) continue;
             ResolvedNodeComponent component;
             UiGraphNodeComponentPresentation* prepared = nullptr;
             if(rule.IsComponent()) {
@@ -585,7 +435,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
                     prepared->reason = UiGraphNodeComponentReason::PolicyOff;
                     continue; // no binding lookup or text measurement for excluded content
                 }
-                component = ResolveNodeComponent(rule, node, style);
+                component = ResolveNodeComponent(rule, node, style, out.micro);
                 prepared->reason = component.reason;
             }
             const bool source = prepared ? component.reason == UiGraphNodeComponentReason::None
@@ -609,7 +459,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             Rect slot;
             Size natural = prepared ? Size(px(component.authored_size.cx), px(component.authored_size.cy))
                                     : natural_size(rule.feature);
-            if(prepared && rule.IsText()
+            if(prepared && !out.micro && rule.IsText()
                && component.authored_size.cy * z >= rule.readable_min_px)
                 natural.cy = max(natural.cy, UiNodeGraphDetail::PresentationFont(component.base_font, z).GetCy());
             int extent = px(rule.extent);
@@ -660,7 +510,19 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
                     p.fits = false;
                 }
                 else if(visible) {
-                    PrepareNodeComponent(rule, component, z, node, style, *prepared);
+                    PrepareNodeComponent(rule, component, z, node, style, *prepared, out.micro);
+                    if(out.micro) {
+                        int cost = UiNodeGraphDetail::ComponentPrimitiveCost(*prepared);
+                        bool collision = false;
+                        for(int q = 0; q + 1 < p.components.GetCount(); q++)
+                            if(p.components[q].representation != UiGraphNodeComponentRepresentation::Hidden
+                               && !(p.components[q].footprint & prepared->footprint).IsEmpty()) collision = true;
+                        if(micro_primitives + cost > node_template->micro_hint_budget || collision) {
+                            prepared->representation = UiGraphNodeComponentRepresentation::Hidden;
+                            prepared->reason = UiGraphNodeComponentReason::Budget;
+                        }
+                        else micro_primitives += cost;
+                    }
                     if(prepared->reason == UiGraphNodeComponentReason::NoSpace) p.fits = false;
                 }
             }
@@ -738,7 +600,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
     }
 
     bool secondary = p.level == UiGraphPresentationLevel::Normal || p.level == UiGraphPresentationLevel::Lod1;
-    p.show_port_labels = style.show_port_labels && secondary && !node.collapsed
+    p.show_port_labels = !out.micro && style.show_port_labels && secondary && !node.collapsed
                       && zoom_ >= lod_policy_.port_label_zoom;
 }
 

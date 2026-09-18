@@ -2,86 +2,73 @@
 
 Remote main is authoritative. Refresh before work/publish. Never force-push.
 
-BASE: `d9754c76d7be0b37d951653f3f643c3e3963782a` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-02 — V6 authoring workspace and production components**
-TOUCHED: this file; `docs/UIGRAPH_NODE_WORKSPACE.md`
-STATUS: **PARTIAL — direction recorded; source implementation in progress**
-PUBLISHED: documentation checkpoint containing this update; inspect current remote main.
-VALIDATION: Gary reported Windows Debug PASS at d9754c7 (details below). This checkpoint has no source changes.
-NEXT ACTION: implement the coherent production/workspace slices below and publish
-with current recovery state. Do not report planned capabilities as implemented.
+BASE: `57988643b83573636ab85731442637eee6f2cab4` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-02A — runtime families, thresholds and native Micro hints**
+TOUCHED: `Ui/Ui.upp`; `Ui/UiGraph/UiGraphNodeTemplate.h`, `UiNodeGraph.h`, presentation/geometry/projection/rich/Micro source; new `UiGraphNodeComponent.h/.cpp`, `UiGraphNodeComponentPaint.cpp`, `UiNodeGraphTemplates.cpp`; `Utilities/UiGraphRenderTests/{main.cpp,UiGraphRenderTests.upp,WorkspaceComponents.cpp}`; this file; `docs/UIGRAPH_WORKSPACE_RUNTIME.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for runtime 02A only. V6 authoring UI remains PARTIAL.
+PUBLISHED: source commit containing this update; recover with `git log -1 --format=%H -- Ui/UiGraph/UiNodeGraphTemplates.cpp`.
+VALIDATION: complete touched-source/diff review, git diff --check PASS, uploaded content hashes checked. New tests added; Windows compilation/runtime NOT run here.
+NEXT ACTION: finish the V6 native workspace, DND, persistence/code generation and focused authoring tests. Retire DesignMatrix only with the replacement source publish; then Gary validates the accumulated checkpoint.
 
 ## Read first
 
-1. `docs/UIGRAPH_NODE_WORKSPACE.md` — current accepted V6 workspace direction.
-2. `docs/UIGRAPH_NODE_COMPONENTS.md` — implemented 01A API and boundaries.
-3. `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` — wider accepted component contract.
-4. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained layout authority.
-5. Current complete source, callers, tests and .upp membership.
+1. `docs/UIGRAPH_NODE_WORKSPACE.md` — accepted V6 workspace specification.
+2. `docs/UIGRAPH_WORKSPACE_RUNTIME.md` — implemented 02A API and limits.
+3. `docs/UIGRAPH_NODE_COMPONENTS.md` — historical 01A baseline; newer runtime supersedes it.
+4. `docs/UIGRAPH_NODE_COMPONENT_CONTRACT_DRAFT.md` — wider accepted direction.
+5. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` and complete current source.
 
-The latest user request replaces the four-preview authoring UI with one main live
-preview plus explicit LOD jump/reset controls and colour-coded region/overlay
-editors. Old four-preview documentation is historical UI guidance, not authority.
+The user now wants ONE live preview plus explicit LOD jump/reset controls and
+colour-coded region/overlay diagrams. Earlier four-preview UI prose is historical.
+Neither existing demo is removed by this runtime checkpoint.
 
-## Last Windows validation — validator-provided evidence
+## Last Windows evidence — Gary's report, baseline only
 
-Gary tested `d9754c76d7be0b37d951653f3f643c3e3963782a`:
-- Required d9754c7 and f12a255 ancestry PASS.
-- UiGraphRenderTests Debug build/runtime PASS.
-- UIGRAPH_COMPONENT_SUMMARY checks=21 failed=0.
-- UIGRAPH_EXECUTION_PATH_SUMMARY checks=8 failed=0.
-- UIGRAPH_RENDER_TESTS_SUMMARY suites=7 failed_suites=0.
-- UiGraphDesignMatrix Debug build PASS; selector smoke checks=4 failed=0.
-- UiGraphComponentStudio Debug build PASS; four previews rendered, no obvious
-  clipping or crash in visual startup inspection.
-- git diff --check PASS; clean worktree; only origin/main; no source fixes.
+Tested `d9754c76d7be0b37d951653f3f643c3e3963782a`:
+- d9754c7 and f12a255 required ancestry PASS.
+- RenderTests Debug build/runtime PASS: Components 21/0, ExecutionPath 8/0,
+  UIGRAPH_RENDER_TESTS_SUMMARY suites=7 failed_suites=0.
+- DesignMatrix Debug build PASS; selector smoke checks=4 failed=0.
+- ComponentStudio Debug build/startup PASS; four previews, no obvious clipping/crash.
+- git diff --check PASS, clean worktree, origin/main only, no fixes.
 
-Title-edit interaction was interrupted by a physical Escape stopping the Windows
-UI helper. No application failure was observed, but that interaction is not a
-completed acceptance PASS. Historical demo PIDs are not recovery authority.
+Title-edit UI automation was interrupted by physical Escape, not an observed app
+failure. That interaction is not a completed PASS. Old PIDs are not recovery state.
+This report does NOT validate 02A or the forthcoming workspace.
 
-## Implementation direction
+## Runtime source now implemented
 
-Evolve `examples/UiGraphComponentStudio` into the single Node Design Workspace.
-Retire the old DesignMatrix Studio at the replacement source checkpoint; preserve
-unrelated graph demos and automated rendering/performance coverage.
+Validated owned template-class registration keyed by node.style_class; optional
+projected-outer-width LOD policy; bounded Text/Icon/Image/Progress/Fields/Tags/painted
+Actions; per-component typography/role/state style and overflow; retained native
+Micro bars/dots/tiny-ready images with budget/collision reasons; cold overview
+parity; pan projection of group rectangles. Named-component wheel scaling remains
+exact fallback. RenderTests has eight suites; no old tests were disabled.
 
-Use the attached V6 HTML as visual guidance: left family/shape/palette management,
-central live thresholds and region/overlay/production preview, lower wide
-hierarchy/placement/LOD table, right actual PropertyEditor with Inspector / Style
-Overrides / generated C++ modes. Native DND must route every surface through one
-validated add/move/reorder operation. Named selection is shared across surfaces.
+The component preparation/painter now use ordinary .h/.cpp units. The existing
+production region cursors still allocate all component capacity. No demo allocator.
 
-Authoring families have a base design and explicit optional shape overrides.
-JSON is versioned authoring interchange; generated shared C++ template/style
-factories use the same validated definitions as the production preview.
+## Not yet in this checkpoint
 
-Painted components are not arbitrary real controls. Only supported component
-families are enabled. Embedded controls use the existing explicit host binding
-and useful-scale activation contract; no per-node Ctrl trees.
+V6 shell, drag/drop, family/shape authoring, JSON and C++ export are the NEXT slice.
+Arbitrary live controls are not a painted palette family; SetNodeCtrl remains the
+explicit host escape hatch. Actions currently paint cues, not clickable commands.
+Image resources are bounded prepared rasters, not a general image-pyramid system.
+Dynamic mosaics require host-supplied small assets. Micro text occupancy is an
+approximate presence cue, not measured glyph spans. No region auto-collapse,
+animated fades or fine-grained dependency engine.
 
-## Current production boundary
+## Architecture and workflow
 
-01A implements named repeated Text/Icon slots, typed existing-data text bindings,
-per-slot alignment/ink/font height/LOD overrides/Stable-Reflow, prepared rich bars
-and dots, retained component output, pan reuse and exact named-component wheel
-fallback. It does NOT yet implement native physical-Micro hints, rich collection
-components, DND, JSON/code export or the V6 shell. Source code overrides this
-summary when subsequent checkpoints advance main.
+NodeGeometry.presentation is the ONE retained evaluated layout result. Body owns
+sibling Content and Overlay layers spanning the same Body, each with independent
+L/M/R columns. Ports retain semantic IDs and silhouette anchors. No retired aliases,
+second layout cache, runtime JSON compiler or per-node Ctrl tree.
 
-`NodeGeometry.presentation` remains the single evaluated layout cache. Body has
-sibling Content and Overlay layers, each with L/M/R columns. Port anchors remain
-semantic silhouette geometry. No retired body_left/body_main/center aliases.
-No parallel demo allocator, runtime JSON compiler or per-node UI layout tree.
-
-## Checkpoint / validation discipline
-
-Publish only coherent reviewed source. Each publish updates BASE/TASK/TOUCHED/
-STATUS/PUBLISHED/VALIDATION/NEXT ACTION here. Verify remote commit and branch after
-writes. Fresh-fetch main before publishing; preserve concurrent work.
-
-Gary validates latest main with required checkpoint ancestry. Debug only:
-UiGraphRenderTests, focused workspace tests and the current native workspace.
-Minor mechanical CLANG fixes may be reviewed/committed/published; no architecture
-redesign, disabled tests or rich-Micro shortcuts. New checkpoints remain platform
-validation pending until actual compile/runtime evidence is supplied.
+REFRESH -> INSPECT -> IMPLEMENT -> REVIEW -> PUBLISH -> VERIFY -> VALIDATE.
+Publish coherent source with current recovery state. Refresh main before publish,
+preserve parallel work, verify commit/branch afterward. No force or proof branches.
+Gary: latest-main ancestry, Debug RenderTests plus focused authoring tests/current
+workspace. Minor mechanical CLANG fixes allowed after review; no disabled tests,
+architecture redesign or rich-Micro shortcuts. Report exact HEAD, first real
+failure, summaries, GUI evidence and clean worktree status.

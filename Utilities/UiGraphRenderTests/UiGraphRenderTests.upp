@@ -15,6 +15,7 @@ file
     PatternedPaint.cpp,
     Presentation.cpp,
     Components.cpp,
+    WorkspaceComponents.cpp,
     PresentationLayout.h,
     ExecutionPath.cpp;
 

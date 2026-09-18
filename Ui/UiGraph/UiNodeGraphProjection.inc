@@ -153,7 +153,7 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
         g.rect = project_rect(src.rect);
         g.surface = project_rect(src.surface);
         g.paint_bounds = project_rect(src.paint_bounds);
-        if(!src.micro) {
+        if(!src.micro || !src.presentation.components.IsEmpty()) {
             // Non-geometric prepared values remain unchanged on a compatible
             // camera frame. Do not deep-copy the component vector every pan.
             ASSERT(g.presentation.components.GetCount() == src.presentation.components.GetCount());
@@ -179,8 +179,19 @@ void ProjectPreparedGraphGeometry(const NodeMap& exact_nodes, const EdgeMap& exa
             for(int side = 0; side < 4; side++)
                 g.presentation.port_lanes[side] = project_rect(src.presentation.port_lanes[side]);
             for(int q = 0; q < g.presentation.components.GetCount(); q++) {
-                g.presentation.components[q].slot = project_rect(src.presentation.components[q].slot);
-                g.presentation.components[q].footprint = project_rect(src.presentation.components[q].footprint);
+                const auto& a = src.presentation.components[q];
+                auto& b = g.presentation.components[q];
+                b.slot = project_rect(a.slot);
+                b.footprint = project_rect(a.footprint);
+                b.content = project_rect(a.content);
+                b.meter = project_rect(a.meter);
+                b.completed = project_rect(a.completed);
+                ASSERT(b.items.GetCount() == a.items.GetCount());
+                for(int j = 0; j < b.items.GetCount(); j++) {
+                    b.items[j].box = project_rect(a.items[j].box);
+                    b.items[j].text_rect = project_rect(a.items[j].text_rect);
+                    b.items[j].value_rect = project_rect(a.items[j].value_rect);
+                }
             }
         }
 
@@ -347,9 +358,10 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             bool compact = UiNodeGraphDetail::IsCompactNode(width, height);
             bool micro = UiNodeGraphDetail::IsMicroNode(width, height);
             const Rect& safe = g.presentation.safe;
-            auto level = UiNodeGraphDetail::PresentationLevel(
-                max(0, fround(safe.GetWidth() * cumulative)),
-                max(0, fround(safe.GetHeight() * cumulative)));
+            auto level = g.presentation.lod_widths.enabled ? g.presentation.lod_widths.Resolve(width)
+                : UiNodeGraphDetail::PresentationLevel(
+                    max(0, fround(safe.GetWidth() * cumulative)),
+                    max(0, fround(safe.GetHeight() * cumulative)));
             if(compact != g.compact || micro != g.micro || level != g.presentation.level) {
                 cancel_approximation();
                 return false;

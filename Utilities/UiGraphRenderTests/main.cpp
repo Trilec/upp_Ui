@@ -9,6 +9,7 @@ int RunPatternedPaintSuite();
 int RunPresentationSuite();
 int RunExecutionPathSuite();
 int RunComponentSuite();
+int RunWorkspaceComponentSuite();
 
 CONSOLE_APP_MAIN
 {
@@ -20,8 +21,9 @@ CONSOLE_APP_MAIN
     failed += RunPresentationSuite() != 0;
     failed += RunExecutionPathSuite() != 0;
     failed += RunComponentSuite() != 0;
+    failed += RunWorkspaceComponentSuite() != 0;
 
-    Cout() << "\nUIGRAPH_RENDER_TESTS_SUMMARY suites=7 failed_suites="
+    Cout() << "\nUIGRAPH_RENDER_TESTS_SUMMARY suites=8 failed_suites="
            << failed << '\n';
     SetExitCode(failed ? 1 : 0);
 }

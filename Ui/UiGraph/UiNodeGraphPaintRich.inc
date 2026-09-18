@@ -452,49 +452,6 @@ void UiNodeGraph::PaintNodeText(Draw& w, const UiGraphNode& node, const NodeGeom
         }
 }
 
-void UiNodeGraph::PaintNodeComponents(Draw& w, const UiGraphNodePresentation& p,
-                                     const UiGraphNodeStyle& style, UiGraphVisualState state)
-{
-    using Rep = UiGraphNodeComponentRepresentation;
-    int si = VisualStateIndex(state);
-    // Overlay is a sibling layer, not whichever component happened to be added
-    // last. Ordering within each layer remains template order.
-    for(int layer = 0; layer < 2; layer++)
-        for(const auto& c : p.components) {
-            bool overlay = c.region == UiGraphNodeSlotRegion::OverlayLeft
-                        || c.region == UiGraphNodeSlotRegion::OverlayMain
-                        || c.region == UiGraphNodeSlotRegion::OverlayRight;
-            if((overlay ? 1 : 0) != layer || c.representation == Rep::Hidden
-               || c.footprint.IsEmpty()) continue;
-            Color ink = c.ink;
-            if(IsNull(ink)) {
-                switch(c.feature) {
-                case UiGraphNodeSlotFeature::Icon: ink = style.palette.icon[si]; break;
-                case UiGraphNodeSlotFeature::Subtitle: ink = style.subtitle_ink[si]; break;
-                case UiGraphNodeSlotFeature::Description: ink = style.description_ink[si]; break;
-                default: ink = style.title_ink[si]; break;
-                }
-            }
-            if(IsNull(ink)) ink = SColorText();
-            w.Clip(c.slot & p.safe);
-            switch(c.representation) {
-            case Rep::Text:
-                w.DrawText(c.footprint.left, c.footprint.top, c.text, c.font, ink);
-                break;
-            case Rep::Icon:
-                if(c.tint_icon) w.DrawImage(c.footprint.left, c.footprint.top, c.image, ink);
-                else w.DrawImage(c.footprint.left, c.footprint.top, c.image);
-                break;
-            case Rep::Bar:
-            case Rep::Dot:
-                if(!IsNull(ink)) w.DrawRect(c.footprint, ink);
-                break;
-            default: break;
-            }
-            w.End();
-        }
-}
-
 void UiNodeGraph::PaintConnectionPreview(Painter& p)
 {
     if(interaction_ != InteractionMode::Connect || !connection_source_.IsValid()
@@ -885,10 +842,9 @@ void UiNodeGraph::PaintGraphRich(Draw& w)
             }
             PaintNodeText(w, *node, g, style, state);
         }
-        // Named components resolve their own inclusion/representation policy.
-        // Do not apply the legacy aesthetic zoom gates a second time. Physical
-        // Micro still skips this rich path; native Micro hints are a later gate.
-        if(!g.micro && !p.components.IsEmpty())
+        // Named components carry their prepared representation. Native Micro
+        // records contain only the supported bounded hints, even on rich fallback.
+        if(!p.components.IsEmpty())
             PaintNodeComponents(w, p, style, state);
         if(WhenPaintNodeOverlay && zoom_ >= lod_policy_.secondary_text_zoom)
             WhenPaintNodeOverlay(w, *node, g.surface, state);

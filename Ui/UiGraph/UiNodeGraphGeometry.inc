@@ -508,8 +508,8 @@ Rect UiNodeGraph::RebuildEdge(UiGraphEdgeRef ref)
     bool prepare_edge = false;
     if(valid && zoom_ >= lod_policy_.edge_hide_zoom) {
         int q = edge_world_bounds_.Find(ref.id);
-        WorldRect view = GetViewportWorldBounds(GetPaintQueryMargin());
-        prepare_edge = q >= 0 && edge_world_bounds_[q].Intersects(view);
+        if(q >= 0)
+            prepare_edge = edge_world_bounds_[q].Intersects(GetViewportWorldBounds(GetPaintQueryMargin()));
         prepare_edge |= IsEdgeSelected(ref) || hot_edge_ == ref
                      || (interaction_ == InteractionMode::EdgeRouteDrag && route_edge_ == ref);
     }
@@ -777,9 +777,20 @@ void UiNodeGraph::BuildViewNodeGeometry(const UiGraphNode& node, NodeGeometry& o
     if(record_evidence)
         last_geometry_silhouette_usecs_ += max<int64>(0, usecs() - silhouette_started);
 
-    // Visible edges still need stable authored-side anchors, but micro geometry
-    // deliberately carries no text/content/control/label/hit rectangles. Reuse
-    // four index buffers so each node does not allocate side-port temporaries.
+    // Opt-in native hints use the same bounded region cursors, without the rich
+    // resolver, glyph measurement, child controls or image preparation. A cold
+    // overview entry does not depend on a previously prepared rich frame.
+    const UiGraphNodeTemplate* node_template = FindNodeTemplateClass(node);
+    if(node_template && node_template->micro_hints) {
+        StyledSkin skin = ScaleNodeSkin(style.skin, zoom_);
+        out.presentation.safe = GetShapeSafeContentRect(node,
+            UiStyledInnerRect(out.rect, metrics, skin), out.surface);
+        BuildNodePresentation(node, style, out);
+    }
+
+    // Visible edges still need stable authored-side anchors. Native hints do not
+    // add control/port-label/hit rectangles. Reuse four index buffers so each
+    // node does not allocate side-port temporaries.
     int64 anchor_started = record_evidence ? usecs() : 0;
     for(int si = 0; si < 4; si++)
         micro_side_port_scratch_[si].SetCount(0);
@@ -898,6 +909,7 @@ void UiNodeGraph::RebuildViewGeometry()
     for(int i = selected_edges_.GetCount() - 1; i >= 0; --i)
         if(!model_->Contains(UiGraphEdgeRef{selected_edges_[i]}))
             selected_edges_.Remove(i);
+    last_geometry_query_usecs_ = max<int64>(0, usecs() - query_started);
 
     Index<UiGraphId> node_candidates;
     Index<UiGraphId> edge_candidates;
@@ -907,7 +919,7 @@ void UiNodeGraph::RebuildViewGeometry()
     for(int i = 0; i < drag_preview_positions_.GetCount(); i++) {
         UiGraphNodeRef ref{drag_preview_positions_.GetKey(i)};
         node_candidates.FindAdd(ref.id);
-        if(zoom_ >= lod_policy_.edge_hide_zoom)
+        if(model_ && zoom_ >= lod_policy_.edge_hide_zoom)
             for(UiGraphEdgeRef edge : model_->GetNodeEdges(ref))
                 edge_candidates.FindAdd(edge.id);
     }

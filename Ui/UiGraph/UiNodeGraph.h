@@ -127,6 +127,7 @@ struct UiGraphNodePresentation {
     UiGraphNodeTemplateKind template_kind = UiGraphNodeTemplateKind::Legacy;
     UiGraphNodeBodyMode body_mode = UiGraphNodeBodyMode::Stack;
     UiAlign text_align = UiAlign::LEFT;
+    UiGraphNodeLodWidths lod_widths;
 
     Rect safe;
     Rect header;
@@ -377,6 +378,15 @@ public:
     Event<const UiGraphNode&, const UiGraphNodeStyle&, UiGraphPresentationRequest&>
         WhenResolveNodePresentation;
     void InvalidateNodePresentation();
+    // Owned, validated shared descriptions. Empty class name is the default.
+    // Registered templates take precedence over the legacy rich-only resolver.
+    bool SetNodeTemplateClass(const String& name, const UiGraphNodeTemplate& node_template,
+                              String& error);
+    void RemoveNodeTemplateClass(const String& name);
+    void ClearNodeTemplateClasses();
+    // Snapshot of actual prepared silhouette for authoring guides; no allocation
+    // or exact preparation is initiated in Paint by this API.
+    bool GetNodeOutline(UiGraphNodeRef node, Vector<Pointf>& path, Rect& surface) const;
     // Read-only snapshot of the retained node layout; does not prepare in Paint.
     bool GetNodePresentation(UiGraphNodeRef node, UiGraphNodePresentation& result) const;
 
@@ -428,6 +438,9 @@ public:
     PaintPath GetLastPaintPath() const { return last_paint_path_; }
     PaintFallbackReason GetLastPaintFallbackReason() const { return last_paint_fallback_reason_; }
     int GetLastPaintedPortCount() const { return last_painted_port_count_; }
+    int GetLastPaintedComponentCount() const { return last_component_paint_count_; }
+    int GetLastMicroHintCount() const { return last_micro_hint_paint_count_; }
+    int GetLastMicroHintPrimitiveCount() const { return last_micro_hint_primitive_count_; }
 
     // Read-only scale evidence. These counters expose real production work and
     // do not alter model semantics or geometry preparation.
@@ -720,6 +733,7 @@ private:
         Upp::UiPaintStyledBackground(w, outer, palette, metrics, skin, st, focus);
     }
 
+    const UiGraphNodeTemplate* FindNodeTemplateClass(const UiGraphNode& node) const;
     Style& StyleEdit();
     const Style& GetEffectiveStyle() const;
     void SyncThemeStyle();
@@ -812,6 +826,9 @@ private:
     PaintPath last_paint_path_ = PaintPath::None;
     PaintFallbackReason last_paint_fallback_reason_ = PaintFallbackReason::None;
     int last_painted_port_count_ = 0;
+    int last_component_paint_count_ = 0;
+    int last_micro_hint_paint_count_ = 0;
+    int last_micro_hint_primitive_count_ = 0;
     void PaintEdge(Painter& p, const UiGraphEdge& edge,
                    const EdgeGeometry& geometry, const UiGraphEdgeStyle& style,
                    UiGraphVisualState state);
@@ -876,6 +893,7 @@ private:
     bool has_custom_style_ = false;
     LodPolicy lod_policy_;
     ExtensionBounds extension_bounds_;
+    VectorMap<String, UiGraphNodeTemplate> node_templates_;
     VectorMap<String, UiGraphNodeStyle> node_styles_;
     VectorMap<String, UiGraphEdgeStyle> edge_styles_;
 

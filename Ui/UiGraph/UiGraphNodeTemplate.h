@@ -95,9 +95,45 @@ constexpr byte UIGRAPH_NODE_LOD_ALL    = 0x0f;
 // Inclusion is independent of the representation that fits in projected pixels.
 enum class UiGraphNodeLodOverride : byte { Inherit, On, Off };
 enum class UiGraphNodeSmallMode : byte { Hidden, Bar, BarThenDot, Dot };
-enum class UiGraphNodeComponentRepresentation : byte { Hidden, Text, Icon, Bar, Dot };
+enum class UiGraphNodeComponentRepresentation : byte {
+    Hidden, Text, Icon, Bar, Dot, Image, Progress, Fields, Tags, Actions, Mosaic
+};
+// Renderer kind is distinct from the legacy semantic feature/style role.
+// Auto preserves the 01A Text/Icon API. No kind constructs an ordinary Ctrl.
+enum class UiGraphNodeComponentKind : byte { Auto, Text, Icon, Image, Progress, Fields, Tags, Actions };
+enum class UiGraphNodeOverflow : byte { Ellipsis, Clip, Wrap };
+enum class UiGraphNodeImageFit : byte { Contain, Cover };
+enum class UiGraphNodeComponentRole : byte { Inherit, Standard, Subtle, Accent, Alert };
+
+// Optional template-owned, final-device-pixel width policy. Legacy templates
+// leave enabled false and retain the existing size-aware production policy.
+struct UiGraphNodeLodWidths {
+    bool enabled = false;
+    int normal = 160, lod1 = 80, lod2 = 48;
+    bool IsValid() const { return normal <= 16384 && normal > lod1 && lod1 > lod2 && lod2 >= 1; }
+    UiGraphPresentationLevel Resolve(int width) const
+    {
+        return width >= normal ? UiGraphPresentationLevel::Normal
+             : width >= lod1 ? UiGraphPresentationLevel::Lod1
+             : width >= lod2 ? UiGraphPresentationLevel::Lod2 : UiGraphPresentationLevel::Lod3;
+    }
+};
+
+// Shared authored component styling, not a widget instance. Null colours and
+// empty font face inherit; weight flags -1 inherit, 0 disable, 1 enable.
+struct UiGraphNodeComponentStyle {
+    UiGraphNodeComponentRole role = UiGraphNodeComponentRole::Inherit;
+    String font_face;
+    int bold = -1, italic = -1, underline = -1;
+    Color ink[4] = { Null, Null, Null, Null };
+    Color face[4] = { Null, Null, Null, Null };
+    Color frame[4] = { Null, Null, Null, Null };
+    int padding = 0;
+    int frame_width = 0;
+    int radius = 0;
+};
 enum class UiGraphNodeComponentReason : byte {
-    None, PolicyOff, MissingData, InvalidData, NoSpace, TooSmall
+    None, PolicyOff, MissingData, InvalidData, NoSpace, TooSmall, Budget, AssetNotReady
 };
 
 struct UiGraphNodeSlotRule {
@@ -115,6 +151,19 @@ struct UiGraphNodeSlotRule {
     // Empty id preserves the existing production-owned feature slot. An id opts
     // into the repeatable Text/Icon path; identity and binding survive reorder.
     String id;
+    String label; // optional author-facing label; stable id owns identity
+    UiGraphNodeComponentKind component_kind = UiGraphNodeComponentKind::Auto;
+    UiGraphNodeComponentStyle component_style;
+    UiGraphNodeOverflow overflow = UiGraphNodeOverflow::Ellipsis;
+    UiGraphNodeImageFit image_fit = UiGraphNodeImageFit::Contain;
+    int max_items = 6; // bounded lines/rows/tags/actions, never a child layout tree
+    Size preferred_size = Size(0, 0);
+    bool use_literal = false;
+    Value literal; // explicitly authored static text/number/array/map, not live data
+    Image asset; // optional static image/icon
+    Image overview_asset; // prepared 2x2 image; registry prepares outside Paint
+    String overview_data_key; // optional host-supplied prefiltered image binding
+    UiIconRenderMode icon_mode = UiIconRenderMode::Auto;
     String data_key; // empty = existing node field selected by feature
     UiAlign align_h = UiAlign::LEFT;
     UiAlign align_v = UiAlign::CENTER;
@@ -126,11 +175,15 @@ struct UiGraphNodeSlotRule {
     byte force_off = 0;
 
     bool IsComponent() const { return !id.IsEmpty(); }
+    UiGraphNodeComponentKind GetKind() const
+    {
+        if(component_kind != UiGraphNodeComponentKind::Auto) return component_kind;
+        return feature == UiGraphNodeSlotFeature::Icon ? UiGraphNodeComponentKind::Icon
+                                                     : UiGraphNodeComponentKind::Text;
+    }
     bool IsText() const
     {
-        return feature == UiGraphNodeSlotFeature::Title
-            || feature == UiGraphNodeSlotFeature::Subtitle
-            || feature == UiGraphNodeSlotFeature::Description;
+        return GetKind() == UiGraphNodeComponentKind::Text;
     }
 
     bool Allows(UiGraphPresentationLevel level) const
@@ -139,7 +192,8 @@ struct UiGraphNodeSlotRule {
         return !(force_off & bit) && ((lod_mask | force_on) & bit);
     }
 
-    UiGraphNodeSlotRule& BindData(const String& key) { data_key = key; return *this; }
+    UiGraphNodeSlotRule& BindData(const String& key) { data_key = key; use_literal = false; return *this; }
+    UiGraphNodeSlotRule& Literal(const Value& value) { literal = value; use_literal = true; return *this; }
     UiGraphNodeSlotRule& Align(UiAlign h, UiAlign v = UiAlign::CENTER)
     { align_h = h; align_v = v; return *this; }
     UiGraphNodeSlotRule& Small(UiGraphNodeSmallMode mode) { small = mode; return *this; }
@@ -162,6 +216,13 @@ struct UiGraphNodeSlotRule {
     }
 };
 
+// A bounded sub-item of a group renderer (or a prepared wrapped text line).
+// Rectangles, strings and rasters here are evaluated output, not semantic data.
+struct UiGraphNodeComponentItem : Moveable<UiGraphNodeComponentItem> {
+    Rect box, text_rect, value_rect;
+    WString text, value;
+};
+
 // Prepared records are bounded by MAX_SLOTS. They live ONLY in the owning
 // NodeGeometry.presentation; no binding lookup, text measurement or resampling
 // happens while painting them. Empty legacy presentations allocate no records.
@@ -175,17 +236,30 @@ struct UiGraphNodeComponentPresentation : Moveable<UiGraphNodeComponentPresentat
     Rect footprint;
     WString text; // prepared single line, including ellipsis where needed
     Font font;
+    Image decoration[4]; // optional shared pre-rasterized component face/frame
     Image image; // already scaled; no cold raster preparation in Paint
     Color ink = Null;
     bool tint_icon = false;
+    Color state_ink[4] = { Null, Null, Null, Null };
+    Color state_face[4] = { Null, Null, Null, Null };
+    Color state_frame[4] = { Null, Null, Null, Null };
+    int frame_width = 0, radius = 0;
+    Rect content, meter, completed;
+    bool micro = false;
+    WithDeepCopy<Vector<UiGraphNodeComponentItem>> items;
 };
 
 // Shared immutable-at-use template description. The fixed slot array is
 // intentional: built-in and custom templates allocate no dynamic tree and are
 // not copied into each NodeGeometry. The evaluated Rects live only in the
 // retained UiGraphNodePresentation owned by NodeGeometry.
-struct UiGraphNodeTemplate {
+struct UiGraphNodeTemplate : Moveable<UiGraphNodeTemplate> {
     static constexpr int MAX_SLOTS = 16;
+    UiGraphNodeLodWidths lod_widths;
+    // Native Micro is opt-in and only used for registered templates. Every
+    // operation is a bounded bar/dot/mosaic; it never activates rich callbacks.
+    bool micro_hints = false;
+    int micro_hint_budget = 8;
 
     UiGraphNodeTemplateKind kind = UiGraphNodeTemplateKind::Legacy;
     UiGraphNodeBodyMode body_mode = UiGraphNodeBodyMode::Stack;
@@ -205,6 +279,13 @@ struct UiGraphNodeTemplate {
 
     UiGraphNodeSlotRule slots[MAX_SLOTS];
     byte slot_count = 0;
+
+    UiGraphNodeTemplate& SetLodWidths(int normal, int lod1, int lod2)
+    {
+        lod_widths.enabled = true;
+        lod_widths.normal = normal; lod_widths.lod1 = lod1; lod_widths.lod2 = lod2;
+        return *this;
+    }
 
     UiGraphNodeTemplate& SetKind(UiGraphNodeTemplateKind value)
     {
@@ -297,10 +378,16 @@ struct UiGraphNodeTemplate {
 inline bool UiGraphNodeTemplate::Validate(String& error) const
 {
     error.Clear();
+    if(!lod_widths.IsValid() || micro_hint_budget < 0 || micro_hint_budget > 16) {
+        error = "Invalid LOD thresholds or Micro hint budget"; return false;
+    }
     if(slot_count > MAX_SLOTS) { error = "Template exceeds slot capacity"; return false; }
-    if(header_height < -1 || footer_height < 0 || content_left_width < 0
-       || content_right_width < 0 || overlay_left_width < 0 || overlay_right_width < 0) {
-        error = "Negative structural reservation";
+    if(header_height < -1 || header_height > 16384 || footer_height < 0 || footer_height > 16384
+       || content_left_width < 0 || content_left_width > 16384
+       || content_right_width < 0 || content_right_width > 16384
+       || overlay_left_width < 0 || overlay_left_width > 16384
+       || overlay_right_width < 0 || overlay_right_width > 16384) {
+        error = "Structural reservation outside supported bounds";
         return false;
     }
     for(int i = 0; i < slot_count; i++) {
@@ -309,19 +396,38 @@ inline bool UiGraphNodeTemplate::Validate(String& error) const
            || (int)r.region > (int)UiGraphNodeSlotRegion::Footer
            || (int)r.placement > (int)UiGraphNodeSlotPlacement::Center
            || (int)r.flow > (int)UiGraphNodeSlotFlow::Reflow
-           || r.extent < 0 || r.gap_after < -1
+           || r.extent < 0 || r.extent > 16384 || r.gap_after < -1 || r.gap_after > 16384
            || ((r.lod_mask | r.force_on | r.force_off) & ~UIGRAPH_NODE_LOD_ALL)
            || (r.force_on & r.force_off)) {
             error = "Invalid slot rule";
             return false;
         }
         if(!r.IsComponent()) continue;
-        if((!r.IsText() && r.feature != UiGraphNodeSlotFeature::Icon)
-           || (!r.IsText() && !r.data_key.IsEmpty())
+        if((int)r.component_kind > (int)UiGraphNodeComponentKind::Actions
+           || (r.component_kind == UiGraphNodeComponentKind::Auto
+               && r.feature != UiGraphNodeSlotFeature::Title
+               && r.feature != UiGraphNodeSlotFeature::Subtitle
+               && r.feature != UiGraphNodeSlotFeature::Description
+               && r.feature != UiGraphNodeSlotFeature::Icon)
            || (r.align_h != UiAlign::LEFT && r.align_h != UiAlign::CENTER && r.align_h != UiAlign::RIGHT)
            || (r.align_v != UiAlign::TOP && r.align_v != UiAlign::CENTER && r.align_v != UiAlign::BOTTOM)
            || (int)r.small > (int)UiGraphNodeSmallMode::Dot
-           || r.font_height < 0 || r.readable_min_px < 1) {
+           || r.font_height < 0 || r.font_height > 512 || r.readable_min_px < 1 || r.readable_min_px > 128
+           || r.max_items < 1 || r.max_items > 12
+           || r.preferred_size.cx < 0 || r.preferred_size.cy < 0
+           || r.preferred_size.cx > 16384 || r.preferred_size.cy > 16384
+           || (int)r.overflow > (int)UiGraphNodeOverflow::Wrap
+           || (int)r.image_fit > (int)UiGraphNodeImageFit::Cover
+           || (int)r.component_style.role > (int)UiGraphNodeComponentRole::Alert
+           || r.component_style.padding < 0 || r.component_style.padding > 512
+           || r.component_style.frame_width < 0 || r.component_style.frame_width > 32
+           || r.component_style.radius < 0 || r.component_style.radius > 512
+           || r.component_style.bold < -1 || r.component_style.bold > 1
+           || r.component_style.italic < -1 || r.component_style.italic > 1
+           || r.component_style.underline < -1 || r.component_style.underline > 1
+           || r.component_style.font_face.GetCount() > 256
+           || r.id.GetCount() > 128 || r.data_key.GetCount() > 256
+           || r.overview_data_key.GetCount() > 256 || r.label.GetCount() > 256) {
             error = "Unsupported component binding, alignment or representation: " + r.id;
             return false;
         }

@@ -156,6 +156,9 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
     last_paint_path_ = PaintPath::None;
     last_paint_fallback_reason_ = PaintFallbackReason::None;
     last_painted_port_count_ = 0;
+    last_component_paint_count_ = 0;
+    last_micro_hint_paint_count_ = 0;
+    last_micro_hint_primitive_count_ = 0;
     auto rich = [&](PaintFallbackReason reason) {
         last_paint_path_ = PaintPath::Rich;
         last_paint_fallback_reason_ = reason;
@@ -402,6 +405,8 @@ void UiNodeGraph::PaintGraphGeometry(Draw& w)
                 last_micro_direct_fallback_count_++;
             }
         }
+        if(!g.presentation.components.IsEmpty())
+            PaintNodeComponents(w, g.presentation, *style, state);
         last_painted_node_count_++;
     }
     last_micro_raster_count_ = micro_rasters.GetCount();
