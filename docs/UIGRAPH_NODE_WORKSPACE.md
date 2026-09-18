@@ -1,136 +1,110 @@
-# UiGraph Node Design Workspace
+# UiGraph Node Design Workspace — V7
 
-Status: accepted V6 direction; implementation progress is recorded in ACTIVE_WORK.md.
-This is the current workspace specification. It supersedes the older four-preview
-Studio direction, not the retained geometry or component contracts.
+The active authoring application is `examples/UiGraphComponentStudio`.
+`examples/UiGraphDesignMatrix` is retired; its former source is in Git history.
+General graph/model/rendering/performance demos and tests are NOT retired.
 
-## One active authoring application
+Reference: the user's `uigraph_graph_node_presentation_workspace_v7.html`.
+V7 supersedes the V6 mock-up and the older four-preview Studio direction.
+The HTML is a visual/interaction reference, not a production allocator or C++ API.
+Native GUI appearance and DND still require Windows validation; see ACTIVE_WORK.
 
-Evolve `examples/UiGraphComponentStudio` into the Node Design Workspace. Retire
-`examples/UiGraphDesignMatrix` once the replacement source checkpoint is published.
-Do not retire the general graph, execution, rendering or performance tests.
+## Document and editor ownership
 
-Visual reference: user-supplied `uigraph_graph_node_presentation_workspace_v6.html`.
-Use its light three-column shell, component palette, colour-coded region/overlay
-diagrams, wide structure/LOD table and selection-driven property rail. The HTML
-is a visual/interaction reference, not production layout or a runtime compiler.
-Its placeholder selectors, hard-coded rectangle, port ordering and monotonic
-visibility shortcut do not override production contracts.
+One document is a named family with Base layout and appearance. Eight shapes each
+inherit those sections independently until explicitly detached. Base is an edit
+scope, not another silhouette. Inherited shape sections are read-only; the panel
+provides create/reset overrides for layout and style separately. Copy-to-all
+explicitly replaces Base with the current effective design and resets overrides,
+with confirmation and undo. Clone creates another independent family/file.
 
-## Authoring model
+Component-local style travels with the identified component definition. Family
+appearance overrides are separate node-surface/theme fields. There is not yet a
+separately named component-style resource or partial-property inheritance graph.
+The JSON document saves both sections together. Generated C++ separates layout
+factories from family appearance factories and real registration/use helpers.
+Preview ports/data/camera/size never enter production templates. See
+`UIGRAPH_WORKSPACE_AUTHORING.md` for the strict schema and file guarantees.
 
-A document contains named design families. Each family has one base template and
-style plus optional per-shape variants. All shapes inherit the base until the user
-explicitly creates an override. Editing an override does not change the base.
-Copy-to-all is an explicit replacement operation with confirmation; resetting a
-shape removes its override. Cloning a family creates independent authoring data.
-There is no implicit shape-specific allocator or automatic semantic substitution.
+## Native V7 shell / 02C
 
-The production hierarchy remains Node/Safe -> optional Header, Body and optional
-Footer. Body contains sibling Content and Overlay layers spanning the same extent;
-each owns independent Left/Main/Right columns. Port reservations are graph-owned
-capacity, not arbitrary component targets. Shape-safe geometry determines actual
-capacity; unsupported compositions report fit failures rather than overlap.
+Left: family selection; shape/Base buttons; explicit independent inheritance
+controls; copy-to-all; preview connector and input/output counts; compact/expand;
+Text, Icon, Image, Progress, Fields, Tags and Actions palette.
 
-Components have stable template-local IDs independent of order, a renderer kind,
-data binding or explicit literal, placement/alignment, a style/role and per-level
-inclusion policy. Moving a component preserves its identity, source and overrides.
-The placement column summarizes actual settings (alignment, flow, overflow and
-local overrides), not another source of editable state.
+Centre: live `UiRangeSegments` thresholds; Node Region and Node Overlay diagrams;
+one production `UiNodeGraph` preview with N/L1/L2/L3 jumps, 1:1 and Fit; resizable
+wide structure/component/placement/LOD table. The placement summary derives from
+current placement, alignment, flow, wrap, source and local style.
 
-## Palette and real controls
+Right: real `Utilities/PropertyEditor`, following the Label/Button demo's editor
+factory and icon rail pattern. Inspector edits selected components; Template edits
+structural regions and preview data; Style edits family node appearance; Code
+shows and copies/saves actual generated production C++. The filter is native to
+PropertyEditor. Font, icon and image use its reusable visual adapters.
 
-The intended bounded painted families are Text, Icon, Image, Progress, Fields,
-Tags and Actions. Title/Subtitle/Description are text-role presets, not one-only
-component identities. Fields/Tags/Actions are bounded collections, not nested UI
-trees. Only implemented families may be enabled in the palette.
+Selection by component ID is shared across diagrams, table and the actual preview.
+Drag palette items into either diagram or a legal structure row. Drag existing
+items to relocate or insert before another component. All targets use the same
+revision/scope/identity-checked transaction. Cancellation does not mutate data.
+Port reservations and structural parent rows are not component drop targets.
+A '+' diagram target denotes an unreserved region; adding its reservation requires
+confirmation. Palette click is an alternative to dragging into the selected region.
 
-Use existing Ui controls for the workspace chrome and its PropertyEditor. Ordinary
-node components remain prepared painted data, not one child Ctrl per node/row.
-A real embedded Ctrl is an explicit host-managed `SetNodeCtrl` binding: registered
-factory/lifetime, useful-scale activation, minimum size and LOD suppression.
-Arbitrary Ctrl graphs cannot be dragged into a serializable painted template.
-Accordion-like content starts with bounded rows and explicit size expansion;
-a complex interactive inspector belongs in a host panel or the existing Ctrl
-escape hatch. A reduced action glyph must not pretend to be a usable tiny button.
+The diagrams project actual retained silhouette/region/component rectangles to an
+authoring-friendly scale. They do not independently allocate node content. Grey
+means inactive content; Stable reservations can remain. Their guide colours are
+authoring chrome, not exported style. Rectangle/ellipse/diamond/etc. containment
+remains the runtime's responsibility.
 
-## Live authoring and DND
+The native implementation uses UiBoxLayout, UiSplitter, Ui buttons/dropdowns/range
+control, PropertyEditor and a bounded painted structure/guide surface. It does not
+create one Ctrl per ordinary graph node or a second production template engine.
 
-Palette -> a legal diagram region or hierarchy row creates a component. Existing
-component -> diagram/row moves it; insertion on a component row orders it. One
-validated operation handles every drop surface. Hover must not mutate the document;
-Escape/cancel must not commit. Reject stale/foreign/invalid payloads and capacity
-overflow without a partial edit. Structural and port lanes are not silent aliases
-for ContentMain. Explicitly creating a column reservation is an authoring edit.
+## Inclusion, camera and size
 
-Selection in diagrams, hierarchy and production preview uses the same component
-ID. The inspector edits that item through the real reusable PropertyEditor, with
-Inspector / Style Overrides / Code icon pages following UiLabelDemo. Region
-selection shows structural reservations; component selection shows binding,
-placement, supported typography/colour/icon/overflow/proxy settings. Theme-derived
-values stay inherited until an explicit override is enabled. Unsupported settings
-must be disabled or absent, never decorative controls with no runtime effect.
+Threshold edits call the production template's outer-width policy. They never
+change node size, zoom or pan. N/L1/L2/L3 buttons intentionally move the camera into
+the corresponding width interval; mouse zoom clears that requested jump selection.
+The preview label always reports the ACTUAL evaluated level.
 
-Region guides are authoring chrome projected from production geometry. Empty
-unreserved regions may have clearly marked authoring targets; these targets are
-not claims of usable production capacity. At the active LOD, guides distinguish
-policy exclusion, retained Stable reservations and insufficient drawable pixels.
+Compact/expand changes authored size with the same template/data. It does not use
+node.collapsed or change the camera. Fit and 1:1 are explicit camera actions.
+Camera changes are saved when Save is requested; they are session navigation and
+do not alone mark the design dirty. Undo is bounded to 16 authoring snapshots.
 
-## Preview, thresholds and size
+The first native workspace rebuilds its tiny preview-only model in a view batch
+on an authoring edit, including genuine connected ports/edges for route previews.
+This is not the production graph update strategy for large application models.
+Pure camera navigation does not rebuild that document/model.
 
-One main production preview is authoritative. Normal/LOD1/LOD2/LOD3 jump buttons
-perform an explicit camera move into the requested band. Manual pan/zoom clears
-the jump selection; actual active LOD is always reported. Fit and 1:1 are explicit
-camera actions. Threshold edits never change camera zoom or authored node size.
-The latest V6 request supersedes the earlier four persistent preview UI.
+## Reuse versus real controls
 
-Width-based authoring thresholds must use one documented production resolver,
-not a Studio-only copy. Inclusion is distinct from component representation:
-On requests a supported representation, possibly a bar/dot; Off excludes it.
-Inherit refers to the template policy for that same level. Regions show aggregate
-state only, not a competing visibility hierarchy. Physical Micro limits remain
-separate from the user-authored bands.
+Seven palette kinds are lightweight production-painted components with bounded
+prepared output. Actions are painted labels/cues, not live commands. Real controls
+remain an explicit host-owned `SetNodeCtrl` binding with lifetime, minimum size and
+LOD activation. Arbitrary controls and nested accordions cannot be dropped into
+this workspace as though they were optimised painted components.
 
-Compact/expanded switches change authored size through the model's normal update
-path, leaving camera, template and thresholds unchanged. Do not silently reuse
-`node.collapsed`, whose legacy meaning suppresses content.
+Image importing decodes outside Paint, bounds file/dimensions, and stores an at-most
+256x256 static thumbnail. Dynamic preview image data is supplied separately; a
+ready 2x2 overview is available under `image_overview`. Static asset serialization
+and production overview preparation remain separate from layout.
 
-## Runtime and performance
+## Validation / remaining refinement
 
-Shared C++ template descriptions are built/validated once and registered per class;
-node data remains in UiGraphModel or the host binding adapter. No class instance,
-Ctrl tree or JSON layout compilation is required per node. Evaluated component
-rectangles/representations remain in `NodeGeometry.presentation`, the one layout
-cache. Paint consumes prepared records; binding, measurement, raster preparation
-and bounded collection summaries happen outside paint.
+02C source includes startup camera/threshold invariance smoke; the authoring
+library has focused JSON/inheritance/transaction/export tests. All newer runtime,
+authoring and UI checkpoints need the accumulated Windows Debug gate.
 
-Native Micro hints require explicit opt-in and a bounded primitive budget. Direct
-overview entry must agree with zoom-out at the same data/asset-ready state. Do not
-activate the rich resolver or general paint hooks to fake tiny hints. Asset caches
-are bounded resources, not a second per-node layout authority. Performance claims
-require runtime evidence, not only source reasoning.
+Windows must check physical DND (including Escape, rejected scopes and capacity),
+property commit/cancel, save/reload, the generated C++ compilation, actual colours,
+small shapes, changing thresholds and Micro representations. Source review is not
+a GUI or performance PASS.
 
-## Save and generated code
-
-Versioned JSON stores authoring state, identities, base/shape inheritance, styles,
-bindings, literal samples and explicit preview state. Open validates into a
-candidate before replacing the current document. Unknown versions, invalid enums,
-duplicate IDs, malformed resources and out-of-range limits fail clearly. Dirty
-New/Open/Close operations need save/discard/cancel protection. Save failures must
-preserve both the in-memory document and the last good file.
-
-Generated C++ has separate template/layout and style sections plus a complete
-registration example. Preview and export consume the same validated description.
-Factories build shared descriptions, not work repeated per node or repaint.
-Shape variants use the base when no override exists. Escaping, portable image
-resources, stable component IDs and explicit inherited values are part of export
-correctness. JSON remains optional authoring interchange, never a second runtime
-layout engine.
-
-## Validation
-
-Protect legacy render tests; add focused runtime and workspace tests for typed
-bindings, repeated IDs, bounds, representation, threshold/camera independence,
-move/reorder/drop transactionality, shape inheritance and JSON/code round trips.
-Gary runs Debug builds and the native GUI smoke, including real DND, property
-editing, template/style export and save/open. Source review is not a GUI PASS.
+Remaining visual refinements include richer gallery/palette glyphs, tighter
+small-window/high-DPI layout, draggable split sizing for side rails, diagram label
+packing and clearer proxy diagnostics. There is no general live-control builder,
+per-property shape patch inheritance, standalone style-library manager, redo or
+fine-grained document undo engine in this checkpoint. Do not advertise these as
+implemented. The reference screenshot cannot prove native visual parity.

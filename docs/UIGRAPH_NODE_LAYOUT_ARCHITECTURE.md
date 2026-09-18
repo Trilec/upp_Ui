@@ -1,199 +1,112 @@
 # UiGraph retained node-layout architecture
 
-This is the durable architecture record for UiGraph node layout. Read with
-`ACTIVE_WORK.md` for current recovery state and `08_UIGRAPH_GUIDE.md` for the wider
-Graph architecture.
+Read ACTIVE_WORK for checkpoint/validation, UIGRAPH_WORKSPACE_RUNTIME for current
+production APIs, and UIGRAPH_NODE_WORKSPACE for the V7 authoring application.
+This page supersedes the older four-preview V4 and narrow eight-feature planning.
 
-## Core decision
+## One retained authority
 
-Node layout is retained node geometry. `NodeGeometry.presentation` is the evaluated
-layout result/cache consumed by paint, attached controls, hit-related presentation
-and compatible camera projection. Do not introduce a second per-node layout cache,
-a runtime JSON layout compiler, or a Ctrl hierarchy for ordinary graph nodes.
+NodeGeometry.presentation is the evaluated layout consumed by paint, embedded
+controls, presentation queries and compatible camera projection. No second
+per-node layout cache, runtime JSON compiler or per-node Ctrl tree is permitted.
 
-The internal `NodeLayout` helper is only cheap rectangle arithmetic during exact
-preparation. Shared template definitions are lightweight immutable-at-use C++ data;
-they are not copied into each node.
+Shared registered templates are copied/validated once at registration and reused.
+The internal NodeLayout cursor performs bounded rectangle arithmetic during exact
+preparation. Named components retain bounded prepared text, image references,
+rectangles and representation decisions inside that same presentation object.
 
-## Structural hierarchy
+## Structure
 
-The current production hierarchy is:
+    Node / Safe Area
+      Header (optional)
+      Body
+        Content: Left / Main / Right
+        Overlay: Left / Main / Right
+      Footer (optional)
 
-```text
-Node / Safe Area
-|
-+-- Header                         optional
-|
-+-- Body
-|   |
-|   +-- Content                   same Body extent
-|   |   +-- Left
-|   |   +-- Main
-|   |   +-- Right
-|   |
-|   +-- Overlay                   same Body extent
-|       +-- Left
-|       +-- Main
-|       +-- Right
-|
-+-- Footer                         optional
-```
+Content and Overlay are sibling layers over the SAME Body rectangle. Each owns
+independent columns. Overlay does not consume Content. Port label lanes can
+reserve full safe sides or Body Content sides; semantic anchors stay on the
+silhouette. Do not import the mock-up's alternative InnerBody allocator.
 
-`Content` and `Overlay` are sibling layers over the same Body rectangle. Overlay
-never consumes Content. Each layer has independent Left/Main/Right column
-reservations. This is deliberate so, for example, Media may occupy ContentMain
-while state icons/badges sit in OverlayRight.
+Shapes determine silhouette and safe capacity. Templates allocate inside that
+capacity. A small triangle is not permission to draw outside its silhouette.
+Header/Footer and side-column reservations remain fixed by default.
 
-Header/Footer are optional structural bands. Port labels may reserve the whole safe
-side or be attached to Body Content Left/Right, while semantic port anchors remain
-on the node silhouette.
+## Independent decisions
 
-## Structure, content and LOD are different concerns
+1. Node authored size: compact/current/expanded. Never changed by camera or LOD.
+2. Structural allocation: legal bands/columns, extent, placement, gap and order.
+3. Identified components: kind, source binding/literal, role and local style.
+4. LOD inclusion: baseline mask plus same-level Inherit/On/Off override.
+5. Representation: full content, bounded summary/bar/dot/mosaic or absent.
 
-Do not conflate these three layers of the design:
+There is no rule that Title must live in Header or Icon beside Title. Repeated
+components use unique IDs, not Title2/Status2 feature enums. Binding follows ID
+and source data; allocation order is separately editable. Placement takes space;
+alignment positions content within the resulting space.
 
-### 1. Structure
+A visible proxy still participates. Off+Stable retains a reservation; Off+Reflow
+releases that slot. Representation reduction does not collapse a region or resize
+the node. Optional regional auto-collapse is not implemented.
 
-Defines where things *may* be placed:
-Header, Body.Content.Left/Main/Right, Body.Overlay.Left/Main/Right, Footer.
+## Production component vocabulary
 
-### 2. Semantic content placement
+The legacy production features Title/Subtitle/Icon/Badge/Media/Description/Control/
+Footer remain an additive compatibility path for unnamed slots. Named components
+use Text, Icon, Image, Progress, Fields, Tags and Actions. Text-role presets and
+semantic region placement are independent. Groups remain bounded content, not
+arbitrary nested UI trees. BodyMode is metadata, not another allocator.
 
-Defines *what* is placed there and how:
-Title, Subtitle, Icon, Media, Description, Control, Status, Progress, Fields, Tags,
-Actions, port-related information, etc.
+Templates remain at most 16 ordered slots. Supported placement is Fill, Top,
+Bottom, Left, Right and bounded Center. Validate before use. Fill consumes the
+remainder, so order matters. Named-component records are addressed by ID and held
+only in the prepared scene. Paint does not perform binding lookup, text measuring,
+image decoding/resampling or arbitrary unbounded group traversal.
 
-A feature has no permanent region. A template may put Icon in Header, ContentMain
-or Overlay; Subtitle may be below Title or act as an overline; Media may fill
-ContentMain; Status could be Footer or Overlay. Placement is template-owned.
+Ordinary components reuse shared style/font/icon/image infrastructure, not full
+Ctrl instances. Live interactive controls are the explicit SetNodeCtrl escape
+hatch. A reduced Actions/Control cue is not a usable microscopic control.
 
-### 3. LOD policy
+## LOD and Micro
 
-Defines whether a semantic feature is present at Normal / LOD1 / LOD2 / LOD3 and
-whether hiding it keeps geometry stable or allows local reflow. LOD is not another
-layout layer and moving an LOD threshold must not resize a preview camera.
+Normal/LOD1/LOD2/LOD3 are presentation levels, distinct from the Micro/Rich backend.
+Registered templates can opt into an outer projected-width threshold policy;
+legacy size policy remains for other nodes. Component representation uses its own
+available final pixels. On cannot bypass missing data, capacity or native limits.
 
-This separation is the key authoring model for Presentation Studio V4.
+02A adds opt-in native bounded Micro hints. Direct overview entry must work without
+a prior rich frame. Micro never reactivates the rich presentation resolver, glyph
+shaping, image processing or embedded controls just to show a hint. Prepared native
+bars/dots and ready tiny images consume an explicit operation budget; suppression
+has a reason. Unsupported or colliding footprints are not unlimited permanent dots.
 
-## Shared C++ template layer
+Compatible pan projects retained output. Named-component wheel scaling currently
+takes exact preparation; do not claim optimised wheel reuse until representation,
+glyph and raster boundaries have a validated compatibility policy. Legacy camera
+reuse remains. Performance claims need measurements, not source inspection.
 
-Implemented at checkpoint `f12a255441361bf2f057b74753638146067d1420`:
+## Authoring and output
 
-- `UiGraphNodeTemplate.h/.cpp`;
-- built-in kinds: Minimal, Identity, Summary, Status, Media, Parameter, Operator;
-- ordered fixed-capacity slot rules;
-- target regions: Header, ContentLeft/Main/Right, OverlayLeft/Main/Right, Footer;
-- placement: Fill, Top, Bottom, Left, Right, Center;
-- authored extent and gap;
-- per-slot LOD mask;
-- `Stable` / `Reflow` flow policy;
-- body-mode metadata;
-- body-scoped left/right port-lane policy;
-- legacy Standard/Centred/MediaCard path remains valid when no template is used.
+The ONE active authoring app is examples/UiGraphComponentStudio, now the Node Design
+Workspace. DesignMatrix is retired. It has a single persistent live preview,
+production-derived region/overlay diagrams and four policy columns. Threshold
+movement never moves the camera; explicit LOD jump/1:1/Fit actions do.
 
-The fixed slot array is intentional. Template descriptions allocate no runtime
-layout tree and are shared across nodes. Only evaluated Rects are retained in each
-prepared node.
+A family has Base layout/appearance and independent optional shape-section
+snapshots. Component-local style belongs to the component definition. JSON is a
+strict versioned authoring document; generated C++ has separate layout and family
+style factories, shape fallbacks and actual registration. Neither the JSON decoder
+nor the authoring package is required by the production generated code.
 
-## Current semantic slot boundary
-
-The first production template layer deliberately exposes only the existing
-production-owned slot features:
-
-- Title;
-- Subtitle;
-- Icon;
-- Badge;
-- Media;
-- Description;
-- Control;
-- Footer.
-
-This is not a claim that these are the final semantic feature vocabulary.
-Status/Progress/Fields/Tags/Actions and richer parameter/port-row concepts are the
-next design decision. Some may deserve first-class slot identity; others may remain
-structured content painted inside ContentMain or another selected region/body mode.
-
-Do not expand the enum merely to mirror every visible chip in the current Studio.
-First ask whether the feature needs independent placement, LOD policy, capacity and
-reuse across templates.
-
-## Body modes
-
-Body modes remain structural hints for content rendered inside the chosen Content
-region:
-
-- Stack;
-- Centered;
-- Media;
-- KeyValue;
-- Fields;
-- PortRows;
-- FlowTags.
-
-They are not separate caches or generic layout engines. They allow specialised
-content painters to interpret the retained Content rectangle without creating a
-one-Ctrl-per-row system.
-
-## Concrete compositions
-
-The retained hierarchy/template system should cover these families without special
-node classes:
-
-- **Media**: Header Title; ContentMain image; OverlayRight state icons; Footer tags.
-- **Hub/controller**: ContentMain centred icon/title/subtitle; multiple semantic
-  ports; external ring/halo as state/focus decoration.
-- **Summary/service list**: Header; ContentMain rows/grid; Footer left/right summary.
-- **Approval/key-value**: Header; ContentMain label/value rows; Footer explanation.
-- **Status/process**: subtitle/title + progress/status; simple process input/output.
-- **Blueprint/operator**: styled Header; Content Left/Right port rows; Main fields or
-  controls; optional Overlay state.
-
-Edge colour, active-flow emphasis and connector animation remain edge concerns and
-must reuse prepared routes rather than enter node layout.
-
-## Performance/cache contract
-
-The evaluated retained layout is the cache. Compatible live pan/zoom projects the
-prepared regions; Micro nodes skip rich layout. Preferred rule:
-
-- paint-only state -> no relayout;
-- local semantic/layout change -> replay the smallest practical structural region;
-- shape/safe-region/template structural change -> replay root layout;
-- compatible camera transform -> project retained geometry;
-- do not build a fine-grained dependency graph without profiling evidence.
-
-Stable/Reflow is already part of slot rules, but coarse per-section dirty/revision
-optimisation is not yet required or proven necessary.
-
-## Presentation Studio V4 authoring model
-
-The Studio should show one selected template/shape with four persistent previews
-for Normal / LOD1 / LOD2 / LOD3. Preview camera size, LOD thresholds, semantic
-feature policy and layout placement are independent controls.
-
-The recommended editor model is:
-
-- Structure tree displays Header, Body.Content L/M/R, Body.Overlay L/M/R, Footer;
-- feature chips show which semantic features are assigned to each structural row;
-- LOD columns control per-level visibility/flow policy;
-- a separate slot editor changes selected feature region/placement/extent/alignment;
-- `UiRangeSegments` edits transition thresholds only;
-- explicit Reset Cameras restores preview zooms;
-- C++ template output is production output; JSON is optional session/interchange.
-
-The Studio must never invent a parallel demo-only allocator.
+Edge colour/activity/flow remain edge presentation using prepared routes, not
+node-layout components. External state/selection rings remain graph chrome with
+conservative declared extension bounds where appropriate.
 
 ## Validation
 
-Focused Windows Debug gate remains:
-
-- `UiGraphRenderTests`;
-- `examples/UiGraphDesignMatrix`;
-- selector/startup smoke;
-- visual sanity of built-in templates and LOD transitions;
-- `git diff --check`.
-
-Protect shape containment, text line boxes, embedded-control capacity, Micro skip,
-live projection reuse and template-slot non-overlap. Performance claims require
-runtime evidence, not source inspection.
+Focused Windows Debug: UiGraphRenderTests (current eight suites),
+UiGraphWorkspaceTests, new Node Design Workspace startup/manual interaction, and
+an exported C++ compilation probe. Read ACTIVE_WORK for required ancestry.
+Protect containment, port identity, component repetition/bindings, Stable/Reflow,
+Micro skip/budget, camera invariants and atomic authoring-file replacement.

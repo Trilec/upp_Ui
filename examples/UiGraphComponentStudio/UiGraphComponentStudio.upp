@@ -1,13 +1,19 @@
-description "Identified node components: production renderer and four persistent previews";
-
+description "UiGraph Node Design Workspace: family, layout, style, live LOD and C++ export";
 noblitz;
-
 uses
     CtrlLib,
-    Ui;
-
+    Ui,
+    Utilities/PropertyEditor,
+    Utilities/UiGraphWorkspace,
+    plugin/png,
+    plugin/jpg;
 file
+    WorkspaceViews.h,
+    WorkspaceViews.cpp,
+    WorkspaceWindow.h,
+    WorkspaceWindow.cpp,
+    WorkspaceInspector.cpp,
+    WorkspaceFiles.cpp,
     main.cpp;
-
 mainconfig
     "GUI" = "GUI";

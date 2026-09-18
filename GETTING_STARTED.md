@@ -32,7 +32,9 @@ Read the canonical guides first:
 For UiGraph node presentation/layout work, also read:
 
 - `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
-- `docs/UIGRAPH_PRESENTATION_AUDIT.md`
+- `docs/UIGRAPH_NODE_WORKSPACE.md`
+- `docs/UIGRAPH_WORKSPACE_AUTHORING.md`
+- `docs/UIGRAPH_WORKSPACE_RUNTIME.md`
 - `docs/ACTIVE_WORK.md`
 
 The current UiGraph rule is deliberate: retained node layout lives in the prepared
@@ -53,10 +55,11 @@ Recommended first demos:
 - `examples/UiLabelDemo`
 - `examples/UiButtonDemo`
 
-For Graph presentation/layout development, `examples/UiGraphDesignMatrix` is the
-current production-backed Presentation Studio/diagnostic example. It is evolving
-toward the V4 focused retained-layout authoring workflow documented in the Graph
-architecture guides.
+For Graph node design, build `examples/UiGraphComponentStudio`, now the V7 Node
+Design Workspace: family/shape inheritance, region/overlay drag-and-drop, one live
+production preview, real PropertyEditor, JSON save/load and generated C++.
+`examples/UiGraphDesignMatrix` is retired. Its old four-preview/selector gate is
+not a current validation instruction. Read ACTIVE_WORK for source/platform status.
 
 ## Building demos from CLI (umk)
 
