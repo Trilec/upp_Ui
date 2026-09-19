@@ -2,7 +2,7 @@
 
 namespace Upp {
 namespace GraphWorkspace {
-void DrawFrame(Draw& w, Rect r, Color c, int n)
+void DrawWorkspaceFrame(Draw& w, Rect r, Color c, int n)
 {
     if(r.IsEmpty() || n <= 0) return;
     n = min(n, min(r.GetWidth(), r.GetHeight()));
@@ -133,11 +133,11 @@ int RegionView::Hit(Point p) const
 void RegionView::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), Color(250, 252, 254));
-    DrawFrame(w, Rect(GetSize()), Color(215, 224, 233));
+    DrawWorkspaceFrame(w, Rect(GetSize()), Color(215, 224, 233));
     for(int i = 0; i < path_.GetCount(); i++)
         w.DrawLine(Project(path_[i]), Project(path_[(i + 1) % path_.GetCount()]), 1, Color(143, 156, 170));
-    DrawFrame(w, Project(presentation_.safe), Color(171, 182, 193));
-    DrawFrame(w, Project(presentation_.body), Color(239, 125, 34));
+    DrawWorkspaceFrame(w, Project(presentation_.safe), Color(171, 182, 193));
+    DrawWorkspaceFrame(w, Project(presentation_.body), Color(239, 125, 34));
     Font font = StdFont().Height(DPI(10));
     for(int i = 0; i < targets_.GetCount(); i++) {
         const auto& t = targets_[i]; if(t.rect.IsEmpty()) continue;
@@ -161,10 +161,10 @@ void RegionView::Paint(Draw& w)
             String label = t.empty ? String("+ ") + region_names[t.region] : String(region_names[t.region]);
             w.Clip(t.rect); w.DrawText(t.rect.left + DPI(3), t.rect.top + DPI(2), label, font, color); w.End();
         }
-        DrawFrame(w, t.rect, selected || hover_ == i ? Color(12, 127, 211) : color, selected || hover_ == i ? DPI(2) : 1);
+        DrawWorkspaceFrame(w, t.rect, selected || hover_ == i ? Color(12, 127, 211) : color, selected || hover_ == i ? DPI(2) : 1);
     }
     // Semantic port reservations are non-drop graph chrome.
-    for(const Rect& lane : presentation_.port_lanes) DrawFrame(w, Project(lane), Color(19, 160, 216));
+    for(const Rect& lane : presentation_.port_lanes) DrawWorkspaceFrame(w, Project(lane), Color(19, 160, 216));
     w.DrawText(DPI(6), max(0, GetSize().cy - DPI(11)), "Grey: inactive. +: unreserved region.", font.Height(DPI(9)), Color(102, 117, 135));
 }
 void RegionView::LeftDown(Point p, dword)
@@ -284,7 +284,7 @@ void StructureView::Paint(Draw& w)
                 label = total ? AsString(on) + "/" + AsString(total) : String("-");
             }
             Rect badge = RectC(columns + l * DPI(62) + DPI(3), y + DPI(3), DPI(52), RowHeight() - DPI(6));
-            w.DrawRect(badge.Offseted(-offset, 0), face); DrawFrame(w, badge.Offseted(-offset, 0), border);
+            w.DrawRect(badge.Offseted(-offset, 0), face); DrawWorkspaceFrame(w, badge.Offseted(-offset, 0), border);
             text(badge, label, font.Height(DPI(10)), ink);
         }
         if(drop_row_ == i && !r.id.IsEmpty())
@@ -333,7 +333,7 @@ void PreviewGraph::Paint(Draw& w)
     UiNodeGraph::Paint(w);
     if(!selected.id.IsEmpty()) {
         const auto* c = snapshot.FindComponent(selected.id);
-        if(c && !c->slot.IsEmpty()) DrawFrame(w, c->slot, Color(100, 182, 230));
+        if(c && !c->slot.IsEmpty()) DrawWorkspaceFrame(w, c->slot, Color(100, 182, 230));
     }
 }
 void PreviewGraph::LeftDown(Point p, dword flags)

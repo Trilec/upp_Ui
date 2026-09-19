@@ -17,7 +17,7 @@ struct WorkspaceSelection {
     int region = 2;
 };
 
-void DrawFrame(Draw& w, Rect r, Color c, int width = 1);
+void DrawWorkspaceFrame(Draw& w, Rect r, Color c, int width = 1);
 String PlacementSummary(const UiGraphNodeSlotRule& r);
 Color RegionColor(int region);
 Rect RegionRect(const UiGraphNodePresentation& p, int region);
