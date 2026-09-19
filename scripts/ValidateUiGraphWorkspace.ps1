@@ -2,7 +2,7 @@
 # Output goes to a unique temporary directory unless OutputRoot is provided.
 [CmdletBinding()]
 param(
-    [string]$Repo = (Split-Path -Parent $PSScriptRoot),
+    [string]$Repo = '',
     [string]$UppRoot = 'E:\upp-18468',
     [string]$Method = 'CLANGx64',
     [ValidatePattern('^[0-9a-fA-F]{40}$')]
@@ -12,6 +12,9 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($Repo)) {
+    $Repo = Split-Path -Parent $PSScriptRoot
+}
 $Repo = (Resolve-Path -LiteralPath $Repo).Path
 $oldLocation = Get-Location
 $report = [System.Collections.Generic.List[string]]::new()
