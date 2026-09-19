@@ -38,7 +38,7 @@ Image TestImage()
     ImageBuffer image(4, 4);
     image.SetKind(IMAGE_ALPHA);
     for(int y = 0; y < 4; y++) for(int x = 0; x < 4; x++)
-        image[y][x] = PremultipliedRGBA(x < 2 ? Color(220, 90, 60) : Color(50, 130, 220), 255);
+        image[y][x] = RGBA(x < 2 ? Color(220, 90, 60) : Color(50, 130, 220));
     return Image(image);
 }
 
