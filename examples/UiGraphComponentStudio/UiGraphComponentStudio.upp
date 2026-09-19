@@ -10,6 +10,7 @@ uses
 file
     WorkspaceViews.h,
     WorkspaceViews.cpp,
+    WorkspaceViewTests.cpp,
     WorkspaceWindow.h,
     WorkspaceWindow.cpp,
     WorkspaceInspector.cpp,

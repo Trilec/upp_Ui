@@ -2,13 +2,30 @@
 
 Remote main is authoritative. Refresh before work/publish; never force-push.
 
-BASE: `acb1b8b5b8029996316ba391bac8830e07c63ca9` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-02C — native V7 workspace and old Studio retirement**
-TOUCHED: `examples/UiGraphComponentStudio/`; retired `examples/UiGraphDesignMatrix/`; `GETTING_STARTED.md`; `docs/{ACTIVE_WORK,UIGRAPH_NODE_WORKSPACE,UIGRAPH_NODE_COMPONENTS,UIGRAPH_NODE_LAYOUT_ARCHITECTURE}.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 02C source. Visual parity/usability is not claimed validated.
-PUBLISHED: the commit containing this update; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceWindow.cpp`.
-VALIDATION: complete touched-source review, declaration/definition and package checks, uploaded-file hash matching, local git diff --check PASS. No native compile or GUI execution here. Tests are source-added, not runtime PASS.
-NEXT ACTION: Gary's accumulated Debug gate: current RenderTests + WorkspaceTests + new workspace + exported C++ compilation. Fix first real blocker, then visual/interaction refinement against V7.
+BASE: `fbd283aba2c9deb0f02a855ce7b008c0283a12f2` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-02D — diagram/table interaction hardening**
+TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceViewTests.cpp,UiGraphComponentStudio.upp,main.cpp}`; this file; `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 02D source.
+PUBLISHED: the commit containing this update; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceViewTests.cpp`.
+VALIDATION: complete touched-source review, exact base-blob matching, declaration/definition and package checks, local git diff --check PASS. U++/Windows compilation and GUI execution NOT run here. Native regression tests are added, not claimed passing.
+NEXT ACTION: Gary's accumulated Debug gate in `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`: RenderTests, WorkspaceTests, workspace --view-tests, generated C++ compilation and actual workspace interaction. No retired DesignMatrix build.
+
+## Latest bounded changes
+
+- Disarm a palette button before entering native DND; Escape/release cannot also activate its click action.
+- Wrap empty-region '+' targets inside narrow diagrams instead of drawing later targets offscreen.
+- Reject diagram drops/hits on actual graph-owned port reservations and outside the client area.
+- Grey hidden component chips independently from their visible siblings. Keep Stable-hidden chips selectable.
+- Scroll the wide structure/LOD table horizontally without changing hit-column meaning.
+- Clip headers/placement text; show coloured inclusion badges and an explicit insertion line.
+- Clear stale DND feedback after reconstruction; copy identities before re-entrant selection callbacks.
+- Placement summaries recognise bindings and all supported component-style overrides.
+- Native view regressions run on Debug startup or with `--view-tests` (test-only exit).
+
+These are authoring-view changes. No runtime layout, template schema, Micro backend,
+or port topology changes are included. Physical DND and visual quality still need
+Windows validation. Threshold-drag undo coalescing and compact-size restoration
+remain the next editing-lifecycle refinement; do not claim them fixed by 02D.
 
 ## Read first
 
@@ -33,7 +50,7 @@ layout/style shape snapshots, strict candidate JSON, portable bounded static
 assets, atomic file replacement, C++ factories/registration, common edit
 transactions and WorkspaceTests. Windows validation pending.
 
-02C: replaces four-preview app with left family/shape/scope/palette, live threshold
+fbd283aba2c9deb0f02a855ce7b008c0283a12f2: 02C replaces four-preview app with left family/shape/scope/palette, live threshold
 control, region/overlay diagrams, ONE production preview, wide structure/LOD table,
 real PropertyEditor Inspector/Template/Style and generated C++ rail. Native DND
 uses scope/revision/ID validation and transactional edits. Save/Open/Clone/New,
@@ -46,7 +63,7 @@ Gary tested d9754c76d7be0b37d951653f3f643c3e3963782a: RenderTests seven suites P
 Components21/0; ExecutionPath8/0; DesignMatrix selector4/0; ComponentStudio Debug
 build/startup PASS; diff check PASS; clean tree; no fixes. Title-edit automation
 was interrupted by physical Escape, not an interaction PASS. That evidence does
-not validate 02A/02B/02C.
+not validate 02A/02B/02C/02D.
 
 ## Architecture / scope
 
@@ -64,11 +81,12 @@ performance claim without measurement. See current workspace page for limitation
 
 ## Gary focused gate
 
-Repo E:\apps\github\upp_Ui / main. Require the supervisor's published 02C commit
+Repo E:\apps\github\upp_Ui / main. Require the supervisor's latest published checkpoint
 as ancestor of current HEAD. Earlier 02A and 02B must also be ancestors.
 Debug only: Utilities/UiGraphRenderTests; Utilities/UiGraphWorkspaceTests;
 examples/UiGraphComponentStudio; an exported C++ fixture using only Ui.
-Do not build retired UiGraphDesignMatrix. Capture UIGRAPH_WORKSPACE_UI_SMOKE.
+Do not build retired UiGraphDesignMatrix. Capture UIGRAPH_WORKSPACE_UI_SMOKE
+and UIGRAPH_WORKSPACE_VIEW_SUMMARY; see the complete 02D validation task.
 
 Manual: palette-to-diagram/table drops and Escape cancellation; move/reorder;
 inherited scope rejection/detach/reset; select same component across three views;

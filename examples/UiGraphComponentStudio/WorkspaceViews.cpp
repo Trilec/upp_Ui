@@ -4,7 +4,7 @@ namespace Upp {
 namespace GraphWorkspace {
 void Frame(Draw& w, Rect r, Color c, int n)
 {
-    if(r.IsEmpty()) return;
+    if(r.IsEmpty() || n <= 0) return;
     n = min(n, min(r.GetWidth(), r.GetHeight()));
     w.DrawRect(r.left, r.top, r.GetWidth(), n, c);
     w.DrawRect(r.left, r.bottom - n, r.GetWidth(), n, c);
@@ -34,23 +34,55 @@ String PlacementSummary(const UiGraphNodeSlotRule& r)
     s << " / " << (r.flow == UiGraphNodeSlotFlow::Stable ? "stable" : "reflow");
     if(r.overflow == UiGraphNodeOverflow::Wrap) s << " / wrap";
     if(r.use_literal) s << " / static";
-    if(!IsNull(r.ink) || r.font_height || !r.component_style.font_face.IsEmpty()) s << " / styled";
+    else if(!r.data_key.IsEmpty()) s << " / " << r.data_key;
+    const auto& cs = r.component_style;
+    bool styled = !IsNull(r.ink) || r.font_height || !cs.font_face.IsEmpty()
+               || cs.role != UiGraphNodeComponentRole::Inherit || cs.bold >= 0
+               || cs.italic >= 0 || cs.underline >= 0 || cs.padding || cs.frame_width || cs.radius;
+    for(int i = 0; i < 4; i++) styled |= !IsNull(cs.ink[i]) || !IsNull(cs.face[i]) || !IsNull(cs.frame[i]);
+    if(styled) s << " / styled";
     return s;
 }
 
+// These are authoring callout targets only. Actual node regions still come
+// exclusively from the retained production presentation.
+int RegionView::ShelfColumns() const
+{
+    return max(1, (GetSize().cx - DPI(12) + DPI(4)) / DPI(64));
+}
+int RegionView::ShelfRows() const
+{
+    int count = 0;
+    for(int r = 0; r < 8; r++)
+        if(overlay_ == (r >= 4 && r <= 6) && RegionRect(presentation_, r).IsEmpty()) count++;
+    return (count + ShelfColumns() - 1) / ShelfColumns();
+}
+Rect RegionView::Board() const
+{
+    Size size = GetSize();
+    int bottom = max(DPI(12), size.cy - DPI(18) - ShelfRows() * DPI(26));
+    return Rect(DPI(14), DPI(12), max(DPI(14), size.cx - DPI(14)), bottom);
+}
+bool RegionView::Active(const Target& target) const
+{
+    for(const auto& c : presentation_.components)
+        if((int)c.region == target.region && (target.id.IsEmpty() || c.id == target.id)
+           && c.representation != UiGraphNodeComponentRepresentation::Hidden) return true;
+    return false;
+}
 Point RegionView::Project(Pointf p) const
 {
-    if(surface_.IsEmpty()) return Point(0, 0);
-    Size size = GetSize();
-    double scale = min((double)max(1, size.cx - DPI(28)) / surface_.GetWidth(),
-                       (double)max(1, size.cy - DPI(60)) / surface_.GetHeight());
-    double x = (size.cx - surface_.GetWidth() * scale) * 0.5;
-    double y = DPI(12) + (max(1, size.cy - DPI(60)) - surface_.GetHeight() * scale) * 0.5;
+    Rect board = Board();
+    if(surface_.IsEmpty() || board.IsEmpty()) return Point(0, 0);
+    double scale = min((double)board.GetWidth() / surface_.GetWidth(),
+                       (double)board.GetHeight() / surface_.GetHeight());
+    double x = board.left + (board.GetWidth() - surface_.GetWidth() * scale) * 0.5;
+    double y = board.top + (board.GetHeight() - surface_.GetHeight() * scale) * 0.5;
     return Point(fround(x + (p.x - surface_.left) * scale), fround(y + (p.y - surface_.top) * scale));
 }
 Rect RegionView::Project(Rect r) const
 {
-    return r.IsEmpty() ? Rect() : Rect(Project(Pointf(r.left, r.top)), Project(Pointf(r.right, r.bottom)));
+    return r.IsEmpty() || Board().IsEmpty() ? Rect() : Rect(Project(Pointf(r.left, r.top)), Project(Pointf(r.right, r.bottom)));
 }
 void RegionView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p,
                      const Vector<Pointf>& path, Rect surface, const Selection& selection)
@@ -60,28 +92,42 @@ void RegionView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentat
 }
 void RegionView::Layout()
 {
-    targets_.Clear();
+    targets_.Clear(); hover_ = -1;
     int empty_count = 0;
     for(int r = 0; r < 8; r++) {
         if(overlay_ != (r >= 4 && r <= 6)) continue;
         Target& t = targets_.Add(); t.region = r; t.rect = Project(RegionRect(presentation_, r));
         if(t.rect.IsEmpty()) {
             t.empty = true;
-            t.rect = RectC(DPI(6) + empty_count * DPI(64), max(0, GetSize().cy - DPI(36)), DPI(60), DPI(26));
+            int columns = ShelfColumns();
+            int cell = max(1, (GetSize().cx - DPI(12) + DPI(4)) / columns);
+            int y = GetSize().cy - DPI(14) - ShelfRows() * DPI(26);
+            t.rect = RectC(DPI(6) + (empty_count % columns) * cell,
+                           max(0, y) + (empty_count / columns) * DPI(26),
+                           max(0, cell - DPI(4)), DPI(22)) & Rect(GetSize());
             empty_count++;
         }
     }
     for(const auto& c : presentation_.components) {
         bool overlay = (int)c.region >= 4 && (int)c.region <= 6;
         if(overlay != overlay_ || c.slot.IsEmpty()) continue;
+        Rect r = Project(c.slot).Deflated(DPI(3));
+        if(r.GetHeight() < DPI(12) || r.GetWidth() < DPI(12)) continue;
         Target& t = targets_.Add(); t.region = (int)c.region; t.id = c.id;
-        Rect r = Project(c.slot);
-        t.rect = RectC(r.left + DPI(3), r.top + DPI(3), max(0, r.GetWidth() - DPI(6)), min(DPI(20), max(0, r.GetHeight() - DPI(6))));
+        // Leave the structural heading visible when the region has room.
+        int height = min(DPI(20), r.GetHeight());
+        t.rect = RectC(r.left, r.bottom - height, r.GetWidth(), height);
     }
 }
 int RegionView::Hit(Point p) const
 {
-    for(int i = targets_.GetCount() - 1; i >= 0; i--) if(targets_[i].rect.Contains(p)) return i;
+    if(!Rect(GetSize()).Contains(p)) return -1;
+    // A body-side port lane may share a Content column rectangle. It is still
+    // graph-owned chrome, not permission to drop a component over its labels.
+    for(const Rect& lane : presentation_.port_lanes)
+        if(Project(lane).Contains(p)) return -1;
+    for(int i = targets_.GetCount() - 1; i >= 0; i--)
+        if(targets_[i].rect.Contains(p)) return i;
     return -1;
 }
 void RegionView::Paint(Draw& w)
@@ -95,17 +141,15 @@ void RegionView::Paint(Draw& w)
     Font font = StdFont().Height(DPI(10));
     for(int i = 0; i < targets_.GetCount(); i++) {
         const auto& t = targets_[i]; if(t.rect.IsEmpty()) continue;
-        bool active = false;
-        for(const auto& c : presentation_.components)
-            if((int)c.region == t.region && c.representation != UiGraphNodeComponentRepresentation::Hidden) active = true;
+        bool active = Active(t);
         Color color = active ? RegionColor(t.region) : Color(174, 185, 195);
         bool selected = selected_.id.IsEmpty() ? t.id.IsEmpty() && selected_.region == t.region : t.id == selected_.id;
         if(!t.id.IsEmpty()) {
-            w.DrawRect(t.rect, selected ? Color(209, 234, 250) : Color(238, 248, 253));
+            w.DrawRect(t.rect, selected ? Color(209, 234, 250) : active ? Color(238, 248, 253) : Color(240, 243, 246));
             int n = spec_.FindComponent(t.id);
             String label = n >= 0 ? spec_.slots[n].label : t.id;
             if(label.IsEmpty()) label = t.id;
-            w.Clip(t.rect); w.DrawText(t.rect.left + DPI(3), t.rect.top + DPI(2), label, font, Color(40, 94, 130)); w.End();
+            w.Clip(t.rect); w.DrawText(t.rect.left + DPI(3), t.rect.top + DPI(2), label, font, active ? Color(40, 94, 130) : Color(126, 139, 152)); w.End();
         }
         else {
             if(overlay_ && !t.empty) {
@@ -121,7 +165,7 @@ void RegionView::Paint(Draw& w)
     }
     // Semantic port reservations are non-drop graph chrome.
     for(const Rect& lane : presentation_.port_lanes) Frame(w, Project(lane), Color(19, 160, 216));
-    w.DrawText(DPI(6), max(0, GetSize().cy - DPI(11)), "Grey: inactive. + target: unreserved (confirmation required).", font.Height(DPI(9)), Color(102, 117, 135));
+    w.DrawText(DPI(6), max(0, GetSize().cy - DPI(11)), "Grey: inactive. +: unreserved region.", font.Height(DPI(9)), Color(102, 117, 135));
 }
 void RegionView::LeftDown(Point p, dword)
 {
@@ -134,19 +178,26 @@ void RegionView::LeftDrag(Point p, dword)
 void RegionView::DragAndDrop(Point p, PasteClip& d)
 {
     int i = Hit(p); hover_ = -1;
-    if(i >= 0 && WhenDrop && WhenDrop(d, targets_[i].region, targets_[i].id)) hover_ = i;
+    if(i >= 0 && WhenDrop) {
+        Target target = targets_[i]; // callbacks can refresh the target array
+        bool accepted = WhenDrop(d, target.region, target.id);
+        int current = Hit(p);
+        if(accepted && !d.IsPaste() && current >= 0
+           && targets_[current].region == target.region && targets_[current].id == target.id) hover_ = current;
+    }
     Refresh();
 }
 
 StructureView::StructureView()
 {
-    AddFrame(scroll_); scroll_.WhenScroll = [this] { Refresh(); };
+    AddFrame(horizontal_.Horz()); AddFrame(scroll_);
+    horizontal_.WhenScroll = scroll_.WhenScroll = [this] { drop_row_ = -1; Refresh(); };
     BackPaint();
 }
 void StructureView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p, const Selection& selected)
 {
     spec_ = spec; presentation_ = p; selected_ = selected;
-    rows_.Clear();
+    rows_.Clear(); drop_row_ = -1;
     auto add = [&](const char* name, int depth, int region, int mask) {
         auto& r = rows_.Add(); r.name = name; r.depth = depth; r.region = region; r.mask = mask;
         if(region < 0) return;
@@ -166,26 +217,39 @@ void StructureView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresen
 }
 void StructureView::Layout()
 {
+    horizontal_.SetTotal(CanvasWidth()); horizontal_.SetPage(max(0, GetSize().cx));
     scroll_.SetTotal(rows_.GetCount() * RowHeight()); scroll_.SetPage(max(0, GetSize().cy - DPI(30)));
 }
 int StructureView::Hit(Point p) const
 {
-    if(p.y < DPI(30)) return -1;
+    if(!Rect(GetSize()).Contains(p) || p.y < DPI(30)) return -1;
     int i = (p.y - DPI(30) + scroll_.Get()) / RowHeight();
     return i >= 0 && i < rows_.GetCount() ? i : -1;
 }
 void StructureView::Paint(Draw& w)
 {
     w.DrawRect(GetSize(), White());
-    int columns = Columns(), placement = min(DPI(310), columns * 3 / 5);
+    const int offset = horizontal_.Get();
+    const int columns = Columns(), placement = min(DPI(310), columns * 3 / 5);
+    const int width = CanvasWidth();
     Font font = StdFont().Height(DPI(11));
+    // Header and rows use the same virtual coordinates. At narrow widths every
+    // LOD remains reachable through the native horizontal scrollbar.
+    auto text = [&](Rect area, const String& value, Font f, Color ink) {
+        area.Offset(-offset, 0);
+        if(area.IsEmpty()) return;
+        w.Clip(area);
+        DrawTextEllipsis(w, area.left + DPI(5), area.top + max(0, (area.GetHeight() - f.GetCy()) / 2),
+                         max(0, area.GetWidth() - DPI(10)), value, "...", f, ink);
+        w.End();
+    };
     w.DrawRect(0, 0, GetSize().cx, DPI(30), Color(247, 249, 252));
-    w.DrawText(DPI(8), DPI(7), "STRUCTURE / COMPONENT", font.Bold(), Color(90, 110, 132));
-    w.DrawText(placement, DPI(7), "PLACEMENT / FEATURES", font.Bold(), Color(90, 110, 132));
+    text(RectC(0, 0, placement, DPI(30)), "STRUCTURE / COMPONENT", font.Bold(), Color(90, 110, 132));
+    text(RectC(placement, 0, columns - placement, DPI(30)), "PLACEMENT / FEATURES", font.Bold(), Color(90, 110, 132));
     for(int l = 0; l < 4; l++) {
         Rect box = RectC(columns + l * DPI(62), DPI(4), DPI(58), DPI(21));
-        w.DrawRect(box, l < 2 ? Color(12, 127, 211) : Color(125, 166, 204));
-        w.DrawText(box.left + DPI(6), box.top + DPI(3), l ? "LOD " + AsString(l) : String("Normal"), font, White());
+        w.DrawRect(box.Offseted(-offset, 0), l < 2 ? Color(12, 127, 211) : Color(125, 166, 204));
+        text(box, l ? "LOD " + AsString(l) : String("Normal"), font, White());
     }
     w.Clip(0, DPI(30), GetSize().cx, max(0, GetSize().cy - DPI(30)));
     for(int i = 0; i < rows_.GetCount(); i++) {
@@ -196,51 +260,72 @@ void StructureView::Paint(Draw& w)
         if(selected || drop_row_ == i) w.DrawRect(0, y, DPI(3), RowHeight(), Color(12, 127, 211));
         w.DrawRect(0, y + RowHeight() - 1, GetSize().cx, 1, Color(232, 237, 242));
         int n = r.id.IsEmpty() ? -1 : spec_.FindComponent(r.id);
-        w.Clip(0, y, placement - DPI(5), RowHeight());
-        w.DrawText(DPI(7) + r.depth * DPI(15), y + DPI(5), r.name, r.id.IsEmpty() ? font.Bold() : font, Color(42, 62, 82));
-        w.End();
+        int indent = DPI(7) + r.depth * DPI(15);
+        text(RectC(indent, y, max(0, placement - indent - DPI(4)), RowHeight()), r.name,
+             r.id.IsEmpty() ? font.Bold() : font, Color(42, 62, 82));
         if(n >= 0) {
             const auto& c = spec_.slots[n];
-            w.Clip(placement, y, max(0, columns - placement - DPI(5)), RowHeight());
-            w.DrawText(placement, y + DPI(6), PlacementSummary(c), font.Height(DPI(10)), Color(93, 110, 127)); w.End();
+            text(RectC(placement, y, columns - placement - DPI(4), RowHeight()), PlacementSummary(c),
+                 font.Height(DPI(10)), Color(93, 110, 127));
         }
         for(int l = 0; l < 4; l++) {
-            String text; Color ink(105, 123, 139);
+            String label; Color ink(105, 123, 139), face(238, 242, 246), border(212, 220, 228);
             if(n >= 0) {
                 const auto& c = spec_.slots[n]; byte bit = byte(1u << l);
-                text = c.force_off & bit ? "Off" : c.force_on & bit ? "On" : c.Allows((UiGraphPresentationLevel)l) ? "Auto +" : "Auto -";
-                ink = c.Allows((UiGraphPresentationLevel)l) ? Color(36, 124, 72) : Color(181, 43, 34);
+                label = c.force_off & bit ? "Off" : c.force_on & bit ? "On" : c.Allows((UiGraphPresentationLevel)l) ? "Auto +" : "Auto -";
+                bool on = c.Allows((UiGraphPresentationLevel)l);
+                ink = on ? Color(36, 124, 72) : Color(181, 43, 34);
+                face = on ? Color(234, 248, 239) : Color(255, 240, 238);
+                border = on ? Color(159, 210, 174) : Color(239, 184, 178);
             }
             else {
                 int total = 0, on = 0;
                 for(int k = 0; k < spec_.slot_count; k++) if(r.mask & (1 << (int)spec_.slots[k].region)) { total++; on += spec_.slots[k].Allows((UiGraphPresentationLevel)l); }
-                text = total ? AsString(on) + "/" + AsString(total) : String("-");
+                label = total ? AsString(on) + "/" + AsString(total) : String("-");
             }
-            w.DrawText(columns + l * DPI(62) + DPI(8), y + DPI(5), text, font, ink);
+            Rect badge = RectC(columns + l * DPI(62) + DPI(3), y + DPI(3), DPI(52), RowHeight() - DPI(6));
+            w.DrawRect(badge.Offseted(-offset, 0), face); Frame(w, badge.Offseted(-offset, 0), border);
+            text(badge, label, font.Height(DPI(10)), ink);
         }
+        if(drop_row_ == i && !r.id.IsEmpty())
+            w.DrawRect(-offset, y, width, DPI(2), Color(12, 127, 211)); // insertion before component
     }
     w.End();
 }
 void StructureView::LeftDown(Point p, dword)
 {
     int i = Hit(p); if(i < 0 || rows_[i].region < 0) return;
-    Row row = rows_[i]; WhenSelect(row.id, row.region);
-    if(!row.id.IsEmpty() && p.x >= Columns()) {
-        int l = (p.x - Columns()) / DPI(62); if(l >= 0 && l < 4) WhenLod(row.id, l);
-    }
+    Row row = rows_[i];
+    int x = p.x + horizontal_.Get();
+    int lod = x >= Columns() ? (x - Columns()) / DPI(62) : -1;
+    WhenSelect(row.id, row.region);
+    if(!row.id.IsEmpty() && lod >= 0 && lod < 4) WhenLod(row.id, lod);
 }
 void StructureView::LeftDrag(Point p, dword)
 {
-    int i = Hit(p); if(i >= 0 && !rows_[i].id.IsEmpty()) WhenDrag(rows_[i].id);
+    int i = Hit(p);
+    if(i >= 0 && p.x + horizontal_.Get() < Columns() && !rows_[i].id.IsEmpty()) {
+        String id = rows_[i].id; WhenDrag(id);
+    }
 }
 void StructureView::MouseWheel(Point, int z, dword)
 {
     scroll_.Set(scroll_.Get() - z / 120 * RowHeight() * 3); Refresh();
 }
+void StructureView::HorzMouseWheel(Point, int z, dword)
+{
+    horizontal_.Set(horizontal_.Get() - z / 120 * DPI(40)); Refresh();
+}
 void StructureView::DragAndDrop(Point p, PasteClip& d)
 {
     int i = Hit(p); drop_row_ = -1;
-    if(i >= 0 && rows_[i].region >= 0 && WhenDrop && WhenDrop(d, rows_[i].region, rows_[i].id)) drop_row_ = i;
+    if(i >= 0 && rows_[i].region >= 0 && WhenDrop) {
+        Row row = rows_[i];
+        bool accepted = WhenDrop(d, row.region, row.id);
+        int current = Hit(p);
+        if(accepted && !d.IsPaste() && current >= 0
+           && rows_[current].region == row.region && rows_[current].id == row.id) drop_row_ = current;
+    }
     Refresh();
 }
 void PreviewGraph::Paint(Draw& w)
