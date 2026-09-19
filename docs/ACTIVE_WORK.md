@@ -2,15 +2,33 @@
 
 Remote main is authoritative. Refresh before work/publish; never force-push.
 
-BASE: `fbd283aba2c9deb0f02a855ce7b008c0283a12f2` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-02D — diagram/table interaction hardening**
-TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceViewTests.cpp,UiGraphComponentStudio.upp,main.cpp}`; this file; `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 02D source.
-PUBLISHED: the commit containing this update; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceViewTests.cpp`.
-VALIDATION: complete touched-source review, exact base-blob matching, declaration/definition and package checks, local git diff --check PASS. U++/Windows compilation and GUI execution NOT run here. Native regression tests are added, not claimed passing.
-NEXT ACTION: Gary's accumulated Debug gate in `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`: RenderTests, WorkspaceTests, workspace --view-tests, generated C++ compilation and actual workspace interaction. No retired DesignMatrix build.
+BASE: `3f9957c7a332312d6d6d3f92bb6206344cd2373e` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-02V — repeatable accumulated Debug validation gate**
+TOUCHED: `scripts/ValidateUiGraphWorkspace.ps1`; `docs/{ACTIVE_WORK,UIGRAPH_WORKSPACE_02D_VALIDATE}.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 02V source.
+PUBLISHED: the commit containing this update; recover with `git log -1 -- scripts/ValidateUiGraphWorkspace.ps1`.
+VALIDATION: full script/diff and package-command review; local git diff --check PASS. PowerShell, U++ builds, native tests and GUI execution NOT run here. No new runtime or layout source changes in 02V.
+NEXT ACTION: Gary runs `scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <latest published SHA> -Launch` on clean current main. See the complete task in `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`.
 
-## Latest bounded changes
+## Repeatable gate / 02V
+
+The script refreshes clean main, checks checkpoint ancestry, records exact HEAD,
+builds/runs RenderTests and WorkspaceTests, compiles the actual exported C++ in a
+temporary Ui/CtrlLib-only package, then builds the native workspace and runs its
+`--view-tests` gate. It checks native exit statuses and nonempty passing summaries,
+records the generated-source hash, verifies unchanged HEAD/clean worktree and
+optionally launches the workspace for manual inspection. A missing native summary
+log is an evidence failure, not an assumed PASS.
+
+Output uses a unique temporary evidence directory; no generated fixtures enter the
+repository. The script does not edit/commit source, kill existing demos, run Release
+or launch a broad benchmark. U++ installation/method remain explicit parameters.
+The first Windows run must also validate the runner itself. Manual drag/drop,
+property-editor commit/cancel, save/reload and visual comparison remain required.
+
+## Source checkpoint / 02D
+
+`3f9957c7a332312d6d6d3f92bb6206344cd2373e` — diagram/table interaction hardening.
 
 - Disarm a palette button before entering native DND; Escape/release cannot also activate its click action.
 - Wrap empty-region '+' targets inside narrow diagrams instead of drawing later targets offscreen.
@@ -63,7 +81,7 @@ Gary tested d9754c76d7be0b37d951653f3f643c3e3963782a: RenderTests seven suites P
 Components21/0; ExecutionPath8/0; DesignMatrix selector4/0; ComponentStudio Debug
 build/startup PASS; diff check PASS; clean tree; no fixes. Title-edit automation
 was interrupted by physical Escape, not an interaction PASS. That evidence does
-not validate 02A/02B/02C/02D.
+not validate 02A/02B/02C/02D/02V.
 
 ## Architecture / scope
 

@@ -19,60 +19,88 @@ component has visible pixels. Actual representation still comes from the preview
 Native view tests cover these coordinates, selection and routing contracts.
 They do NOT simulate Windows drag negotiation or prove screenshot parity.
 
-## Gary task
+## Gary task — accumulated gate, runner added in 02V
 
 Repo: `E:\apps\github\upp_Ui`, branch `main`.
 Require the supervisor's latest published checkpoint as an ancestor of tested
-HEAD; also require `fbd283aba2c9deb0f02a855ce7b008c0283a12f2` (02C).
+HEAD, not exact HEAD equality. The runner also requires the V7 source checkpoint
+`fbd283aba2c9deb0f02a855ce7b008c0283a12f2` (02C).
 Preserve unrelated work; stop on a dirty checkout or failed fast-forward.
 
-Use existing U++ installation and build method. Debug only (no `-r`).
-From the repository root in PowerShell:
+First fetch/pull clean main so the new runner exists. Then run in PowerShell:
 
 ```powershell
-$ErrorActionPreference = 'Stop'
-$umk = 'E:\upp-18468\umk.exe'
-$assembly = 'E:\apps\github\upp_Ui,E:\apps\github\upp_statemachine,E:\apps\github\upp_animation,E:\upp-18468\uppsrc'
-$out = Join-Path (Get-Location) 'build\workspace-debug'
-New-Item -ItemType Directory -Force $out | Out-Null
-
-& $umk $assembly Utilities/UiGraphRenderTests CLANGx64 -b "$out\UiGraphRenderTests.exe"
-if ($LASTEXITCODE) { throw 'RenderTests build failed' }
-& "$out\UiGraphRenderTests.exe"
-if ($LASTEXITCODE) { throw 'RenderTests failed' }
-
-& $umk $assembly Utilities/UiGraphWorkspaceTests CLANGx64 -b "$out\UiGraphWorkspaceTests.exe"
-if ($LASTEXITCODE) { throw 'WorkspaceTests build failed' }
-& "$out\UiGraphWorkspaceTests.exe" "--export=$out\GeneratedFamily.cpp"
-if ($LASTEXITCODE) { throw 'WorkspaceTests failed' }
-
-& $umk $assembly examples/UiGraphComponentStudio CLANGx64 -b +GUI "$out\UiGraphComponentStudio.exe"
-if ($LASTEXITCODE) { throw 'Workspace build failed' }
-$p = Start-Process "$out\UiGraphComponentStudio.exe" -ArgumentList '--view-tests' -PassThru -Wait
-if ($p.ExitCode) { throw 'Native view tests failed; inspect application log' }
-$p = Start-Process "$out\UiGraphComponentStudio.exe" -PassThru
-"Workspace PID: $($p.Id)"
+Set-Location E:\apps\github\upp_Ui
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ValidateUiGraphWorkspace.ps1 `
+    -RequiredAncestor '3f9957c7a332312d6d6d3f92bb6206344cd2373e' -Launch
+if ($LASTEXITCODE) { throw 'Workspace Debug gate failed; inspect its evidence directory' }
 ```
 
-Check `UIGRAPH_WORKSPACE_VIEW_SUMMARY ... failed=0` in the executable's log.
-Debug startup also runs these tests and the existing camera/threshold smoke.
-RenderTests should have eight passing suites; WorkspaceTests must report failed=0.
+The example requires the 02D source checkpoint. Use the supervisor's newer
+published SHA when supplied. The runner's default ancestor is also 02D. It permits current main
+to advance as long as the requested ancestor remains present.
 
-Compile the exported `GeneratedFamily.cpp` as a temporary U++ package depending
-only on Ui and CtrlLib; do not copy Utilities/UiGraphWorkspace into its dependencies.
-Use a separate nest under the build output and a minimal main. The output file
-must be the actual `--export` result, not a hand-edited equivalent. Do not publish
-the temporary package or generated fixture.
+Established defaults: `E:\upp-18468\umk.exe`, `CLANGx64`, repository/sibling
+`upp_statemachine` and `upp_animation` nests plus the installed `uppsrc`.
+`-UppRoot` and `-Method` accept the already validated local equivalents; do not
+switch compiler/framework versions silently. Debug only: `-b`, no `-r`.
+The per-process execution-policy option does not change machine policy.
 
-Manual checks: drag palette -> diagram and table; cancel with Escape and release
-over the source (no duplicate addition); scroll table horizontally and edit LOD3;
-resize and reach every '+' target; move/reorder; grey hidden Stable chips remain
-selectable; port-lane drops reject without document mutation. Also run the 02C
-save/open, independent inheritance, property-editor and live-LOD checks recorded
-in ACTIVE_WORK. Do not build retired UiGraphDesignMatrix.
+The script performs:
 
-Run `git diff --check`. Report exact HEAD, ancestry, build/test summaries, first
-real blocker, generated-code compile result, visual findings, PID and worktree
-clean YES/NO. Minor mechanical CLANG fixes may be reviewed/committed/published.
-Stop for architecture/ownership failures; no weakening tests or enabling rich
-Micro fallbacks. No Release/broad suite/10k benchmark without a focused reason.
+1. Clean-main check, fetch/fast-forward, no unpublished local commits, ancestry
+   verification and exact tested HEAD capture.
+2. Build/run `Utilities/UiGraphRenderTests`; require its passing suite summary.
+3. Build/run `Utilities/UiGraphWorkspaceTests` with `--export=<fixture path>`;
+   require its passing summary and nonempty generated C++.
+4. Build that unchanged generated C++ in a temporary package depending on only Ui
+   and CtrlLib. It does NOT reproduce the export manually or include the authoring
+   package. Record and recheck the generated-source SHA-256.
+5. Build `examples/UiGraphComponentStudio` and run `--view-tests` with a 120-second
+   timeout. Only a test process started by this invocation can be stopped.
+6. Require exit=0 and `UIGRAPH_WORKSPACE_VIEW_SUMMARY ... failed=0` in the native
+   log. Missing evidence stops the gate rather than silently passing it.
+7. Check `git diff --check`, unchanged HEAD and clean worktree; with `-Launch`,
+   open the workspace for manual checks and report its PID.
+
+Evidence is retained under a unique directory in
+`%TEMP%\UiGraphWorkspace-validation`, printed at startup. `-OutputRoot` changes
+the parent evidence directory. Read `summary.txt`, individual build/test logs,
+`native-view-test.log` and the actual generated fixture. No files are automatically
+committed. Nothing from this temporary package should be published.
+
+RenderTests currently has eight suites. All suites must pass; later added suites
+are permitted. WorkspaceTests and native view checks must report failed=0 with
+positive check counts. A build-only PASS is not a runtime PASS. Compiling the export
+is not proof of host integration. Debug workspace startup additionally logs
+`UIGRAPH_WORKSPACE_UI_SMOKE`; record that result during launch inspection.
+
+### Manual acceptance
+
+Drag palette -> region diagram, overlay diagram and structure row; cancel with
+Escape and release over the source (no duplicate addition). Move and reorder
+components. Scroll the table horizontally and edit LOD3. Resize to reach all '+'
+targets. Hidden Stable chips stay individually grey and selectable. Port-lane and
+inherited-scope drops must reject without document mutation.
+
+Check selection across diagrams/table/preview; PropertyEditor commit/cancel and
+style overrides; real colours and all seven painted kinds; Open/Save/Save As/Clone;
+invalid import preserving work; independent layout/style detachment/reset; threshold
+versus camera independence; 1:1/LOD jumps and native Micro hints. Compare actual
+Windows rendering to the user's V7 mockup. Do not build retired DesignMatrix.
+
+### Stop, edits and evidence
+
+Stop at the first real compile/assertion/runtime failure or missing required test
+evidence. First Windows execution also validates this new PowerShell runner; it
+has only been source-reviewed in the implementation environment.
+
+Minor mechanical CLANG/script fixes may be reviewed, documented, committed and
+published. Refresh main first, include only your fixes, verify publication, and
+rerun the gate on the resulting SHA. Stop for architecture/ownership failures;
+no weakened tests, restored retired fields, or rich-Micro fallback. No Release,
+broad suite or 10k benchmark without a focused reason.
+
+Report exact tested HEAD and ancestry; each build/test summary; first real blocker;
+generated-code compile/hash result; native view and startup smoke; manual findings;
+evidence directory; demo PID; git diff --check; worktree clean YES/NO; any fix SHA.
