@@ -1,4 +1,4 @@
-#include "WorkspaceViews.h"
+#include "WorkspaceWindow.h"
 
 namespace Upp {
 namespace GraphWorkspace {
@@ -104,6 +104,66 @@ bool RunWorkspaceViewTests(String& error)
     expect(drags == 1 && clicks == 0, "drag path is disarmed before a later button release");
     tile.Key(K_SPACE, 1);
     expect(clicks == 1, "palette keyboard activation still works after drag cancellation");
+    // User regression: two icons dropped into Media's existing header must not
+    // appear only when the subtitle reflows away at LOD1. Use real authoring
+    // transactions and the production renderer, not a hand-made allocation.
+    NodeWorkspace workspace;
+    workspace.document_ = MakeDocument(UiGraphNodeTemplateKind::Media);
+    workspace.document_.edit_base = true;
+    String icons[2];
+    for(int i = 0; i < 2; i++) {
+        auto icon = NewComponent(UiGraphNodeComponentKind::Icon, workspace.EffectiveLayout());
+        icons[i] = icon.id;
+        expect(PlaceComponent(workspace.document_, -1, workspace.document_.revision,
+                              icon, false, UiGraphNodeSlotRegion::Header, String(), error),
+               "Media header accepts a new identified icon");
+    }
+    workspace.ApplyDocument();
+    bool icons_visible = true;
+    for(double zoom : {1.0, 0.38, 1.0}) {
+        workspace.preview_.SetZoom(zoom, Point(0, 0));
+        workspace.preview_.CenterOnNode(workspace.node_);
+        workspace.Reports();
+        for(const String& id : icons) {
+            const auto* c = workspace.snapshot_.FindComponent(id);
+            icons_visible &= c && !c->slot.IsEmpty()
+                          && c->representation != UiGraphNodeComponentRepresentation::Hidden;
+        }
+    }
+    expect(icons_visible, "both header icons survive Normal / LOD1 / Normal without mask changes");
+    workspace.page_ = 1; workspace.selection_.id.Clear(); workspace.RebuildInspector();
+    workspace.inspector_.SelectProperty("preview_labels");
+    workspace.inspector_.SetPropertyExpanded("preview_data", true);
+    const int revision = workspace.properties_.GetStructureRevision();
+    for(bool labels : {true, false, true}) {
+        workspace.ApplyProperty("preview_labels", labels, true);
+        Ctrl::ProcessEvents();
+        expect(workspace.inspector_.GetSelectedPropertyId() == "preview_labels"
+               && workspace.inspector_.IsPropertyExpanded("preview_data")
+               && workspace.properties_.GetStructureRevision() == revision,
+               "port-label commit preserves property selection, expansion and model structure");
+    }
+    String title_id;
+    for(int i = 0; i < workspace.EffectiveLayout().slot_count; i++)
+        if(workspace.EffectiveLayout().slots[i].feature == UiGraphNodeSlotFeature::Title)
+            title_id = workspace.EffectiveLayout().slots[i].id;
+    workspace.Select(title_id, (int)UiGraphNodeSlotRegion::Header);
+    auto* font = workspace.properties_.Find("font_face");
+    expect(font && font->enabled && workspace.properties_.FindIndex("font_face") < workspace.properties_.FindIndex("placement"),
+           "selected text exposes editable typography before detailed layout");
+    workspace.inspector_.SelectProperty("font_height");
+    workspace.ApplyProperty("font_height", 20, true);
+    Ctrl::ProcessEvents();
+    expect(workspace.inspector_.GetSelectedPropertyId() == "font_height"
+           && workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height == DPI(20),
+           "component typography commits without losing the edited property");
+    workspace.document_.edit_base = false;
+    workspace.RebuildInspector();
+    int height = workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height;
+    workspace.ApplyProperty("font_height", 40, true);
+    expect(!workspace.properties_.Find("font_face")->enabled
+           && workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height == height,
+           "inherited component rejects edits rather than mutating Base implicitly");
     LOG("UIGRAPH_WORKSPACE_VIEW_SUMMARY checks=" << checks << " failed=" << failed);
     return failed == 0;
 }

@@ -175,7 +175,12 @@ UiGraphNodeSlotRule NewComponent(UiGraphNodeComponentKind kind, const UiGraphNod
     int suffix = 1;
     do { r.id = "component_" + AsString(suffix++); } while(t.FindComponent(r.id) >= 0);
     r.region = UiGraphNodeSlotRegion::ContentMain;
-    r.placement = UiGraphNodeSlotPlacement::Top;
+    // An icon is a side item by default, not another full-width text row.
+    // In Media's 42-unit header a 28-unit Top icon cannot follow the subtitle;
+    // at LOD1 subtitle Reflow used to make that same icon suddenly fit.
+    // This is an authoring default only; moves/imports keep authored placement.
+    r.placement = kind == UiGraphNodeComponentKind::Icon
+                ? UiGraphNodeSlotPlacement::Left : UiGraphNodeSlotPlacement::Top;
     r.extent = DPI(kind == UiGraphNodeComponentKind::Fields || kind == UiGraphNodeComponentKind::Image ? 60 : 28);
     r.small = kind == UiGraphNodeComponentKind::Icon ? UiGraphNodeSmallMode::Dot : UiGraphNodeSmallMode::BarThenDot;
     r.feature = kind == UiGraphNodeComponentKind::Icon ? UiGraphNodeSlotFeature::Icon : UiGraphNodeSlotFeature::Title;

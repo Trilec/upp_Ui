@@ -111,9 +111,25 @@ void NodeWorkspace::RebuildInspector()
             };
         };
         selection_label_.SetText((r.label.IsEmpty() ? r.id : r.label) + " / " + region_names[(int)r.region]);
+        if(!EditableLayout(document_)) {
+            selection_label_.SetText((r.label.IsEmpty() ? r.id : r.label) + " / inherited - edit Base or create layout override");
+            selection_label_.Tip("Typography and component settings belong to the layout section. Select BASE on the left to edit the family, or Create layout override for this shape.");
+        }
+        else selection_label_.Tip("Component typography, colour and layout are independently editable here.");
         properties_.AddReadOnly("identity", "Stable ID", r.id, "Component");
         text("label", "Label", r.label, "Component", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.label = (String)v; }));
         properties_.AddReadOnly("kind", "Renderer", kind_names[(int)r.GetKind()], "Component");
+        choice("component_role", "Role", (int)r.component_style.role, "Inherit|Standard|Subtle|Accent|Alert", "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.role = (UiGraphNodeComponentRole)(int)v; }));
+        AddPropertyFont(properties_, "font_face", "Font face", r.component_style.font_face, "Typography");
+        AddSetter("font_face", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.font_face = (String)v; }));
+        integer("font_height", "Font height (0 = inherited)", Logical(r.font_height), 0, 256, "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.font_height = Metric(v); }));
+        const int flags[] = { r.component_style.bold, r.component_style.italic, r.component_style.underline };
+        const char* names[] = { "Bold", "Italic", "Underline" };
+        for(int i = 0; i < 3; i++) {
+            String id = "fontflag" + AsString(i); auto& p = properties_.AddChoice(id, names[i], flags[i], "Typography");
+            p.AddChoice(-1, "Inherit").AddChoice(0, "Off").AddChoice(1, "On");
+            AddSetter(id, mutate([i](UiGraphNodeSlotRule& r, const Value& v) { int* flags[] = {&r.component_style.bold, &r.component_style.italic, &r.component_style.underline}; *flags[i] = (int)v; }));
+        }
         boolean("literal", "Use static content", r.use_literal, "Source", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.use_literal = (bool)v; }));
         text("binding", "Data key (empty = node field)", r.data_key, "Source", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.data_key = (String)v; }));
         choice("feature", "Node field / text role", (int)r.feature, "Title|Subtitle|Icon|Badge|Media|Description|Control|Footer", "Source", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.feature = (UiGraphNodeSlotFeature)(int)v; }));
@@ -147,17 +163,6 @@ void NodeWorkspace::RebuildInspector()
         integer("preferred_height", "Preferred height", Logical(r.preferred_size.cy), 0, 2048, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cy = Metric(v); }));
         choice("small", "Small representation", (int)r.small, "Hidden|Bar|Bar then dot|Dot", "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.small = (UiGraphNodeSmallMode)(int)v; }));
         integer("readable", "Readable minimum (pixels)", r.readable_min_px, 1, 128, "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.readable_min_px = (int)v; }));
-        choice("component_role", "Role", (int)r.component_style.role, "Inherit|Standard|Subtle|Accent|Alert", "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.role = (UiGraphNodeComponentRole)(int)v; }));
-        AddPropertyFont(properties_, "font_face", "Font face", r.component_style.font_face, "Typography");
-        AddSetter("font_face", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.font_face = (String)v; }));
-        integer("font_height", "Font height (0 = inherited)", Logical(r.font_height), 0, 256, "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.font_height = Metric(v); }));
-        const int flags[] = { r.component_style.bold, r.component_style.italic, r.component_style.underline };
-        const char* names[] = { "Bold", "Italic", "Underline" };
-        for(int i = 0; i < 3; i++) {
-            String id = "fontflag" + AsString(i); auto& p = properties_.AddChoice(id, names[i], flags[i], "Typography");
-            p.AddChoice(-1, "Inherit").AddChoice(0, "Off").AddChoice(1, "On");
-            AddSetter(id, mutate([i](UiGraphNodeSlotRule& r, const Value& v) { int* flags[] = {&r.component_style.bold, &r.component_style.italic, &r.component_style.underline}; *flags[i] = (int)v; }));
-        }
         for(int field = 0; field < 3; field++) for(int state = 0; state < 4; state++) {
             const char* names[] = {"Ink", "Face", "Frame"};
             const Color* colors = field == 0 ? r.component_style.ink : field == 1 ? r.component_style.face : r.component_style.frame;
@@ -180,6 +185,10 @@ void NodeWorkspace::ApplyProperty(const String& id, const Value& value, bool fin
 {
     if(building_) return;
     int i = setters_.Find(id); if(i < 0) return;
+    const auto* item = properties_.Find(id);
+    if(!item || !item->enabled || item->read_only) return;
+    // Only a renderer-kind change alters this inspector's schema. Ordinary
+    // commits must not detach its model, lose scroll, or select the first row.
     Document next = property_origin_ ? *property_origin_ : document_;
     try {
         setters_[i](next, value);
@@ -193,10 +202,83 @@ void NodeWorkspace::ApplyProperty(const String& id, const Value& value, bool fin
         ApplyDocument();
         if(final) {
             property_origin_.Clear();
-            PostCallback([this] { if(!property_origin_) RebuildInspector(); });
+            properties_.SetValue(id, value, false);
+            properties_.SetValidationError(id, String(), false);
+            // Auto components can change kind during Preview already; deciding
+            // from the final value versus the preview would miss that change.
+            bool schema_changed = id == "feature";
+            const int scope = Scope(), page = page_, revision = document_.revision;
+            const String selected = selection_.id;
+            // Run after PropertyEditor finishes its own commit transaction. A
+            // queued update may not replace a newer selection/edit/document.
+            PostCallback([this, scope, page, revision, selected, id, schema_changed] {
+                if(property_origin_ || Scope() != scope || page_ != page
+                   || document_.revision != revision || selection_.id != selected) return;
+                if(schema_changed) {
+                    RebuildInspector();
+                    inspector_.SelectProperty(id);
+                }
+                else SyncInspectorValues();
+            });
         }
     }
     catch(const Exc& e) { properties_.SetValidationError(id, e); status_.SetText(e); }
+}
+// Refresh dependent summaries in the SAME model. Selection, expanded rows,
+// filter and scroll remain owned by PropertyEditor and are not reconstructed.
+void NodeWorkspace::SyncInspectorValues()
+{
+    auto set = [&](const String& id, const Value& value) {
+        if(properties_.Find(id)) {
+            properties_.SetValue(id, value, false);
+            inspector_.RefreshValue(id);
+        }
+    };
+    auto colour = [&](const String& id, Color authored, Color inherited) {
+        auto* p = properties_.Find(id);
+        if(!p) return;
+        p->default_value = inherited;
+        p->override_active = !IsNull(authored);
+        p->inherited = IsNull(authored);
+        set(id, IsNull(authored) ? inherited : authored);
+    };
+    if(page_ == 2) {
+        const auto& s = document_.family.Style(Scope());
+        UiGraphNodeStyle theme = UiNodeGraph::StyleForRole(preview_.GetStyle().node, (UiGraphNodeRole)s.role);
+        const char* keys[] = { "face", "frame", "ink", "header" };
+        for(int field = 0; field < 4; field++) for(int state = 0; state < 4; state++) {
+            const Color* authored = field == 0 ? s.face : field == 1 ? s.frame : field == 2 ? s.ink : s.header;
+            Color inherited = field == 0 ? (theme.palette.face[state].IsSolid() ? theme.palette.face[state].color : SColorPaper())
+                            : field == 1 ? theme.palette.frame[state] : field == 2 ? theme.title_ink[state] : theme.header_face[state];
+            colour(String(keys[field]) + AsString(state), authored[state], inherited);
+        }
+        colour("shadow_color", s.shadow_color, Color(32, 48, 64));
+    }
+    else if(page_ == 1 || selection_.id.IsEmpty()) {
+        set("preview_data", AsJSON(document_.data));
+        int labels = document_.data.Find("show_port_labels");
+        set("preview_labels", labels >= 0 && document_.data.GetValue(labels).Is<bool>() && (bool)document_.data.GetValue(labels));
+    }
+    else {
+        int n = EffectiveLayout().FindComponent(selection_.id);
+        if(n < 0) return;
+        const auto& r = EffectiveLayout().slots[n];
+        const auto* c = snapshot_.FindComponent(selection_.id);
+        selection_.region = (int)r.region;
+        selection_label_.SetText((r.label.IsEmpty() ? r.id : r.label) + " / " + region_names[(int)r.region]);
+        set("literal", r.use_literal);
+        set("asset", r.asset);
+        for(int field = 0; field < 3; field++) for(int state = 0; state < 4; state++) {
+            const Color* authored = field == 0 ? r.component_style.ink : field == 1 ? r.component_style.face : r.component_style.frame;
+            Color inherited = c ? (field == 0 ? c->state_ink[state] : field == 1 ? c->state_face[state] : c->state_frame[state]) : Color(Null);
+            if(IsNull(inherited)) inherited = field == 0 ? SColorText() : SColorPaper();
+            colour("color" + AsString(field) + AsString(state), authored[state], inherited);
+        }
+    }
+    // Values not covered by dependency groups already belong to the same model.
+    // Refreshing that row does not rebuild the rows or force it back into view.
+    String selected = inspector_.GetSelectedPropertyId();
+    if(!selected.IsEmpty()) inspector_.RefreshValue(selected);
 }
 void NodeWorkspace::CancelProperty()
 {

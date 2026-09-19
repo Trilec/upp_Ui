@@ -7,6 +7,7 @@
 namespace Upp {
 namespace GraphWorkspace {
 class NodeWorkspace : public TopWindow {
+    friend bool RunWorkspaceViewTests(String& error);
     Document document_;
     Array<Document> undo_;
     One<Document> property_origin_;
@@ -64,6 +65,7 @@ class NodeWorkspace : public TopWindow {
     void Select(const String& id, int region);
     void SelectPage(int page);
     void RebuildInspector();
+    void SyncInspectorValues();
     void ApplyProperty(const String& id, const Value& value, bool final);
     void CancelProperty();
     void FinishProperty();
