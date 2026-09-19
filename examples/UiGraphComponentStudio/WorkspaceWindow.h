@@ -15,7 +15,7 @@ class NodeWorkspace : public TopWindow {
     UiGraphNodePresentation snapshot_;
     Vector<Pointf> outline_;
     Rect surface_;
-    Selection selection_;
+    WorkspaceSelection selection_;
     int page_ = 0, jump_ = -1;
     bool expanded_ = false;
     Size compact_size_ = Size(320, 210);

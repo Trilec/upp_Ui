@@ -9,6 +9,8 @@ STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 02V sour
 WINDOWS FIXES: the validator now resolves its default repository path after
 PowerShell parameter binding; the workspace render fixture uses the public
 `RGBA(Color)` conversion instead of a UiNodeGraph translation-unit helper.
+The native workspace view helpers also use non-conflicting `WorkspaceSelection`
+and `DrawFrame` names for CLANG's Ctrl-scope lookup rules.
 PUBLISHED: the commit containing this update; recover with `git log -1 -- scripts/ValidateUiGraphWorkspace.ps1`.
 VALIDATION: full script/diff and package-command review; local git diff --check PASS. PowerShell, U++ builds, native tests and GUI execution NOT run here. No new runtime or layout source changes in 02V.
 NEXT ACTION: Gary runs `scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <latest published SHA> -Launch` on clean current main. See the complete task in `docs/UIGRAPH_WORKSPACE_02D_VALIDATE.md`.

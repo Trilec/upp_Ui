@@ -17,7 +17,7 @@ bool RunWorkspaceViewTests(String& error)
     UiGraphNodePresentation p;
     Vector<Pointf> outline;
     outline << Pointf(0, 0) << Pointf(100, 0) << Pointf(100, 80) << Pointf(0, 80);
-    Selection selection;
+    WorkspaceSelection selection;
     RegionView region;
     for(int width : {160, 220, 320}) {
         region.SetRect(0, 0, DPI(width), DPI(210));

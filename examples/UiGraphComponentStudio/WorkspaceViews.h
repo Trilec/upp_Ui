@@ -12,12 +12,12 @@ struct Drag {
     String id;
 };
 
-struct Selection {
+struct WorkspaceSelection {
     String id;
     int region = 2;
 };
 
-void Frame(Draw& w, Rect r, Color c, int width = 1);
+void DrawFrame(Draw& w, Rect r, Color c, int width = 1);
 String PlacementSummary(const UiGraphNodeSlotRule& r);
 Color RegionColor(int region);
 Rect RegionRect(const UiGraphNodePresentation& p, int region);
@@ -45,7 +45,7 @@ class RegionView : public Ctrl {
     Vector<Pointf> path_;
     Rect surface_;
     Vector<Target> targets_;
-    Selection selected_;
+    WorkspaceSelection selected_;
     bool overlay_ = false;
     int hover_ = -1;
     int ShelfColumns() const;
@@ -64,7 +64,7 @@ public:
     Size GetMinSize() const override { return Size(DPI(160), DPI(170)); }
     void SetOverlay(bool on) { overlay_ = on; }
     void Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p,
-             const Vector<Pointf>& path, Rect surface, const Selection& selection);
+             const Vector<Pointf>& path, Rect surface, const WorkspaceSelection& selection);
     void Layout() override;
     void Paint(Draw& w) override;
     void LeftDown(Point p, dword) override;
@@ -81,7 +81,7 @@ class StructureView : public Ctrl {
     Vector<Row> rows_;
     UiGraphNodeTemplate spec_;
     UiGraphNodePresentation presentation_;
-    Selection selected_;
+    WorkspaceSelection selected_;
     ScrollBar scroll_, horizontal_;
     int drop_row_ = -1;
     int Hit(Point p) const;
@@ -95,7 +95,7 @@ public:
     Function<bool(PasteClip&, int, String)> WhenDrop;
     friend bool RunWorkspaceViewTests(String& error);
     StructureView();
-    void Set(const UiGraphNodeTemplate&, const UiGraphNodePresentation&, const Selection&);
+    void Set(const UiGraphNodeTemplate&, const UiGraphNodePresentation&, const WorkspaceSelection&);
     void Layout() override;
     void Paint(Draw& w) override;
     void LeftDown(Point p, dword) override;
@@ -109,7 +109,7 @@ public:
 class PreviewGraph : public UiNodeGraph {
 public:
     UiGraphNodePresentation snapshot;
-    Selection selected;
+    WorkspaceSelection selected;
     Event<String, int> WhenComponentSelect;
     void Paint(Draw& w) override;
     void LeftDown(Point p, dword flags) override;

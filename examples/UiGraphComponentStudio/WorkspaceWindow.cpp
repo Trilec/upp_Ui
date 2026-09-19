@@ -392,7 +392,7 @@ void NodeWorkspace::DragComponent(Ctrl& source, const String& id, UiGraphNodeCom
     payload.id = id; payload.move = !id.IsEmpty(); payload.kind = kind;
     ImageDraw ghost(DPI(130), DPI(28));
     ghost.DrawRect(Size(DPI(130), DPI(28)), Color(238, 248, 253));
-    Frame(ghost, Rect(Size(DPI(130), DPI(28))), Color(12, 127, 211));
+    DrawFrame(ghost, Rect(Size(DPI(130), DPI(28))), Color(12, 127, 211));
     ghost.DrawText(DPI(7), DPI(6), payload.move ? id : String(kind_names[(int)kind]), StdFont().Height(DPI(12)), Color(40, 94, 130));
     source.DoDragAndDrop(InternalClip(payload, "uigraph-workspace"), ghost, payload.move ? DND_MOVE : DND_COPY);
     region_.DragLeave(); overlay_.DragLeave(); table_.DragLeave();
