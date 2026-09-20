@@ -298,7 +298,9 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         // margin. Keep that expanded exact footprint as reusable camera coverage.
         state.coverage = GraphViewWorldBounds(geometry_zoom_, geometry_pan_, geometry_size_,
                                               GraphViewPaintMargin(lod_policy_, geometry_zoom_));
-        CaptureLiveViewBaseline();
+        // Synchronise metadata first. Rejected camera frames must not deep-copy
+        // the prepared scene just to discard that copy in the exact fallback.
+        live_baseline_revision_ = -1;
         state.approximate_zoom = false;
     };
 
@@ -319,6 +321,12 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         }
         sync_exact_state();
     }
+
+    // Before the first accepted projection, the current geometry is exact and
+    // can supply admission checks directly. Existing projected frames must keep
+    // using the immutable baseline; never compound their rounded coordinates.
+    const bool capture_baseline = live_baseline_revision_ != prepared_geometry_revision_;
+    const auto& admission_nodes = capture_baseline ? node_geometry_ : live_baseline_nodes_;
 
     // The prepared exact scene already includes overscan. Require only the new
     // visible viewport to remain inside it; demanding another full query margin
@@ -343,8 +351,8 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             cancel_approximation();
             return false;
         }
-        for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
-            const NodeGeometry& g = live_baseline_nodes_[i];
+        for(int i = 0; i < admission_nodes.GetCount(); i++) {
+            const NodeGeometry& g = admission_nodes[i];
             // Component glyphs/rasters and proxy decisions are prepared at an
             // exact pixel scale. Preserve cheap translation, but settle a scale
             // change exactly until component-boundary reuse is validated.
@@ -372,8 +380,8 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
         // camera frame. Scanning the complete registration map here would turn
         // wheel zoom back into O(total embedded bindings), including offscreen
         // controls that cannot become active.
-        for(int i = 0; i < live_baseline_nodes_.GetCount(); i++) {
-            UiGraphId id = live_baseline_nodes_.GetKey(i);
+        for(int i = 0; i < admission_nodes.GetCount(); i++) {
+            UiGraphId id = admission_nodes.GetKey(i);
             if(node_ctrls_.Find(id) < 0)
                 continue;
             const UiGraphNode* node = model_->FindNode(UiGraphNodeRef{id});
@@ -383,7 +391,7 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             UiGraphNodeStyle node_style = ResolveNodeStyle(*node, GetNodeVisualState(*node));
             double threshold = max(node_style.content_cell_min_zoom, lod_policy_.secondary_text_zoom);
             if(child) {
-                const auto& p = live_baseline_nodes_[i].presentation;
+                const auto& p = admission_nodes[i].presentation;
                 Size minimum = child->GetMinSize();
                 bool visible = p.level == UiGraphPresentationLevel::Normal && !node->collapsed
                     && next_zoom >= threshold && !p.control.IsEmpty()
@@ -400,6 +408,9 @@ bool UiNodeGraph::ProjectLiveView(double next_zoom, Pointf next_pan, bool approx
             }
         }
     }
+
+    if(capture_baseline)
+        CaptureLiveViewBaseline();
 
     ProjectPreparedGraphGeometry(live_baseline_nodes_, live_baseline_edges_,
                                  node_geometry_, edge_geometry_,

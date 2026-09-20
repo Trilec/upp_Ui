@@ -10,7 +10,12 @@ NodeGeometry.presentation is the evaluated layout consumed by paint, embedded
 controls, presentation queries and compatible camera projection. No second
 per-node layout cache, runtime JSON compiler or per-node Ctrl tree is permitted.
 
-Shared registered templates are copied/validated once at registration and reused.
+Shared registered templates are copied/validated at registration and reused.
+The current evaluator also revalidates them per prepared node; eliminating that
+redundancy for owned registry entries is an open performance item, not shipped.
+The immutable camera baseline copies evaluated geometry for drift-free projection;
+ONE layout authority does not imply one physical payload copy. See
+UIGRAPH_PERFORMANCE_AUDIT for the 03C audit and measured-acceptance boundary.
 The internal NodeLayout cursor performs bounded rectangle arithmetic during exact
 preparation. Named components retain bounded prepared text, image references,
 rectangles and representation decisions inside that same presentation object.
@@ -27,7 +32,10 @@ rectangles and representation decisions inside that same presentation object.
 Content and Overlay are sibling layers over the SAME Body rectangle. Each owns
 independent columns. Overlay does not consume Content. Port label lanes can
 reserve full safe sides or Body Content sides; semantic anchors stay on the
-silhouette. Do not import the mock-up's alternative InnerBody allocator.
+silhouette. Do not import a second mock-up-only InnerBody allocator. The V8
+post-port interior shared by both layers is a proposed production correction,
+not an implemented four-side reservation policy. See UIGRAPH_WORKSPACE_V8_AUDIT
+and the separate optional band proposal in UIGRAPH_WORKSPACE_03B.
 
 Shapes determine silhouette and safe capacity. Templates allocate inside that
 capacity. A small triangle is not permission to draw outside its silhouette.
@@ -61,8 +69,10 @@ arbitrary nested UI trees. BodyMode is metadata, not another allocator.
 Templates remain at most 16 ordered slots. Supported placement is Fill, Top,
 Bottom, Left, Right and bounded Center. Validate before use. Fill consumes the
 remainder, so order matters. Named-component records are addressed by ID and held
-only in the prepared scene. Paint does not perform binding lookup, text measuring,
-image decoding/resampling or arbitrary unbounded group traversal.
+in the prepared scene and its immutable camera snapshot. Component Paint does
+not perform binding lookup, text measuring, image decoding/resampling or arbitrary
+unbounded group traversal. Overall graph surface Paint can still create bounded
+cold-cache rasters; do not describe all graph painting as allocation-free.
 
 Ordinary components reuse shared style/font/icon/image infrastructure, not full
 Ctrl instances. Live interactive controls are the explicit SetNodeCtrl escape
@@ -110,3 +120,7 @@ UiGraphWorkspaceTests, new Node Design Workspace startup/manual interaction, and
 an exported C++ compilation probe. Read ACTIVE_WORK for required ancestry.
 Protect containment, port identity, component repetition/bindings, Stable/Reflow,
 Micro skip/budget, camera invariants and atomic authoring-file replacement.
+
+03C additionally requires a focused 10k legacy/component profile and retained-camera
+regression before optional shape-aware bands expand. Measure input-event cost as
+well as Paint; passing correctness tests alone does not certify 10k response.

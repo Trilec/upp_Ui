@@ -12,6 +12,7 @@ file
     Scale.cpp,
     Performance.cpp,
     PanProfile.cpp,
+    ComponentProfile.cpp,
     ModelSwitchProfile.cpp;
 
 mainconfig
