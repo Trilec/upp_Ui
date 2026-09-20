@@ -44,6 +44,42 @@ String PlacementSummary(const UiGraphNodeSlotRule& r)
     return s;
 }
 
+String ComponentOutcome(const UiGraphNodeComponentPresentation* c)
+{
+    if(!c) return "Not prepared";
+    using Rep = UiGraphNodeComponentRepresentation;
+    const char* name = "Hidden";
+    switch(c->representation) {
+    case Rep::Text: name = "Text"; break;
+    case Rep::Icon: name = "Icon"; break;
+    case Rep::Bar: name = "Bar"; break;
+    case Rep::Dot: name = "Dot"; break;
+    case Rep::Image: name = "Image"; break;
+    case Rep::Progress: name = "Progress"; break;
+    case Rep::Fields: name = "Fields"; break;
+    case Rep::Tags: name = "Tags"; break;
+    case Rep::Actions: name = "Actions"; break;
+    case Rep::Mosaic: name = "Mosaic"; break;
+    default: break;
+    }
+    String out = name;
+    using Reason = UiGraphNodeComponentReason;
+    switch(c->reason) {
+    case Reason::PolicyOff: out << ": LOD off"; break;
+    case Reason::MissingData: out << ": missing data"; break;
+    case Reason::InvalidData: out << ": invalid data"; break;
+    case Reason::NoSpace: out << ": no room"; break;
+    case Reason::TooSmall: out << ": below readable size"; break;
+    case Reason::Budget: out << ": Micro budget"; break;
+    case Reason::AssetNotReady: out << ": asset not ready"; break;
+    default:
+        if(c->representation == Rep::Text) out << " " << c->font.GetHeight() << "px";
+        else if(c->representation == Rep::Bar || c->representation == Rep::Dot) out << ": simplified";
+        break;
+    }
+    return out;
+}
+
 // These are authoring callout targets only. Actual node regions still come
 // exclusively from the retained production presentation.
 int RegionView::ShelfColumns() const
@@ -169,7 +205,11 @@ void RegionView::Paint(Draw& w)
 }
 void RegionView::LeftDown(Point p, dword)
 {
-    int i = Hit(p); if(i >= 0) WhenSelect(targets_[i].id, targets_[i].region);
+    int i = Hit(p);
+    if(i < 0) return;
+    const Target target = targets_[i]; // selection may rebuild the target array
+    WhenSelect(target.id, target.region);
+    SetFocus(); // clicking a painted surface must transfer keyboard ownership
 }
 void RegionView::LeftDrag(Point p, dword)
 {
@@ -192,7 +232,7 @@ StructureView::StructureView()
 {
     AddFrame(horizontal_.Horz()); AddFrame(scroll_);
     horizontal_.WhenScroll = scroll_.WhenScroll = [this] { drop_row_ = -1; Refresh(); };
-    BackPaint();
+    BackPaint(); WantFocus();
 }
 void StructureView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p, const WorkspaceSelection& selected)
 {
@@ -265,7 +305,8 @@ void StructureView::Paint(Draw& w)
              r.id.IsEmpty() ? font.Bold() : font, Color(42, 62, 82));
         if(n >= 0) {
             const auto& c = spec_.slots[n];
-            text(RectC(placement, y, columns - placement - DPI(4), RowHeight()), PlacementSummary(c),
+            text(RectC(placement, y, columns - placement - DPI(4), RowHeight()),
+                 ComponentOutcome(presentation_.FindComponent(c.id)) + " | " + PlacementSummary(c),
                  font.Height(DPI(10)), Color(93, 110, 127));
         }
         for(int l = 0; l < 4; l++) {
@@ -300,6 +341,7 @@ void StructureView::LeftDown(Point p, dword)
     int lod = x >= Columns() ? (x - Columns()) / DPI(62) : -1;
     WhenSelect(row.id, row.region);
     if(!row.id.IsEmpty() && lod >= 0 && lod < 4) WhenLod(row.id, lod);
+    SetFocus();
 }
 void StructureView::LeftDrag(Point p, dword)
 {
@@ -338,14 +380,25 @@ void PreviewGraph::Paint(Draw& w)
 }
 void PreviewGraph::LeftDown(Point p, dword flags)
 {
-    for(int layer = 1; layer >= 0; layer--)
-        for(int i = snapshot.components.GetCount() - 1; i >= 0; i--) {
-            const auto& c = snapshot.components[i];
-            bool overlay = (int)c.region >= 4 && (int)c.region <= 6;
-            if((overlay ? 1 : 0) == layer && c.representation != UiGraphNodeComponentRepresentation::Hidden && c.footprint.Contains(p)) {
-                WhenComponentSelect(c.id, (int)c.region); return;
+    // Prefer exact painted footprints. Then permit a small, slot-clipped hit
+    // tolerance for a thin bar/dot; do not make a whole Fill slot steal clicks.
+    for(int pass = 0; pass < 2; pass++)
+        for(int layer = 1; layer >= 0; layer--)
+            for(int i = snapshot.components.GetCount() - 1; i >= 0; i--) {
+                const auto& c = snapshot.components[i];
+                bool overlay = (int)c.region >= 4 && (int)c.region <= 6;
+                if((overlay ? 1 : 0) != layer
+                   || c.representation == UiGraphNodeComponentRepresentation::Hidden
+                   || c.footprint.IsEmpty()) continue;
+                Rect hit = (pass ? c.footprint.Deflated(-DPI(3)) : c.footprint)
+                         & c.slot & snapshot.safe;
+                if(hit.Contains(p)) {
+                    String id = c.id; int region = (int)c.region;
+                    WhenComponentSelect(id, region); // may replace snapshot
+                    SetFocus();
+                    return;
+                }
             }
-        }
     UiNodeGraph::LeftDown(p, flags);
 }
 } // namespace GraphWorkspace

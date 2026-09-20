@@ -19,6 +19,7 @@ struct WorkspaceSelection {
 
 void DrawWorkspaceFrame(Draw& w, Rect r, Color c, int width = 1);
 String PlacementSummary(const UiGraphNodeSlotRule& r);
+String ComponentOutcome(const UiGraphNodeComponentPresentation* component);
 Color RegionColor(int region);
 Rect RegionRect(const UiGraphNodePresentation& p, int region);
 // Native view regressions; no model, template allocator or OS drag simulation.
@@ -60,7 +61,7 @@ public:
     Event<String> WhenDrag;
     Function<bool(PasteClip&, int, String)> WhenDrop;
     friend bool RunWorkspaceViewTests(String& error);
-    RegionView() { BackPaint(); }
+    RegionView() { BackPaint(); WantFocus(); }
     Size GetMinSize() const override { return Size(DPI(160), DPI(170)); }
     void SetOverlay(bool on) { overlay_ = on; }
     void Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p,
@@ -113,6 +114,9 @@ public:
     Event<String, int> WhenComponentSelect;
     void Paint(Draw& w) override;
     void LeftDown(Point p, dword flags) override;
+    // Delete belongs to the workspace's component command, never graph topology.
+    bool Key(dword key, int count) override
+    { return key == K_DELETE ? false : UiNodeGraph::Key(key, count); }
 };
 } // namespace GraphWorkspace
 } // namespace Upp

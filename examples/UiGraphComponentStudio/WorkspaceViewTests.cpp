@@ -1,4 +1,5 @@
 #include "WorkspaceWindow.h"
+#include <Ui/UiGraph/UiGraphNodeComponent.h>
 
 namespace Upp {
 namespace GraphWorkspace {
@@ -157,6 +158,22 @@ bool RunWorkspaceViewTests(String& error)
     expect(workspace.inspector_.GetSelectedPropertyId() == "font_height"
            && workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height == DPI(20),
            "component typography commits without losing the edited property");
+    for(int i = 0; i < workspace.document_.family.base_layout.slot_count; i++) {
+        auto& rule = workspace.document_.family.base_layout.slots[i];
+        if(rule.feature == UiGraphNodeSlotFeature::Subtitle && rule.region == UiGraphNodeSlotRegion::Header) {
+            rule.font_height = DPI(18); rule.component_style.bold = 1;
+        }
+    }
+    for(int shape : {0, 1}) {
+        workspace.document_.shape = shape;
+        workspace.preview_.SetZoom(1.0, Point(0, 0));
+        workspace.ApplyDocument();
+        const auto* title = workspace.snapshot_.FindComponent(title_id);
+        expect(workspace.snapshot_.level == UiGraphPresentationLevel::Normal && title
+               && title->representation == UiGraphNodeComponentRepresentation::Text
+               && title->font.GetCy() <= title->content.GetHeight(),
+               "Media title stays readable with an enlarged subtitle and two icons on Rectangle/Ellipse");
+    }
     workspace.document_.edit_base = false;
     workspace.RebuildInspector();
     int height = workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height;
@@ -164,6 +181,124 @@ bool RunWorkspaceViewTests(String& error)
     expect(!workspace.properties_.Find("font_face")->enabled
            && workspace.EffectiveLayout().slots[workspace.EffectiveLayout().FindComponent(title_id)].font_height == height,
            "inherited component rejects edits rather than mutating Base implicitly");
+    // The workspace must own Delete only while a component surface has focus.
+    // Open a real native window for focus tests; no save/file dialogs are used.
+    workspace.SetRect(0, 0, DPI(1100), DPI(760));
+    workspace.TopWindow::Open();
+    Ctrl::ProcessEvents();
+    auto dispatch_key = [&](dword key) {
+        // Mirror Ctrl's focus-to-parent Key propagation, including PreviewGraph.
+        for(Ctrl* c = Ctrl::GetFocusCtrl(); c; c = c->GetParent())
+            if(c->Key(key, 1)) return true;
+        return false;
+    };
+    int slots_before = workspace.EffectiveLayout().slot_count;
+    workspace.table_.SetFocus();
+    dispatch_key(K_DELETE);
+    expect(workspace.EffectiveLayout().slot_count == slots_before,
+           "Delete on inherited shape does not mutate Base");
+    workspace.document_.edit_base = true;
+    workspace.Select(icons[0], (int)UiGraphNodeSlotRegion::Header);
+    workspace.inspector_.SetFocus();
+    workspace.Key(K_DELETE, 1);
+    expect(workspace.EffectiveLayout().FindComponent(icons[0]) >= 0,
+           "workspace Delete does not remove a component while inspector owns focus");
+    auto click_row = [&](const String& id) {
+        auto& table = workspace.table_;
+        table.horizontal_.Set(0);
+        for(int i = 0; i < table.rows_.GetCount(); i++) if(table.rows_[i].id == id) {
+            table.scroll_.Set(i * table.RowHeight());
+            Point at(DPI(100), DPI(30) + i * table.RowHeight() - table.scroll_.Get() + DPI(10));
+            table.LeftDown(at, 0);
+            return;
+        }
+    };
+    click_row(icons[0]);
+    expect(workspace.table_.HasFocus() && workspace.selection_.id == icons[0],
+           "clicking a structure component takes keyboard focus from inspector");
+    dispatch_key(K_DELETE);
+    expect(workspace.EffectiveLayout().slot_count == slots_before - 1
+           && workspace.EffectiveLayout().FindComponent(icons[0]) < 0
+           && workspace.EffectiveLayout().FindComponent(icons[1]) >= 0,
+           "Delete removes only the selected identified component");
+    dispatch_key(K_CTRL_Z);
+    expect(workspace.EffectiveLayout().slot_count == slots_before
+           && workspace.EffectiveLayout().FindComponent(icons[0]) >= 0,
+           "component Delete uses the existing undo transaction");
+    workspace.Select(icons[1], (int)UiGraphNodeSlotRegion::Header);
+    workspace.preview_.SetFocus();
+    dispatch_key(K_DELETE);
+    expect(workspace.EffectiveLayout().FindComponent(icons[1]) < 0
+           && workspace.model_.FindNode(workspace.node_) != nullptr,
+           "preview Delete removes a component and never the specimen node");
+    workspace.TopWindow::Close(); // bypass authoring save prompt for the test fixture
+
+    PreviewGraph proxy;
+    proxy.snapshot.safe = RectC(0, 0, 100, 60);
+    auto& cue = proxy.snapshot.components.Add();
+    cue.id = "thin-title"; cue.region = UiGraphNodeSlotRegion::Header;
+    cue.slot = RectC(10, 10, 80, 30); cue.footprint = RectC(15, 22, 50, 1);
+    cue.representation = UiGraphNodeComponentRepresentation::Bar;
+    String proxy_pick;
+    proxy.WhenComponentSelect = [&](String id, int) { proxy_pick = id; };
+    proxy.LeftDown(Point(25, 24), 0);
+    expect(proxy_pick == "thin-title", "thin preview proxy has a small slot-clipped selection tolerance");
+    proxy_pick.Clear();
+    proxy.LeftDown(Point(5, 24), 0);
+    expect(proxy_pick.IsEmpty(), "proxy hit tolerance does not leak outside its component slot");
+    // Direct production preparation with measured heights keeps this test
+    // independent of Arial availability, monitor DPI and platform font metrics.
+    UiGraphNodeSlotRule text_rule;
+    text_rule.id = "height-fit"; text_rule.component_kind = UiGraphNodeComponentKind::Text;
+    text_rule.feature = UiGraphNodeSlotFeature::Title;
+    text_rule.font_height = 24; text_rule.readable_min_px = 9;
+    text_rule.small = UiGraphNodeSmallMode::BarThenDot;
+    UiGraphNode text_node;
+    text_node.title = "A deliberately long asset name to elide";
+    UiGraphNodeStyle text_style = UiNodeGraph::StyleDefault().node;
+    auto resolved = UiNodeGraphDetail::ResolveNodeComponent(text_rule, text_node, text_style, false);
+    Font small_font = resolved.base_font; small_font.Height(12);
+    auto prepare_text = [&](int width, int height, double zoom, bool micro = false) {
+        UiGraphNodeComponentPresentation out;
+        out.slot = RectC(0, 0, width, height);
+        auto data = UiNodeGraphDetail::ResolveNodeComponent(text_rule, text_node, text_style, micro);
+        UiNodeGraphDetail::PrepareNodeComponent(text_rule, data, zoom, text_node, text_style, out, micro);
+        return out;
+    };
+    auto fitted = prepare_text(80, small_font.GetCy(), 1.0);
+    expect(fitted.representation == UiGraphNodeComponentRepresentation::Text
+           && !fitted.text.IsEmpty() && fitted.font.GetHeight() >= text_rule.readable_min_px
+           && fitted.font.GetHeight() < resolved.base_font.GetHeight()
+           && fitted.font.GetCy() <= fitted.content.GetHeight()
+           && (fitted.footprint & fitted.content) == fitted.footprint,
+           "short text slot shrinks to a readable line before becoming a bar");
+    expect(fitted.text != resolved.text && fitted.text.ToString().EndsWith("...")
+           && GetTextSize(fitted.text, fitted.font).cx <= fitted.content.GetWidth(),
+           "width overflow remains ellipsis at the fitted readable font");
+    auto full = prepare_text(1000, resolved.base_font.GetCy(), 1.0);
+    expect(full.representation == UiGraphNodeComponentRepresentation::Text
+           && full.font == resolved.base_font && full.text == resolved.text,
+           "a text slot with capacity keeps its exact authored font and content");
+    Font minimum_font = resolved.base_font; minimum_font.Height(text_rule.readable_min_px);
+    auto cramped = prepare_text(100, max(1, minimum_font.GetCy() - 2), 1.0);
+    expect(cramped.representation != UiGraphNodeComponentRepresentation::Text
+           && cramped.reason == UiGraphNodeComponentReason::NoSpace,
+           "no sub-readable font is forced into an insufficient text band");
+    auto distant = prepare_text(100, 40, 0.25);
+    expect(distant.representation != UiGraphNodeComponentRepresentation::Text
+           && distant.reason == UiGraphNodeComponentReason::TooSmall,
+           "height fitting does not enlarge a zoomed-out font past its readability policy");
+    auto micro_text = prepare_text(12, 8, 0.25, true);
+    expect(micro_text.representation != UiGraphNodeComponentRepresentation::Text && micro_text.micro,
+           "native Micro remains a proxy path without the text fitting search");
+    text_rule.overflow = UiGraphNodeOverflow::Clip;
+    auto clipped = prepare_text(80, small_font.GetCy(), 1.0);
+    expect(clipped.representation != UiGraphNodeComponentRepresentation::Text,
+           "Clip overflow retains authored font sizing instead of automatic height fitting");
+    expect(ComponentOutcome(&cramped).Find("no room") >= 0
+           && ComponentOutcome(&distant).Find("readable") >= 0
+           && ComponentOutcome(&full).Find("Text") >= 0,
+           "table outcome explains capacity, pixel simplification and readable text separately from LOD mask");
     LOG("UIGRAPH_WORKSPACE_VIEW_SUMMARY checks=" << checks << " failed=" << failed);
     return failed == 0;
 }

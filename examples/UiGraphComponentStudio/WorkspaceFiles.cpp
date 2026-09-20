@@ -112,6 +112,18 @@ bool NodeWorkspace::Key(dword key, int count)
 {
     if(key == K_CTRL_S) { Save(false); return true; }
     if(key == K_CTRL_Z) { Undo(); return true; }
+    if(key == K_DELETE && (table_.HasFocus() || region_.HasFocus()
+                          || overlay_.HasFocus() || preview_.HasFocus())) {
+        // Never intercept Delete from a text/value editor or its filter. The
+        // button and keyboard share the same transaction, undo and scope guard.
+        if(!selection_.id.IsEmpty()) {
+            if(!EditableLayout(document_))
+                status_.SetText("Inherited layout: edit Base or create a layout override to remove this component.");
+            else
+                remove_.WhenAction();
+        }
+        return true;
+    }
     return TopWindow::Key(key, count);
 }
 } // namespace GraphWorkspace

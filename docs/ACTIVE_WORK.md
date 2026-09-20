@@ -1,97 +1,88 @@
 # ACTIVE WORK
 
-Remote main is authoritative. Refresh before editing/publishing; never force-push.
+Remote main is authoritative. Fetch before editing/publishing; never force-push.
 
-BASE: `0520f452aab5f2b7028fc0ebc597d7cfcdfe1f5f` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03A — user-reported authoring regressions**
-TOUCHED: `Utilities/UiGraphWorkspace/WorkspaceDocument.cpp`; `examples/UiGraphComponentStudio/{WorkspaceInspector.cpp,WorkspaceWindow.h,WorkspaceViewTests.cpp}`; this file; `docs/UIGRAPH_WORKSPACE_V8_AUDIT.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 03A only.
-PUBLISHED: the commit containing this update; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceInspector.cpp`.
-VALIDATION: complete touched files reconstructed from pinned GitHub and original blob hashes matched; full local diff reviewed; git diff --check PASS. Windows compilation/new tests NOT run here.
-NEXT ACTION: continue the bounded diagram-inventory/diagnostic fix, then validate current main with Gary. Read the V8 audit before changing port reservation semantics.
+BASE: `8f9a49a8367f0dd9d95d1085582e9348c5aa91db` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03B — component Delete, preview selection and readable text fitting**
+TOUCHED: `Ui/UiGraph/UiGraphNodeComponent.cpp`; `examples/UiGraphComponentStudio/{WorkspaceFiles.cpp,WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceViewTests.cpp}`; this file; `docs/UIGRAPH_WORKSPACE_03B.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for this bounded 03B source slice. Oval band layout is documented direction, NOT implemented.
+PUBLISHED: the commit containing this update; recover with `git log -1 -- docs/UIGRAPH_WORKSPACE_03B.md` and inspect current remote main.
+VALIDATION: complete pinned touched source reconstructed and original Git blob hashes matched; full local source diff and `git diff --check` PASS. No U++/Windows compilation or native execution in this environment. Added regressions are not a runtime PASS.
+NEXT ACTION: Gary's focused Debug gate and manual Delete/text checks in `docs/UIGRAPH_WORKSPACE_03B.md`. Then the outstanding diagram inventory and V8 port-reservation work; resolve shape-aware bands against those contracts rather than moving demo rectangles independently.
 
-## Latest changes / boundaries
+## Latest source changes
 
-03A fixes the authoring default which stacked new icons as 28-unit Top rows in a
-42-unit Media header. New icons default Left; existing saved/moved placement is
-not silently migrated. Ordinary property commits now update dependent values in
-the existing PropertyEditor model instead of detaching/recreating its rows. Only
-a renderer-kind/schema change needs a guarded rebuild. Typography is immediately
-after component identity, with explicit inherited-scope guidance and disabled-edit
-rejection. Native regressions cover two icons Normal/LOD1/Normal, repeated label
-commits, typography and inheritance. Tests are added, not yet native PASS.
+- Painted structure/region selection takes keyboard focus. Preview selection does
+  the same, copies component IDs before callbacks, and adds a three-pixel logical
+  hit tolerance for bars/dots, clipped to the component slot and retained safe area.
+- Delete on those focused surfaces invokes the existing Remove transaction. It
+  does not intercept Delete in property/text editors or delete graph topology.
+  Inherited layouts remain read-only; removal is undoable.
+- Single-line Ellipsis text tries a bounded font-height fit down to its configured
+  final-pixel readable floor before becoming a bar. Width still uses ellipsis;
+  a fitting authored font is unchanged. Clip/Wrap are unchanged. No node/slot
+  resizing, mask rewriting, extra layout cache or Micro text work is introduced.
+- The structure table now prefixes its placement summary with the ACTUAL current
+  representation and a named reason (for example Text 12px / Bar: no room).
+- Existing native view tests now also exercise focus routing, Delete/undo/scope,
+  thin proxy hits, Media title on Rectangle/Ellipse, height-fit/ellipsis/floor,
+  unchanged authored fonts and the Micro early-return boundary.
 
-Still pending: diagram tags for unallocated/reflow-hidden components, readable
-capacity/missing-data diagnostics, malformed zoom-label formatting, V8 left-panel
-port controls and the Body-only/Full-edge reservation refinement. Do not claim
-these fixed by 03A. See `docs/UIGRAPH_WORKSPACE_V8_AUDIT.md`.
+## Latest Windows evidence — Gary's report, 03A only
 
-## Latest Windows validation — reported by Gary
+Tested `8f9a49a8367f0dd9d95d1085582e9348c5aa91db`; ancestry PASS.
+Debug builds: RenderTests, WorkspaceTests, generated C++ and Component Studio PASS.
+Generated C++ compiled unchanged with Ui/CtrlLib only. RenderTests: 8 suites,
+failed_suites=0. WorkspaceTests: checks=33, failed=0. Native view checks=27,
+failed=0. Startup smoke checks=1, failed=0. Diff check PASS; worktree clean.
+No source fixes/commits. Demo was PID 320416 (historical observation, not a process
+that the next agent should kill or assume still exists).
 
-Tested `0520f452aab5f2b7028fc0ebc597d7cfcdfe1f5f`; current remote matched that HEAD.
-RenderTests: 8 suites, failed_suites=0. WorkspaceTests: checks=33, failed=0.
-Generated C++ compiled unchanged with Ui/CtrlLib only, SHA-256
-`5058C4DB324F6D2A2F30DD889E823FF9AABFDAC6606E8168353828F06DD868D3`.
-Component Studio Debug build PASS. View tests: checks=18, failed=0.
-UI smoke: checks=1, failed=0. Diff check PASS; worktree clean; retired DesignMatrix
-not built. Mechanical fixes 94597a9, 7347212, 97d36b2, 0520f45 are included.
+Manual PASS reported: both Left header icons survive Normal/LOD1/Normal; isolated
+component typography changes; port-label toggles preserve inspector position;
+inherited Ellipse is explained/read-only. Held-mouse-button Escape during native
+DND remains unverified. Curt then reported missing Delete and a Normal title bar.
+Those were not covered by the passing 03A gate. This 03B source is newer and must
+be validated separately. Evidence path supplied by Gary:
+`C:\Users\admin\AppData\Local\Temp\UiGraphWorkspace-validation\20260920-203041-8f9a49a8367f-6ea403`.
 
-Manual evidence: shape change and Thumbnail selection synchronized guides, table,
-preview and inspector; LOD3 reachable. Physical drag negotiation and full Save/Open
-workflows were NOT completed. Curt subsequently reported header icons missing at
-Normal, missing diagram inventory, hard-to-find typography and inspector scroll
-reset. Passing automated tests did not cover those interactions. The 03A source
-is newer than this Windows evidence and requires validation.
+## Read first / authoritative boundaries
 
-## Read first
+1. This file and `docs/UIGRAPH_WORKSPACE_03B.md`.
+2. `docs/UIGRAPH_WORKSPACE_V8_AUDIT.md` (03A audit; pending items remain pending).
+3. `docs/UIGRAPH_NODE_WORKSPACE.md`, `docs/UIGRAPH_WORKSPACE_AUTHORING.md`.
+4. `docs/UIGRAPH_WORKSPACE_RUNTIME.md`, `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
+5. Current complete source, callers and tests.
 
-1. This file and `docs/UIGRAPH_WORKSPACE_V8_AUDIT.md`.
-2. `docs/UIGRAPH_NODE_WORKSPACE.md` — active app and current limitations.
-3. `docs/UIGRAPH_WORKSPACE_AUTHORING.md` — family inheritance, strict JSON/export.
-4. `docs/UIGRAPH_WORKSPACE_RUNTIME.md` and current full source.
-5. `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained layout authority.
-
-Active app: `examples/UiGraphComponentStudio`. DesignMatrix is retired. V8 is the
-latest user reference; V7/four-preview notes are historical direction, not a reason
-to restore the old app. HTML remains a design reference, not runtime source/schema.
-
-## Architecture
-
+Active application: `examples/UiGraphComponentStudio`. DesignMatrix remains
+retired. V8 is the latest HTML reference; the newer oval sketch is design input,
+not a second production allocator. JSON is authoring interchange, not runtime UI.
 NodeGeometry.presentation remains the sole evaluated per-node layout cache.
-Content and Overlay are sibling layers; component identity, inclusion and actual
-representation are separate. No per-node Ctrl tree or runtime JSON compiler.
-Seven palette kinds are painted. Actions are not arbitrary live controls; a real
-Ctrl uses the existing host-owned SetNodeCtrl contract.
+Component identity, inclusion, available capacity and representation are distinct.
+Content/Overlay are sibling layers. Ordinary components never allocate Ctrl trees.
+One family JSON saves Base layout/appearance plus independent shape snapshots;
+component styling travels with layout. Production C++ has no authoring dependency.
+Camera edits do not resize nodes. Port identities and connections remain model-owned.
 
-One family JSON saves Base layout and appearance plus independent shape snapshots.
-Component styling currently travels with its layout definition; family appearance
-has separate inheritance. Generated C++ separates factories and uses only Ui.
-Camera edits never resize authored nodes. Port topology/IDs remain model-owned.
+## Remaining work (not claimed complete)
 
-## Durable source checkpoints
+- Template-driven diagram inventory for components lacking a prepared rectangle.
+- Complete V8 Body-only/Full-edge post-port interior shared by BOTH layers,
+  input/output zone preview controls, and associated JSON/export/anchor tests.
+- Shape-aware independently fitted Header/Footer bands: see the explicit proposal
+  and containment/cache constraints in 03B. Current production still uses one
+  conservative safe rectangle.
+- Malformed zoom-caption suffix, palette/gallery glyphs, diagram chip packing,
+  threshold gesture undo and compact-size restoration; wider save/open/DND manual
+  follow-through. No native screenshot parity or large-graph performance claim.
 
-- 14551a3aa933a1e6e65296e7acb1d82bb401ac0f: 02A registered templates, painted kinds, Micro hints.
-- acb1b8b5b8029996316ba391bac8830e07c63ca9: 02B authoring JSON/inheritance/export.
-- fbd283aba2c9deb0f02a855ce7b008c0283a12f2: 02C V7 workspace, old Studio retirement.
-- 3f9957c7a332312d6d6d3f92bb6206344cd2373e: 02D diagram/table interaction hardening.
-- 4873b1965d97751a5671162d85b439cc0f8748bc: repeatable Debug runner.
-- 0520f452aab5f2b7028fc0ebc597d7cfcdfe1f5f: Gary's mechanically corrected, validated baseline.
+## Recovery / validation
 
-## Gary gate
-
-Clean current main at E:\apps\github\upp_Ui. Require latest supervisor SHA as an
-ancestor, not exact equality. Run `scripts/ValidateUiGraphWorkspace.ps1
--RequiredAncestor <SHA> -Launch`; full task in UIGRAPH_WORKSPACE_02D_VALIDATE.md.
-Debug only. RenderTests, WorkspaceTests, unchanged generated C++, workspace and
---view-tests. The native view check count grows; require all checks passing.
-
-Specifically retest Media + two new icons at Normal/LOD1/Normal; selected text
-font/colour; repeated Show port labels edits without selection/scroll loss;
-keyboard and physical drag cancellation; inherited scope. Do not weaken tests or
-change authored LOD masks to conceal missing capacity. Minor mechanical fixes may
-be reviewed/committed/published; stop for ownership/architecture failures.
-
-Report exact HEAD, ancestry, summaries, first blocker, manual evidence, PID,
-evidence directory, diff check, clean worktree and any fix SHA. No Release, broad
-suite or 10k benchmark without a focused reason. Continue coherent publications
-with this recovery record updated each time.
+Refresh current main. Require the latest supervisor commit as an ancestor, never
+exact equality. Run `scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <SHA>
+-Launch` using established Windows toolchain; full command/task is in 03B.
+No Release/broad suite/10k benchmark without a focused reason. No test weakening,
+retired-field restoration or rich-Micro fallback. Minor mechanical CLANG fixes
+may be reviewed, documented, published and retested. Stop for ownership/architecture
+failures. Report exact tested HEAD, ancestry, summaries, first issue, manual findings,
+evidence directory, demo PID, diff check, worktree status and any fix SHA.

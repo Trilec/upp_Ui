@@ -51,6 +51,27 @@ WString FitText(const WString& input, Font font, int width, bool ellipsis)
     return input.Left(lo) + tail;
 }
 
+// Single-line Ellipsis text keeps readable letters before falling back to a
+// footprint. Fit HEIGHT only; width still elides at the chosen font. This is
+// bounded preparation, not a paint-time solver or a change to the slot/template.
+bool FitReadableLine(Font& font, int available_height, int minimum_height)
+{
+    if(font.GetHeight() < minimum_height || available_height <= 0) return false;
+    if(font.GetCy() <= available_height) return true;
+    int lo = minimum_height, hi = font.GetHeight() - 1, best = 0;
+    const Font preferred = font;
+    for(int probe = 0; probe < 16 && lo <= hi; probe++) {
+        int mid = lo + (hi - lo) / 2;
+        Font candidate = preferred;
+        candidate.Height(mid);
+        if(candidate.GetCy() <= available_height) { best = mid; lo = mid + 1; }
+        else hi = mid - 1;
+    }
+    if(!best) return false;
+    font.Height(best);
+    return true;
+}
+
 void PrepareColours(const UiGraphNodeSlotRule& r, const UiGraphNodeStyle& base,
                     double zoom, UiGraphNodeComponentPresentation& out)
 {
@@ -252,9 +273,12 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
     }
 
     Font font = PresentationFont(value.base_font, zoom);
+    const bool scale_readable = abs(value.base_font.GetHeight()) * zoom >= r.readable_min_px;
+    if(kind == Kind::Text && r.overflow == UiGraphNodeOverflow::Ellipsis && scale_readable)
+        FitReadableLine(font, area.GetHeight(), r.readable_min_px);
     int line = font.GetCy();
     out.font = font;
-    bool readable = abs(value.base_font.GetHeight()) * zoom >= r.readable_min_px && line <= area.GetHeight();
+    bool readable = scale_readable && font.GetHeight() >= r.readable_min_px && line <= area.GetHeight();
     if(kind == Kind::Text && readable) {
         if(r.overflow == UiGraphNodeOverflow::Wrap) {
             // Bounded word wrapping during preparation. At most max_items lines.
@@ -413,6 +437,11 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
         }
     }
     PrepareProxy(r, natural, area, width, height, h, v, out);
+    // A successfully painted proxy still needs an explanation in authoring UI.
+    // Distinguish a physically small font from an included text slot that cannot
+    // fit even a readable line/ellipsis. NoSpace does not mean the slot is empty.
+    if(kind == Kind::Text)
+        out.reason = scale_readable ? Reason::NoSpace : Reason::TooSmall;
 }
 
 int ComponentPrimitiveCost(const UiGraphNodeComponentPresentation& c)
