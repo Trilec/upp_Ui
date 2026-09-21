@@ -30,6 +30,8 @@ class NodeWorkspace : public TopWindow {
     UiBoxLayout preview_box_ { UiDirection::V }, region_box_ { UiDirection::V }, overlay_box_ { UiDirection::V };
     UiBoxLayout shape_rows_[3], palette_rows_[4], preview_rows_[3];
     UiBoxLayout tools_ { UiDirection::H }, code_tools_ { UiDirection::H }, camera_tools_ { UiDirection::H };
+    // Exclusive rail pages: UiBoxLayout owns only the host, never both pages.
+    ParentCtrl rail_content_;
     UiSplitter center_split_;
     UiLabel heading_, current_, status_, family_label_, shape_label_, scope_label_, palette_label_;
     UiLabel preview_label_, region_label_, overlay_label_, table_label_, selection_label_, preview_data_label_;

@@ -136,9 +136,29 @@ void NodeWorkspace::BuildShell()
     tools_.SetGap(DPI(4));
     Image icons[] = { ICON_DESIGN_TUNE_48(), ICON_DESIGN_WIDGETS_48(), ICON_DESIGN_FORMAT_PAINT_48(), ICON_DESIGN_CODE_BLOCKS_48() };
     const char* modes[] = { "Inspector", "Template / Layout", "Style overrides", "Generated C++" };
-    for(int i = 0; i < 4; i++) { mode_[i].SetIcon(icons[i]).SetIconSize(DPI(18), DPI(18)).SetCheckable().Tip(modes[i]); tools_.Add(mode_[i]).Fixed(DPI(36)); }
+    for(int i = 0; i < 4; i++) {
+        mode_[i].SetIcon(icons[i]).SetIconSize(DPI(18), DPI(18)).SetCheckable().Tip(modes[i]);
+        // Checked is the persistent selected-page state, not mouse focus. Give
+        // it a distinct face/frame/icon even under the Minimal toolbar theme.
+        auto selected_style = mode_[i].GetStyle();
+        selected_style.transparent = false;
+        selected_style.palette.face[ST_PRESSED] = UiFill::Solid(Color(223, 238, 250));
+        selected_style.palette.frame[ST_PRESSED] = Color(80, 155, 202);
+        selected_style.palette.icon[ST_PRESSED] = Color(10, 115, 200);
+        selected_style.metrics.frame_enabled = true;
+        selected_style.metrics.frame_width = DPI(1);
+        selected_style.press_offset = Point(0, 0);
+        mode_[i].SetCustomStyle(selected_style);
+        tools_.Add(mode_[i]).Fixed(DPI(36));
+    }
     remove_.SetText("Remove"); tools_.AddSpacer(1).Expand(1); tools_.Add(remove_).Fixed(DPI(66));
-    rail_.Add(inspector_).Expand(1); rail_.Add(code_tools_).Fixed(DPI(28)); rail_.Add(code_).Expand(1);
+    // UiBoxLayout deliberately shows its participating children during Layout.
+    // Page visibility therefore belongs to this non-flow host, not to Hide() on
+    // two expanding flow items (which resurrected the empty PropertyEditor).
+    rail_.Add(rail_content_).Expand(1);
+    rail_content_.Add(inspector_.SizePos());
+    rail_content_.Add(code_tools_.HSizePos().TopPos(0, DPI(28)));
+    rail_content_.Add(code_.HSizePos().VSizePos(DPI(32), 0));
     copy_code_.SetText("Copy C++"); save_code_.SetText("Save .cpp"); code_tools_.SetGap(DPI(5));
     code_tools_.Add(copy_code_).Expand(1); code_tools_.Add(save_code_).Expand(1);
     code_.SetReadOnly(); code_.Hide(); code_tools_.Hide();
@@ -284,7 +304,7 @@ void NodeWorkspace::Reports()
     overlay_.Set(EffectiveLayout(), snapshot_, outline_, surface_, selection_);
     table_.Set(EffectiveLayout(), snapshot_, selection_);
     String actual = snapshot_.level == UiGraphPresentationLevel::Normal ? "Normal" : "LOD " + AsString((int)snapshot_.level);
-    CompactLabel(preview_label_, actual + Format(" / %.2fx", preview_.GetZoom()), true);
+    CompactLabel(preview_label_, actual + " / " + Format("%.2f", preview_.GetZoom()) + "x", true);
     region_label_.SetText("Node Region / " + actual); overlay_label_.SetText("Node Overlay / " + actual);
     for(int i = 0; i < 4; i++) camera_buttons_[i].SetChecked(jump_ == i);
     static const char* reps[] = { "Hidden", "Text", "Icon", "Bar", "Dot", "Image", "Progress", "Fields", "Tags", "Actions", "Mosaic" };
@@ -446,7 +466,22 @@ void NodeWorkspace::RunSmoke()
     document_.family.base_layout.lod_widths.normal += 3; ApplyDocument();
     bool ok = preview_.GetZoom() == zoom && preview_.GetPan() == pan && document_.size == size;
     document_.family.base_layout.lod_widths.normal = normal; ApplyDocument();
-    LOG("UIGRAPH_WORKSPACE_UI_SMOKE checks=1 failed=" << (ok ? 0 : 1)); ASSERT(ok);
+    int failed = ok ? 0 : 1;
+    const int saved_page = page_;
+    for(int page : {3, 0, 2, 3}) {
+        SelectPage(page);
+        rail_.Layout(); rail_content_.Layout();
+        const bool coding = page == 3;
+        bool page_ok = inspector_.IsShown() != coding && code_.IsShown() == coding
+                    && code_tools_.IsShown() == coding;
+        if(coding)
+            page_ok &= code_.GetRect().top == DPI(32)
+                    && code_.GetRect().bottom == rail_content_.GetSize().cy;
+        for(int i = 0; i < 4; i++) page_ok &= mode_[i].IsChecked() == (i == page);
+        if(!page_ok) { failed++; LOG("UIGRAPH_RAIL_SMOKE_FAILURE page=" << page); }
+    }
+    SelectPage(saved_page);
+    LOG("UIGRAPH_WORKSPACE_UI_SMOKE checks=5 failed=" << failed); ASSERT(!failed);
 #endif
 }
 } // namespace GraphWorkspace
