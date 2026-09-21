@@ -2,114 +2,89 @@
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 
-BASE: `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03D6 — accumulated validation evidence and executable identity**
-TOUCHED: `scripts/ValidateUiGraphWorkspace.ps1`; this file. No C++/layout edits in 03D6.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the recovery gate and accumulated title/rail/band corrections. Gary's last native gate is still FAIL until a newer run.
-PUBLISHED: the commit containing this record; recover with `git log -1 -- scripts/ValidateUiGraphWorkspace.ps1`.
-VALIDATION: original touched-file blob hashes matched current pinned GitHub; full script/diff review and git diff --check PASS. PowerShell self-tests, Windows/U++ builds and native GUI tests have NOT run here.
-NEXT ACTION: Gary runs the accumulated Debug gate on clean current main with the latest published SHA as ancestor. Require ellipse render, native view, BAND_UI and startup evidence. Keep the failed Media assertions. Then manually inspect the exact executable recorded by the gate.
+BASE: `57e8d38167cde7cee2bc62b0093979af86ca91ca` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03E1 — true Overlay demonstration and non-interference gate**
+TOUCHED: `Utilities/UiGraphWorkspace/WorkspaceDocument.cpp`; `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceOverlayTests.cpp,main.cpp,UiGraphComponentStudio.upp}`; this file; `docs/UIGRAPH_OVERLAY_CONTRACT.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 03E1. The preceding 03D gate is now reported PASS, not FAIL.
+PUBLISHED: the commit containing this record; recover exact SHA with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceOverlayTests.cpp`.
+VALIDATION: complete pinned touched originals reconstructed with matching Git blob hashes; local full diff and git diff --check PASS. New C++ tests/Windows GUI not executed here.
+NEXT ACTION: finish the bounded Overlay-diagram underlay/fit-label follow-through, publish, then Gary validates the accumulated overlay checkpoint. Do not redesign port allocation or suppress the previous regression suites.
 
-## Recovery / 03D6
+## Latest source / 03E1
 
-Recovered remote main at `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a`: all five
-03D implementation slices survived the interrupted sessions. Do not repeat or
-replace them from chat snapshots. Review current source and validate accumulated
-changes before starting another layout feature.
+Content/Overlay allocation and paint ordering are already separate in production.
+The native Media preview looked like two columns because Thumbnail used left-
+aligned Contain, leaving unpainted space where Ready sat. New Media uses Cover
+(crop to fill its own allocation), with State right-aligned in OverlayRight.
+No saved-family migration, global image-fit change, fake ContentRight column,
+new runtime schema or retained geometry cache is introduced.
 
-The runner now requires at least nine RenderTests suites AND the named ellipse
-suite, WorkspaceTests, unchanged generated C++, native view, BAND_UI and startup
-summaries. Every occurrence of a required summary must have positive checks and
-zero failures; one passing record cannot conceal another failing record.
+The new native Overlay gate checks real overlap, unchanged underlying rectangles
+and image bytes across overlay edits, paint order with reversed template ordering,
+upper-layer selection, Contain invariance and persistence. It is wired into both
+Debug startup and --view-tests and fails the process before normal launch.
+No new native PASS is claimed. Read UIGRAPH_OVERLAY_CONTRACT.md for exact scope.
 
-Native logs and observed summaries are copied before checking the process exit
-code. A stopped gate retains the first failed check and full diagnostic log.
-The built workspace path/SHA-256 and launched PID are recorded: use that executable
-for screenshot/manual evidence, not an older already-running demo. Existing demos
-are not stopped by the gate. Nonzero exit, missing summary or timeout remains FAIL.
+## Latest Windows evidence — reported PASS at 57e8d381
 
-Twelve parser-only cases run before the normal gate. They are also available via
-`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ValidateUiGraphWorkspace.ps1 -EvidenceSelfTest`.
-This mode performs no Git, compiler or GUI operations. It tests only evidence
-parsing, not the application. The first Windows run must validate these cases too.
-The established full task and manual acceptance remain in UIGRAPH_ELLIPSE_BANDS.md.
+Gary tested `57e8d38167cde7cee2bc62b0093979af86ca91ca` on clean main, using
+U++18468 / CLANGx64. Required ancestry and origin/main ancestry PASS. No fixes.
+RenderTests 9/0; EllipseBands 16/0; Workspace 44/0; native View 45/0;
+Band UI 23/0; startup smoke 5/0; WorkspaceComponent 24/0; Component 21/0;
+ExecutionPath 8/0; Presentation 87/0; evidence-reader self-tests 12/0.
+Generated C++ compiled unchanged with Ui/CtrlLib only, SHA-256:
+`F29B56A3C5AB929B43CEE845A606654C2142A848ABC025ABBCA03AC954F57F62`.
 
-## Current source
+Manual PASS: both Media text rows readable on Rectangle/Ellipse; independent
+ellipse bands/60% width and outer-band picking; camera/node size stable;
+explicit capacity warning at Header20 and recovery at42; save/reload typography
+and bands; generated fields; exclusive full-height Code page and persistent mode
+selection after resizing; component Delete/Undo and inherited-layout protection.
 
-Source integration checkpoint: `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a` / 03D5.
+Executable evidence SHA-256:
+`31644228035E31E05EF33EA276368A675AFD7C18EB95D410C3EC1245AF7BB17E`.
+Evidence directory:
+`C:\Users\admin\AppData\Local\Temp\UiGraphWorkspace-validation\20260921-210253-57e8d38167cd-6f4450`.
+Executable: UiGraphComponentStudio.exe in that directory. PID 339420 was reported
+running; historical observation only. Diff check PASS; worktree clean; no commits.
+Held-button Escape during native drag remains unverified.
+Curt separately reported the confusing Overlay/thumbnail composition. The 03D
+PASS does not cover that new issue or source added after the tested checkpoint.
 
-03D5 exposes Fit ellipse Header/Footer and Band width (%) in Template / Regions,
-using the existing guarded property transactions and Base/shape scope rules. New
-Media families enable the runtime policy; other presets and old v1 imports do not.
-The preview uses the same NodeComponentClip as production paint, so the newly
-available outer-band content is selectable rather than clipped to old safe.
+## Retained implementation / recovery
 
-WorkspaceBandTests runs after existing view tests during Debug/--view-tests and
-exits nonzero on failure. It covers default vs legacy behavior, real inspector
-geometry changes, stable camera/inspector, Undo, inherited rejection, independent
-shape edits, JSON/code propagation, outer-band picking, the conservative AND banded
-Media text cases, and all four exclusive rail pages. It reports
-UIGRAPH_WORKSPACE_BAND_UI_SUMMARY. Existing view tests remain intact.
+Read this file, UIGRAPH_OVERLAY_CONTRACT.md, UIGRAPH_ELLIPSE_BANDS.md,
+UIGRAPH_WORKSPACE_AUTHORING.md, UIGRAPH_WORKSPACE_RUNTIME.md and current source.
+Active app is examples/UiGraphComponentStudio. DesignMatrix remains retired.
 
-03D4 writes strict workspace schema v2. Base and every detached shape preserve
-ellipse_bands and ellipse_band_width_percent. V1 imports retain false/80 and all
-previous authored geometry; saving upgrades explicitly to v2. Missing/wrong/unknown
-v2 fields reject transactionally. C++ emits both fields without runtime JSON or
-an authoring dependency. Tests include v1 migration, v2 round-trip, independent
-layout/style inheritance, failed-import preservation and the actual exported
-compilation fixture. These tests are not a native PASS yet.
+- 35a2cf8 / 03D1: exclusive rail host, selected-mode styling, zoom caption.
+- 08f09ba / 03D2: readable per-region height reservation, old failing tests retained.
+- 645a6b7 / 03D3: production Ellipse/Circle bands and independent clipping.
+- e5a1f19 / 03D4: strict schema v2; conservative v1 migration; C++ band export.
+- 8b2e53c / 03D5: band inspector/defaults/picking and native integration gate.
+- 57e8d381 / 03D6: evidence parser and executable identity; now Windows PASS.
 
-Retained preceding checkpoints:
-- e5a1f19b4aa1a71c0a600dd8e5029733b7a73549 / 03D4: strict v2 band persistence,
-  conservative v1 migration and production C++ export.
-- 35a2cf89665a4800d3a706466cf7c26c0661083b / 03D1: one ParentCtrl rail host;
-  code consumes the rail instead of sharing with hidden inspector. Checked mode
-  feedback and zoom caption repaired; startup smoke has five checks.
-- 08f09ba1f1b8a02d24a5f6301acc371ebef307af / 03D2: one rich input-resolution pass
-  and bounded reverse per-region readable-height reservation. A natural Subtitle
-  must leave a readable minimum for later Title Fill. Existing failing assertions
-  remain; no font-floor reduction, fixed-header inflation or LOD-mask rewriting.
-- 645a6b774a47c62ab0955621fb81cf39efe9e717 / 03D3: real opt-in Ellipse/Circle bands;
-  whole-band containment, unchanged conservative safe, per-region paint clipping,
-  no new per-node cache. Nine RenderTests suites. Read UIGRAPH_ELLIPSE_BANDS.md.
+One NodeGeometry.presentation remains authoritative. Components are bounded
+painted C++ descriptions, not Ctrl trees or runtime JSON. Content/Overlay are
+sibling layers; Overlay never participates in Content flow. Image allocation and
+painted footprint are distinct. Component styling follows layout; node appearance
+inherits independently. Camera edits never resize nodes. Preserve 03C performance
+and projection work. Do not identify running executables from source HEAD alone.
 
-## Latest Windows evidence — FAIL at 1fa8793
+## Open boundaries
 
-Gary tested `1fa8793c1b3ad440d86be9a2007f0825d0650275`, ancestry PASS.
-Render8/0, Workspace33/0, generated C++ Ui/CtrlLib-only compile PASS, SHA-256
-`5058C4DB324F6D2A2F30DD889E823FF9AABFDAC6606E8168353828F06DD868D3`.
-Startup1/0. Native view45/2 FAIL: Media title with enlarged Subtitle and two icons
-failed on Rectangle and Ellipse. Other Delete/Undo/focus/proxy checks passed.
-Stopped before manual checks/normal launch; no fix/new PID; diff PASS; tree clean.
-Evidence: `C:\Users\admin\AppData\Local\Temp\UiGraphWorkspace-validation\20260921-124117-1fa8793c1b3a-208e3d`.
-03A was previously validated; held-button Escape DND remains unverified.
-New export fixtures legitimately have a different hash. Do not assert the old hash.
-Do not identify the screenshot executable solely from source HEAD.
-
-## Architecture / recovery
-
-Active app: examples/UiGraphComponentStudio. DesignMatrix stays retired.
-One NodeGeometry.presentation; bounded shared C++ templates; no runtime JSON
-compiler, ordinary per-node Ctrl tree or competing preview allocator. Component
-styling follows layout; family appearance inheritance remains separate. Camera
-changes never resize authored nodes. Preserve prior 03C performance/camera work.
-Read this file, UIGRAPH_ELLIPSE_BANDS.md, UIGRAPH_WORKSPACE_AUTHORING.md,
-UIGRAPH_WORKSPACE_03B.md, UIGRAPH_WORKSPACE_V8_AUDIT.md and complete current source.
-
-Still pending (not part of this completed integration): diagram inventory for unallocated components;
-complete V8 Body-only/Full-edge shared post-port Content/Overlay and zone controls;
-threshold undo/compact lifecycle; physical DND and full Save/Open checks. Neither
-bands nor this integration checkpoint claims to finish those tasks.
+General diagram inventory for hidden/unallocated components; full V8 Body-only /
+Full-edge shared post-port Content/Overlay and input/output zones; threshold undo /
+compact lifecycle; wider physical DND. No completion claim for these in 03E1.
 
 ## Gary gate
 
-Clean current main: E:\apps\github\upp_Ui. Require latest published SHA as ancestor.
-Run scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <SHA> -Launch with
-established U++18468 / CLANGx64, Debug only. RenderTests now nine suites;
-WorkspaceTests, unchanged exported C++, native view, BAND_UI and startup smoke
-must pass. The current runner propagates the combined native test exit status.
-Keep failed Media checks. After PASS: code full-height/selected icon, Normal text,
-ellipse toggle/width, outer-band picking, Delete/Undo and save/reload/export.
-Minor mechanical fixes may be reviewed/documented/published and retested; stop for
-architecture failures. No weakened tests, rich-Micro fallback, retired matrix,
-Release/broad benchmark. Report exact HEAD, summaries, first issue and clean tree.
+Use E:\apps\github\upp_Ui (literal underscore, no backslash before it), clean main.
+Require latest published checkpoint as ancestor. Run the established Debug runner
+with -RequiredAncestor <SHA> -Launch. Read the overlay contract for manual checks.
+All prior required summaries and the new OVERLAY summary must pass with positive
+counts. No fixed generated-code hash: the new preset legitimately changes it.
+Record exact HEAD, executable path/SHA-256, all summaries, manual result, evidence
+path, PID and clean worktree. Stop at first real failure. Minor mechanical fixes
+only, reviewed/documented/published and retested. No weakened tests, retired matrix,
+Release/broad benchmark or rich-Micro fallback. Publish coherent reviewed slices.

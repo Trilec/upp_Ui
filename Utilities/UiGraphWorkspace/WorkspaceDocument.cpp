@@ -98,7 +98,9 @@ Document MakeDocument(UiGraphNodeTemplateKind kind)
         case UiGraphNodeSlotFeature::Badge:
             r.component_kind = UiGraphNodeComponentKind::Text;
             r.feature = UiGraphNodeSlotFeature::Subtitle;
-            r.label = "State"; r.data_key = "state"; break;
+            r.label = "State"; r.data_key = "state";
+            if(kind == UiGraphNodeTemplateKind::Media) r.align_h = UiAlign::RIGHT;
+            break;
         case UiGraphNodeSlotFeature::Control:
             r.component_kind = UiGraphNodeComponentKind::Actions;
             r.label = "Actions (painted)"; r.data_key = "actions"; break;
@@ -106,6 +108,11 @@ Document MakeDocument(UiGraphNodeTemplateKind kind)
             if(kind == UiGraphNodeTemplateKind::Media) {
                 r.component_kind = UiGraphNodeComponentKind::Image;
                 r.label = "Thumbnail"; r.data_key = "image";
+                // Demonstrate true superposition: fill the Content allocation,
+                // cropping to aspect rather than leaving a left-aligned gutter
+                // in which the Overlay badge can look like a second column.
+                // This is a new-family default; imports keep their authored fit.
+                r.image_fit = UiGraphNodeImageFit::Cover;
             }
             else if(kind == UiGraphNodeTemplateKind::Status) {
                 r.component_kind = UiGraphNodeComponentKind::Progress;

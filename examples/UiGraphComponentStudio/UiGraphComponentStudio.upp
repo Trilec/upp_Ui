@@ -12,6 +12,7 @@ file
     WorkspaceViews.cpp,
     WorkspaceViewTests.cpp,
     WorkspaceBandTests.cpp,
+    WorkspaceOverlayTests.cpp,
     WorkspaceWindow.h,
     WorkspaceWindow.cpp,
     WorkspaceInspector.cpp,

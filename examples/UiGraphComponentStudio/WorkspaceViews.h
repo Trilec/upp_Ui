@@ -24,6 +24,7 @@ Color RegionColor(int region);
 Rect RegionRect(const UiGraphNodePresentation& p, int region);
 // Native view regressions; no model, template allocator or OS drag simulation.
 bool RunWorkspaceViewTests(String& error);
+bool RunWorkspaceOverlayTests(String& error);
 
 class DragTile : public UiButton {
 public:

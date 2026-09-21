@@ -20,6 +20,11 @@ GUI_APP_MAIN
             SetExitCode(1);
             return;
         }
+        if(!GraphWorkspace::RunWorkspaceOverlayTests(error)) {
+            LOG("UIGRAPH_WORKSPACE_OVERLAY_FAILURE: " << error);
+            SetExitCode(1);
+            return;
+        }
     }
     if(!test_only) GraphWorkspace::NodeWorkspace().Run();
 }
