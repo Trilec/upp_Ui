@@ -2,15 +2,28 @@
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 
-BASE: `645a6b774a47c62ab0955621fb81cf39efe9e717` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03D4 — persist and export ellipse-band policy**
-TOUCHED: `Utilities/UiGraphWorkspace/{WorkspaceJson.cpp,WorkspaceCode.cpp}`; `Utilities/UiGraphWorkspaceTests/main.cpp`; this file; `docs/UIGRAPH_WORKSPACE_AUTHORING.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the persistence/export slice. Workspace controls/defaults/picking are next.
-PUBLISHED: the commit containing this record; recover with `git log -1 -- Utilities/UiGraphWorkspace/WorkspaceJson.cpp`.
-VALIDATION: full pinned touched files reconstructed, original Git blob hashes matched, full local diff reviewed and git diff --check PASS. No Windows/U++ build or native execution here. Gary's last gate remains FAIL until a newer run.
-NEXT ACTION: wire runtime ellipse_bands/width into Template inspector, new Media defaults and shared clip-based preview picking. Keep current title and rail corrections. Publish that integration, then run accumulated Debug validation.
+BASE: `e5a1f19b4aa1a71c0a600dd8e5029733b7a73549` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03D5 — complete visible ellipse-band authoring integration**
+TOUCHED: `Utilities/UiGraphWorkspace/WorkspaceDocument.cpp`; `examples/UiGraphComponentStudio/{WorkspaceInspector.cpp,WorkspaceViews.cpp,WorkspaceWindow.h,WorkspaceBandTests.cpp,main.cpp,UiGraphComponentStudio.upp}`; this file; `docs/UIGRAPH_ELLIPSE_BANDS.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the accumulated title/rail/band corrections. No new native PASS is claimed.
+PUBLISHED: the commit containing this record; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceBandTests.cpp`.
+VALIDATION: complete pinned touched source inspected; original C++/package blob hashes matched, full local diff reviewed and git diff --check PASS. No Windows/U++ build or native execution here. Gary's last gate remains FAIL until a newer run.
+NEXT ACTION: Gary runs the accumulated Debug gate and focused manual checks in UIGRAPH_ELLIPSE_BANDS.md. Keep the previously failed Media checks; test both rows with bands disabled AND enabled. Then continue diagram inventory and the full V8 port contract.
 
 ## Current source
+
+03D5 exposes Fit ellipse Header/Footer and Band width (%) in Template / Regions,
+using the existing guarded property transactions and Base/shape scope rules. New
+Media families enable the runtime policy; other presets and old v1 imports do not.
+The preview uses the same NodeComponentClip as production paint, so the newly
+available outer-band content is selectable rather than clipped to old safe.
+
+WorkspaceBandTests runs after existing view tests during Debug/--view-tests and
+exits nonzero on failure. It covers default vs legacy behavior, real inspector
+geometry changes, stable camera/inspector, Undo, inherited rejection, independent
+shape edits, JSON/code propagation, outer-band picking, the conservative AND banded
+Media text cases, and all four exclusive rail pages. It reports
+UIGRAPH_WORKSPACE_BAND_UI_SUMMARY. Existing view tests remain intact.
 
 03D4 writes strict workspace schema v2. Base and every detached shape preserve
 ellipse_bands and ellipse_band_width_percent. V1 imports retain false/80 and all
@@ -21,6 +34,8 @@ layout/style inheritance, failed-import preservation and the actual exported
 compilation fixture. These tests are not a native PASS yet.
 
 Retained preceding checkpoints:
+- e5a1f19b4aa1a71c0a600dd8e5029733b7a73549 / 03D4: strict v2 band persistence,
+  conservative v1 migration and production C++ export.
 - 35a2cf89665a4800d3a706466cf7c26c0661083b / 03D1: one ParentCtrl rail host;
   code consumes the rail instead of sharing with hidden inspector. Checked mode
   feedback and zoom caption repaired; startup smoke has five checks.
@@ -55,17 +70,18 @@ changes never resize authored nodes. Preserve prior 03C performance/camera work.
 Read this file, UIGRAPH_ELLIPSE_BANDS.md, UIGRAPH_WORKSPACE_AUTHORING.md,
 UIGRAPH_WORKSPACE_03B.md, UIGRAPH_WORKSPACE_V8_AUDIT.md and complete current source.
 
-Pending after current integration: diagram inventory for unallocated components;
+Still pending (not part of this completed integration): diagram inventory for unallocated components;
 complete V8 Body-only/Full-edge shared post-port Content/Overlay and zone controls;
 threshold undo/compact lifecycle; physical DND and full Save/Open checks. Neither
-bands nor this persistence checkpoint claims to finish those tasks.
+bands nor this integration checkpoint claims to finish those tasks.
 
 ## Gary gate
 
 Clean current main: E:\apps\github\upp_Ui. Require latest published SHA as ancestor.
 Run scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <SHA> -Launch with
 established U++18468 / CLANGx64, Debug only. RenderTests now nine suites;
-WorkspaceTests, unchanged exported C++, native view and startup smoke must pass.
+WorkspaceTests, unchanged exported C++, native view, BAND_UI and startup smoke
+must pass. The current runner propagates the combined native test exit status.
 Keep failed Media checks. After PASS: code full-height/selected icon, Normal text,
 ellipse toggle/width, outer-band picking, Delete/Undo and save/reload/export.
 Minor mechanical fixes may be reviewed/documented/published and retested; stop for

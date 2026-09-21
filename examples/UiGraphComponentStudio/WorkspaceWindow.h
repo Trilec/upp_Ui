@@ -6,8 +6,10 @@
 
 namespace Upp {
 namespace GraphWorkspace {
+bool RunWorkspaceBandTests(String& error);
 class NodeWorkspace : public TopWindow {
     friend bool RunWorkspaceViewTests(String& error);
+    friend bool RunWorkspaceBandTests(String& error);
     Document document_;
     Array<Document> undo_;
     One<Document> property_origin_;

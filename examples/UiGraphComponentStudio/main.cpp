@@ -15,6 +15,11 @@ GUI_APP_MAIN
             SetExitCode(1);
             return;
         }
+        if(!GraphWorkspace::RunWorkspaceBandTests(error)) {
+            LOG("UIGRAPH_WORKSPACE_BAND_UI_FAILURE: " << error);
+            SetExitCode(1);
+            return;
+        }
     }
     if(!test_only) GraphWorkspace::NodeWorkspace().Run();
 }

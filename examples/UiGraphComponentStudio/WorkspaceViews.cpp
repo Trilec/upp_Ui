@@ -1,4 +1,5 @@
 #include "WorkspaceViews.h"
+#include <Ui/UiGraph/UiGraphNodeComponent.h>
 
 namespace Upp {
 namespace GraphWorkspace {
@@ -391,7 +392,7 @@ void PreviewGraph::LeftDown(Point p, dword flags)
                    || c.representation == UiGraphNodeComponentRepresentation::Hidden
                    || c.footprint.IsEmpty()) continue;
                 Rect hit = (pass ? c.footprint.Deflated(-DPI(3)) : c.footprint)
-                         & c.slot & snapshot.safe;
+                         & UiNodeGraphDetail::NodeComponentClip(snapshot, c);
                 if(hit.Contains(p)) {
                     String id = c.id; int region = (int)c.region;
                     WhenComponentSelect(id, region); // may replace snapshot

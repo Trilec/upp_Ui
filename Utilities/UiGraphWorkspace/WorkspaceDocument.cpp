@@ -77,6 +77,9 @@ Document MakeDocument(UiGraphNodeTemplateKind kind)
     t = UiGraphBuiltinNodeTemplate(kind);
     t.SetLodWidths(160, 80, 48);
     t.micro_hints = true;
+    // New Media families demonstrate the production ellipse policy. Loading an
+    // existing family never calls this factory; v1 imports remain conservative.
+    t.ellipse_bands = kind == UiGraphNodeTemplateKind::Media;
     for(int i = 0; i < t.slot_count; i++) {
         auto& r = t.slots[i];
         r.id = "component_" + AsString(i + 1);

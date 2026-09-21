@@ -75,6 +75,10 @@ void NodeWorkspace::RebuildInspector()
         choice("body_mode", "Body mode", (int)t.body_mode, "Stack|Centered|Media|Key value|Fields|Port rows|Flow tags", "Layout", [this](Document& d, const Value& v) { EditableLayout(d)->body_mode = (UiGraphNodeBodyMode)(int)v; });
         integer("header", "Header height", Logical(t.header_height), -1, 1024, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->header_height = Metric(v); });
         integer("footer", "Footer height", Logical(t.footer_height), 0, 1024, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->footer_height = Metric(v); });
+        boolean("ellipse_bands", "Fit ellipse Header/Footer", t.ellipse_bands, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->ellipse_bands = (bool)v; });
+        properties_.Find("ellipse_bands")->SetHelp("Ellipse/Circle only: fit contained Header and Footer bands outward. Their authored heights, port reservations and camera are unchanged. Other shapes and Micro keep conservative capacity.");
+        integer("ellipse_width", "Band width (%)", t.ellipse_band_width_percent, 20, 100, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->ellipse_band_width_percent = (int)v; });
+        properties_.Find("ellipse_width")->SetHelp("Percentage of the conservative band width, not node width. Narrower bands can move farther toward the ellipse edge. A move that cannot fit retains its conservative position. Saved with the layout, not node appearance.");
         const int dimensions[] = {t.content_left_width, t.content_right_width, t.overlay_left_width, t.overlay_right_width};
         const char* names[] = { "Content left", "Content right", "Overlay left", "Overlay right" };
         for(int i = 0; i < 4; i++) {
@@ -255,6 +259,8 @@ void NodeWorkspace::SyncInspectorValues()
         colour("shadow_color", s.shadow_color, Color(32, 48, 64));
     }
     else if(page_ == 1 || selection_.id.IsEmpty()) {
+        set("ellipse_bands", EffectiveLayout().ellipse_bands);
+        set("ellipse_width", EffectiveLayout().ellipse_band_width_percent);
         set("preview_data", AsJSON(document_.data));
         int labels = document_.data.Find("show_port_labels");
         set("preview_labels", labels >= 0 && document_.data.GetValue(labels).Is<bool>() && (bool)document_.data.GetValue(labels));
