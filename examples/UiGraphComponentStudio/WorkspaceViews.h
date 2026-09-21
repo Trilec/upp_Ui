@@ -54,6 +54,7 @@ class RegionView : public Ctrl {
     int ShelfRows() const;
     Rect Board() const;
     bool Active(const Target& target) const;
+    Rect UnderlayRect(const UiGraphNodeComponentPresentation& c) const;
     Rect Project(Rect r) const;
     Point Project(Pointf p) const;
     int Hit(Point p) const;
@@ -62,6 +63,7 @@ public:
     Event<String> WhenDrag;
     Function<bool(PasteClip&, int, String)> WhenDrop;
     friend bool RunWorkspaceViewTests(String& error);
+    friend bool RunWorkspaceOverlayTests(String& error);
     RegionView() { BackPaint(); WantFocus(); }
     Size GetMinSize() const override { return Size(DPI(160), DPI(170)); }
     void SetOverlay(bool on) { overlay_ = on; }

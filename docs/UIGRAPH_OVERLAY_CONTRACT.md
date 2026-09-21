@@ -61,16 +61,23 @@ UIGRAPH_WORKSPACE_OVERLAY_SUMMARY and tests:
 Source/diff reviewed only until Gary runs this newer checkpoint. The reported
 03D PASS at 57e8d381 does not validate the new default or these new tests.
 
-## Follow-through
+## 03E2: implemented authoring-layer explanation
 
-The Overlay diagram should show a subdued, geometry-derived Content footprint
-under its Overlay guides/markers. This must not create Content drop targets in
-the Overlay diagram, shrink the preview image, or invent another layout allocator.
-At-a-glance labels should distinguish image fit and layer membership. General
-inventory chips for hidden/unallocated components remain a separate open item.
+The Overlay diagram now shows a subdued, labelled Content footprint underneath
+its Overlay guides/markers. It projects the actual painted footprint, intersected
+with the production clip/content; it does not expand Contain to fill its slot.
+Hidden Content leaves no invented footprint. These are neutral diagnostic shapes,
+not a second thumbnail painter, independent layout or additional retained cache.
+
+The subdued Content is not a drop/selection target in the Overlay diagram. Overlay
+hit routing and graph-owned lane rejection remain intact. The structure title
+says Overlay (above Content), and placement summaries include Overlay, Cover (crop)
+or Contain (whole) where applicable. Tests cover geometry, actual guide paint,
+hidden state, routing and summary labels. General named inventory chips for
+unallocated/hidden components remain a separate open item.
 
 The complete V8 Body-only/Full-edge shared post-port interior remains outstanding.
-No change to that larger port contract is claimed by 03E1.
+No change to that larger port contract is claimed by 03E1/03E2.
 
 ## Validation
 
@@ -84,7 +91,8 @@ After automated PASS use the recorded executable: fresh Media, toggle State's
 Normal setting, change Overlay Right width, move State between Overlay regions,
 and Delete/Undo it. The image must not move, shrink, recrop or change resolution.
 State must paint over image pixels. Check Rectangle and Ellipse. Compare Contain
-with Cover; save/reload both. Existing saved Contain families must remain unchanged.
+with Cover; save/reload both. The Overlay diagram must show Content beneath it,
+with no extra Content drop targets. Existing saved Contain families must remain unchanged.
 Keep old text, ellipse, code-page and inherited-scope checks. Held-button Escape
 is still a separate unverified physical gesture. No tests may be weakened to
 obtain a pass; minor mechanical fixes only, with publication and exact retest SHA.

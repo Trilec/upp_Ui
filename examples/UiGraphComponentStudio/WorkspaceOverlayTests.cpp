@@ -195,6 +195,47 @@ bool RunWorkspaceOverlayTests(String& error)
                && loaded.family.base_layout.slots[image_index].image_fit == fit,
                "saved image-fit choices round-trip without applying new-family defaults");
     }
+    // The diagram must reveal the underlying painted footprint, not invent a
+    // Content-side reservation or route a drop to the subdued underlay.
+    RegionView diagram;
+    diagram.SetOverlay(true); diagram.SetRect(0, 0, DPI(240), DPI(210));
+    UiGraphNodePresentation guide;
+    guide.safe = RectC(0, 0, 100, 80);
+    guide.body = guide.content = guide.overlay = RectC(10, 10, 80, 60);
+    guide.content_main = guide.overlay_main = guide.body;
+    guide.port_lanes[0] = RectC(0, 10, 10, 60);
+    auto& underlay = guide.components.Add();
+    underlay.id = image_id; underlay.region = Region::ContentMain;
+    underlay.slot = underlay.content = guide.content_main;
+    underlay.footprint = RectC(10, 10, 40, 60); // simulated Contain footprint
+    underlay.representation = Rep::Image;
+    Vector<Pointf> outline;
+    outline << Pointf(0, 0) << Pointf(100, 0) << Pointf(100, 80) << Pointf(0, 80);
+    diagram.Set(base, guide, outline, guide.safe, WorkspaceSelection());
+    Rect shown = diagram.UnderlayRect(underlay);
+    expect(shown == diagram.Project(underlay.footprint)
+           && shown.GetWidth() < diagram.Project(underlay.slot).GetWidth(),
+           "Overlay diagram projects the underlay footprint rather than its unused Fill space");
+    int hit = diagram.Hit(shown.CenterPoint());
+    bool overlay_targets = hit >= 0 && diagram.targets_[hit].region == (int)Region::OverlayMain;
+    for(const auto& target : diagram.targets_)
+        overlay_targets &= target.region >= (int)Region::OverlayLeft && target.region <= (int)Region::OverlayRight;
+    expect(overlay_targets && diagram.Hit(diagram.Project(guide.port_lanes[0]).CenterPoint()) < 0,
+           "underlay guide cannot hijack Overlay drops or graph-owned port lanes");
+    ImageDraw guide_draw(DPI(240), DPI(210)); diagram.Paint(guide_draw);
+    Image guide_image = guide_draw;
+    int underlay_pixels = 0;
+    for(int y = shown.top; y < shown.bottom; y++) for(int x = shown.left; x < shown.right; x++)
+        underlay_pixels += PixelIs(guide_image, Point(x, y), Color(228, 237, 243));
+    expect(underlay_pixels > 0, "Overlay diagram actually paints subdued Content below its guides");
+    guide.components[0].representation = Rep::Hidden;
+    diagram.Set(base, guide, outline, guide.safe, WorkspaceSelection());
+    expect(diagram.UnderlayRect(guide.components[0]).IsEmpty(),
+           "hidden Content leaves no invented underlay footprint");
+    expect(PlacementSummary(base.slots[image_index]).Find("Cover (crop)") >= 0
+           && PlacementSummary(contain.slots[image_index]).Find("Contain (whole)") >= 0
+           && PlacementSummary(base.slots[state_index]).Find("Overlay") >= 0,
+           "structure summaries expose image-fit and Overlay membership at a glance");
     LOG("UIGRAPH_WORKSPACE_OVERLAY_SUMMARY checks=" << checks << " failed=" << failed);
     return failed == 0;
 }

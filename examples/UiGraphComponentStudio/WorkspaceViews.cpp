@@ -30,7 +30,12 @@ Rect RegionRect(const UiGraphNodePresentation& p, int r)
 String PlacementSummary(const UiGraphNodeSlotRule& r)
 {
     const char* place[] = { "Fill", "Top", "Bottom", "Left", "Right", "Center" };
-    String s = place[(int)r.placement];
+    String s;
+    if(r.region >= UiGraphNodeSlotRegion::OverlayLeft && r.region <= UiGraphNodeSlotRegion::OverlayRight)
+        s << "Overlay / ";
+    s << place[(int)r.placement];
+    if(r.GetKind() == UiGraphNodeComponentKind::Image)
+        s << (r.image_fit == UiGraphNodeImageFit::Cover ? " / Cover (crop)" : " / Contain (whole)");
     s << " / " << (r.align_h == UiAlign::LEFT ? "left" : r.align_h == UiAlign::RIGHT ? "right" : "center");
     s << " / " << (r.flow == UiGraphNodeSlotFlow::Stable ? "stable" : "reflow");
     if(r.overflow == UiGraphNodeOverflow::Wrap) s << " / wrap";
@@ -121,6 +126,16 @@ Rect RegionView::Project(Rect r) const
 {
     return r.IsEmpty() || Board().IsEmpty() ? Rect() : Rect(Project(Pointf(r.left, r.top)), Project(Pointf(r.right, r.bottom)));
 }
+Rect RegionView::UnderlayRect(const UiGraphNodeComponentPresentation& c) const
+{
+    if(!overlay_ || c.region < UiGraphNodeSlotRegion::ContentLeft
+       || c.region > UiGraphNodeSlotRegion::ContentRight
+       || c.representation == UiGraphNodeComponentRepresentation::Hidden) return Rect();
+    // Actual painted capacity, not the whole Fill slot. Contain's unused space
+    // must stay visibly empty. These guides never become drop/selection targets.
+    return Project(c.footprint & c.content & UiNodeGraphDetail::NodeComponentClip(presentation_, c))
+         & Rect(GetSize());
+}
 void RegionView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresentation& p,
                      const Vector<Pointf>& path, Rect surface, const WorkspaceSelection& selection)
 {
@@ -176,6 +191,24 @@ void RegionView::Paint(Draw& w)
     DrawWorkspaceFrame(w, Project(presentation_.safe), Color(171, 182, 193));
     DrawWorkspaceFrame(w, Project(presentation_.body), Color(239, 125, 34));
     Font font = StdFont().Height(DPI(10));
+    if(overlay_) for(const auto& c : presentation_.components) {
+        Rect r = UnderlayRect(c);
+        if(r.IsEmpty()) continue;
+        // Subdued Content below the overlay guides, from the SAME projection.
+        // This is an authoring footprint, not a second thumbnail renderer.
+        w.DrawRect(r, Color(228, 237, 243));
+        DrawWorkspaceFrame(w, r, Color(160, 181, 195));
+        int n = spec_.FindComponent(c.id);
+        String label = n >= 0 && !spec_.slots[n].label.IsEmpty() ? spec_.slots[n].label : c.id;
+        label << " (Content)";
+        Font small = font; small.Height(DPI(9));
+        if(r.GetHeight() >= small.GetCy() + DPI(6)) {
+            w.Clip(r);
+            DrawTextEllipsis(w, r.left + DPI(3), r.bottom - small.GetCy() - DPI(3),
+                             max(0, r.GetWidth() - DPI(6)), label, "...", small, Color(111, 139, 159));
+            w.End();
+        }
+    }
     for(int i = 0; i < targets_.GetCount(); i++) {
         const auto& t = targets_[i]; if(t.rect.IsEmpty()) continue;
         bool active = Active(t);
@@ -202,7 +235,11 @@ void RegionView::Paint(Draw& w)
     }
     // Semantic port reservations are non-drop graph chrome.
     for(const Rect& lane : presentation_.port_lanes) DrawWorkspaceFrame(w, Project(lane), Color(19, 160, 216));
-    w.DrawText(DPI(6), max(0, GetSize().cy - DPI(11)), "Grey: inactive. +: unreserved region.", font.Height(DPI(9)), Color(102, 117, 135));
+    const char* hint = overlay_ ? "Overlay above Content; +: unreserved." : "Grey: inactive. +: unreserved region.";
+    w.Clip(Rect(GetSize()));
+    DrawTextEllipsis(w, DPI(6), max(0, GetSize().cy - DPI(11)), max(0, GetSize().cx - DPI(12)),
+                     hint, "...", font.Height(DPI(9)), Color(102, 117, 135));
+    w.End();
 }
 void RegionView::LeftDown(Point p, dword)
 {
@@ -251,7 +288,7 @@ void StructureView::Set(const UiGraphNodeTemplate& spec, const UiGraphNodePresen
     add("Node / Safe Area", 0, -1, 255); add("Header", 1, 0, 1);
     add("Body", 1, -1, 126); add("Content", 2, -1, 14);
     add("Left", 3, 1, 2); add("Main", 3, 2, 4); add("Right", 3, 3, 8);
-    add("Overlay (same Body extent)", 2, -1, 112);
+    add("Overlay (above Content)", 2, -1, 112);
     add("Left", 3, 4, 16); add("Main", 3, 5, 32); add("Right", 3, 6, 64);
     add("Footer", 1, 7, 128); add("Port lanes (graph-owned / not component targets)", 1, -1, 0);
     Layout(); Refresh();

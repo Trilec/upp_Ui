@@ -2,15 +2,27 @@
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 
-BASE: `57e8d38167cde7cee2bc62b0093979af86ca91ca` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03E1 — true Overlay demonstration and non-interference gate**
-TOUCHED: `Utilities/UiGraphWorkspace/WorkspaceDocument.cpp`; `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceOverlayTests.cpp,main.cpp,UiGraphComponentStudio.upp}`; this file; `docs/UIGRAPH_OVERLAY_CONTRACT.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for 03E1. The preceding 03D gate is now reported PASS, not FAIL.
+BASE: `4c997824f741f1555269f95aec3462e7674045e0` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03E2 — visible Content underlay and explicit Overlay/fit summaries**
+TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceOverlayTests.cpp}`; this file; `docs/UIGRAPH_OVERLAY_CONTRACT.md`.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for accumulated 03E1/03E2. The preceding 03D gate is now reported PASS, not FAIL.
 PUBLISHED: the commit containing this record; recover exact SHA with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceOverlayTests.cpp`.
 VALIDATION: complete pinned touched originals reconstructed with matching Git blob hashes; local full diff and git diff --check PASS. New C++ tests/Windows GUI not executed here.
-NEXT ACTION: finish the bounded Overlay-diagram underlay/fit-label follow-through, publish, then Gary validates the accumulated overlay checkpoint. Do not redesign port allocation or suppress the previous regression suites.
+NEXT ACTION: Gary validates the accumulated overlay checkpoint and manual on/off test using the recorded executable. Preserve the preceding PASS and regression suites; continue general diagram inventory / V8 ports only after this bounded gate.
 
-## Latest source / 03E1
+## Latest source / 03E2
+
+The Overlay diagram now paints a subdued labelled Content footprint below its
+Overlay guides, using the same retained projection/clip. Contain gaps remain
+unpainted; hidden Content leaves no invented footprint. This is diagnostic guide
+painting only, never another production allocator or thumbnail renderer.
+Underlay guides cannot receive drops or hijack Overlay/port hit routing.
+Structure summaries expose Cover (crop), Contain (whole), and Overlay membership.
+Native tests exercise projected footprint, guide paint, hidden state, hit-routing
+and summaries in addition to 03E1 geometry/raster/paint-order tests.
+
+## Retained source / 03E1 — 4c997824
+
 
 Content/Overlay allocation and paint ordering are already separate in production.
 The native Media preview looked like two columns because Thumbnail used left-
@@ -75,7 +87,7 @@ and projection work. Do not identify running executables from source HEAD alone.
 
 General diagram inventory for hidden/unallocated components; full V8 Body-only /
 Full-edge shared post-port Content/Overlay and input/output zones; threshold undo /
-compact lifecycle; wider physical DND. No completion claim for these in 03E1.
+compact lifecycle; wider physical DND. No completion claim for these in 03E1/03E2.
 
 ## Gary gate
 
