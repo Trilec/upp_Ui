@@ -2,87 +2,81 @@
 
 Remote main is authoritative. Fetch before editing/publishing; never force-push.
 
-BASE: `1fa8793c1b3ad440d86be9a2007f0825d0650275` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03D1 — exclusive code rail and selected mode**
-TOUCHED: `examples/UiGraphComponentStudio/WorkspaceWindow.{h,cpp}`; this file.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the rail slice. **The Media title regression remains FAIL at the validated baseline.**
-PUBLISHED: the commit containing this record; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceWindow.cpp`.
-VALIDATION: complete touched source fetched at BASE and reconstructed with matching Git blob hashes; complete local diff / git diff --check PASS. Native U++/Windows builds and new smoke checks not run here.
-NEXT ACTION: repair the actual Media header capacity regression without weakening its two failing tests; implement the user-approved ellipse bands in production, then run the accumulated Debug gate. See the boundaries below.
+BASE: `35a2cf89665a4800d3a706466cf7c26c0661083b` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03D2 — readable capacity across natural text rows**
+TOUCHED: `Ui/UiGraph/UiNodeGraphPresentation.inc`; this file.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for D2 source. Baseline native gate was FAIL; no newer native PASS is claimed.
+PUBLISHED: the commit containing this update; recover via `git log -1 -- Ui/UiGraph/UiNodeGraphPresentation.inc`.
+VALIDATION: full pinned original matched blob `87007890a90036cd406f9236cbe8dbeaa90106a4`; complete diff reviewed and git diff --check PASS. Local capacity-arithmetic cases PASS (4,950 combinations), NOT U++ or font-backend validation. Existing failing native integration assertions are unchanged. No Windows execution here.
+NEXT ACTION: implement the approved ellipse-band capacity and its clipping/export/authoring integration, then run Gary's accumulated Debug correctness gate. Preserve the D2 and 03B assertions; do not accept a proxy to hide a text failure.
 
-## 03D1 — implemented source
+## D2 source correction
 
-The rail previously registered PropertyEditor and code as two expanding children
-of UiBoxLayout. RebuildInspector hid one, but UiBoxLayout::Layout explicitly shows
-participating children again. Both reappeared and split the height. A single
-ParentCtrl page host now owns those alternatives. Code occupies the complete host
-below its Copy/Save toolbar; the hidden PropertyEditor cannot consume flow space.
-No PropertyEditor library behaviour is changed.
+03B fitted a Title only after earlier natural Top rows had consumed the header.
+Its two Media integration cases still failed, although isolated fitting tests passed.
+The allocator now resolves each participating named rich component once and makes
+one reverse, eight-region minimum-height pass. Natural single-line Ellipsis
+Top/Bottom rows yield excess height to later readable text in the same region.
+Minimum heights use each component's actual font at its existing final-pixel floor;
+explicit extents, Clip/Wrap and component identities/order remain authored.
+Hidden Reflow and missing data do not request capacity. Stable reservations still
+participate. Outer node/header dimensions and LOD masks are unchanged.
 
-The four mode buttons retain the existing checked-state contract and now have a
-distinct pressed face/frame/icon under Minimal, with no pressed content offset.
-Selection is independent of keyboard focus. Debug startup smoke exercises repeated
-Code/Inspector/Style switches, exclusive visibility, code bounds and checked state.
-The malformed zoom suffix is separated from the numeric Format conversion.
+The fixed 16-entry preparation scratch is transient, not retained state. Micro
+keeps its lazy source resolution and never enters this font-metric/budget pass.
+Paint still consumes retained output. If combined minima do not fit, ordinary
+capacity/proxy diagnostics remain; no unreadable font or overlapping slot is forced.
+Native font behaviour remains the validation boundary, not a claimed PASS.
 
-## Latest Windows evidence — user/Gary report, 03B + 03C
+## D1 source, already published
 
-Tested `1fa8793c1b3ad440d86be9a2007f0825d0650275`. Required ancestry PASS.
-RenderTests: eight suites/zero failures. WorkspaceTests: 33 checks/zero failures.
-Generated C++ compiled unchanged with Ui/CtrlLib only; SHA-256:
+`35a2cf89665a4800d3a706466cf7c26c0661083b`: code/inspector alternatives share one
+ParentCtrl host. UiBoxLayout can no longer resurrect the hidden PropertyEditor and
+split the rail in half. Code fills the host below Copy/Save. Checked mode buttons
+have distinct face/frame/icon; zoom caption formatting is repaired. Startup smoke
+now checks repeated rail page switching, visibility and code bounds (5 checks).
+
+## Latest Windows evidence — Gary report at 1fa8793
+
+`1fa8793c1b3ad440d86be9a2007f0825d0650275`: ancestry PASS; RenderTests 8 suites/0;
+WorkspaceTests 33/0; unchanged generated C++ compiled with Ui/CtrlLib only, hash
 `5058C4DB324F6D2A2F30DD889E823FF9AABFDAC6606E8168353828F06DD868D3`.
-Startup smoke 1/0. Native views **45 checks, 2 FAIL**: Media title readability with
-an enlarged subtitle and two icons failed for both Rectangle and Ellipse.
-Other native Delete/Undo/focus/topology/proxy-hit checks passed. The gate stopped;
-manual acceptance and normal launch were not performed. No fix commits or new PID.
-Diff check PASS, tree clean. Evidence supplied by Gary:
+Startup smoke 1/0. Native views **45 checks / 2 FAIL**, both Media title readability
+cases (Rectangle/Ellipse, enlarged subtitle, two icons). Other Delete/Undo/focus/
+proxy-hit checks passed. Gate stopped: no manual checks or normal launch/new PID.
+Diff check PASS; tree clean; no fixes. Evidence:
 `C:\Users\admin\AppData\Local\Temp\UiGraphWorkspace-validation\20260921-124117-1fa8793c1b3a-208e3d`.
+Do not identify a screenshot's executable version solely from the tested source SHA.
 
-Curt's screenshot also shows the code rail/selection defect and unchanged ellipse
-bands. Do not infer which executable produced that screenshot from the source SHA;
-the failed gate did not launch a new normal workspace. The source defects still
-need repair, not an assumption that a stale running process explains them all.
+## Architecture / recovery
 
-## Architecture and previous checkpoints
+Active app: examples/UiGraphComponentStudio. DesignMatrix stays retired.
+NodeGeometry.presentation is the sole retained layout authority. Shared bounded
+C++ templates; no runtime JSON compiler, second layout cache or per-node Ctrl tree.
+Content/Overlay are siblings. Port identities/connections stay model-owned.
+Family JSON saves layout/style with independent shape inheritance; generated C++
+requires Ui, not authoring. Camera changes never resize authored nodes.
 
-03A `8f9a49a8367f0dd9d95d1085582e9348c5aa91db`: side-default icon insertion,
-persistent inspector updates; Gary passed Debug and manual icon/typography/scope
-checks. Held-button Escape during native DND remains unverified.
-03B `e02bbd0845f154e417f242088db93cf1f75da446`: focused Delete/Undo, proxy picking,
-height-fit text and outcome summaries. Its two Media integration tests now FAIL.
-03C `1fa8793c1b3ad440d86be9a2007f0825d0650275`: camera-baseline admission fix and
-matched 10k component diagnostics. Preserve that work; no performance acceptance
-is implied by the correctness results. Read UIGRAPH_PERFORMANCE_AUDIT.md.
+03A `8f9a49a8367f0dd9d95d1085582e9348c5aa91db` was Windows-validated; held-button
+Escape DND remains unverified. 03B `e02bbd0845f154e417f242088db93cf1f75da446`
+contains Delete/text-fit/tests; its Media failure motivates D2. 03C `1fa8793...`
+contains camera-admission correction and matched 10k diagnostics: preserve it;
+performance acceptance is still pending. Read UIGRAPH_PERFORMANCE_AUDIT.md.
 
-NodeGeometry.presentation remains the only evaluated layout authority. Shared
-bounded C++ templates, no runtime JSON compiler and no ordinary per-node Ctrl tree.
-Content and Overlay are sibling layers; labelled ports are graph-owned reservations.
-Camera edits never resize authored nodes. Generated C++ uses Ui without authoring.
-Family JSON saves layout/style with independent shape inheritance.
-
-## Next source slices / acceptance
-
-1. Diagnose Media allocation and actual font metrics; preserve both failing
-   integration assertions, the configured readable floor and authored-font tests.
-   Do not merely accept a proxy or silently enlarge the specimen to pass.
-2. Implement the approved shape-aware bands rather than only documenting them.
-   Audit clipping, picking, projection, ports, JSON/export and containment. Keep
-   conservative fallback and the Micro/performance boundary; no extra layout cache.
-   The latest user request explicitly asks for this previously deferred capability.
-3. Continue the outstanding template-driven diagram inventory and V8 Body-only /
-   Full-edge post-port interior/zone controls. Do not claim these delivered by D1.
-
-Read: this file, UIGRAPH_WORKSPACE_03B.md, UIGRAPH_WORKSPACE_V8_AUDIT.md,
-UIGRAPH_PERFORMANCE_AUDIT.md, UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md and current source.
-The active app is examples/UiGraphComponentStudio; DesignMatrix stays retired.
+Read current source and docs/UIGRAPH_WORKSPACE_03B.md, UIGRAPH_WORKSPACE_V8_AUDIT.md,
+UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md, UIGRAPH_WORKSPACE_AUTHORING.md and runtime guide.
+Latest user explicitly requests implementation of previously deferred ellipse bands.
+Outstanding: those bands, complete V8 Body-only/Full-edge post-port interior and
+zone controls, template-driven diagram inventory, palette glyphs, threshold undo/
+compact-size lifecycle and full Save/Open/DND manual follow-through.
 
 ## Validation
 
-Use clean current main at E:\apps\github\upp_Ui and require the latest supervisor
-checkpoint as ancestor, not exact equality. Run scripts/ValidateUiGraphWorkspace.ps1
--RequiredAncestor <SHA> -Launch with U++ 18468 / CLANGx64 / Debug. Do not weaken gates.
-Until the text failure is repaired, a rail-only publish does NOT imply gate PASS.
-Capture all summaries and first blocker; manual code-page full height/highlight,
-Media text, ellipse geometry, Delete/Undo and inspector-scroll checks follow PASS.
-Minor mechanical fixes only for Gary, with reviewed diff / docs / publish / retest.
-No force-push, broad suite or new benchmark without the existing focused reason.
+Clean current main at E:\apps\github\upp_Ui; require latest supervisor SHA as an
+ancestor. Run scripts/ValidateUiGraphWorkspace.ps1 -RequiredAncestor <SHA> -Launch
+with established U++ 18468 / CLANGx64 / Debug. All existing assertions stay enabled.
+Require passing RenderTests, WorkspaceTests, unchanged generated C++, native view
+and startup summaries before manual Media text, code rail/highlight and geometry.
+Report exact HEAD, first blocker, summaries, evidence, PID and clean tree.
+Gary may make reviewed mechanical fixes only; document/publish/verify/retest them.
+No architectural redesign, guard removal, weakened tests or rich-Micro fallback.

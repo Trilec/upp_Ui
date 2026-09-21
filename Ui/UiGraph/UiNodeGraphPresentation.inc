@@ -418,6 +418,51 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             }
         };
 
+        // Resolve named rich components once, then protect readable vertical
+        // capacity for later rows in the SAME region. A natural Top subtitle
+        // must not consume the minimum line needed by a following Title Fill.
+        // These are bounded preparation inputs, never another retained cache.
+        // Micro keeps its existing lazy resolution and performs no font metrics.
+        ResolvedNodeComponent resolved[UiGraphNodeTemplate::MAX_SLOTS];
+        int row_min[UiGraphNodeTemplate::MAX_SLOTS] = {};
+        int later_min[UiGraphNodeTemplate::MAX_SLOTS] = {};
+        bool flexible_row[UiGraphNodeTemplate::MAX_SLOTS] = {};
+        if(!out.micro) {
+            int required[8] = {};
+            for(int i = node_template->slot_count - 1; i >= 0; i--) {
+                const auto& r = node_template->slots[i];
+                const int region = (int)r.region;
+                later_min[i] = required[region];
+                if(!r.IsComponent()) continue; // legacy feature behaviour is unchanged
+                if(!r.Allows(p.level) && r.flow == UiGraphNodeSlotFlow::Reflow) continue;
+                resolved[i] = ResolveNodeComponent(r, node, style, false);
+                if(resolved[i].reason != UiGraphNodeComponentReason::None) continue;
+                bool vertical = r.placement == UiGraphNodeSlotPlacement::Top
+                             || r.placement == UiGraphNodeSlotPlacement::Bottom;
+                int minimum = 0;
+                Font font = UiNodeGraphDetail::PresentationFont(resolved[i].base_font, z);
+                if(r.IsText() && r.overflow == UiGraphNodeOverflow::Ellipsis
+                   && abs(resolved[i].base_font.GetHeight()) * z >= r.readable_min_px
+                   && font.GetHeight() >= r.readable_min_px) {
+                    font.Height(r.readable_min_px);
+                    minimum = font.GetCy() + 2 * (px(r.component_style.padding)
+                                                  + px(r.component_style.frame_width));
+                    flexible_row[i] = vertical && r.extent == 0;
+                }
+                row_min[i] = minimum;
+                if(vertical) {
+                    int amount = r.extent > 0 ? px(r.extent)
+                               : flexible_row[i] ? minimum : px(resolved[i].authored_size.cy);
+                    if(required[region] > 0)
+                        amount += r.gap_after < 0 ? gap : px(r.gap_after);
+                    required[region] += amount;
+                }
+                else if(r.placement == UiGraphNodeSlotPlacement::Fill
+                        || r.placement == UiGraphNodeSlotPlacement::Center)
+                    required[region] = max(required[region], minimum);
+            }
+        }
+
         int micro_primitives = 0;
         for(int i = 0; i < node_template->slot_count; i++) {
             const UiGraphNodeSlotRule& rule = node_template->slots[i];
@@ -435,7 +480,7 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
                     prepared->reason = UiGraphNodeComponentReason::PolicyOff;
                     continue; // no binding lookup or text measurement for excluded content
                 }
-                component = ResolveNodeComponent(rule, node, style, out.micro);
+                component = out.micro ? ResolveNodeComponent(rule, node, style, true) : resolved[i];
                 prepared->reason = component.reason;
             }
             const bool source = prepared ? component.reason == UiGraphNodeComponentReason::None
@@ -464,6 +509,13 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
                 natural.cy = max(natural.cy, UiNodeGraphDetail::PresentationFont(component.base_font, z).GetCy());
             int extent = px(rule.extent);
             int gap_after = rule.gap_after < 0 ? -1 : px(rule.gap_after);
+            if(prepared && !out.micro && flexible_row[i]) {
+                const int following_gap = later_min[i] > 0 ? (gap_after < 0 ? gap : gap_after) : 0;
+                const int available = layout.Remaining().GetHeight() - later_min[i] - following_gap;
+                // Never cross the actual font's readable floor. If the combined
+                // minima cannot fit, keep the ordinary no-capacity outcome.
+                natural.cy = min(natural.cy, max(row_min[i], available));
+            }
 
             switch(rule.placement) {
             case UiGraphNodeSlotPlacement::Fill:
