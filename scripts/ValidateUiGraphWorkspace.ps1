@@ -6,16 +6,13 @@ param(
     [string]$UppRoot = 'E:\upp-18468',
     [string]$Method = 'CLANGx64',
     [ValidatePattern('^[0-9a-fA-F]{40}$')]
-    [string]$RequiredAncestor = '3f9957c7a332312d6d6d3f92bb6206344cd2373e',
+    [string]$RequiredAncestor = '8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a',
     [string]$OutputRoot = '',
-    [switch]$Launch
+    [switch]$Launch,
+    [switch]$EvidenceSelfTest
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-if ([string]::IsNullOrWhiteSpace($Repo)) {
-    $Repo = Split-Path -Parent $PSScriptRoot
-}
-$Repo = (Resolve-Path -LiteralPath $Repo).Path
 $oldLocation = Get-Location
 $report = [System.Collections.Generic.List[string]]::new()
 $run = $null
@@ -45,13 +42,75 @@ function Native-Checked([string]$Executable, [string[]]$Arguments, [string]$Labe
     if (!(Test-Path -LiteralPath $log)) { throw "$Label did not produce its evidence log" }
     $report.Add("PASS $Label")
 }
-function Require-Summary([string]$Label, [string]$Pattern) {
+# Every emitted record for the requested suite must pass. One passing record
+# must not conceal a failure from another fixture/window in the same native log.
+function Read-TestSummary([string]$Text, [string]$Name,
+                          [string]$CountField = 'checks', [string]$FailureField = 'failed',
+                          [int]$MinimumCount = 1) {
+    $namePattern = [regex]::Escape($Name)
+    $records = [regex]::Matches($Text, '\b' + $namePattern + '\b[^\r\n]*')
+    if ($records.Count -eq 0) { throw "Missing summary: $Name" }
+    $pattern = '^' + $namePattern + '[ \t]+' + [regex]::Escape($CountField) +
+               '=([0-9]+)[ \t]+' + [regex]::Escape($FailureField) + '=([0-9]+)(?=[ \t]|$)'
+    # Validate all records before writing any successful evidence to the pipeline.
+    $valid = [System.Collections.Generic.List[string]]::new()
+    foreach ($record in $records) {
+        $match = [regex]::Match($record.Value, $pattern)
+        if (!$match.Success) { throw "Malformed summary: $($record.Value)" }
+        if ([long]$match.Groups[1].Value -lt $MinimumCount -or [long]$match.Groups[2].Value -ne 0) {
+            throw "Failed or incomplete summary: $($record.Value)"
+        }
+        $valid.Add($match.Value)
+    }
+    return $valid.ToArray()
+}
+function Require-Summary([string]$Label, [string]$Name,
+                         [string]$CountField = 'checks', [string]$FailureField = 'failed',
+                         [int]$MinimumCount = 1) {
     $text = Get-Content -LiteralPath (Join-Path $run ($Label + '.log')) -Raw
-    if ($text -notmatch $Pattern) { throw "Missing passing summary in $Label.log" }
-    $report.Add($Matches[0])
+    foreach ($line in @(Read-TestSummary $text $Name $CountField $FailureField $MinimumCount)) {
+        $report.Add($line)
+    }
+}
+function Test-EvidenceReader {
+    $cases = @(
+        @{ Text = 'SUITE checks=7 failed=0'; Pass = $true },
+        @{ Text = "prefix SUITE checks=7 failed=0`r`nSUITE checks=9 failed=0"; Pass = $true },
+        @{ Text = ''; Pass = $false },
+        @{ Text = 'OTHER checks=7 failed=0'; Pass = $false },
+        @{ Text = 'SUITE checks=0 failed=0'; Pass = $false },
+        @{ Text = 'SUITE checks=7 failed=2'; Pass = $false },
+        @{ Text = "SUITE checks=7 failed=0`nSUITE checks=7 failed=2"; Pass = $false },
+        @{ Text = "SUITE checks=7 failed=2`nSUITE checks=7 failed=0"; Pass = $false },
+        @{ Text = 'SUITE checks=7 failed=0x'; Pass = $false },
+        @{ Text = "SUITE checks=7 failed=0`nSUITE checks=? failed=0"; Pass = $false }
+    )
+    foreach ($case in $cases) {
+        $accepted = $true
+        try { Read-TestSummary $case.Text 'SUITE' | Out-Null }
+        catch { $accepted = $false }
+        if ($accepted -ne $case.Pass) { throw 'Evidence reader self-test failed' }
+    }
+    Read-TestSummary 'SUITE suites=9 failed_suites=0' 'SUITE' 'suites' 'failed_suites' 9 | Out-Null
+    $accepted = $true
+    try { Read-TestSummary 'SUITE suites=8 failed_suites=0' 'SUITE' 'suites' 'failed_suites' 9 | Out-Null }
+    catch { $accepted = $false }
+    if ($accepted) { throw 'Evidence reader accepted an incomplete render suite' }
+    return 'UIGRAPH_EVIDENCE_READER_SUMMARY checks=12 failed=0'
+}
+
+# Parser-only fixtures: no repository lookup, network, compiler or GUI process.
+if ($EvidenceSelfTest) {
+    Write-Output (Test-EvidenceReader)
+    return
 }
 
 try {
+    $report.Add((Test-EvidenceReader))
+    if ([string]::IsNullOrWhiteSpace($Repo)) {
+        $Repo = Split-Path -Parent $PSScriptRoot
+    }
+    $Repo = (Resolve-Path -LiteralPath $Repo).Path
     Set-Location -LiteralPath $Repo
     $runnerHash = (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
     if (((Git-Read -Arguments @('rev-parse', '--show-toplevel')) -replace '/', '\') -ne ($Repo -replace '/', '\')) {
@@ -99,7 +158,8 @@ try {
     $render = Join-Path $run 'UiGraphRenderTests.exe'
     Native-Checked -Executable $umk -Arguments @($assembly, 'Utilities/UiGraphRenderTests', $Method, '-b', $render) -Label 'render-build'
     Native-Checked -Executable $render -Arguments @() -Label 'render-test'
-    Require-Summary 'render-test' 'UIGRAPH_RENDER_TESTS_SUMMARY\s+suites=[1-9]\d*\s+failed_suites=0\b'
+    Require-Summary 'render-test' 'UIGRAPH_RENDER_TESTS_SUMMARY' 'suites' 'failed_suites' 9
+    Require-Summary 'render-test' 'UIGRAPH_ELLIPSE_BANDS_SUMMARY'
 
     # Export from the actual authoring test executable, then compile the output
     # unchanged against Ui. The temporary package deliberately does not use the
@@ -111,7 +171,7 @@ try {
     $workspace = Join-Path $run 'UiGraphWorkspaceTests.exe'
     Native-Checked -Executable $umk -Arguments @($assembly, 'Utilities/UiGraphWorkspaceTests', $Method, '-b', $workspace) -Label 'authoring-build'
     Native-Checked -Executable $workspace -Arguments @("--export=$generated") -Label 'authoring-test'
-    Require-Summary 'authoring-test' 'UIGRAPH_WORKSPACE_SUMMARY\s+checks=[1-9]\d*\s+failed=0\b'
+    Require-Summary 'authoring-test' 'UIGRAPH_WORKSPACE_SUMMARY'
     if (!(Test-Path -LiteralPath $generated) -or (Get-Item -LiteralPath $generated).Length -eq 0) {
         throw 'Authoring tests did not create the generated C++ fixture'
     }
@@ -135,24 +195,44 @@ mainconfig "GUI" = "GUI";
 
     $studio = Join-Path $run 'UiGraphComponentStudio.exe'
     Native-Checked -Executable $umk -Arguments @($assembly, 'examples/UiGraphComponentStudio', $Method, '-b', '+GUI', $studio) -Label 'workspace-build'
+    $studioHash = (Get-FileHash -LiteralPath $studio -Algorithm SHA256).Hash
+    $report.Add("WORKSPACE EXE: $studio")
+    $report.Add("WORKSPACE SHA256: $studioHash")
+    $nativeLog = [IO.Path]::ChangeExtension($studio, '.log')
     $p = Start-Process -FilePath $studio -ArgumentList '--view-tests' -WorkingDirectory $run -PassThru
-    if (!$p.WaitForExit(120000)) {
+    $timedOut = !$p.WaitForExit(120000)
+    if ($timedOut) {
+        # Only this runner's test process is stopped; existing demos are untouched.
         Stop-Process -Id $p.Id -ErrorAction SilentlyContinue
-        throw 'View tests exceeded 120 seconds; inspect the native log/assertion'
+        $p.WaitForExit(5000) | Out-Null
     }
     $p.Refresh()
-    if ($p.ExitCode -ne 0) { throw "Native view tests failed (exit $($p.ExitCode)); inspect the application log" }
-    $report.Add('PASS native-view-test exit=0')
-    $nativeLog = [IO.Path]::ChangeExtension($studio, '.log')
+    $exitCode = if ($p.HasExited) { $p.ExitCode } else { $null }
+    $report.Add("NATIVE TEST EXIT: $exitCode; TIMEOUT: $timedOut")
+
+    # Preserve evidence BEFORE judging exit/summary status. The first failing
+    # Media check and its capacity diagnostics must survive a stopped gate.
     if (Test-Path -LiteralPath $nativeLog) {
         Copy-Item -LiteralPath $nativeLog -Destination (Join-Path $run 'native-view-test.log')
         $text = Get-Content -LiteralPath $nativeLog -Raw
-        if ($text -notmatch 'UIGRAPH_WORKSPACE_VIEW_SUMMARY\s+checks=[1-9]\d*\s+failed=0\b') {
-            throw 'Native view log did not contain its passing test summary'
+        foreach ($m in [regex]::Matches($text, '\bUIGRAPH_[A-Z0-9_]*(?:SUMMARY|SMOKE)\b[^\r\n]*')) {
+            $report.Add('OBSERVED: ' + $m.Value) # observed is not a passing verdict
         }
-        $report.Add($Matches[0])
+        $firstFailure = [regex]::Match($text, '(?m)^[^\r\n]*(?:FAIL:|UIGRAPH_[A-Z0-9_]*FAILURE)[^\r\n]*')
+        if ($firstFailure.Success) { $report.Add('FIRST NATIVE FAILURE: ' + $firstFailure.Value) }
     }
-    else { throw 'Native summary log not found beside executable; retrieve the U++ log before claiming the gate passed' }
+    if ($timedOut) { throw 'View tests exceeded 120 seconds; inspect native-view-test.log/native application log' }
+    if ($null -eq $exitCode -or $exitCode -ne 0) { throw "Native view tests failed (exit $exitCode); inspect native-view-test.log/native application log" }
+    if (!(Test-Path -LiteralPath $nativeLog)) {
+        throw 'Native summary log not found beside executable; retrieve the U++ log before claiming the gate passed'
+    }
+    Require-Summary 'native-view-test' 'UIGRAPH_WORKSPACE_VIEW_SUMMARY'
+    Require-Summary 'native-view-test' 'UIGRAPH_WORKSPACE_BAND_UI_SUMMARY'
+    Require-Summary 'native-view-test' 'UIGRAPH_WORKSPACE_UI_SMOKE'
+    $report.Add('PASS native-view-test exit=0; view, band integration and startup evidence present')
+    if ((Get-FileHash -LiteralPath $studio -Algorithm SHA256).Hash -ne $studioHash) {
+        throw 'Workspace executable changed during validation'
+    }
 
     Git-Read -Arguments @('diff', '--check') | Out-Null
     if ((Git-Read -Arguments @('rev-parse', 'HEAD')) -ne $head) { throw 'Checkout changed while tests ran; evidence must identify one HEAD' }
@@ -163,6 +243,7 @@ mainconfig "GUI" = "GUI";
     if ($Launch) {
         $demo = Start-Process -FilePath $studio -WorkingDirectory $run -PassThru
         $report.Add("WORKSPACE PID: $($demo.Id) - manual validation pending")
+        $report.Add("MANUAL REVIEW EXE: $studio / SHA256 $studioHash")
     }
     $report.Add('AUTOMATED DEBUG GATE: PASS - physical drag/drop and visual checks remain manual')
 }

@@ -2,15 +2,41 @@
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 
-BASE: `e5a1f19b4aa1a71c0a600dd8e5029733b7a73549` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03D5 — complete visible ellipse-band authoring integration**
-TOUCHED: `Utilities/UiGraphWorkspace/WorkspaceDocument.cpp`; `examples/UiGraphComponentStudio/{WorkspaceInspector.cpp,WorkspaceViews.cpp,WorkspaceWindow.h,WorkspaceBandTests.cpp,main.cpp,UiGraphComponentStudio.upp}`; this file; `docs/UIGRAPH_ELLIPSE_BANDS.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the accumulated title/rail/band corrections. No new native PASS is claimed.
-PUBLISHED: the commit containing this record; recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceBandTests.cpp`.
-VALIDATION: complete pinned touched source inspected; original C++/package blob hashes matched, full local diff reviewed and git diff --check PASS. No Windows/U++ build or native execution here. Gary's last gate remains FAIL until a newer run.
-NEXT ACTION: Gary runs the accumulated Debug gate and focused manual checks in UIGRAPH_ELLIPSE_BANDS.md. Keep the previously failed Media checks; test both rows with bands disabled AND enabled. Then continue diagram inventory and the full V8 port contract.
+BASE: `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a` / main
+TASK: **UIGRAPH-NODE-WORKSPACE-03D6 — accumulated validation evidence and executable identity**
+TOUCHED: `scripts/ValidateUiGraphWorkspace.ps1`; this file. No C++/layout edits in 03D6.
+STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for the recovery gate and accumulated title/rail/band corrections. Gary's last native gate is still FAIL until a newer run.
+PUBLISHED: the commit containing this record; recover with `git log -1 -- scripts/ValidateUiGraphWorkspace.ps1`.
+VALIDATION: original touched-file blob hashes matched current pinned GitHub; full script/diff review and git diff --check PASS. PowerShell self-tests, Windows/U++ builds and native GUI tests have NOT run here.
+NEXT ACTION: Gary runs the accumulated Debug gate on clean current main with the latest published SHA as ancestor. Require ellipse render, native view, BAND_UI and startup evidence. Keep the failed Media assertions. Then manually inspect the exact executable recorded by the gate.
+
+## Recovery / 03D6
+
+Recovered remote main at `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a`: all five
+03D implementation slices survived the interrupted sessions. Do not repeat or
+replace them from chat snapshots. Review current source and validate accumulated
+changes before starting another layout feature.
+
+The runner now requires at least nine RenderTests suites AND the named ellipse
+suite, WorkspaceTests, unchanged generated C++, native view, BAND_UI and startup
+summaries. Every occurrence of a required summary must have positive checks and
+zero failures; one passing record cannot conceal another failing record.
+
+Native logs and observed summaries are copied before checking the process exit
+code. A stopped gate retains the first failed check and full diagnostic log.
+The built workspace path/SHA-256 and launched PID are recorded: use that executable
+for screenshot/manual evidence, not an older already-running demo. Existing demos
+are not stopped by the gate. Nonzero exit, missing summary or timeout remains FAIL.
+
+Twelve parser-only cases run before the normal gate. They are also available via
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ValidateUiGraphWorkspace.ps1 -EvidenceSelfTest`.
+This mode performs no Git, compiler or GUI operations. It tests only evidence
+parsing, not the application. The first Windows run must validate these cases too.
+The established full task and manual acceptance remain in UIGRAPH_ELLIPSE_BANDS.md.
 
 ## Current source
+
+Source integration checkpoint: `8b2e53cb8229c49c5e42aa1a068dbeb46b0ce50a` / 03D5.
 
 03D5 exposes Fit ellipse Header/Footer and Band width (%) in Template / Regions,
 using the existing guarded property transactions and Base/shape scope rules. New
