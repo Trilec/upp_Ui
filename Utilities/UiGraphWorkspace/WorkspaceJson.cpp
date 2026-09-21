@@ -139,6 +139,8 @@ Value EncodeLayout(const UiGraphNodeTemplate& t)
     ValueArray columns; columns.Add(Dip(t.content_left_width)); columns.Add(Dip(t.content_right_width));
     columns.Add(Dip(t.overlay_left_width)); columns.Add(Dip(t.overlay_right_width)); m.Add("columns", columns);
     m.Add("body_ports_left", t.left_port_lane_body_only); m.Add("body_ports_right", t.right_port_lane_body_only);
+    m.Add("ellipse_bands", t.ellipse_bands);
+    m.Add("ellipse_band_width_percent", t.ellipse_band_width_percent);
     m.Add("width_policy", t.lod_widths.enabled);
     ValueArray thresholds; thresholds.Add(t.lod_widths.normal); thresholds.Add(t.lod_widths.lod1); thresholds.Add(t.lod_widths.lod2);
     m.Add("thresholds", thresholds); m.Add("micro_hints", t.micro_hints); m.Add("micro_budget", t.micro_hint_budget);
@@ -180,7 +182,7 @@ int ArrayInt(const Value& v, int low, int high)
 {
     Reader r(ValueMap()("v", v)); return r.Int("v", low, high);
 }
-UiGraphNodeTemplate ReadLayout(const Value& v)
+UiGraphNodeTemplate ReadLayout(const Value& v, int version)
 {
     Reader m(v); UiGraphNodeTemplate t;
     t.kind = (UiGraphNodeTemplateKind)m.Int("kind", 0, 7);
@@ -192,6 +194,12 @@ UiGraphNodeTemplate ReadLayout(const Value& v)
     t.SetContentColumns(DPI(ArrayInt(columns[0], 0, 16384)), DPI(ArrayInt(columns[1], 0, 16384)));
     t.SetOverlayColumns(DPI(ArrayInt(columns[2], 0, 16384)), DPI(ArrayInt(columns[3], 0, 16384)));
     t.left_port_lane_body_only = m.Bool("body_ports_left"); t.right_port_lane_body_only = m.Bool("body_ports_right");
+    // Version 1 predates bands. Preserve its geometry; do not apply new-family
+    // defaults while importing an existing authoring document. Version 2 is strict.
+    if(version >= 2) {
+        t.ellipse_bands = m.Bool("ellipse_bands");
+        t.ellipse_band_width_percent = m.Int("ellipse_band_width_percent", 20, 100);
+    }
     t.lod_widths.enabled = m.Bool("width_policy");
     auto widths = ArrayOf(m.Get("thresholds"), 3);
     t.lod_widths.normal = ArrayInt(widths[0], 1, 16384); t.lod_widths.lod1 = ArrayInt(widths[1], 1, 16384); t.lod_widths.lod2 = ArrayInt(widths[2], 1, 16384);
@@ -267,20 +275,22 @@ Value Encode(const Document& d)
     preview.Add("inputs", d.inputs); preview.Add("outputs", d.outputs); preview.Add("connector", d.connector);
     preview.Add("width", d.size.cx); preview.Add("height", d.size.cy); preview.Add("zoom", d.zoom);
     preview.Add("pan_x", d.pan.x); preview.Add("pan_y", d.pan.y);
-    return ValueMap()("schema", "uigraph.workspace")("version", 1)("units", "logical96")("family", family)("preview", preview);
+    return ValueMap()("schema", "uigraph.workspace")("version", 2)("units", "logical96")("family", family)("preview", preview);
 }
 
 bool Decode(const Value& v, Document& output, String& error)
 {
     try {
         Reader root(v);
-        if(root.Str("schema") != "uigraph.workspace" || root.Int("version", 1, 1) != 1 || root.Str("units") != "logical96") throw Exc("Unsupported workspace schema");
+        if(root.Str("schema") != "uigraph.workspace") throw Exc("Unsupported workspace schema");
+        int version = root.Int("version", 1, 2);
+        if(root.Str("units") != "logical96") throw Exc("Unsupported workspace units");
         Document d; Reader f(root.Get("family"));
-        d.family.name = f.Str("name", 128); d.family.base_layout = ReadLayout(f.Get("layout")); d.family.base_style = ReadStyle(f.Get("style"));
+        d.family.name = f.Str("name", 128); d.family.base_layout = ReadLayout(f.Get("layout"), version); d.family.base_style = ReadStyle(f.Get("style"));
         auto variants = ArrayOf(f.Get("shapes"), SHAPE_COUNT); f.Done();
         for(int i = 0; i < SHAPE_COUNT; i++) {
             Reader s(variants[i]); Value layout = s.Get("layout"), style = s.Get("style"); s.Done();
-            if(!IsNull(layout)) { d.family.shape_layout[i] = ReadLayout(layout); d.family.layout_override[i] = true; }
+            if(!IsNull(layout)) { d.family.shape_layout[i] = ReadLayout(layout, version); d.family.layout_override[i] = true; }
             if(!IsNull(style)) { d.family.shape_style[i] = ReadStyle(style); d.family.style_override[i] = true; }
         }
         Reader p(root.Get("preview")); root.Done();

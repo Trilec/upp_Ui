@@ -66,6 +66,8 @@ void LayoutCode(String& out, const Value& value, const String& name)
     out << "    t.SetContentColumns(" << Metric(c[0]) << ", " << Metric(c[1]) << ");\n"
         << "    t.SetOverlayColumns(" << Metric(c[2]) << ", " << Metric(c[3]) << ");\n"
         << "    t.SetBodyPortLanes(" << ((bool)m["body_ports_left"] ? "true" : "false") << ", " << ((bool)m["body_ports_right"] ? "true" : "false") << ");\n"
+        << "    t.ellipse_bands = " << ((bool)m["ellipse_bands"] ? "true" : "false") << ";\n"
+        << "    t.ellipse_band_width_percent = " << AsString(m["ellipse_band_width_percent"]) << ";\n"
         << "    t.SetLodWidths(" << AsString(widths[0]) << ", " << AsString(widths[1]) << ", " << AsString(widths[2]) << ");\n"
         << "    t.lod_widths.enabled = " << ((bool)m["width_policy"] ? "true" : "false") << ";\n"
         << "    t.micro_hints = " << ((bool)m["micro_hints"] ? "true" : "false") << ";\n"

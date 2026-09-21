@@ -46,7 +46,81 @@ CONSOLE_APP_MAIN
     bad = Encode(d); bad.Add("future_field", 1);
     expect(!Decode(bad, loaded, error), "unknown fields rejected rather than lost");
     expect(!Load(String('[', 40) + String(']', 40), loaded, error), "nesting bound enforced before parse");
-    String code = GenerateCpp(d, error);
+    // Exercise both independent sections and all layout snapshots, not only Base.
+    Document bands = d;
+    bands.family.base_layout.ellipse_bands = true;
+    bands.family.base_layout.ellipse_band_width_percent = 80;
+    bands.family.shape_layout[1].ellipse_bands = false;
+    bands.family.shape_layout[1].ellipse_band_width_percent = 65;
+    bands.family.DetachLayout(3);
+    bands.family.shape_layout[3].ellipse_bands = true;
+    bands.family.shape_layout[3].ellipse_band_width_percent = 70;
+    ValueMap encoded = Encode(bands);
+    expect((int)encoded["version"] == 2, "band settings use workspace schema version two");
+    String band_json = AsJSON(encoded);
+    expect(Load(band_json, loaded, error) && AsJSON(Encode(loaded)) == band_json
+           && loaded.family.base_layout.ellipse_bands
+           && !loaded.family.Layout(1).ellipse_bands
+           && loaded.family.Layout(1).ellipse_band_width_percent == 65
+           && loaded.family.Layout(3).ellipse_band_width_percent == 70,
+           "band flags and widths round trip independently for Base and shape overrides");
+    expect(!loaded.family.style_override[1] && loaded.family.style_override[2]
+           && !loaded.family.layout_override[2],
+           "band persistence never detaches or rewrites independent appearance");
+
+    auto without_bands = [](const Value& value) {
+        ValueMap source = value, result;
+        for(int i = 0; i < source.GetCount(); i++) {
+            String key = source.GetKey(i);
+            if(key != "ellipse_bands" && key != "ellipse_band_width_percent")
+                result.Add(key, source.GetValue(i));
+        }
+        return result;
+    };
+    ValueMap legacy = encoded, family = legacy["family"];
+    family.Set("layout", without_bands(family["layout"]));
+    ValueArray shapes = family["shapes"], old_shapes;
+    for(int i = 0; i < shapes.GetCount(); i++) {
+        ValueMap variant = shapes[i];
+        if(!IsNull(variant["layout"])) variant.Set("layout", without_bands(variant["layout"]));
+        old_shapes.Add(variant);
+    }
+    family.Set("shapes", old_shapes); legacy.Set("family", family); legacy.Set("version", 1);
+    Document migrated;
+    bool migration = Decode(legacy, migrated, error);
+    for(int i = -1; i < SHAPE_COUNT; i++)
+        migration &= !migrated.family.Layout(i).ellipse_bands
+                  && migrated.family.Layout(i).ellipse_band_width_percent == 80;
+    expect(migration && migrated.family.layout_override[1] && migrated.family.style_override[2]
+           && migrated.family.Layout(1).header_height == d.family.Layout(1).header_height,
+           "v1 import preserves conservative geometry and existing independent sections");
+    ValueMap upgraded = Encode(migrated);
+    expect((int)upgraded["version"] == 2 && Decode(upgraded, migrated, error),
+           "old documents can be saved as explicit v2 without enabling bands");
+
+    auto invalid_base = [&](const Value& layout) {
+        ValueMap root = encoded, f = root["family"];
+        f.Set("layout", layout); root.Set("family", f);
+        String prior = AsJSON(Encode(loaded)); int revision = loaded.revision;
+        return !Decode(root, loaded, error) && !error.IsEmpty()
+            && prior == AsJSON(Encode(loaded)) && loaded.revision == revision;
+    };
+    ValueMap base_family = encoded["family"], base_layout = base_family["layout"];
+    expect(invalid_base(without_bands(base_layout)), "v2 missing band fields rejects transactionally");
+    ValueMap invalid = base_layout; invalid.Set("ellipse_bands", "yes");
+    expect(invalid_base(invalid), "non-Boolean band flag rejects transactionally");
+    for(int width : {19, 101}) {
+        invalid = base_layout; invalid.Set("ellipse_band_width_percent", width);
+        expect(invalid_base(invalid), "out-of-range band width rejects transactionally");
+    }
+    invalid = base_layout; invalid.Add("ellipse_future", 1);
+    expect(invalid_base(invalid), "unknown band fields are not silently discarded");
+    String code = GenerateCpp(bands, error);
+    expect(code.Find("t.ellipse_bands = true;") >= 0
+           && code.Find("t.ellipse_bands = false;") >= 0
+           && code.Find("t.ellipse_band_width_percent = 65;") >= 0
+           && code.Find("t.ellipse_band_width_percent = 70;") >= 0,
+           "actual compilation fixture exports enabled and disabled shape-band policies");
     expect(!code.IsEmpty() && error.IsEmpty(), "C++ emitted");
     expect(code.Find("MakeBaseLayout") >= 0 && code.Find("MakeBaseStyle") >= 0 && code.Find("bool Register") >= 0, "separate layout style and real registration");
     expect(code.Find("ParseJSON") < 0 && code.Find("UiGraphWorkspace.h") < 0, "generated runtime code has no authoring/JSON dependency");
