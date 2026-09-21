@@ -8,6 +8,18 @@
 namespace Upp {
 namespace UiNodeGraphDetail {
 
+// Header/Footer may use independently validated shape bands. Paint and authoring
+// picking consume the SAME retained region rather than the old inscribed box.
+// A legacy/synthetic snapshot without a band keeps conservative safe clipping.
+inline Rect NodeComponentClip(const UiGraphNodePresentation& p,
+                              const UiGraphNodeComponentPresentation& c)
+{
+    Rect region = p.safe;
+    if(c.region == UiGraphNodeSlotRegion::Header && !p.header.IsEmpty()) region = p.header;
+    if(c.region == UiGraphNodeSlotRegion::Footer && !p.footer.IsEmpty()) region = p.footer;
+    return c.slot & region;
+}
+
 struct ResolvedNodeComponent {
     UiGraphNodeComponentReason reason = UiGraphNodeComponentReason::None;
     WString text;

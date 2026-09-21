@@ -16,6 +16,7 @@ file
     Presentation.cpp,
     Components.cpp,
     WorkspaceComponents.cpp,
+    EllipseBands.cpp,
     PresentationLayout.h,
     ExecutionPath.cpp;
 

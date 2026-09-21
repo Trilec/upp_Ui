@@ -261,6 +261,11 @@ struct UiGraphNodeTemplate : Moveable<UiGraphNodeTemplate> {
     bool micro_hints = false;
     int micro_hint_budget = 8;
 
+    // Identified templates can fit narrower Header/Footer bands independently
+    // inside ellipses/circles. Other shapes and Micro keep conservative capacity.
+    bool ellipse_bands = false;
+    int ellipse_band_width_percent = 80;
+
     UiGraphNodeTemplateKind kind = UiGraphNodeTemplateKind::Legacy;
     UiGraphNodeBodyMode body_mode = UiGraphNodeBodyMode::Stack;
     UiAlign text_align = UiAlign::LEFT;
@@ -381,6 +386,9 @@ inline bool UiGraphNodeTemplate::Validate(String& error) const
     if(!lod_widths.IsValid() || micro_hint_budget < 0 || micro_hint_budget > 16) {
         error = "Invalid LOD thresholds or Micro hint budget"; return false;
     }
+    if(ellipse_band_width_percent < 20 || ellipse_band_width_percent > 100) {
+        error = "Ellipse band width must be 20..100 percent"; return false;
+    }
     if(slot_count > MAX_SLOTS) { error = "Template exceeds slot capacity"; return false; }
     if(header_height < -1 || header_height > 16384 || footer_height < 0 || footer_height > 16384
        || content_left_width < 0 || content_left_width > 16384
@@ -392,6 +400,9 @@ inline bool UiGraphNodeTemplate::Validate(String& error) const
     }
     for(int i = 0; i < slot_count; i++) {
         const auto& r = slots[i];
+        if(ellipse_bands && !r.IsComponent()) {
+            error = "Ellipse bands require identified components"; return false;
+        }
         if((int)r.feature >= (int)UiGraphNodeSlotFeature::Count
            || (int)r.region > (int)UiGraphNodeSlotRegion::Footer
            || (int)r.placement > (int)UiGraphNodeSlotPlacement::Center

@@ -32,7 +32,7 @@ void UiNodeGraph::PaintNodeComponents(Draw& w, const UiGraphNodePresentation& p,
             Color ink = IsNull(c.state_ink[si]) ? SColorText() : c.state_ink[si];
             Color base = style.palette.face[si].IsSolid() ? style.palette.face[si].color : SColorPaper();
             Color muted = Blend(base, ink, 70);
-            w.Clip(c.slot & p.safe);
+            w.Clip(UiNodeGraphDetail::NodeComponentClip(p, c));
             if(!c.micro && !IsNull(c.decoration[si]))
                 w.DrawImage(c.slot.left, c.slot.top, c.decoration[si]);
             w.Clip(c.content);

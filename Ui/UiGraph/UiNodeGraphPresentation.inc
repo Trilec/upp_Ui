@@ -339,6 +339,44 @@ void UiNodeGraph::BuildNodePresentation(const UiGraphNode& node,
             p.header = root.Take(px(header_height), UiAlign::TOP);
         if(!root.fits)
             p.fits = false;
+        // Ellipse bands use their own contained rectangles, not a larger or
+        // falsely labelled safe rectangle. The central body remains inside safe.
+        // This is opt-in for identified templates; Micro keeps its cheap default.
+        if(node_template->ellipse_bands && !out.micro
+           && (node.shape == UiGraphNodeShape::Ellipse || node.shape == UiGraphNodeShape::Circle)) {
+            int margin = max(max(style.metrics.content_margin.left, style.metrics.content_margin.right),
+                             max(style.metrics.content_margin.top, style.metrics.content_margin.bottom));
+            Rect inner = out.surface.Deflated(max(1, px(margin + style.metrics.frame_width)));
+            auto fit_band = [&](Rect old, bool top) {
+                if(old.IsEmpty() || inner.IsEmpty()
+                   || !p.port_lanes[top ? 2 : 3].IsEmpty()) return old;
+                int width = max(1, fround(old.GetWidth() * (node_template->ellipse_band_width_percent / 100.0)));
+                int left = old.left + (old.GetWidth() - width) / 2;
+                double cx = (inner.left + inner.right) * 0.5;
+                double cy = (inner.top + inner.bottom) * 0.5;
+                double rx = inner.GetWidth() * 0.5, ry = inner.GetHeight() * 0.5;
+                double x = max(abs(left - cx), abs(left + width - cx)) / rx;
+                if(x >= 1) return old;
+                double reach = ry * std::sqrt(max(0.0, 1.0 - x * x));
+                int upper = (int)ceil(cy - reach), lower = (int)floor(cy + reach);
+                if(lower - upper < old.GetHeight()) return old;
+                if((top && upper >= old.top) || (!top && lower <= old.bottom)) return old;
+                int y = top ? upper : lower - old.GetHeight();
+                Rect band = RectC(left, y, width, old.GetHeight());
+                if(!contained(band)) return old;
+                for(const Rect& lane : p.port_lanes)
+                    if(!(band & lane).IsEmpty()) return old;
+                return band;
+            };
+            p.header = fit_band(p.header, true);
+            p.footer = fit_band(p.footer, false);
+            // Reclaim only space that is still in the conservative central
+            // capacity. Header/Footer clips may extend outside safe; Body may not.
+            if(!root.area.IsEmpty()) {
+                if(!p.header.IsEmpty()) root.area.top = min(root.area.top, max(p.safe.top, p.header.bottom + gap));
+                if(!p.footer.IsEmpty()) root.area.bottom = max(root.area.bottom, min(p.safe.bottom, p.footer.top - gap));
+            }
+        }
     }
 
     p.body = root.Remaining();
