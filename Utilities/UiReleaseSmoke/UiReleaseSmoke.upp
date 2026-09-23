@@ -1,0 +1,17 @@
+description "Focused native Ui release regression and compile smoke";
+
+noblitz;
+
+uses
+    Core,
+    Draw,
+    Painter,
+    CtrlCore,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp;
+
+mainconfig
+    "GUI" = "GUI";

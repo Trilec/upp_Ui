@@ -12,19 +12,6 @@ Color ContrastInk(Color c)
     return luminance >= 150000 ? Color(17, 24, 39) : White();
 }
 
-void PaintRectFrame(Draw& w, Rect r, Color c, int width)
-{
-    if(r.IsEmpty() || IsNull(c) || width <= 0)
-        return;
-    width = min(width, min(r.GetWidth(), r.GetHeight()) / 2);
-    if(width <= 0)
-        return;
-    w.DrawRect(r.left, r.top, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.bottom - width, r.GetWidth(), width, c);
-    w.DrawRect(r.left, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
-    w.DrawRect(r.right - width, r.top + width, width, max(0, r.GetHeight() - 2 * width), c);
-}
-
 } // namespace
 
 void UiRangeSegments::Paint(Draw& w)
@@ -40,44 +27,7 @@ void UiRangeSegments::Paint(Draw& w)
 
     int radius = max(0, style.track_metrics.radius -
                          (style.track_metrics.frame_enabled ? style.track_metrics.frame_width : 0));
-    for(const SegmentGeometry& sg : g.segments) {
-        Color c = sg.color;
-        if(sg.index == hot_segment_ && !dragging_)
-            c = LtColor(c, 10);
-        PaintSegmentFill(w, sg, g, c, radius);
-    }
-
-    if(show_dividers_) {
-        Color divider = style.divider_color;
-        if(IsNull(divider))
-            divider = style.track_palette.frame[base_state];
-        int normal_width = max(1, style.divider_width);
-        for(int i = 0; i < g.boundaries.GetCount(); i++) {
-            Point p = g.boundaries[i];
-            const bool segment_edge = (hot_segment_ >= 0 && (i == hot_segment_ - 1 || i == hot_segment_)) ||
-                                      (selected_segment_ >= 0 && (i == selected_segment_ - 1 || i == selected_segment_));
-            const bool emphasized = i == hot_boundary_ || i == active_boundary_ || segment_edge;
-            int width = normal_width + (emphasized ? DPI(1) : 0);
-            Color c = i == active_boundary_ && !IsNull(style.selected_frame)
-                    ? style.selected_frame : divider;
-            if(dir_ == UiDirection::H)
-                w.DrawRect(p.x - width / 2, g.content.top + DPI(2), width,
-                           max(0, g.content.GetHeight() - DPI(4)), c);
-            else
-                w.DrawRect(g.content.left + DPI(2), p.y - width / 2,
-                           max(0, g.content.GetWidth() - DPI(4)), width, c);
-        }
-    }
-
-    if(selected_segment_ >= 0 && selected_segment_ < g.segments.GetCount()) {
-        Color frame = style.selected_frame;
-        if(IsNull(frame))
-            frame = SColorHighlight();
-        if(base_state == ST_DISABLED)
-            frame = DisabledColor(frame);
-        PaintRectFrame(w, g.segments[selected_segment_].rect, frame,
-                       max(1, style.selected_frame_width));
-    }
+    PaintTrackContent(w, g, base_state, radius);
 
     if(show_labels_) {
         for(const SegmentGeometry& sg : g.segments) {
@@ -112,7 +62,7 @@ void UiRangeSegments::Paint(Draw& w)
         }
         PaintBoundaryThumb(w, i, g, st);
         if(show_values && show_boundary_values_)
-            PaintValueLabel(w, FormatValueLabel(GetBoundaryValue(i)), g.boundaries[i], true, style);
+            PaintValueLabel(w, FormatValueLabel(g.segments[i].end), g.boundaries[i], true, style);
     }
 
     if(show_values && show_endpoint_values_) {

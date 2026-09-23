@@ -20,8 +20,9 @@
       labelled spans without turning the control into a chart or gradient editor.
     - Keep semantic values in scalar domain units; pixel positions are only a view
       projection and never become authoritative data.
-    - Keep steady-state painting lightweight: rectangles, lines, text and native
-      ellipse thumbs use direct Draw; no per-frame full-control BufferPainter work.
+    - Keep text/readouts on Draw; antialias only the content strip and thumbs.
+      Exact shared rasters are reused at rest; live raster work is bounded to the
+      track, never the complete control including its readout whitespace.
 
     Thread context
     - GUI thread only.
@@ -31,6 +32,13 @@
       spans, labels, optional colours and application payloads.
     - Drag an internal boundary to redistribute span only between its two neighbours.
     - Observe live edits with WhenChanging and committed edits with WhenAction.
+      Programmatic setters are silent. Callbacks see committed state and may
+      destroy/rebuild the control. Capture loss/disable/Escape ends a live drag
+      without a second commit; its last live value is retained.
+    - Non-finite/null scalar inputs are ignored. Invalid/negative weights count
+      as zero; an all-zero weight collection receives equal spans.
+    - SetCustomStyle and convenience style setters own a complete style snapshot;
+      ClearCustomStyle restores current role/theme inheritance.
 
     Changelog
     - 2026-09: introduced the labelled multi-boundary range control.
@@ -231,6 +239,8 @@ public:
     virtual void LeftUp(Point p, dword flags) override;
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseLeave() override;
+    virtual void CancelMode() override;
+    virtual void State(int reason) override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
     virtual bool Key(dword key, int count) override;
     virtual Image CursorImage(Point p, dword flags) override;
@@ -260,8 +270,8 @@ private:
                               bool enabled) const;
     Color ResolvePaletteColor(int index) const;
     String FormatValueLabel(double value) const;
-    void PaintSegmentFill(Draw& w, const SegmentGeometry& sg,
-                          const Geometry& g, Color color, int radius) const;
+    void PaintTrackContent(Draw& w, const Geometry& g,
+                           StyledState state, int radius) const;
     void PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
                             StyledState state) const;
     void PaintValueLabel(Draw& w, const String& text, Point anchor,

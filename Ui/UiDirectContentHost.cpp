@@ -3,12 +3,22 @@
 
 namespace Upp {
 
+Ctrl* UiDirectContentHost::GetContent() const
+{
+    Ctrl* child = content_;
+    return child && child->GetParent() == this ? child : nullptr;
+}
+
 UiDirectContentHost& UiDirectContentHost::SetContent(Ctrl& ctrl)
 {
-    if(content_ == &ctrl)
+    // Test before detaching anything: Add must never create a parent cycle.
+    for(Ctrl* parent = this; parent; parent = parent->GetParent())
+        if(parent == &ctrl)
+            return *this;
+    if(GetContent() == &ctrl)
         return *this;
-    if(content_)
-        content_->Remove();
+    if(Ctrl* child = GetContent())
+        child->Remove();
     content_ = &ctrl;
     Add(ctrl);
     RefreshLayout();
@@ -17,11 +27,11 @@ UiDirectContentHost& UiDirectContentHost::SetContent(Ctrl& ctrl)
 
 UiDirectContentHost& UiDirectContentHost::ClearContent()
 {
-    if(content_) {
-        content_->Remove();
-        content_ = nullptr;
-        RefreshLayout();
-    }
+    Ctrl* child = GetContent();
+    content_ = nullptr;
+    if(child)
+        child->Remove();
+    RefreshLayout();
     return *this;
 }
 
@@ -76,7 +86,8 @@ static UiResolvedAxis UiDirectResolveAxis(UiDirectSizeMode mode, int minimum, in
 
 Size UiDirectContentHost::GetMinSize() const
 {
-    Size natural = content_ ? content_->GetMinSize() : Size(0, 0);
+    Ctrl* child = GetContent();
+    Size natural = child ? child->GetMinSize() : Size(0, 0);
     UiResolvedAxis hw = UiDirectResolveAxis(h_mode_, min_.cx, max_.cx, fixed_.cx,
                                             natural.cx, h_mode_ == UIDIRECT_EXPAND ? min_.cx : natural.cx);
     UiResolvedAxis hv = UiDirectResolveAxis(v_mode_, min_.cy, max_.cy, fixed_.cy,
@@ -117,17 +128,18 @@ static UiResolvedAxis UiDirectResolveAxis(UiDirectSizeMode mode, int minimum, in
 
 void UiDirectContentHost::Layout()
 {
-    if(!content_)
+    Ctrl* child = GetContent();
+    if(!child)
         return;
     Rect r = GetSize();
-    Size natural = content_->GetMinSize();
+    Size natural = child->GetMinSize();
     UiResolvedAxis hw = UiDirectResolveAxis(h_mode_, min_.cx, max_.cx, fixed_.cx, natural.cx, r.GetWidth());
     UiResolvedAxis hv = UiDirectResolveAxis(v_mode_, min_.cy, max_.cy, fixed_.cy, natural.cy, r.GetHeight());
     int w = hw.final_size;
     int h = hv.final_size;
     int x = UiDirectAlignedPos(r.left, r.GetWidth(), w, align_h_);
     int y = UiDirectAlignedPos(r.top, r.GetHeight(), h, align_v_);
-    content_->SetRect(RectC(x, y, w, h));
+    child->SetRect(RectC(x, y, w, h));
 }
 
 }

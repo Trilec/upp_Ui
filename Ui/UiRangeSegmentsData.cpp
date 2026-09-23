@@ -4,6 +4,8 @@ namespace Upp {
 
 UiRangeSegments& UiRangeSegments::SetPaletteMode(PaletteMode mode)
 {
+    if(mode != PaletteMode::Series && mode != PaletteMode::Gradient)
+        return *this;
     if(palette_mode_ != mode) {
         palette_mode_ = mode;
         Refresh();
@@ -92,6 +94,8 @@ UiRangeSegments& UiRangeSegments::ShowDividers(bool on)
 
 UiRangeSegments& UiRangeSegments::SetValueDisplay(ValueDisplay display)
 {
+    if(display != ValueDisplay::Domain && display != ValueDisplay::Percent)
+        return *this;
     if(value_display_ != display) {
         value_display_ = display;
         Refresh();
@@ -138,13 +142,18 @@ void UiRangeSegments::SetData(const Value& value)
             ValueMap map = entry;
             UiRangeSegment segment;
             int q = map.Find("span");
+            if(q >= 0 && !IsNull(map.GetValue(q)) && !IsNumber(map.GetValue(q)))
+                return;
             segment.span = q >= 0 && !IsNull(map.GetValue(q)) ? (double)map.GetValue(q) : 0.0;
             q = map.Find("label");
             if(q >= 0 && !IsNull(map.GetValue(q)))
                 segment.label = AsString(map.GetValue(q));
             q = map.Find("color");
-            if(q >= 0 && !IsNull(map.GetValue(q)))
+            if(q >= 0 && !IsNull(map.GetValue(q))) {
+                if(!map.GetValue(q).Is<Color>())
+                    return;
                 segment.color = Color(map.GetValue(q));
+            }
             q = map.Find("data");
             if(q >= 0)
                 segment.data = map.GetValue(q);

@@ -5,9 +5,22 @@
     UiDirectContentHost
     ===================
 
+    Author / license
+    - C Edwards (dodobar); Apache License 2.0 (see LICENSE).
+
     Purpose
     - Lightweight one-child host for non-layout containers that need Designer-
       style direct content placement without becoming a box/grid layout.
+
+    Ownership / thread context
+    - GUI thread only. SetContent reparents a borrowed Ctrl; it never deletes it.
+      The caller owns the child's lifetime. ClearContent only detaches our own
+      current child; destroyed or externally reparented children are ignored.
+    - Self/ancestor parenting is rejected without changing existing content.
+
+    Usage
+    - Keep a child as a member, call SetContent(child), then select Fit, Fixed
+      or Expand independently on each axis. A host has no painted role of its own.
 */
 
 #include <CtrlLib/CtrlLib.h>
@@ -33,12 +46,12 @@ public:
     UiDirectContentHost& SetMaximumSize(Size sz);
     UiDirectContentHost& SetAlign(UiAlign h, UiAlign v);
 
-    Ctrl* GetContent() const { return content_; }
+    Ctrl* GetContent() const;
     Size GetMinSize() const override;
     void Layout() override;
 
 private:
-    Ctrl* content_ = nullptr;
+    Ptr<Ctrl> content_; // non-owning; invalidated automatically on destruction
     UiDirectSizeMode h_mode_ = UIDIRECT_FIT;
     UiDirectSizeMode v_mode_ = UIDIRECT_FIT;
     Size fixed_ = Size(0, 0);

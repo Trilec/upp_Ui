@@ -1,125 +1,66 @@
 # ACTIVE WORK
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
+This file is a recovery pointer, not an implementation history. Keep <=100 lines.
 
-## Current reusable Theme fix — UI-TAB-THEME-01
+## Release hygiene — UI-RC-HYGIENE-01
+
+BASE: `8114269abd91cc33569f68117bef4fd4d537897a` / main.
+TASK: release-readiness audit and coherent source/documentation cleanup.
+TOUCHED: `Ui/UiRangeSegments*.{h,cpp}`; `Ui/UiDirectContentHost.{h,cpp}`;
+`Utilities/UiReleaseSmoke/{main.cpp,UiReleaseSmoke.upp}`; this file.
+STATUS: PARTIAL overall; this source slice IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+PUBLISHED: commit containing this entry; recover with `git log -1 -- Utilities/UiReleaseSmoke/main.cpp`.
+VALIDATION: complete touched originals reconstructed with matching Git blob hashes;
+full diff and git diff --check PASS. Extracted normalization algorithm compiled with
+Clang and passed 20,002 deterministic cases; this is not a U++/Windows test result.
+New native regression gate and existing focused suite have not been run here.
+NEXT ACTION: continue catalogue/docs/demo coverage and release tooling. Gary's final
+surgical task must use latest main and the checked-in GitHubOut.var. Build/run
+UiReleaseSmoke plus UiRangeSegmentsRunTests; compile the RangeSegments demo.
+
+Source changes: distinct inherited Accent/Subtle/Alert ramps; finite input guards;
+order-independent minimum-span normalization; callback lifetime guards and capture
+cancellation; linear range projection; bounded antialiased track/thumb rasters;
+borrowed-child lifetime/parent checks. No persistence-schema or Graph layout change.
+UiReleaseSmoke checks actual pixels/cache reuse as well as model/lifetime behavior.
+Do not infer all-controls audit completion or visual acceptance from this smoke.
+
+## Parallel reusable Theme fix — UI-TAB-THEME-01
 
 BASE: `11783c34ade07ceb8bf03b760eb58b314b2edd59` / main.
-TASK: remove OS light-face fallback from active UiTab caps and strip painting.
-TOUCHED: `Ui/UiTab.cpp`; `Utilities/UiTabThemePaintTest/{main.cpp,UiTabThemePaintTest.upp}`; this file.
+TASK: preserve Theme-owned active UiTab caps and strip fills, including explicit None.
+TOUCHED: `Ui/UiTab.cpp`; `Utilities/UiTabThemePaintTest/{main.cpp,UiTabThemePaintTest.upp}`.
 STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
-PUBLISHED: commit containing this entry; recover with `git log -1 -- Utilities/UiTabThemePaintTest/main.cpp`.
-VALIDATION: complete original UiTab source reconstructed with matching blob hash;
-full source/API/diff review and local git diff --check PASS. New native paint test
-written but not compiled/run here. This does not claim Windows visual acceptance.
-NEXT ACTION: Gary builds/runs UiTabThemePaintTest plus Designer ThemeStudioRoleTest,
-compiles the canonical Designer and leaves it open. Curt owns the visual checks.
-No graph-project matrix is required for this Theme Studio task.
+PUBLISHED: `8114269abd91cc33569f68117bef4fd4d537897a`.
+VALIDATION: source/API/diff review PASS; native pixel test not compiled/run here.
+NEXT ACTION: existing Designer gate: UiTabThemePaintTest + ThemeStudioRoleTest,
+canonical Designer compile/open; Curt owns visual checks. No broad Graph matrix.
 
-A transparent tab body must not invent SColorFace for its active tab. When the body
-actually paints a face, the active cap borrows the original UiFill; otherwise the
-resolved tab palette remains authoritative. The strip no longer mixes its resolved
-body face with OS SColorPaper. Explicit active-tab colours, transparent fills and
-active_tab_uses_body_face=false remain supported. No layout/hit/selection change.
-The focused paint test inspects real pixels across Light/Dark/Light and page changes.
+## Parallel UiGraph — UIGRAPH-NODE-WORKSPACE-03E2
 
-## Parallel UiGraph recovery — retained, not part of Designer validation
+BASE: `4c997824f741f1555269f95aec3462e7674045e0` / main.
+TASK: Content footprint underlay in Overlay diagram; explicit Overlay/fit summaries.
+TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceOverlayTests.cpp}`;
+`docs/UIGRAPH_OVERLAY_CONTRACT.md`.
+STATUS: accumulated 03E1/03E2 IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+PUBLISHED: recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceOverlayTests.cpp`.
+VALIDATION: pinned full source/diff review PASS; newer native tests not executed here.
+NEXT ACTION: existing `scripts/ValidateUiGraphWorkspace.ps1` Debug gate with required
+ancestor and -Launch; retain positive counts/all prior summaries plus OVERLAY.
+Read the overlay contract for physical/manual checks. Do not restart old matrix work.
 
-BASE: `4c997824f741f1555269f95aec3462e7674045e0` / main
-TASK: **UIGRAPH-NODE-WORKSPACE-03E2 — visible Content underlay and explicit Overlay/fit summaries**
-TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceOverlayTests.cpp}`; this file; `docs/UIGRAPH_OVERLAY_CONTRACT.md`.
-STATUS: **IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING** for accumulated 03E1/03E2. The preceding 03D gate is now reported PASS, not FAIL.
-PUBLISHED: the commit containing this record; recover exact SHA with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceOverlayTests.cpp`.
-VALIDATION: complete pinned touched originals reconstructed with matching Git blob hashes; local full diff and git diff --check PASS. New C++ tests/Windows GUI not executed here.
-NEXT ACTION: Gary validates the accumulated overlay checkpoint and manual on/off test using the recorded executable. Preserve the preceding PASS and regression suites; continue general diagram inventory / V8 ports only after this bounded gate.
+The preceding 03D gate remains reported PASS at
+`57e8d38167cde7cee2bc62b0093979af86ca91ca` (U++18468 / CLANGx64).
+Reported suites: Render 9/0; EllipseBands 16/0; Workspace 44/0; native View 45/0;
+Band UI 23/0; startup 5/0; WorkspaceComponent 24/0; Component 21/0;
+ExecutionPath 8/0; Presentation 87/0; evidence-reader 12/0. Generated C++ compiled.
+This earlier PASS does NOT validate source added afterwards. Full evidence and
+historical executable identity remain in Git at the BASE commit above.
 
-## Latest source / 03E2
-
-The Overlay diagram now paints a subdued labelled Content footprint below its
-Overlay guides, using the same retained projection/clip. Contain gaps remain
-unpainted; hidden Content leaves no invented footprint. This is diagnostic guide
-painting only, never another production allocator or thumbnail renderer.
-Underlay guides cannot receive drops or hijack Overlay/port hit routing.
-Structure summaries expose Cover (crop), Contain (whole), and Overlay membership.
-Native tests exercise projected footprint, guide paint, hidden state, hit-routing
-and summaries in addition to 03E1 geometry/raster/paint-order tests.
-
-## Retained source / 03E1 — 4c997824
-
-
-Content/Overlay allocation and paint ordering are already separate in production.
-The native Media preview looked like two columns because Thumbnail used left-
-aligned Contain, leaving unpainted space where Ready sat. New Media uses Cover
-(crop to fill its own allocation), with State right-aligned in OverlayRight.
-No saved-family migration, global image-fit change, fake ContentRight column,
-new runtime schema or retained geometry cache is introduced.
-
-The new native Overlay gate checks real overlap, unchanged underlying rectangles
-and image bytes across overlay edits, paint order with reversed template ordering,
-upper-layer selection, Contain invariance and persistence. It is wired into both
-Debug startup and --view-tests and fails the process before normal launch.
-No new native PASS is claimed. Read UIGRAPH_OVERLAY_CONTRACT.md for exact scope.
-
-## Latest Windows evidence — reported PASS at 57e8d381
-
-Gary tested `57e8d38167cde7cee2bc62b0093979af86ca91ca` on clean main, using
-U++18468 / CLANGx64. Required ancestry and origin/main ancestry PASS. No fixes.
-RenderTests 9/0; EllipseBands 16/0; Workspace 44/0; native View 45/0;
-Band UI 23/0; startup smoke 5/0; WorkspaceComponent 24/0; Component 21/0;
-ExecutionPath 8/0; Presentation 87/0; evidence-reader self-tests 12/0.
-Generated C++ compiled unchanged with Ui/CtrlLib only, SHA-256:
-`F29B56A3C5AB929B43CEE845A606654C2142A848ABC025ABBCA03AC954F57F62`.
-
-Manual PASS: both Media text rows readable on Rectangle/Ellipse; independent
-ellipse bands/60% width and outer-band picking; camera/node size stable;
-explicit capacity warning at Header20 and recovery at42; save/reload typography
-and bands; generated fields; exclusive full-height Code page and persistent mode
-selection after resizing; component Delete/Undo and inherited-layout protection.
-
-Executable evidence SHA-256:
-`31644228035E31E05EF33EA276368A675AFD7C18EB95D410C3EC1245AF7BB17E`.
-Evidence directory:
-`C:\Users\admin\AppData\Local\Temp\UiGraphWorkspace-validation\20260921-210253-57e8d38167cd-6f4450`.
-Executable: UiGraphComponentStudio.exe in that directory. PID 339420 was reported
-running; historical observation only. Diff check PASS; worktree clean; no commits.
-Held-button Escape during native drag remains unverified.
-Curt separately reported the confusing Overlay/thumbnail composition. The 03D
-PASS does not cover that new issue or source added after the tested checkpoint.
-
-## Retained implementation / recovery
-
-Read this file, UIGRAPH_OVERLAY_CONTRACT.md, UIGRAPH_ELLIPSE_BANDS.md,
-UIGRAPH_WORKSPACE_AUTHORING.md, UIGRAPH_WORKSPACE_RUNTIME.md and current source.
-Active app is examples/UiGraphComponentStudio. DesignMatrix remains retired.
-
-- 35a2cf8 / 03D1: exclusive rail host, selected-mode styling, zoom caption.
-- 08f09ba / 03D2: readable per-region height reservation, old failing tests retained.
-- 645a6b7 / 03D3: production Ellipse/Circle bands and independent clipping.
-- e5a1f19 / 03D4: strict schema v2; conservative v1 migration; C++ band export.
-- 8b2e53c / 03D5: band inspector/defaults/picking and native integration gate.
-- 57e8d381 / 03D6: evidence parser and executable identity; now Windows PASS.
-
-One NodeGeometry.presentation remains authoritative. Components are bounded
-painted C++ descriptions, not Ctrl trees or runtime JSON. Content/Overlay are
-sibling layers; Overlay never participates in Content flow. Image allocation and
-painted footprint are distinct. Component styling follows layout; node appearance
-inherits independently. Camera edits never resize nodes. Preserve 03C performance
-and projection work. Do not identify running executables from source HEAD alone.
-
-## Open boundaries
-
-General diagram inventory for hidden/unallocated components; full V8 Body-only /
-Full-edge shared post-port Content/Overlay and input/output zones; threshold undo /
-compact lifecycle; wider physical DND. No completion claim for these in 03E1/03E2.
-
-## Gary gate
-
-Use E:\apps\github\upp_Ui (literal underscore, no backslash before it), clean main.
-Require latest published checkpoint as ancestor. Run the established Debug runner
-with -RequiredAncestor <SHA> -Launch. Read the overlay contract for manual checks.
-All prior required summaries and the new OVERLAY summary must pass with positive
-counts. No fixed generated-code hash: the new preset legitimately changes it.
-Record exact HEAD, executable path/SHA-256, all summaries, manual result, evidence
-path, PID and clean worktree. Stop at first real failure. Minor mechanical fixes
-only, reviewed/documented/published and retested. No weakened tests, retired matrix,
-Release/broad benchmark or rich-Micro fallback. Publish coherent reviewed slices.
+Preserve one NodeGeometry.presentation authority, immutable camera baseline,
+independent Content/Overlay allocation, prepared native components/Micro budgets,
+and 03C projection/performance work. Active authoring app: UiGraphComponentStudio.
+General graph demos/tests remain supported; DesignMatrix is retired.
+Open: held-button Escape/physical DND, general diagram inventory, proposed V8
+post-port zones, threshold undo and compact lifecycle. No closure claimed here.

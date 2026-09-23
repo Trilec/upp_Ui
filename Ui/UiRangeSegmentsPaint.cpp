@@ -1,5 +1,6 @@
 #include <Ui/UiRangeSegments.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiTheme.h>
 #include <cmath>
 
 namespace Upp {
@@ -78,24 +79,15 @@ UiRangeSegments::Geometry UiRangeSegments::BuildGeometry(Size size) const
     if(g.content.IsEmpty())
         g.content = g.track;
 
-    const int length = dir_ == UiDirection::H ? g.content.GetWidth() : g.content.GetHeight();
-    auto EdgePos = [&](double value) {
-        if(length <= 0 || max_ <= min_)
-            return 0;
-        double t = (ClampRangePaintValue(value, min_, max_) - min_) / (max_ - min_);
-        if(reversed_)
-            t = 1.0 - t;
-        return clamp(fround(t * length), 0, length);
-    };
-
+    double start = min_;
+    int p0 = ValueToPos(start, g.content);
     for(int i = 0; i < segments_.GetCount(); i++) {
         SegmentGeometry sg;
         sg.index = i;
-        sg.start = GetSegmentStart(i);
-        sg.end = GetSegmentEnd(i);
-        sg.color = ResolveSegmentColor(i, segments_[i], IsEnabled());
-        int p0 = EdgePos(sg.start);
-        int p1 = EdgePos(sg.end);
+        sg.start = start;
+        sg.end = i + 1 == segments_.GetCount() ? max_ : start + segments_[i].span;
+        sg.color = ResolveSegmentColor(i, segments_[i], IsEnabled() && IsShowEnabled());
+        int p1 = ValueToPos(sg.end, g.content);
         int lo = min(p0, p1);
         int hi = max(p0, p1);
         if(dir_ == UiDirection::H)
@@ -106,14 +98,14 @@ UiRangeSegments::Geometry UiRangeSegments::BuildGeometry(Size size) const
                            g.content.right, g.content.top + hi);
         sg.visible = !sg.rect.IsEmpty();
         g.segments.Add(sg);
-    }
-
-    for(int i = 0; i < GetBoundaryCount(); i++) {
-        int pos = ValueToPos(GetBoundaryValue(i), g.content);
-        if(dir_ == UiDirection::H)
-            g.boundaries.Add(Point(g.content.left + pos, g.content.CenterPoint().y));
-        else
-            g.boundaries.Add(Point(g.content.CenterPoint().x, g.content.top + pos));
+        if(i < GetBoundaryCount()) {
+            if(dir_ == UiDirection::H)
+                g.boundaries.Add(Point(g.content.left + p1, g.content.CenterPoint().y));
+            else
+                g.boundaries.Add(Point(g.content.CenterPoint().x, g.content.top + p1));
+        }
+        start = sg.end;
+        p0 = p1;
     }
     return g;
 }
@@ -165,7 +157,10 @@ Color UiRangeSegments::ResolvePaletteColor(int index) const
 {
     const Style& s = GetEffectiveStyle();
     int count = clamp(s.series_count, 1, MAX_SERIES_COLORS);
-    if(palette_mode_ == PaletteMode::Gradient && segments_.GetCount() > 1 && count > 1) {
+    // Inherited semantic ramps span all visible segments, even for 2 or 3
+    // segments. Authored palettes retain their exact Series/Gradient semantics.
+    const bool tonal = !has_custom_style_ && role_ != UiRole::Standard;
+    if((palette_mode_ == PaletteMode::Gradient || tonal) && segments_.GetCount() > 1 && count > 1) {
         double t = ClampRangePaintValue((double)index / max(1, segments_.GetCount() - 1), 0.0, 1.0);
         double p = t * (count - 1);
         int a = clamp((int)floor(p), 0, count - 1);

@@ -68,7 +68,7 @@ UiRangeSegments::UiRangeSegments()
 }
 
 UiRangeSegments::UiRangeSegments(UiDirection dir)
-    : role_(UiRole::Standard), dir_(dir)
+    : role_(UiRole::Standard), dir_(dir == UiDirection::V ? UiDirection::V : UiDirection::H)
 {
     WantFocus();
     Transparent();
@@ -127,21 +127,18 @@ UiRangeSegments::Style UiRangeSegments::ResolveThemeStyle() const
     UiThemeContext context = UiTheme::GetContext();
 
     if(role_ != UiRole::Standard) {
-        if(role_ == UiRole::Alert) {
-            const Color orange = dark ? Color(251, 146, 60) : Color(234, 88, 12);
-            static const int alert_mix[MAX_SERIES_COLORS] =
-                { 0, 28, 56, 84, 112, 140, 168, 196 };
-            for(int i = 0; i < MAX_SERIES_COLORS; i++)
-                s.series[i] = Blend(primary, orange, alert_mix[i]);
+        // The semantic families are deliberately distinct. Blend takes 0..255,
+        // not a percentage; both ends of a tonal range must actually be reached.
+        Color first = primary;
+        Color last = Blend(primary, White(), dark ? 112 : 180);
+        if(role_ == UiRole::Alert)
+            last = dark ? Color(251, 146, 60) : Color(234, 88, 12);
+        else if(role_ == UiRole::Subtle) {
+            first = dark ? Color(190, 190, 190) : Color(220, 220, 220);
+            last = Color(88, 88, 88);
         }
-        else {
-            const Color dark_grey = Color(71, 85, 105);
-            const Color light_grey = dark ? Color(148, 163, 184) : Color(203, 213, 225);
-            static const int subtle_mix[MAX_SERIES_COLORS] =
-                { 0, 16, 32, 48, 64, 80, 92, 100 };
-            for(int i = 0; i < MAX_SERIES_COLORS; i++)
-                s.series[i] = Blend(dark_grey, light_grey, subtle_mix[i]);
-        }
+        for(int i = 0; i < MAX_SERIES_COLORS; i++)
+            s.series[i] = Blend(first, last, i * 255 / (MAX_SERIES_COLORS - 1));
         s.series_count = MAX_SERIES_COLORS;
     }
     else {
@@ -230,6 +227,8 @@ void UiRangeSegments::OnStyleChanged()
 
 UiRangeSegments& UiRangeSegments::SetDirection(UiDirection dir)
 {
+    if(dir != UiDirection::H && dir != UiDirection::V)
+        return *this;
     if(dir_ != dir) {
         dir_ = dir;
         RefreshLayout();

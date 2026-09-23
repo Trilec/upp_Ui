@@ -4,6 +4,11 @@
 namespace Upp {
 namespace {
 
+bool IsRangeScalar(double value)
+{
+    return !IsNull(value) && std::isfinite(value);
+}
+
 double ClampRangeModelValue(double v, double lo, double hi)
 {
     if(v < lo) return lo;
@@ -15,8 +20,13 @@ double ClampRangeModelValue(double v, double lo, double hi)
 
 UiRangeSegments& UiRangeSegments::SetRange(double mn, double mx)
 {
+    if(!IsRangeScalar(mn) || !IsRangeScalar(mx) || !std::isfinite(mx - mn))
+        return *this;
     if(mx < mn)
         Swap(mx, mn);
+    if(min_ == mn && max_ == mx)
+        return *this;
+    CancelMode();
     min_ = mn;
     max_ = mx;
     NormalizeSegments();
@@ -27,13 +37,20 @@ UiRangeSegments& UiRangeSegments::SetRange(double mn, double mx)
 
 UiRangeSegments& UiRangeSegments::SetStep(double step)
 {
-    step_ = step > 0.0 ? step : 0.0;
+    if(IsRangeScalar(step))
+        step_ = step > 0.0 ? step : 0.0;
     return *this;
 }
 
 UiRangeSegments& UiRangeSegments::SetMinimumSegmentSpan(double span)
 {
-    min_segment_span_ = max(0.0, span);
+    if(!IsRangeScalar(span))
+        return *this;
+    span = max(0.0, span);
+    if(min_segment_span_ == span)
+        return *this;
+    CancelMode();
+    min_segment_span_ = span;
     NormalizeSegments();
     Refresh();
     return *this;
@@ -54,23 +71,23 @@ void UiRangeSegments::NormalizeSegments()
 
     Vector<double> weights;
     weights.SetCount(n);
-    double weight_sum = 0.0;
+    double largest = 0.0;
     for(int i = 0; i < n; i++) {
-        weights[i] = max(0.0, segments_[i].span);
-        weight_sum += weights[i];
+        double v = segments_[i].span;
+        weights[i] = IsRangeScalar(v) ? max(0.0, v) : 0.0;
+        largest = max(largest, weights[i]);
     }
-    if(weight_sum <= 1e-12) {
-        for(int i = 0; i < n; i++)
-            weights[i] = 1.0;
-        weight_sum = n;
-    }
+    // Scaling before summation avoids overflow for otherwise valid weights.
+    // A zero weight stays zero unless the entire collection is empty of weight.
+    for(int i = 0; i < n; i++)
+        weights[i] = largest > 0.0 ? weights[i] / largest : 1.0;
 
-    double effective_min = min(max(0.0, min_segment_span_), domain / n);
+    const double effective_min = min(min_segment_span_, domain / n);
     Vector<byte> fixed;
     fixed.SetCount(n, 0);
     double remaining = domain;
-
-    for(int pass = 0; pass < n; pass++) {
+    int remainder_index = 0;
+    for(int pass = 0; pass <= n; pass++) {
         double free_weight = 0.0;
         int free_count = 0;
         for(int i = 0; i < n; i++)
@@ -78,58 +95,49 @@ void UiRangeSegments::NormalizeSegments()
                 free_weight += weights[i];
                 free_count++;
             }
-        if(free_count == 0)
+        if(!free_count)
             break;
-        if(free_weight <= 1e-12)
-            free_weight = free_count;
 
-        bool locked_any = false;
+        const bool equal = free_weight == 0.0;
+        int locked = 0;
+        // All candidates in a pass use the same remaining total. Reducing that
+        // total inside this loop would make normalization depend on item order.
         for(int i = 0; i < n; i++) {
             if(fixed[i])
                 continue;
-            double w = weights[i] > 0.0 ? weights[i] : (free_weight == free_count ? 1.0 : 0.0);
-            double candidate = remaining * w / free_weight;
-            if(candidate + 1e-12 < effective_min) {
+            double share = equal ? 1.0 / free_count : weights[i] / free_weight;
+            if(remaining * share < effective_min) {
                 segments_[i].span = effective_min;
-                fixed[i] = true;
-                remaining -= effective_min;
-                locked_any = true;
+                fixed[i] = 1;
+                locked++;
             }
         }
-        if(!locked_any)
-            break;
+        if(locked) {
+            remaining = max(0.0, remaining - locked * effective_min);
+            continue;
+        }
+        double largest_span = -1.0;
+        for(int i = 0; i < n; i++)
+            if(!fixed[i]) {
+                double share = equal ? 1.0 / free_count : weights[i] / free_weight;
+                segments_[i].span = remaining * share;
+                if(segments_[i].span > largest_span) {
+                    largest_span = segments_[i].span;
+                    remainder_index = i;
+                }
+            }
+        break;
     }
-
-    double free_weight = 0.0;
-    int free_count = 0;
-    for(int i = 0; i < n; i++)
-        if(!fixed[i]) {
-            free_weight += weights[i];
-            free_count++;
-        }
-    if(free_count > 0) {
-        if(free_weight <= 1e-12) {
-            double each = remaining / free_count;
-            for(int i = 0; i < n; i++)
-                if(!fixed[i])
-                    segments_[i].span = each;
-        }
-        else {
-            for(int i = 0; i < n; i++)
-                if(!fixed[i])
-                    segments_[i].span = remaining * weights[i] / free_weight;
-        }
-    }
-
     double sum = 0.0;
     for(const UiRangeSegment& segment : segments_)
         sum += segment.span;
-    if(n > 0)
-        segments_[n - 1].span += domain - sum;
+    // Put rounding residue in a free span, not in a span locked at its minimum.
+    segments_[remainder_index].span = max(0.0, segments_[remainder_index].span + (domain - sum));
 }
 
 UiRangeSegments& UiRangeSegments::SetSegments(const Vector<UiRangeSegment>& segments)
 {
+    CancelMode();
     segments_ = clone(segments);
     NormalizeSegments();
     selected_segment_ = segments_.IsEmpty() ? -1 : clamp(selected_segment_, -1, segments_.GetCount() - 1);
@@ -141,6 +149,7 @@ UiRangeSegments& UiRangeSegments::SetSegments(const Vector<UiRangeSegment>& segm
 
 UiRangeSegments& UiRangeSegments::SetSegmentCount(int count)
 {
+    CancelMode();
     count = max(0, count);
     segments_.Clear();
     if(count > 0) {
@@ -157,6 +166,7 @@ UiRangeSegments& UiRangeSegments::SetSegmentCount(int count)
 
 UiRangeSegments& UiRangeSegments::ClearSegments()
 {
+    CancelMode();
     segments_.Clear();
     selected_segment_ = active_boundary_ = hot_segment_ = hot_boundary_ = -1;
     RefreshLayout();
@@ -168,6 +178,7 @@ UiRangeSegments& UiRangeSegments::SetSegment(int index, const UiRangeSegment& se
 {
     if(index < 0 || index >= segments_.GetCount())
         return *this;
+    CancelMode();
     segments_[index] = segment;
     segments_[index].span = max(0.0, segments_[index].span);
     NormalizeSegments();
@@ -179,6 +190,9 @@ UiRangeSegments& UiRangeSegments::SplitSegment(int index, double ratio, const St
 {
     if(index < 0 || index >= segments_.GetCount())
         return *this;
+    if(!IsRangeScalar(ratio))
+        return *this;
+    CancelMode();
     ratio = ClampRangeModelValue(ratio, 0.01, 0.99);
     UiRangeSegment& left = segments_[index];
     double old_span = left.span;
@@ -206,6 +220,7 @@ UiRangeSegments& UiRangeSegments::RemoveSegment(int index)
     if(n == 1)
         return ClearSegments();
 
+    CancelMode();
     double removed = segments_[index].span;
     if(index > 0)
         segments_[index - 1].span += removed;
@@ -256,13 +271,20 @@ double UiRangeSegments::GetBoundaryValue(int index) const
 Vector<double> UiRangeSegments::GetBoundaryValues() const
 {
     Vector<double> out;
-    for(int i = 0; i < GetBoundaryCount(); i++)
-        out.Add(GetBoundaryValue(i));
+    double value = min_;
+    for(int i = 0; i < GetBoundaryCount(); i++) {
+        value += segments_[i].span;
+        out.Add(value);
+    }
     return out;
 }
 
 UiRangeSegments& UiRangeSegments::SetBoundaryValues(const Vector<double>& values)
 {
+    for(double value : values)
+        if(!IsRangeScalar(value))
+            return *this;
+    CancelMode();
     const int required_segments = values.GetCount() + 1;
     if(required_segments <= 0)
         return *this;
@@ -307,7 +329,10 @@ double UiRangeSegments::NormalizeValue(double value) const
     double v = ClampRangeModelValue(value, min_, max_);
     if(step_ > 0.0) {
         double k = (v - min_) / step_;
-        v = min_ + std::floor(k + 0.5) * step_;
+        // An extremely small step can overflow the quotient; at that scale the
+        // input already has less precision than one step. Keep the clamped input.
+        if(std::isfinite(k))
+            v = min_ + std::floor(k + 0.5) * step_;
     }
     return ClampRangeModelValue(v, min_, max_);
 }
@@ -315,7 +340,7 @@ double UiRangeSegments::NormalizeValue(double value) const
 bool UiRangeSegments::SetBoundaryValueInternal(int index, double value,
                                                bool fire_action, bool fire_changing)
 {
-    if(index < 0 || index >= GetBoundaryCount())
+    if(index < 0 || index >= GetBoundaryCount() || !IsRangeScalar(value))
         return false;
 
     double left_start = GetSegmentStart(index);
@@ -334,10 +359,13 @@ bool UiRangeSegments::SetBoundaryValueInternal(int index, double value,
     segments_[index].span = nv - left_start;
     segments_[index + 1].span = right_end - nv;
     Refresh();
-    if(fire_changing && WhenChanging)
-        WhenChanging();
-    if(fire_action && WhenAction)
-        WhenAction();
+    Ptr<UiRangeSegments> self = this;
+    Event<> changing = WhenChanging;
+    Event<> action = WhenAction;
+    if(fire_changing && changing)
+        changing();
+    if(self && fire_action && action)
+        action();
     return true;
 }
 

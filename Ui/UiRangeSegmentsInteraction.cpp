@@ -7,7 +7,10 @@ void UiRangeSegments::LeftDown(Point p, dword)
 {
     if(!IsEnabled() || !IsShowEnabled())
         return;
+    Ptr<UiRangeSegments> self = this;
     SetFocus();
+    if(!self)
+        return;
     Geometry g = BuildGeometry(GetSize());
     int boundary = HitBoundary(p, g);
     if(boundary >= 0) {
@@ -17,18 +20,22 @@ void UiRangeSegments::LeftDown(Point p, dword)
         Point c = g.boundaries[boundary];
         drag_offset_ = dir_ == UiDirection::H ? p.x - c.x : p.y - c.y;
         SetCapture();
-        if(WhenBoundarySelect)
-            WhenBoundarySelect(boundary);
+        if(!self)
+            return;
         Refresh();
+        Event<int> select = WhenBoundarySelect;
+        if(select)
+            select(boundary);
         return;
     }
 
     int segment = HitSegment(p, g);
     if(segment >= 0 && segment != selected_segment_) {
         selected_segment_ = segment;
-        if(WhenSegmentSelect)
-            WhenSegmentSelect(segment);
         Refresh();
+        Event<int> select = WhenSegmentSelect;
+        if(select)
+            select(segment);
     }
 }
 
@@ -37,18 +44,22 @@ void UiRangeSegments::LeftUp(Point, dword)
     if(!dragging_)
         return;
     dragging_ = false;
-    ReleaseCapture();
     bool changed = active_boundary_ >= 0 && active_boundary_ < GetBoundaryCount()
                 && fabs(GetBoundaryValue(active_boundary_) - drag_start_boundary_) >= 1e-12;
     Ptr<UiRangeSegments> self = this;
-    if(changed && WhenAction)
-        WhenAction();
-    if(self)
-        Refresh();
+    Event<> action = WhenAction;
+    ReleaseCapture();
+    if(!self)
+        return;
+    Refresh();
+    if(changed && action)
+        action();
 }
 
 void UiRangeSegments::MouseMove(Point p, dword)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return;
     Geometry g = BuildGeometry(GetSize());
     if(dragging_ && active_boundary_ >= 0 && active_boundary_ < GetBoundaryCount()) {
         int pos = dir_ == UiDirection::H
@@ -85,12 +96,18 @@ void UiRangeSegments::MouseWheel(Point, int zdelta, dword)
     double delta = step_ > 0.0 ? step_ : max(1e-9, (max_ - min_) / 100.0);
     if(zdelta < 0)
         delta = -delta;
-    if(SetBoundaryValueInternal(active_boundary_, GetBoundaryValue(active_boundary_) + delta, true, true))
-        Refresh();
+    // The internal edit already queues repaint before callbacks. It may delete
+    // this control, so no member access is permitted after it returns.
+    if(zdelta)
+        SetBoundaryValueInternal(active_boundary_, GetBoundaryValue(active_boundary_) + delta, true, true);
 }
 
 bool UiRangeSegments::Key(dword key, int)
 {
+    if(key == K_ESCAPE && dragging_) {
+        CancelMode();
+        return true;
+    }
     if(!IsEnabled() || !IsShowEnabled() || active_boundary_ < 0 || active_boundary_ >= GetBoundaryCount())
         return false;
     double delta = step_ > 0.0 ? step_ : max(1e-9, (max_ - min_) / 100.0);
@@ -107,8 +124,30 @@ bool UiRangeSegments::Key(dword key, int)
     return false;
 }
 
+void UiRangeSegments::CancelMode()
+{
+    const bool dirty = dragging_ || hot_boundary_ >= 0 || hot_segment_ >= 0;
+    dragging_ = false;
+    hot_boundary_ = hot_segment_ = -1;
+    drag_offset_ = 0;
+    if(dirty)
+        Refresh();
+    // Clear state before releasing capture: the framework may re-enter CancelMode.
+    if(HasCapture())
+        ReleaseCapture();
+}
+
+void UiRangeSegments::State(int reason)
+{
+    Ctrl::State(reason);
+    if(reason == CLOSE || !IsShown() || !IsShowEnabled())
+        CancelMode();
+}
+
 Image UiRangeSegments::CursorImage(Point p, dword)
 {
+    if(!IsEnabled() || !IsShowEnabled())
+        return Image::Arrow();
     if(dragging_)
         return dir_ == UiDirection::H ? Image::SizeHorz() : Image::SizeVert();
     Geometry g = BuildGeometry(GetSize());
