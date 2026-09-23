@@ -2,6 +2,29 @@
 
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 
+## Current reusable Theme fix — UI-TAB-THEME-01
+
+BASE: `11783c34ade07ceb8bf03b760eb58b314b2edd59` / main.
+TASK: remove OS light-face fallback from active UiTab caps and strip painting.
+TOUCHED: `Ui/UiTab.cpp`; `Utilities/UiTabThemePaintTest/{main.cpp,UiTabThemePaintTest.upp}`; this file.
+STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+PUBLISHED: commit containing this entry; recover with `git log -1 -- Utilities/UiTabThemePaintTest/main.cpp`.
+VALIDATION: complete original UiTab source reconstructed with matching blob hash;
+full source/API/diff review and local git diff --check PASS. New native paint test
+written but not compiled/run here. This does not claim Windows visual acceptance.
+NEXT ACTION: Gary builds/runs UiTabThemePaintTest plus Designer ThemeStudioRoleTest,
+compiles the canonical Designer and leaves it open. Curt owns the visual checks.
+No graph-project matrix is required for this Theme Studio task.
+
+A transparent tab body must not invent SColorFace for its active tab. When the body
+actually paints a face, the active cap borrows the original UiFill; otherwise the
+resolved tab palette remains authoritative. The strip no longer mixes its resolved
+body face with OS SColorPaper. Explicit active-tab colours, transparent fills and
+active_tab_uses_body_face=false remain supported. No layout/hit/selection change.
+The focused paint test inspects real pixels across Light/Dark/Light and page changes.
+
+## Parallel UiGraph recovery — retained, not part of Designer validation
+
 BASE: `4c997824f741f1555269f95aec3462e7674045e0` / main
 TASK: **UIGRAPH-NODE-WORKSPACE-03E2 — visible Content underlay and explicit Overlay/fit summaries**
 TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceOverlayTests.cpp}`; this file; `docs/UIGRAPH_OVERLAY_CONTRACT.md`.

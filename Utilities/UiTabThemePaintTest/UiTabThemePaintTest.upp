@@ -1,0 +1,11 @@
+description "UiTab Theme-owned active face and strip paint regression";
+
+uses
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "GUI";

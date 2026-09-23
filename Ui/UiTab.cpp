@@ -809,7 +809,9 @@ void UiTab::Paint(Draw& w)
 
     if(!strip_rect_.IsEmpty() && style.metrics.face_enabled && style.palette.face[st].IsSolid()) {
         Color strip_face = style.palette.face[st].color;
-        w.DrawRect(strip_rect_, Blend(strip_face, SColorPaper(), 220));
+        // The body palette is already resolved for the selected Theme. Mixing
+        // OS paper into it turns a dark strip light on a light desktop.
+        w.DrawRect(strip_rect_, strip_face);
     }
 
     Font f = style.tab_font;
@@ -819,7 +821,6 @@ void UiTab::Paint(Draw& w)
     Color accent = !IsNull(style.active_frame_color) ? style.active_frame_color : style.tab_palette.frame[ST_PRESSED];
     if(IsNull(accent))
         accent = SColorHighlight();
-    Color pane_face = style.palette.face[st].IsSolid() ? style.palette.face[st].color : SColorFace();
     Color seam_edge = accent;
     if(IsNull(seam_edge))
         seam_edge = Blend(SColorShadow(), Black(), 10);
@@ -988,8 +989,12 @@ void UiTab::Paint(Draw& w)
                 StyledPalette cap_palette = style.tab_palette;
 
                 if(i == active_) {
-                    if(style.active_tab_uses_body_face && !IsNull(pane_face))
-                        cap_palette.face[ST_PRESSED] = UiFill::Solid(pane_face);
+                    // A transparent body has no face to lend to the active
+                    // tab. Keep its resolved tab fill instead of inventing an
+                    // OS face colour. Copy the UiFill intact (including None
+                    // or a gradient) when the body really paints a face.
+                    if(style.active_tab_uses_body_face && style.metrics.face_enabled)
+                        cap_palette.face[ST_PRESSED] = style.palette.face[st];
                     if(style.visual == UITAB_CLASSIC) {
                         for(int sidx = 0; sidx < 4; sidx++)
                             cap_palette.frame[sidx] = Null;
