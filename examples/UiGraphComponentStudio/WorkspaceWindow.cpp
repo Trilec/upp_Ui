@@ -12,6 +12,15 @@ void CompactLabel(UiLabel& label, const String& text, bool bold = false)
     if(bold) s.font = s.font.Bold();
     label.SetCustomStyle(s);
 }
+void CompactChooserButton(UiButton& button)
+{
+    auto s = UiTheme::ResolveButton();
+    s.font = StdFont().Height(DPI(9));
+    s.metrics.content_margin = Rect(DPI(5), DPI(3), DPI(5), DPI(3));
+    s.content_gap = DPI(2);
+    button.SetCustomStyle(s);
+    button.SetMinSize(Size(DPI(40), DPI(20)));
+}
 Image SampleImage()
 {
     ImageBuffer b(96, 64); b.SetKind(IMAGE_OPAQUE);
@@ -70,13 +79,14 @@ void NodeWorkspace::BuildShell()
     left_.Add(family_).Fixed(DPI(29));
     CompactLabel(shape_label_, "SHAPE PREVIEW", true); left_.Add(shape_label_).Fixed(DPI(22));
     for(int y = 0; y < 3; y++) {
-        shape_rows_[y].SetDirection(UiDirection::H).SetGap(DPI(4));
+        shape_rows_[y].SetDirection(UiDirection::H).SetGap(DPI(2));
         for(int x = 0; x < 3; x++) {
             int i = y * 3 + x;
             shape_buttons_[i].SetText(i == 8 ? "BASE" : shape_names[i]).SetCheckable();
+            CompactChooserButton(shape_buttons_[i]);
             shape_rows_[y].Add(shape_buttons_[i]).Expand(1);
         }
-        left_.Add(shape_rows_[y]).Fixed(DPI(34));
+        left_.Add(shape_rows_[y]).Fixed(DPI(28));
     }
     CompactLabel(scope_label_, "Editing Base"); left_.Add(scope_label_).Fixed(DPI(38));
     left_.Add(detach_layout_).Fixed(DPI(25)); left_.Add(detach_style_).Fixed(DPI(25));
@@ -94,14 +104,15 @@ void NodeWorkspace::BuildShell()
     expand_.SetText("Expand specimen"); left_.Add(expand_).Fixed(DPI(25));
     CompactLabel(palette_label_, "COMPONENTS / drag or click", true); left_.Add(palette_label_).Fixed(DPI(24));
     for(int y = 0; y < 4; y++) {
-        palette_rows_[y].SetDirection(UiDirection::H).SetGap(DPI(5));
+        palette_rows_[y].SetDirection(UiDirection::H).SetGap(DPI(3));
         for(int x = 0; x < 2 && y * 2 + x < 7; x++) {
             int i = y * 2 + x;
             palette_[i].SetText(kind_names[i + 1]);
+            CompactChooserButton(palette_[i]);
             palette_[i].Tip(i == 6 ? "Painted actions only. Live Ctrl objects require a host SetNodeCtrl binding." : "Drag onto a region diagram or structure row; click adds to selected region.");
             palette_rows_[y].Add(palette_[i]).Expand(1);
         }
-        left_.Add(palette_rows_[y]).Fixed(DPI(43));
+        left_.Add(palette_rows_[y]).Fixed(DPI(34));
     }
     center_split_.Vert(center_top_, table_box_).SetSplitPercent(38).SetMinPixels(0, DPI(265)).SetMinPixels(1, DPI(260));
     center_top_.SetGap(DPI(5)).SetAlignItems(UiCrossAlign::Stretch);
@@ -174,7 +185,10 @@ void NodeWorkspace::Connect()
     undo_button_.WhenAction = [this] { Undo(); };
     theme_.WhenAction = [this] {
         FinishProperty(); auto c = UiTheme::GetContext(); c.mode = c.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
-        UiTheme::Set(c); ApplyDocument(); RebuildInspector(); Refresh();
+        UiTheme::Set(c);
+        for(auto& button : shape_buttons_) CompactChooserButton(button);
+        for(auto& button : palette_) CompactChooserButton(button);
+        ApplyDocument(); RebuildInspector(); Refresh();
     };
     family_.WhenSelect = [this](int i) { if(!building_ && i >= 0) NewFamily(i + 1); };
     for(int i = 0; i < 9; i++) shape_buttons_[i].WhenAction = [this, i] {
