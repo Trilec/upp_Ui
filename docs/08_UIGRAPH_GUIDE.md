@@ -1,607 +1,144 @@
 # 08 — UiGraph Guide
 
-This is the canonical architecture and usage guide for `UiGraphModel` and
-`UiNodeGraph`.
+UiGraph is a generic graph model/editor/view. It owns topology, graph editing,
+view state and presentation. Application execution, scheduling, budgets, retries
+and AgentFlow behavior stay with the host. Internal layout/performance and workspace
+contracts are in [Graph Development](09_UIGRAPH_DEVELOPMENT.md).
 
-Read with:
+## Model and view
 
-- `03_UI_MODEL_GUIDE.md` — model/view ownership;
-- `06_UI_SCALE_AND_LOD_GUIDE.md` — large-scale view architecture;
-- `07_UI_DRAWING_GUIDE.md` — final-pixel geometry and rendering;
-- `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained node-layout/cache architecture.
-
-## 1. Scope
-
-UiGraph is a generic graph editor/view. It owns:
-
-- graph presentation topology;
-- node/port/edge editing mechanics;
-- spatial/view state;
-- generic hierarchy and backdrops.
-
-It does **not** own application execution/orchestration semantics.
-
-AgentFlow or another host remains authoritative for budgets, execution,
-scheduling, retries, spawning and domain behavior.
-
-## 2. Model and view ownership
-
-`UiGraphModel` owns semantic graph data:
-
-- scopes;
-- nodes;
-- ports;
-- edges;
-- backdrops;
-- subgraph interfaces;
-- style/data metadata that belongs to the graph document.
-
-`UiNodeGraph` owns transient/derived view state:
-
-- active model binding;
-- active scope;
-- pan/zoom;
-- selection/hot/focus;
-- gestures;
-- retained spatial index;
-- prepared projected geometry;
-- retained node layout;
-- LOD;
-- attached visible child controls;
-- profiling evidence.
-
-The control owns an internal model by default and can bind an external model
-without copying:
+UiGraphModel owns scopes, nodes, ports, edges, backdrops, subgraph interfaces and
+graph-document metadata. UiNodeGraph owns active binding/scope, camera, selection,
+gestures, spatial/projection state, retained presentation, LOD and active embedded
+controls. It owns an internal model unless an external one is bound:
 
 ```cpp
+UiNodeGraph graph;
 graph.Model();
-graph.SetModel(external);
-graph.UseInternalModel();
+// graph.SetModel(external_model); // borrowed; must outlive its active binding
+// graph.UseInternalModel();      // original internal data remains
 ```
 
-## 3. Node vocabulary
-
-Canonical authored concepts:
-
-- Rectangle — arbitrary width/height + corner radius;
-- Ellipse — circle when dimensions are equal;
-- Diamond;
-- Triangle;
-- Hexagon;
-- Cloud;
-- Document;
-- Database;
-- Custom.
-
-Equal rectangle dimensions represent a square. A half-height radius represents a
-pill/capsule. Avoid multiplying enum variants when dimensions/metrics already
-express the distinction.
-
-Graph is a dense scene, so its hot projected geometry may use `UiGeometry`
-directly rather than allocate `UiShapePath` objects per node. Reusable normal
-controls should still prefer `UiShapes`.
-
-## 4. Ports and ordinary nodes are painted, not child controls
-
-Ordinary nodes and ports are retained geometry inside one `UiNodeGraph : Ctrl`.
-
-Do not create one child control per ordinary graph object.
-
-`SetNodeCtrl()` is the explicit escape hatch for real embedded controls.
-Registration and activation are separate:
-
-- a binding may remain registered while its node is offscreen/out-of-scope/LOD-suppressed;
-- only controls whose nodes are prepared, visible and above the content LOD are
-  attached as live child controls;
-- camera/layout updates inspect the active set plus prepared nodes with
-  registrations, not the entire registration map;
-- `GetRegisteredNodeCtrlCount()`, `GetActiveNodeCtrlCount()` and
-  `GetLastNodeCtrlCandidateCount()` expose the distinction.
-
-Ordinary graph objects still must not become one child `Ctrl` per node.
-
-## 5. Spatial architecture
-
-UiNodeGraph uses one retained world-space spatial hash as its broad phase.
-
-It supports:
-
-- bounded visible/prepared scene queries;
-- point hit candidates;
-- dirty-region paint candidates;
-- local marquee candidates;
-- local node/edge mutation;
-- style-class-local prepared rebuilds.
-
-Exact shape/route tests happen after candidate lookup. Port and edge broad-phase
-radii are derived from the same effective final-pixel hit policy used by prepared
-bounds/exact tests.
-
-### Extension bounds
-
-Host callbacks may legally paint/hit outside stock geometry, but they must
-declare conservative bounds through `UiNodeGraph::ExtensionBounds`:
-
-- node paint/hit margins — final device pixels;
-- maximum dynamically resolved port hit radius / edge hit width — final device pixels;
-- edge overlay paint margin — final device pixels;
-- custom-route escape margin — authored world units, because the retained broad
-  phase is world-space and must survive camera changes.
-
-Changing the declaration invalidates the spatial/prepared scene before the next
-paint/hit. The declaration is a bounds contract, not a curve-quality or LOD knob.
-
-Do not add a second prepared-viewport scan path for hit testing, and do not add a
-parallel spatial tree without measured evidence.
-
-## 6. View transactions and model changes
-
-Composite view changes coalesce to one final exact geometry frame.
-
-Local mutations rebuild only affected prepared geometry and incident routes where
-possible. Structural/model/scope changes rebuild the structures they actually
-invalidate.
-
-Switching model authority cancels incompatible gestures and reconciles selection,
-hover and attached controls so reused stable IDs cannot inherit state from a
-different graph.
-
-## 7. Rendering and LOD
-
-Graph follows the generic scale architecture in
-`06_UI_SCALE_AND_LOD_GUIDE.md`.
-
-LOD is runtime view policy, not serialized model/style data.
-
-The scene progressively removes work as projected detail disappears:
-
-- rich node content at normal scale;
-- secondary text/icons/shadows disappear before primary identity;
-- ports and labels disappear at their own thresholds;
-- connectors simplify before they disappear;
-- physically micro nodes use a direct Draw scene without rich details/content;
-- extreme overview may reduce ordinary connector population while preserving
-  semantic topology and selected/hot context.
-
-Geometry detail itself follows `UiGeometry` final-pixel error, not a Graph-owned
-sample count.
-
-A diamond remains a diamond and edges remain attached to the same semantic sides
-through LOD transitions.
-
-## 8. Grid
-
-The grid is hierarchical and world-origin aligned.
-
-As the finest grid becomes too dense it fades while coarser major levels become
-the stable orientation reference. This avoids a sudden empty canvas and prevents
-the grid from swimming under pan/zoom.
-
-Grid presentation LOD does not change authored `grid_size` or snap semantics.
-
-## 9. Live camera behavior
-
-Public/programmatic `SetZoom`, `SetPan`, `PanBy`, Fit and host setup remain
-exact.
-
-Live interaction may reuse retained prepared geometry:
-
-- middle-pan translates projected geometry while retained coverage is valid;
-- wheel zoom projects prepared geometry about the pointer while LOD/coverage
-  constraints remain compatible;
-- retained node-layout regions are transformed with the rest of `NodeGeometry`;
-- quiet after the gesture triggers one exact settle rebuild;
-- unsafe coverage/LOD boundary triggers exact fallback immediately.
-
-The world spatial index remains authoritative.
-
-## 10. Edge routing
-
-Built-in route styles:
-
-- Straight;
-- Bezier;
-- Orthogonal;
-- Custom.
-
-Route geometry is adaptive in final pixels.
-
-The stock orthogonal lead is zero; a host may opt into a positive lead through
-edge style when it has a concrete presentation reason.
-
-### Endpoint markers
-
-The core authored marker vocabulary is:
-
-- None;
-- Open;
-- Triangle;
-- Tee;
-- Square;
-- Circle;
-- Diamond.
-
-These are presentation choices on the edge; they do not change topology or port
-semantics. Existing wire values are stable and new marker values are append-only.
-
-Filled/hollow presentation should be treated as a separate style dimension if it
-is added later rather than multiplying the shape enum into duplicate variants.
-
-### Editing
-
-Route editing is request-first through `UiGraphEdgeRouteRequest`.
-
-Straight near-direct waypoints normalize back to a direct route.
-
-Bezier midpoint drags remain in useful port-forward half-planes so the route does
-not fold back through endpoints.
-
-Same-orientation orthogonal midpoint editing controls a stable corridor with
-hysteresis around orientation changes. Mixed-orientation routes keep their
-single useful elbow behavior.
-
-### Semantic midpoint rule
-
-The visible route handle/label midpoint is derived from visible arc length, not
-a tessellation vertex index.
-
-Adaptive flattening may reduce a straight Bezier to only its endpoints without
-moving the semantic handle.
-
-## 11. Selection and editing
-
-Selection is semantic and independent from ordinary node frame styling.
-
-- point selection distinguishes click from group drag;
-- mouse-down on an already selected member may preserve the group for a drag;
-- plain click/release may collapse to that item;
-- modifier add/toggle/subtract semantics remain explicit;
-- marquee preview is transient; semantic selection commits on release.
-
-Model mutation may be internal or request-first depending on host policy.
-
-## 12. Backdrops
-
-A Backdrop is presentation-only same-scope organization.
-
-It:
-
-- belongs to one scope;
-- has a world rectangle/title;
-- paints behind edges/nodes;
-- does not own nodes or edges;
-- does not alter topology;
-- does not prevent nodes crossing its bounds.
-
-A Backdrop is never a weak Subgraph.
-
-## 13. Subgraphs and scopes
-
-A Subgraph is true hierarchy.
-
-- the root graph is one scope;
-- every Subgraph owns one child scope;
-- a node belongs to exactly one scope;
-- an ordinary edge connects endpoints inside one scope;
-- child node positions are local to the child scope;
-- nesting is allowed;
-- scope cycles are rejected.
-
-The parent scope represents the Subgraph through an ordinary group node.
-
-### Interface
-
-A Subgraph has an authoritative stable input/output interface.
-
-Each interface port owns stable identity plus its graph-facing metadata:
-title/description, data/custom type, multiplicity, enabled/visible state and
-optional application `Value data`.
-
-The outer group node mirrors that interface as normal ports.
-
-Inside the child scope:
-
-- **Group Inputs** exposes external inputs as internal outputs;
-- **Group Outputs** accepts internal values for external outputs.
-
-Parent edges never connect directly to child-internal nodes. Ordinary edges
-remain same-scope.
-
-Outer/interface/boundary mirror ports must not drift. Interface mutation must
-preserve stable ids and reject scope cycles/self-containment.
-
-### Navigation
-
-Enter/Exit changes only the active view scope. It does not rewrite topology.
-
-Scope-local viewing prepares/paints only that scope, not hidden descendants.
-
-## 14. Presentation metadata
-
-Application/demo-specific metadata such as small tags or image thumbnails should
-use generic data/provider hooks where appropriate rather than adding domain
-fields to UiGraphModel.
-
-The Graph demo may display tags/media without making them universal graph
-semantics.
-
-## 15. Coordinate authoring
-
-UiGraphModel does not impose an arbitrary global world-size limit.
-
-Interactive inspectors, however, should not offer a million-unit scrub range that
-can accidentally create enormous routes. The Graph demo uses a viewport-relative
-working range while preserving explicit numeric entry.
-
-This is authoring UX, not model semantics.
-
-## 16. Performance evidence
-
-The current deterministic large fixture is 10,000 nodes.
-
-Graph exposes observer-only evidence including:
-
-- candidates;
-- prepared nodes/edges;
-- painted nodes/edges;
-- LOD population;
-- path vertices;
-- geometry/spatial build counts;
-- geometry/node/edge/surface/details/content phase timing;
-- registered/active embedded-control counts and candidate work;
-- spatial cell/global/raw-edge probes and in-place bound updates;
-- backdrop candidate count.
-
-The important contracts are structural:
-
-- live reusable camera movement does not rebuild geometry every event;
-- compatible camera motion projects retained node-layout regions rather than relayout;
-- micro nodes do not return to rich details/content;
-- fit/overview stays bounded;
-- hit testing uses spatial candidates;
-- generated/demo diagnostics do not become part of measured interaction work.
-
-A static viewport must eventually become idle; continuous idle repaint is a
-separate defect even when individual paint paths are efficient.
-
-## 17. Demo and generated code
-
-The reference demo is executable documentation, not another model authority.
-
-- Reference and 10k fixtures exercise the same production control;
-- property/appearance editors act on real APIs;
-- generated C++ is lazy behind explicit Code/Copy/Save actions;
-- selection/code output may include multiple selected nodes/edges;
-- demo-only style callbacks must not accidentally force conservative full-scene
-  renderer paths.
-
-The Presentation Studio must use production node-layout geometry. It must not
-invent a parallel demo-only allocator or make preview-camera size synonymous with
-LOD thresholds.
-
-## 18. Acceptance surface
-
-The Graph regression family covers:
-
-- general model/API;
-- canonical shapes;
-- hierarchy/scope view;
-- live camera reuse;
-- pan/profile behavior;
-- scale/spatial behavior;
-- model switching;
-- route editing;
-- presentation/detail/render LOD;
-- retained node-layout containment/projection;
-- selection/interaction state;
-- 10k performance evidence.
-
-When changing Graph, build the complete touched test slice rather than weakening a
-single failing assertion.
-
-## 19. Non-goals
-
-Do not put into UiGraph:
-
-- AgentFlow execution semantics;
-- one child Ctrl per normal node;
-- nested UiNodeGraph controls as the primary hierarchy mechanism;
-- a second model/topology authority;
-- a second per-node layout cache;
-- runtime JSON layout compilation as a production requirement;
-- a private curve-quality/sample-count system;
-- a GPU dependency merely to compensate for avoidable CPU work.
-
-## 20. Execution ownership and source map
-
-`UiNodeGraph.h` contains the actual class declarations. `UiNodeGraph.cpp` includes
-internal implementation parts exactly once, without method-renaming macros. The
-`.inc` suffix deliberately preserves shared helper linkage and the existing build
-boundary; it does not indicate a second implementation or a runtime backend.
-
-| Responsibility | Source / entry point |
-| --- | --- |
-| Lifetime, styles, notifications, attached controls | `UiNodeGraphCore.inc` |
-| Exact node/edge preparation, anchors and geometry LOD | `UiNodeGraphGeometry.inc`: `PrepareViewGeometry`, `BuildViewNodeGeometry`, `BuildNodeGeometry` |
-| Retained rich node-layout allocation and visibility | `UiNodeGraphPresentation.inc`: `BuildNodePresentation` |
-| World-space queries and scope filtering | `UiNodeGraphSpatial.cpp` |
-| Programmatic camera and batched view updates | `UiNodeGraphCamera.inc` |
-| Live pan/zoom projection and settle | `UiNodeGraphProjection.inc`: `ProjectLiveView`, `SettleLiveViewProjection` |
-| Scope navigation, selection, fit/layout and backdrops | `UiNodeGraphHierarchy.inc` |
-| Model replacement | `UiNodeGraphModelBinding.inc` |
-| Frame/grid/overlay orchestration | `UiNodeGraphPaint.inc`: `Paint` |
-| Backend admission and micro surfaces/edges | `UiNodeGraphPaintMicro.inc`: `PaintGraphGeometry` |
-| Rich surfaces, port glyphs, details/content and edges | `UiNodeGraphPaintRich.inc`: `PaintGraphRich` |
-| Shared projected-size, visibility and edge-backend policy | `UiNodeGraphLod.h` |
-| Editing gestures and interaction lifecycle | `UiNodeGraphInteraction.cpp` |
-
-H2 was a hierarchy migration label, not a second runtime spatial mode. Its accepted
-scope-aware spatial implementation is now the sole `UiNodeGraphSpatial.cpp` in
-`Ui.upp`. Old spatial sources and replaced methods are recoverable from Git history.
-Do not restore a parallel production copy to fix a regression.
-
-Two paint backends remain intentional. Micro drawing avoids rich per-node work;
-merging their drawing loops would risk the measured 10k improvement. Shared policy
-is small, inline and allocation-free. Backend admission completes before drawing,
-so a Painter-only edge cannot disappear after a partial micro frame. Admitted edge
-styles are reused between preflight and micro drawing.
-
-LOD is not a fixed number of scene-wide bands. Host zoom thresholds and each node's
-projected size both matter: a mixed-size scene can contain micro and rich nodes at
-the same zoom. Micro nodes omit content and port glyphs even when another node or
-edge requires rich scene paint. Semantic port anchors remain available. Idle and
-middle-pan permit micro drawing; semantic editing gestures, rich-sized nodes,
-custom painting and Painter-required edges can intentionally select rich paint.
-`GetLastPaintPath()` and `GetLastPaintFallbackReason()` expose that choice directly.
-Camera projection eligibility and render backend admission are separate checks.
-
-The supported canonical built-ins remain Rectangle, Ellipse, Diamond, Triangle,
-Hexagon, Cloud, Document and Database (eight), plus the Custom callback extension.
-Historical shape enum values remain for compatibility. No shapes or route types
-were added or removed by this consolidation; Straight, Bezier and Orthogonal remain
-the three built-in connection routes. Shape identity and authored styling survive LOD.
-
-Before changing a threshold, update the shared policy and check live projection
-compatibility. Before changing a glyph, distinguish the node port glyph from the
-separate edge arrow. Run the execution-path suite and 10k pan profile; a paint speed
-claim requires runtime measurements, not file reduction or source inspection.
-
-Demo viewport observation lives in `examples/UiGraphDemo/UiGraphDemoObservation.cpp`.
-One `WhenViewport` callback schedules a replaceable 200 ms observer. Normal status
-updates regardless of the diagnostics page/toggle; diagnostics sampling checks both
-at execution time. Hiding or disabling diagnostics cannot cancel normal status.
-After the observer runs, no repeating timer remains. Runtime fixture setup does not
-replace this callback. Diagnostic zoom gates describe configured thresholds; actual
-paint-path/fallback/port evidence describes the rendered frame.
-
-## 21. Retained node presentation/layout
-
-The agreed designer vocabulary remains **Normal, LOD 1, LOD 2, LOD 3**. Normal is
-the authored composition; LOD 1-3 are progressively simplified, with LOD 3
-smallest. These prepared levels are separate from Micro/Rich execution and
-historical diagnostic L0-L4 bands.
-
-The current architecture is documented in detail in
-`UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`. The key rule is:
-
-> `NodeGeometry.presentation` is the retained node-layout result/cache.
-
-There is no second `UiGraphLayout` cache after geometry. Exact rich node preparation
-allocates the retained layout; paint, attached controls and compatible camera
-projection consume that same result. Micro preparation keeps an empty/simplified
-presentation and skips rich layout/resolver work.
-
-### Current section structure
-
-`UiGraphNodePresentation` retains:
-
-```text
-safe
-├── header
-├── body
-│   ├── body_left
-│   ├── body_main
-│   └── body_right
-├── footer
-├── overlay
-└── center
+SetModel switches without copying/merging/clearing. Scope/model changes cancel
+incompatible gestures and reconcile selection/attached controls so reused IDs
+cannot inherit another graph's transient state. Model notifications update the
+view; mutable node/edge edits must publish through TouchNode/TouchEdge or the
+appropriate mutation API. See [Models](03_UI_MODEL_GUIDE.md).
+
+## Shapes and actual controls
+
+Eight canonical built-ins: Rectangle, Ellipse, Diamond, Triangle, Hexagon, Cloud,
+Document, Database; Custom is the callback extension. Equal Rectangle dimensions
+make a square, radius/aspect make a capsule, equal Ellipse dimensions make a circle.
+Historical enum values remain compatible; do not multiply shape types for sizes.
+
+Ordinary nodes/ports are painted geometry in one UiNodeGraph, not child Ctrl trees.
+SetNodeCtrl is the sparse explicit escape hatch. Registration and activation are
+separate: offscreen/out-of-scope/LOD-suppressed bindings can stay registered, but
+only prepared, visible, useful-size controls attach. GetRegisteredNodeCtrlCount,
+GetActiveNodeCtrlCount and GetLastNodeCtrlCandidateCount distinguish those costs.
+Host code owns real-control lifetime; a painted Actions component is not a tiny
+live button/editor.
+
+## Shared templates and node content
+
+Register a validated C++ UiGraphNodeTemplate once per class and use its style class
+on nodes. Do not construct templates or parse authoring JSON per node paint.
+
+```cpp
+String error;
+UiGraphNodeTemplate layout;
+// Configure the shared layout using UiGraphNodeTemplate's public API.
+if(!graph.SetNodeTemplateClass("asset", layout, error))
+    Panic(~error);
+UiGraphNode node;
+node.style_class = "asset";
+graph.Model().AddNode(node);
 ```
 
-Current leaf slots include title, subtitle, icon, badge, media, description,
-control, footer and four physical port-label lanes. `overlay` and `center`
-intentionally overlap `body_main` as composition regions; they are not competing
-sibling allocations.
+Identified components have stable nonempty IDs, not identity derived from slot
+order. Text/Icon/Image/Progress/Fields/Tags/Actions are bounded painted kinds;
+repeated Text or Icon components need no Title2/Icon2 enum. Bindings resolve node
+fields, node data or explicit resources. Use IDs again after reordering rather
+than retaining an array index. Legacy unnamed/rich hooks remain supported within
+their documented bounds but do not run as a Micro fallback.
 
-The structural body modes are:
+The structure is optional Header / Body / Footer. Body has independent Content
+and Overlay layers, each with Left/Main/Right regions. Overlay paints last and
+never consumes Content space. Ports remain graph-owned reservations. Width, height,
+placement, alignment, component style and semantic binding are separate concepts.
 
-- `Stack`;
-- `Centered`;
-- `Media`;
-- `KeyValue`;
-- `Fields`;
-- `PortRows`;
-- `FlowTags`.
+Normal / LOD 1 / LOD 2 / LOD 3 are author-facing inclusion levels; representation
+(Text/Bar/Dot/Hidden, etc.) also depends on real capacity, data readiness and budget.
+On requests a legal representation, not unreadable text or escape from the shape.
+Micro/Rich execution is a separate decision. The workspace displays the actual
+representation/reason alongside authored inclusion.
 
-These are authoring metadata, not heavy runtime layout engines. Specialised rows,
-tags, fields, media and port-row content remain bounded inside `body_main`.
+## Camera, grid and size
 
-### Side port lanes
+Programmatic SetZoom, SetPan, PanBy and Fit remain exact. Compatible live pan may
+project retained geometry; live zoom has explicit admission and exact fallback.
+Named-component scale reuse is not generally enabled yet. See the development
+guide before making performance claims about that path.
 
-Left/right labelled port lanes may retain the legacy full-safe-height reservation
-or be constrained to Body. Body-only lanes share `body_left` / `body_right` and do
-not reduce Header/Footer width. Semantic port anchors remain on the node silhouette
-and are independent from label-lane presentation.
+The hierarchical grid is world-origin aligned: fine levels fade as coarser levels
+become useful. Grid presentation never changes authored grid size or snapping.
+World coordinates have no arbitrary global cap; an inspector's bounded scrub range
+is user-interface policy, not a topology limit.
 
-Top/bottom lane behaviour is unchanged by the current retained-layout tranche.
+Changing LOD thresholds with UiRangeSegments changes presentation policy, not camera
+zoom or world-space node size. Fit, 1:1 and LOD-jump camera actions are explicit.
+The existing collapsed flag suppresses body content/port labels; a future size-only
+disclosure must not silently reinterpret it.
 
-### Layout caching and scaling
+## Edges and interaction
 
-The layout result is retained in `NodeGeometry`; it is not calculated and then
-copied into another cache. Compatible camera movement projects the retained region
-rectangles along with the rest of prepared node geometry.
+Built-in routes are Straight, Bezier and Orthogonal, with Custom as an extension.
+Route detail is adaptive in final pixels. Orthogonal stock lead is zero unless the
+host authors a positive lead. Endpoint markers are None, Open, Triangle, Tee,
+Square, Circle and Diamond; their wire values stay stable/append-only.
 
-The performance rule is deliberately coarse:
+Route edits use UiGraphEdgeRouteRequest. Near-direct straight waypoints normalize
+to direct routes; Bezier midpoint movement respects useful port-forward half-planes;
+orthogonal corridor editing retains its existing orientation/hysteresis policy.
+Midpoint/label handles use visible arc length, not a tessellation vertex index.
 
-- paint-only state should not cause layout work;
-- local section changes should eventually replay only the affected Header/Body/
-  Footer section when practical;
-- shape/safe-region/structural changes may replay the root layout;
-- compatible camera scaling projects cached layout rather than relayout;
-- do not create a fine-grained dependency graph until measurement justifies it.
+Selection is semantic, separate from ordinary frame styling. Clicking an already
+selected member can preserve the group during drag; plain release can collapse the
+selection. Modifier add/toggle/subtract and marquee preview/commit are explicit.
+Application-owned mutations use the request-first policy rather than mutating before
+asking permission. Port glyphs, edge arrows and semantic port anchors are distinct.
 
-Fine-grained per-section dirty/revision updates are a **planned next step**, not a
-current implementation claim.
+## Backdrops and hierarchy
 
-### Template direction
+A Backdrop is same-scope presentation organization, painted behind content. It does
+not own nodes/edges, change topology or prevent objects crossing its bounds.
 
-The starting presentation intents remain:
+A Subgraph owns one child scope. Each node belongs to one scope; ordinary edges
+connect endpoints within that scope; nested child positions are local. Scope cycles
+are rejected. The parent presents the subgraph as an ordinary group node with an
+authoritative stable input/output interface mirrored as normal outer ports.
 
-- Minimal;
-- Identity;
-- Summary;
-- Status;
-- Media;
-- Parameter;
-- Operator.
+Inside, Group Inputs exposes external inputs as internal outputs; Group Outputs
+accepts values for external outputs. Parent edges never connect directly to child-
+internal nodes. Interface changes preserve IDs/metadata/multiplicity and reject
+self-containment. Enter/Exit changes the view's active scope, not topology.
 
-They are not LOD levels. The next production layer should define them as small
-shared C++ template/slot descriptions mapping features into retained sections/body
-modes. One immutable template definition may serve many nodes; prepared nodes retain
-only evaluated geometry.
+## Examples and boundaries
 
-Feature placement must remain template-owned rather than hard-wired. An Icon may
-appear in Header, Center or Overlay; Subtitle may be below Title or above it as an
-overline; Media may fill BodyMain while state icons occupy Overlay.
+UiGraphDemo remains the general graph/10k reference; UiGraphHierarchyDemo teaches
+scope hierarchy. UiGraphComponentStudio is the current single-preview family/node
+workspace with real PropertyEditor, diagrams, structure/LOD table, files and C++.
+DesignMatrix is retired, not another active editor.
 
-Production template definitions compile normally with UMK/CLANG. JSON is optional
-Studio/session interchange or an offline source for generated C++; it is not a
-required runtime layout compiler.
+Workspace files are authoring interchange, not runtime layout programs. Base layout
+and appearance inherit independently into eight shapes. Explicit detach creates a
+section snapshot. Inherited sections are read-only; selecting a shape alone does
+not author an override. The generated C++ has no workspace/PropertyEditor dependency.
 
-### Presentation Studio direction
-
-The V3 wide matrix remains useful diagnostic history, but it is not the final
-authoring model.
-
-V4 should keep four independent persistent previews for Normal/LOD1/LOD2/LOD3 and
-separate:
-
-1. preview/camera size;
-2. LOD transition thresholds;
-3. per-LOD feature policy;
-4. template/node layout.
-
-Dragging `UiRangeSegments` must change transition thresholds without resizing the
-preview specimens. When a threshold crosses a fixed specimen size, the specimen's
-actual LOD/policy changes while its camera stays put.
-
-Feature policy should evolve toward `Inherit / Force On / Force Off`, still subject
-to genuine shape/capacity limits. The builder should edit region/slot placement,
-body mode, alignment and eventual Stable/Reflow behaviour against the production
-retained-layout path.
-
-`GetNodePresentation(ref, result)` remains a read-only snapshot of already prepared
-retained layout and never prepares geometry. Native child controls remain active
-only when the current policy/LOD/slot capacity permits them.
-
-See `UIGRAPH_PRESENTATION_AUDIT.md` for the historical audit disposition and
-`ACTIVE_WORK.md` for current validation/recovery status.
+Use node data/provider hooks for application tags, thumbnails and status rather
+than universal graph fields. Declare extension paint/hit bounds before painting
+outside stock geometry. Read the development guide for exact size/budget, source,
+file schema, projection and validation contracts. ACTIVE_WORK is the current
+publication/platform boundary, not a promise that every proposed workspace feature
+or optimization is already complete.

@@ -33,4 +33,4 @@ indexes.
 
 See repository docs:
 - docs/07_UI_DRAWING_GUIDE.md
-- docs/06_UI_SCALE_AND_LOD_GUIDE.md
+- docs/09_UIGRAPH_DEVELOPMENT.md (Graph-specific retained execution)

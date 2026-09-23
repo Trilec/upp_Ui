@@ -1,85 +1,79 @@
 # U++ Ui
 
-Modern, style-first controls and UI helpers for Ultimate++.
+Style-first controls, layouts and model-backed views for Ultimate++.
 
-This repository contains the reusable **Ui library family**:
+Ui supplies shared themes, four semantic roles, modern controls, drawing helpers,
+icons, and retained Graph/document views. It can coexist with ordinary CtrlLib
+controls. Reusable PropertyEditorCore and PropertyEditor packages support typed
+property inspection without depending on UiDesigner.
 
-- `Ui` — the control library: controls, theme/style infrastructure, layout
-  helpers, icons, and draw utilities.
-- `Utilities/PropertyEditorCore` — headless property schema and value model.
-- `Utilities/PropertyEditor` — the `Ui`-backed property inspector/editor.
+![UiButton example](Snapshot_Button.jpg)
 
-Important controls include `UiMatrixSelector` (compact styled matrix selector)
-and `UiRangeSlider` (two-handle interval slider), alongside the rest of the
-control family documented in the controls guide.
+## Start here
 
-![UiButton demo screenshot](Snapshot_Button.jpg)
+Read [Getting Started](GETTING_STARTED.md) to configure the assembly and build a
+real demo. Browse the [Controls Guide](docs/01_UI_CONTROLS_GUIDE.md) for every public
+control and its reference example. Full demos are self-contained packages with a
+live preview, production PropertyEditor and C++ examples; UiLabelDemo defines the
+reference shell.
 
-![General UI demo screenshot](Snapshot_Controls.jpg)
+## Release status
 
-![UiAccordion demo screenshot](Snapshot_Accordion.jpg)
+The current Ui release identity is defined only in [UiVersion.h](Ui/UiVersion.h).
+The release-readiness pass is in progress: a release-candidate identifier is **not**
+a certificate that every control, demo, generated recipe or platform has passed.
+See [ACTIVE_WORK](docs/ACTIVE_WORK.md) for current published/validated boundaries
+and the [coverage register](tests/ui_release_inventory.json) for remaining gates.
 
-![UiColorPicker demo screenshot](Snapshot_Colorpicker.jpg)
-
-![UiFontSelector demo screenshot](Snapshot_FontSelector.jpg)
-
-![UiTheme demo screenshot](Snapshot_Theme.jpg)
+The maintainer's validation environment is Windows, U++18468 and CLANGx64. Recent
+source changes still require that native gate. Do not infer Linux/macOS acceptance
+from portable source or from an optional OS-dialog implementation. Existing sibling
+package versions and saved-data schemas are independent of the Ui release number.
 
 ## Documentation
 
-The canonical, portable documentation set lives in `docs/`:
+| Guide | Purpose |
+| --- | --- |
+| [Coding](docs/00_UPP_CODING_GUIDE.md) | ownership, APIs, packages, review and release rules |
+| [Controls](docs/01_UI_CONTROLS_GUIDE.md) | complete control catalogue and practical contracts |
+| [Theme](docs/02_UI_THEME_GUIDE.md) | Minimal roles, states, inheritance and explicit styles |
+| [Models](docs/03_UI_MODEL_GUIDE.md) | model authority, binding, transactions and UiDoc |
+| [Demos](docs/04_UI_DEMO_GUIDE.md) | readable standalone demos and generated C++ |
+| [PropertyEditor](docs/05_UI_PROPERTY_EDITOR_GUIDE.md) | schema, adapters, providers and editing lifecycle |
+| [Drawing and Performance](docs/07_UI_DRAWING_GUIDE.md) | Draw/Painter/cache, geometry, DPI and large views |
+| [UiGraph](docs/08_UIGRAPH_GUIDE.md) | graph use, templates, routes, hierarchy and examples |
+| [UiGraph Development](docs/09_UIGRAPH_DEVELOPMENT.md) | retained layout/execution, workspace and open boundaries |
 
-- `docs/00_UPP_CODING_GUIDE.md` — reusable U++ engineering practice
-- `docs/01_UI_CONTROLS_GUIDE.md` — the current control catalogue
-- `docs/02_UI_THEME_GUIDE.md` — theme and style system
-- `docs/03_UI_MODEL_GUIDE.md` — model-driven architecture and PropertyEditor
-- `docs/04_UI_DEMO_GUIDE.md` — the intended demo structure
-- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor integration and override layout
-- `docs/06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD
-- `docs/07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/final-pixel geometry and shapes
-- `docs/08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing, retained node layout and hierarchy
-- `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained UiGraph node-layout/cache and template direction
-- `docs/UIGRAPH_PRESENTATION_AUDIT.md` — historical presentation-audit disposition and current evolution
-- `docs/09_UIDOC_GUIDE.md` — document model/view/reuse architecture
-
-Start with `00_UPP_CODING_GUIDE.md`, then read the controls guide before
-touching any control or demo. For drawing/shape work, read 07; for dense views/LOD,
-read 06. For UiGraph presentation/layout work, read 08 and
-`UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` before changing production geometry or the
-Presentation Studio.
-
-The repository-wide geometry rule is deliberate: **normal controls can use
-`UiShapes`; dense scenes such as Graph may go directly to `UiGeometry`.**
-Do not introduce control-local curve sample counts or force an authored-path
-allocation into a high-count scene merely for uniformity.
+Source-adjacent U++ API topics remain reference material. Current work belongs in
+the bounded ACTIVE_WORK file; completed checkpoint history belongs in Git.
+[Changelog](CHANGELOG.md) records release-facing changes rather than every commit.
 
 ## Repository layout
 
-- `Ui/` — the `Ui` package (controls, themes, layouts, icons, `UiGeometry`,
-  `UiShapePath`/`UiShapes`, and draw helpers).
-- `Utilities/` — sibling reusable packages: `PropertyEditor`,
-  `PropertyEditorCore`, `IconExportCore`, `MakeIconFromSVG`, plus control and
-  model test packages.
-- `examples/` — demos; these also act as a manual regression suite.
-- `tests/` — control test packages.
-- `docs/` — the canonical guide set above.
+`Ui/` is the library. `Utilities/` contains reusable PropertyEditor/authoring/icon
+packages and regression executables. `examples/` contains demos and specialized
+authoring tools. `tests/` contains additional tests, assets and the release inventory.
+`scripts/` contains focused validation entry points. `docs/` contains the nine guides
+above plus ACTIVE_WORK (maximum 100 lines).
 
-## Building
+## Validate a published implementation slice
 
-Use the local assembly (`GitHubOut.var`) with `umk`:
+After updating a clean main checkout, use PowerShell:
 
-```bat
-E:\upp-18468\umk.exe GitHubOut Ui CLANGx64 -br E:\apps\github\upp_Ui\build\Ui.exe
-E:\upp-18468\umk.exe GitHubOut Utilities/PropertyEditorCore CLANGx64 -br E:\apps\github\upp_Ui\build\PropertyEditorCore.exe
-E:\upp-18468\umk.exe GitHubOut Utilities/PropertyEditor CLANGx64 -br E:\apps\github\upp_Ui\build\PropertyEditor.exe
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ValidateUiRelease.ps1
 ```
 
-Demos build from the `examples` nest, e.g.:
+The default is a small Debug gate: build/run UiReleaseSmoke and RangeSegments tests,
+then compile RangeSegmentsDemo and the UiLabel reference. It reads GitHubOut.var,
+records exact source/toolchain evidence and leaves existing running demos alone.
+Headers, Demos and Full profiles are explicit broader gates; they are not required
+for every small edit. The existing Graph workspace gate remains separate.
 
-```bat
-E:\upp-18468\umk.exe GitHubOut examples/UiLabelDemo CLANGx64 -br +GUI E:\apps\github\upp_Ui\build\UiLabelDemo.exe
-```
+**Ui and PropertyEditor are libraries, not executables.** Do not build Ui.exe or
+add a dummy WinMain to fix an invalid library-as-application command.
 
-## Licence
+## License
 
-Apache License 2.0 — see `LICENSE`.
+Apache License 2.0 — see [LICENSE](LICENSE). Preserve applicable attribution and
+asset/dependency licenses when distributing a release.

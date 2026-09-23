@@ -1,96 +1,93 @@
-# Getting Started (U++ Ui)
+# Getting Started
 
-This repository is a style-first UI layer for Ultimate++.
+The shortest path is to build UiLabelDemo, then read its small application shell
+and generated control code. Reading Graph workspace architecture is not a prerequisite
+for displaying a label or button.
 
-The goal is to implement modern `Ui*` controls that:
+## 1. Use a declared U++ environment
 
-- live alongside CtrlLib controls (no forced migration)
-- share a consistent styling surface (palette/metrics/skin)
-- share a consistent content layout model (icon + text blocks, per-block margins)
-- expose optional animation hooks without requiring subclassing
+The maintainer setup uses Windows, U++18468 and CLANGx64. Keep your established
+compiler/framework version while validating a checkpoint; do not upgrade silently.
+Ui depends on Core, Draw, Painter, CtrlCore, CtrlLib and the external Animation
+package. The checked-in assembly also includes the external upp_statemachine nest.
+Demos using PropertyEditor find its packages under this repository's Utilities path.
 
-## Where to look first
+GitHubOut.var contains the maintainer's actual nest and output configuration:
 
-- `Ui/UiLabel.h` + `Ui/UiLabel.cpp` (baseline for text + icon + block layout)
-- `Ui/UiButton.h` + `Ui/UiButton.cpp` (baseline for state handling + animation hooks)
-- `Ui/UiStyle.h` (the styling model and reusable layout primitives)
-- `Ui/UiDraw.h` (shared drawing helpers, 9-slice, blur utilities)
-
-Read the canonical guides first:
-
-- `docs/00_UPP_CODING_GUIDE.md`
-- `docs/01_UI_CONTROLS_GUIDE.md`
-- `docs/02_UI_THEME_GUIDE.md`
-- `docs/03_UI_MODEL_GUIDE.md`
-- `docs/04_UI_DEMO_GUIDE.md`
-- `docs/05_UI_PROPERTY_EDITOR_GUIDE.md`
-- `docs/06_UI_SCALE_AND_LOD_GUIDE.md`
-- `docs/07_UI_DRAWING_GUIDE.md`
-- `docs/08_UIGRAPH_GUIDE.md`
-- `docs/09_UIDOC_GUIDE.md`
-
-For UiGraph node presentation/layout work, also read:
-
-- `docs/UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`
-- `docs/UIGRAPH_NODE_WORKSPACE.md`
-- `docs/UIGRAPH_WORKSPACE_AUTHORING.md`
-- `docs/UIGRAPH_WORKSPACE_RUNTIME.md`
-- `docs/ACTIVE_WORK.md`
-
-The current UiGraph rule is deliberate: retained node layout lives in the prepared
-`NodeGeometry` state and is the cache consumed by paint, controls and compatible
-camera projection. Do not introduce a second per-node layout cache or runtime JSON
-layout compiler.
-
-## Running demos in TheIDE
-
-1) Open the repo in TheIDE.
-2) Make sure your assembly includes:
-   - this repo root (so TheIDE can see `Ui/` and `examples/`)
-   - U++ `uppsrc` (so it can see `Core`, `CtrlLib`, etc.)
-3) Build and run demos under `examples/`.
-
-Recommended first demos:
-
-- `examples/UiLabelDemo`
-- `examples/UiButtonDemo`
-
-For Graph node design, build `examples/UiGraphComponentStudio`, now the V7 Node
-Design Workspace: family/shape inheritance, region/overlay drag-and-drop, one live
-production preview, real PropertyEditor, JSON save/load and generated C++.
-`examples/UiGraphDesignMatrix` is retired. Its old four-preview/selector gate is
-not a current validation instruction. Read ACTIVE_WORK for source/platform status.
-
-## Building demos from CLI (umk)
-
-If you have `umk.exe`, you can build demos without opening TheIDE.
-
-Example (Windows):
-
-```bat
-"E:\upp-18468\umk.exe" "E:\apps\github\upp_Ui,E:\upp-18468\uppsrc" examples/UiLabelDemo CLANGx64 -br +GUI "E:\apps\github\upp_Ui\build\UiLabelDemo"
+```text
+UPP = "E:/apps/github/upp_Ui/examples;E:/apps/github/upp_Ui;E:/apps/github/upp_statemachine;E:/apps/github/upp_animation;E:/upp-18468/uppsrc";
+OUTPUT = "E:/apps/github/upp_Ui/build";
 ```
 
-Notes:
+At those paths use that file unchanged. On another machine create a local assembly
+.var with equivalent existing nests and your actual output folder; do not change
+source paths or depend on somebody else's E: drive. Keep build output outside source
+or in a git-ignored build directory. TheIDE and UMK must resolve the same packages.
 
-- The first argument is the assembly: a comma-separated list of nests.
-- `Ui` depends on `Painter` and `Animation` (see `Ui/Ui.upp`); `Animation` is the
-  external `upp_animation` package, not a vendored copy.
-- For local development, use this repo's `GitHubOut.var`; it includes the
-  external animation nest and writes build intermediates to
-  `E:/apps/github/upp_Ui/build`.
+## 2. Build a runnable demo, not the library
 
-## Conventions (important)
+From the maintainer checkout in PowerShell:
 
-- No backward-compat naming shims: if API changes, update demos + docs.
-- Avoid heap churn in `Paint()`: prefer cached values and precomputed images.
-- Prefer U++ containers and ownership patterns (`Vector`, `Array`, `One<>`, `Ptr<>`).
-- Prefer data-only `Style` structs and keep behaviour in the control.
-- Keep headers self-documenting: intention, usage, and non-obvious constraints.
-- For retained high-scale views, keep one geometry/layout authority and reuse
-  prepared state rather than layering parallel caches.
+```powershell
+Set-Location E:\apps\github\upp_Ui
+& 'E:\upp-18468\umk.exe' '.\GitHubOut.var' 'examples/UiLabelDemo' 'CLANGx64' -b +GUI '.\build\UiLabelDemo.exe'
+if ($LASTEXITCODE) { throw 'UiLabelDemo build failed' }
+& '.\build\UiLabelDemo.exe'
+```
 
-## Next steps
+UMK accepts an assembly name, a full .var path or an explicit nest list. Use the
+full .var path when assembly discovery is ambiguous. Debug is the default; `-r`
+selects Release and `-b` BLITZ. `-a` is rebuild-all, not a library-link workaround.
+TheIDE users open an assembly with the same nests, select UiLabelDemo and run it.
 
-Read the guide set in `docs/` for deeper architecture, theme, model, demo, scale,
-drawing, Graph and document guidance.
+Ui/Ui.upp and the PropertyEditor packages are libraries with no main entry point.
+A missing main when asking for Ui.exe is a wrong build target, not a missing library
+feature. Real test/demo packages supply GUI_APP_MAIN or CONSOLE_APP_MAIN.
+
+## 3. Explore one control
+
+Use Inspector for normal public behavior, Theme Overrides for explicitly authored
+style, and Code for the corresponding C++. UiLabelDemo is the shell reference;
+UiButtonDemo is the next action/state example. UiEditDemo covers the text-edit
+family; UiIntFloatDemo covers numeric input. See the Controls Guide for other types.
+
+Generated examples deliberately omit the demo shell. Copy them into an ordinary
+U++ application with the stated headers/resources and lifetimes. Where the generator
+requires host resource/provider/callback code, supply it explicitly. Compile the
+actual output unchanged before treating the example as accepted.
+
+## 4. Run the surgical implementation gate
+
+Update clean main first; do not discard local work:
+
+```powershell
+git status --short
+git pull --ff-only
+if ($LASTEXITCODE) { throw 'Update failed; preserve local work and inspect' }
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ValidateUiRelease.ps1
+if ($LASTEXITCODE) { throw 'Read the reported validation evidence directory' }
+```
+
+The runner checks a clean main checkout and the freshly fetched origin/main,
+reads the supplied assembly, derives UMK from its uppsrc nest unless -Umk is given,
+and records tested HEAD, version, toolchain, logs and summaries. It never adds a
+library main, commits code, deletes user files or kills an unrelated demo instance.
+-AssemblyFile and -Method select an already installed equivalent environment.
+-RequiredAncestor verifies a published checkpoint without requiring exact HEAD equality.
+
+Profiles: Surgical (default), Headers (isolated public headers), Demos (build each
+retained example), Full (retained test/demo builds and test execution). Select
+-Configuration Debug/Release/Both and -Blitz explicitly; Full defaults to Both.
+Broader profiles may reveal unfinished release work: failure is not permission to
+weaken tests or remove a target. -SelfTest exercises the evidence parser only.
+
+A surgical PASS is not full visual, generated-code, all-controls or cross-platform
+acceptance. The release inventory and ACTIVE_WORK keep those boundaries explicit.
+
+## Where to go next
+
+Read the [Controls Guide](docs/01_UI_CONTROLS_GUIDE.md), then the guide for the
+subsystem you are changing. Read [Coding](docs/00_UPP_CODING_GUIDE.md) before edits.
+Graph users start with its usage guide; graph authors/developers use the separate
+development guide and the existing workspace runner. Do not resurrect DesignMatrix
+or historical checkpoint tasks as the current graph workflow.

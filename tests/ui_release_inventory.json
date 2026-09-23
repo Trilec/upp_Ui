@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "version_header": "Ui/UiVersion.h",
+  "inventory_base": "297beabdea87e3cc2c32282968e262ef68392abb",
+  "scope": "Coverage register, not a release PASS. An example path is a review starting point, not accepted full API coverage.",
+  "support_headers": [
+    "Ui/UiBaseEdit.h",
+    "Ui/UiIndicatorBase.h",
+    "Ui/UiStyle.h",
+    "Ui/UiTheme.h",
+    "Ui/UiThemeStructureContract.h",
+    "Ui/UiDraw.h",
+    "Ui/UiRenderLayer.h",
+    "Ui/UiFrameTicker.h",
+    "Ui/UiGeometry.h",
+    "Ui/UiShapePath.h",
+    "Ui/UiShapes.h",
+    "Ui/UiAxis.h",
+    "Ui/UiLayoutCursor.h",
+    "Ui/UiMeasure.h",
+    "Ui/UiIcons.h",
+    "Ui/UiDataModels.h",
+    "Ui/UiItemRender.h",
+    "Ui/UiModelView.h",
+    "Ui/UiGraph/UiGraph.h",
+    "Ui/UiGraph/UiGraphModel.h",
+    "Ui/UiGraph/UiGraphNodeTemplate.h",
+    "Ui/UiGraph/UiGraphNodeComponent.h",
+    "Ui/UiDocCore.h",
+    "Ui/UiDoc/UiDocCore.h",
+    "Ui/UiColorPicker/UiColorPickerPaletteLab.h"
+  ],
+  "sibling_packages": [
+    "Utilities/PropertyEditorCore",
+    "Utilities/PropertyEditor",
+    "Utilities/UiGraphWorkspace",
+    "Utilities/IconExportCore"
+  ],
+  "optional_platform_packages": [
+    "Ui/UiOsFileDialog"
+  ],
+  "surgical_targets": [
+    {
+      "package": "Utilities/UiReleaseSmoke",
+      "run": true,
+      "summary": "UI_RELEASE_SMOKE",
+      "minimum_checks": 58
+    },
+    {
+      "package": "Utilities/UiRangeSegmentsRunTests",
+      "run": true,
+      "summary": "UIRANGESEGMENTS_SUMMARY",
+      "minimum_checks": 60
+    },
+    {
+      "package": "examples/UiRangeSegmentsDemo",
+      "run": false,
+      "minimum_checks": 1
+    },
+    {
+      "package": "examples/UiLabelDemo",
+      "run": false,
+      "minimum_checks": 1
+    }
+  ],
+  "retirement_policy": "Delete only after replacement source/behavior/generated-code coverage and build/run are verified. No test is retired by filename or age.",
+  "review_candidates": [
+    {
+      "paths": [
+        "examples/UiLineEditDemo",
+        "examples/UiPasswordEditDemo",
+        "examples/UiMaskEditDemo",
+        "examples/UiMultiEditDemo"
+      ],
+      "replacement": "examples/UiEditDemo",
+      "state": "compare capabilities and generated C++ before removal"
+    },
+    {
+      "paths": [
+        "examples/BuilderDemoSupport.h",
+        "examples/DemoPropertyRows.h"
+      ],
+      "state": "keep while referenced; migrate callers before removal"
+    },
+    {
+      "paths": [
+        "Utilities/UiControlTests",
+        "Utilities/UiDrawingTests",
+        "Utilities/UiThemeTests",
+        "Utilities/UiModelTests",
+        "Utilities/UiModelViewTests",
+        "Utilities/UiGraphModelTests",
+        "Utilities/UiGraphViewTests",
+        "Utilities/UiGraphRenderTests",
+        "Utilities/UiGraphScaleTests"
+      ],
+      "state": "map aggregate versus standalone cases; retain unique coverage"
+    },
+    {
+      "paths": [
+        "examples/UiGraphDesignMatrix"
+      ],
+      "state": "retired explanatory stub; no executable target; delete only when current references are updated"
+    }
+  ],
+  "open_release_gates": [
+    "Complete source/API/lifetime/role review of rows still marked pending.",
+    "Accept every canonical demo and actual unchanged generated C++ for each supported type/override.",
+    "Run Debug/Release and public-header isolation gates on the declared toolchain.",
+    "Complete visual role/state/DPI and idle/lifecycle checks; compile-only is not visual acceptance.",
+    "Preserve separate current UiTab/Designer and UiGraph overlay/native validation boundaries in ACTIVE_WORK."
+  ],
+  "guides": [
+    "docs/00_UPP_CODING_GUIDE.md",
+    "docs/01_UI_CONTROLS_GUIDE.md",
+    "docs/02_UI_THEME_GUIDE.md",
+    "docs/03_UI_MODEL_GUIDE.md",
+    "docs/04_UI_DEMO_GUIDE.md",
+    "docs/05_UI_PROPERTY_EDITOR_GUIDE.md",
+    "docs/07_UI_DRAWING_GUIDE.md",
+    "docs/08_UIGRAPH_GUIDE.md",
+    "docs/09_UIGRAPH_DEVELOPMENT.md"
+  ],
+  "acceptance_defaults": {
+    "demo": "pending",
+    "generated_code": "pending",
+    "platform": "pending",
+    "behavior_test_mapping": "pending"
+  },
+  "role_policy": "Audit Minimal Standard/Subtle/Accent/Alert in Light/Dark for themeable controls; document genuine nonvisual/layout exceptions.",
+  "controls": [
+    {"type":"UiLabel","family":"actions","header":"Ui/UiLabel.h","example":"examples/UiLabelDemo","source_review":"pending"},
+    {"type":"UiButton","family":"actions","header":"Ui/UiButton.h","example":"examples/UiButtonDemo","source_review":"pending"},
+    {"type":"UiToolButton","family":"actions","header":"Ui/UiToolButton.h","example":"examples/UiLabelDemo","source_review":"pending"},
+    {"type":"UiSplitButton","family":"actions","header":"Ui/UiSplitButton.h","example":"examples/UiSplitButtonDemo","source_review":"pending"},
+    {"type":"UiCheckBox","family":"actions","header":"Ui/UiCheckBox.h","example":"examples/UiCheckBoxDemo","source_review":"pending"},
+    {"type":"UiRadioButton","family":"actions","header":"Ui/UiRadioButton.h","example":"examples/UiRadioButtonDemo","source_review":"pending"},
+    {"type":"UiToggle","family":"actions","header":"Ui/UiToggle.h","example":"examples/UiToggleDemo","source_review":"pending"},
+    {"type":"UiBreadcrumbs","family":"navigation","header":"Ui/UiBreadcrumbs.h","example":"examples/UiBreadcrumbsDemo","source_review":"pending"},
+    {"type":"UiLineEdit","family":"edits","header":"Ui/UiLineEdit.h","example":"examples/UiEditDemo","source_review":"pending"},
+    {"type":"UiIntEdit","family":"edits","header":"Ui/UiIntEdit.h","example":"examples/UiIntFloatDemo","source_review":"pending"},
+    {"type":"UiFloatEdit","family":"edits","header":"Ui/UiFloatEdit.h","example":"examples/UiIntFloatDemo","source_review":"pending"},
+    {"type":"UiPasswordEdit","family":"edits","header":"Ui/UiPasswordEdit.h","example":"examples/UiEditDemo","source_review":"pending"},
+    {"type":"UiMultiEdit","family":"edits","header":"Ui/UiMultiEdit.h","example":"examples/UiEditDemo","source_review":"pending"},
+    {"type":"UiMaskEdit","family":"edits","header":"Ui/UiMaskEdit.h","example":"examples/UiEditDemo","source_review":"pending"},
+    {"type":"UiSlider","family":"ranges","header":"Ui/UiSlider.h","example":"examples/UiSliderDemo","source_review":"pending"},
+    {"type":"UiRangeSlider","family":"ranges","header":"Ui/UiRangeSlider.h","example":"examples/UiSliderDemo","source_review":"pending"},
+    {"type":"UiSliderEdit","family":"ranges","header":"Ui/UiSliderEdit.h","example":null,"source_review":"pending"},
+    {"type":"UiRangeSliderEdit","family":"ranges","header":"Ui/UiRangeSliderEdit.h","example":null,"source_review":"pending"},
+    {"type":"UiRangeSegments","family":"ranges","header":"Ui/UiRangeSegments.h","example":"examples/UiRangeSegmentsDemo","source_review":"focused","behavior_tests":["Utilities/UiReleaseSmoke","Utilities/UiRangeSegmentsRunTests"]},
+    {"type":"UiScrollBar","family":"ranges","header":"Ui/UiScrollBar.h","example":"examples/UiScrollBarDemo","source_review":"pending"},
+    {"type":"UiProgressBar","family":"progress","header":"Ui/UiProgressBar.h","example":"examples/UiProgressBarDemo","source_review":"pending"},
+    {"type":"UiProgressRing","family":"progress","header":"Ui/UiProgressRing.h","example":"examples/UiProgressRingDemo","source_review":"pending"},
+    {"type":"UiChartRing","family":"progress","header":"Ui/UiChartRing.h","example":"examples/UiChartRingDemo","source_review":"pending"},
+    {"type":"UiMatrixSelector","family":"choosers","header":"Ui/UiMatrixSelector.h","example":"examples/UiMatrixSelectorDemo","source_review":"pending"},
+    {"type":"UiColorMatrix","family":"choosers","header":"Ui/UiColorMatrix.h","example":null,"source_review":"pending"},
+    {"type":"UiDateTime","family":"choosers","header":"Ui/UiDateTime.h","example":"examples/UiDateTimeDemo","source_review":"pending"},
+    {"type":"UiColorPicker","family":"choosers","header":"Ui/UiColorPicker/UiColorPicker.h","example":"examples/UiColorPickerDemo","source_review":"pending"},
+    {"type":"UiDropdown","family":"collections","header":"Ui/UiDropdown.h","example":"examples/UiDropdownDemo","source_review":"pending"},
+    {"type":"UiMenu","family":"collections","header":"Ui/UiMenu.h","example":"examples/UiMenuDemo","source_review":"pending"},
+    {"type":"UiPanel","family":"containers","header":"Ui/UiPanel.h","example":"examples/UiPanelDemo","source_review":"pending"},
+    {"type":"UiDirectContentHost","family":"containers","header":"Ui/UiDirectContentHost.h","example":null,"source_review":"focused","behavior_tests":["Utilities/UiReleaseSmoke"]},
+    {"type":"UiGroupPanel","family":"containers","header":"Ui/UiGroupPanel.h","example":"examples/UiPanelDemo","source_review":"pending"},
+    {"type":"UiTitleCard","family":"containers","header":"Ui/UiTitleCard.h","example":"examples/UiTitleCardDemo","source_review":"pending"},
+    {"type":"UiStack","family":"containers","header":"Ui/UiStack.h","example":null,"source_review":"pending"},
+    {"type":"UiAccordion","family":"containers","header":"Ui/UiAccordion.h","example":"examples/UiAccordionDemo","source_review":"pending"},
+    {"type":"UiScrollPanel","family":"containers","header":"Ui/UiScrollPanel.h","example":"examples/UiScrollPanelDemo","source_review":"pending"},
+    {"type":"UiTab","family":"containers","header":"Ui/UiTab.h","example":"examples/UiTabDemo","source_review":"pending","behavior_tests":["Utilities/UiTabThemePaintTest","Utilities/UiTabMeasureTest"]},
+    {"type":"UiSplitter","family":"containers","header":"Ui/UiSplitter.h","example":"examples/UiSplitterDemo","source_review":"pending"},
+    {"type":"UiQuadSplitter","family":"containers","header":"Ui/UiQuadSplitter.h","example":"examples/UiSplitterDemo","source_review":"pending"},
+    {"type":"UiAbsoluteLayout","family":"layouts","header":"Ui/UiAbsoluteLayout.h","example":null,"source_review":"pending"},
+    {"type":"UiGridLayout","family":"layouts","header":"Ui/UiGridLayout.h","example":null,"source_review":"pending"},
+    {"type":"UiBoxLayout","family":"layouts","header":"Ui/UiBoxLayout.h","example":null,"source_review":"pending"},
+    {"type":"UiList","family":"collections","header":"Ui/UiList.h","example":"examples/UiListDemo","source_review":"pending"},
+    {"type":"UiTree","family":"collections","header":"Ui/UiTree.h","example":"examples/UiTreeDemo","source_review":"pending"},
+    {"type":"UiTable","family":"collections","header":"Ui/UiTable.h","example":"examples/UiTableDemo","source_review":"pending"},
+    {"type":"UiGallery","family":"collections","header":"Ui/UiGallery.h","example":"examples/UiGalleryDemo","source_review":"pending"},
+    {"type":"UiDoc","family":"documents","header":"Ui/UiDoc/UiDoc.h","example":"examples/UiDocDemo","source_review":"pending"},
+    {"type":"UiBezierCurveEditor","family":"curves","header":"Ui/UiBezierCurveEditor.h","example":null,"source_review":"pending"},
+    {"type":"UiBezierCurveField","family":"curves","header":"Ui/UiBezierCurveField.h","example":null,"source_review":"pending"},
+    {"type":"UiNodeGraph","family":"graph","header":"Ui/UiGraph/UiNodeGraph.h","example":"examples/UiGraphDemo","source_review":"pending"}
+  ]
+}

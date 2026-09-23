@@ -1,342 +1,190 @@
-# 07 — Drawing and Geometry Guide
+# 07 — Drawing, Geometry and Performance
 
-This is the canonical drawing, geometry and shape-construction architecture for
-`upp_Ui`.
+Canonical rendering and scale rules for `upp_Ui`. Geometry defines where content
+belongs; raster policy defines how pixels are produced/reused. Keep those concerns
+separate. Graph-specific retained execution is in [Graph Development](09_UIGRAPH_DEVELOPMENT.md).
 
-The goal is simple: controls should be highly themeable **and** avoid doing
-drawing or geometry work that cannot affect final pixels.
+## Choose the cheapest correct representation
 
-## 1. Rendering hierarchy
+1. Direct Draw for cheap rectangles, straight lines, text and images.
+2. Native Painter curves for smooth circles, ellipses, rounded rectangles and paths.
+3. Shared exact raster caching for stable repeated AA/composed presentation.
+4. Bounded live Painter/BufferPainter for changing vector content that cannot
+   truthfully reuse a cached raster.
+5. Explicit fallback for rich skins, shadows, image fills and unusual paths.
 
-Use the cheapest correct representation.
+Do not route every control through a full-size BufferPainter for uniformity.
+Conversely, painting aliased direct-Draw curves over an AA background does not
+preserve smooth edges. RangeSegments uses a shared rounded content clip so even
+very narrow end segments cannot leak square corners. Only its content strip and
+thumbs are rasterized, not readout whitespace; unchanged strips/thumbs are cached
+and live drag work bypasses position-cache pollution. Straight internal partitions
+remain sharp and text stays direct Draw.
 
-1. **Direct `Draw`** for cheap rectangles, lines, text, images and other simple
-   primitives.
-2. **Native Painter primitives/curves** for unique antialiased circles, ellipses,
-   arcs, rounded rectangles and cubic/quadratic paths.
-3. **Shared exact raster cache** for repeated/stable antialiased or composed
-   presentation where rerasterizing each paint is wasteful.
-4. **Bounded live Painter/BufferPainter** for specialist vector work, animation or
-   cases that cannot reuse a stable raster.
-5. Rich skins, shadows, image fills and unusual paths remain explicit fallbacks.
+Bounds and invalidation must be correct before introducing caching. A cache cannot
+repair a dirty-region bug or turn an unbounded workload into bounded work.
 
-Do not route every control through BufferPainter merely for uniformity.
+## Final-device-pixel geometry contract
 
-## 2. Final-pixel geometry invariant
+Generated explicit geometry uses one library-owned flattened-centreline positional
+budget: **0.35 final device pixels**, within the numeric/work envelope reported by
+UiGeometry::TessellationStatus::IsExactContract(). This is not a blanket guarantee
+of pixel-identical stroking, joins, caps, clipping or antialiasing across backends.
+Integer Draw conversion makes one final nearest-pixel rounding (up to roughly
+0.707 px Euclidean displacement); later raster semantics are a separate seam.
 
-**No generated geometry owned by `upp_Ui` should contain detail that cannot
-materially affect the final device image.**
+Apply authored units, DPI and camera/view transforms before deciding curve detail.
+Apply DPI once. UiGeometry/UiShapePath/UiShapes accept final pixel-space values;
+there is no hidden global DPI setting. VisibleExtentPx is presentation significance
+policy, not a theorem that every subpixel feature has zero coverage.
 
-The explicit-geometry positional budget is library-owned:
+No fixed 20/40/100-point circles, radius*2 subdivision, per-control sample count or
+private quality slider. Native Painter curves stay native when no explicit points
+are needed. Semantic labels/handles/anchors use parameters, analytic intersections
+or arc length, not `vertices[count/2]`, because adaptive point counts may change.
 
-**0.35 final device pixels**
+## Responsibility stack
 
-That number is a **flattened-centreline positional tolerance**, not a blanket
-pixel-equivalence promise. It is guaranteed only inside the supported
-numeric/work envelope reported by `UiGeometry::TessellationStatus`.
+| Layer | Responsibility |
+| --- | --- |
+| UiGeometry | final-pixel math, containment, lengths/distances, adaptive explicit geometry |
+| UiShapePath | authored Move/Line/Quadratic/Cubic/Arc/EllipseArc/Close topology |
+| UiShapes | reusable parameterized silhouettes |
+| UiDraw | Draw/Painter seam, appearance, fills, shadows, raster/cache policy |
+| Control | semantic state, layout/hit policy, interaction and visible content |
 
-Separate allowances apply at later seams:
+This is a responsibility stack, not a mandatory call chain. Normal controls use
+native primitives or stock UiShapes where appropriate. Dense Graph scenes may
+use UiGeometry directly rather than allocate authored path commands per item.
+Both paths obey the same final-pixel rule.
 
-- explicit `UiGeometry` curve flattening: <= 0.35 px positional error when
-  `TessellationStatus::IsExactContract()` is true;
-- integer `Draw`/legacy-overlay conversion: one final nearest-pixel rounding,
-  with at most about 0.707 px Euclidean coordinate displacement;
-- live Graph camera projection: always from one immutable exact prepared
-  baseline, so repeated interaction does not accumulate rounding drift;
-- stroke outline, joins/caps and antialiasing remain backend raster semantics;
-  centreline error alone does not prove identical stroke pixels.
-
-`UiGeometry::VisibleExtentPx()` is presentation policy: detail below that
-threshold may be omitted because it is not worth representing explicitly. It is
-not a mathematical statement that subpixel coverage can never affect AA pixels.
-
-Geometry quality is therefore decided after all scale transforms:
-
-```text
-authored units
-    -> DPI
-    -> view/camera transform
-    -> final device pixels
-    -> geometry decision
-```
-
-There is no per-control tessellation-quality knob.
-
-Do not introduce arbitrary approximations such as:
-
-- fixed 20/40/100 point curves;
-- `radius * 2` segments;
-- a private `samples` or `steps` setting.
-
-## 3. The geometry/shape stack
-
-```text
-UiGeometry
-    final-pixel math + adaptive explicit geometry
-        |
-UiShapePath
-    authored Move/Line/Quadratic/Cubic/Arc/EllipseArc/Close topology
-        |
-UiShapes
-    reusable parameterised stock silhouettes
-        |
-UiDraw
-    Draw/Painter rendering, appearance, raster/cache policy
-        |
-Controls
-```
-
-This is a responsibility stack, **not a mandatory call chain**.
-
-### UiGeometry
-
-Backend-independent final-pixel mathematics:
-
-- pixel significance;
-- vector/line/polyline length;
-- segment/polyline distance;
-- point-at-polyline-fraction;
-- analytic ellipse/rounded-rect/polygon containment;
-- adaptive circular/elliptic arcs;
-- quadratic and cubic flattening;
-- rounded polyline/polygon geometry;
-- radial band/pie geometry;
-- generated-polyline simplification.
-
-Use it directly when explicit points or geometry math are genuinely required.
-
-### UiShapePath
-
-Backend-neutral authored path commands:
-
-- MoveTo;
-- LineTo;
-- QuadraticTo;
-- CubicTo;
-- Arc;
-- EllipseArc;
-- Close;
-- multiple contours/holes.
-
-`Flatten()` delegates continuous curve detail to `UiGeometry`.
-
-### UiShapes
-
-Preferred reusable silhouette vocabulary for normal controls:
-
-- Polygon / RoundedPolygon;
-- Rectangle / RoundedRectangle / Capsule;
-- Ellipse;
-- arbitrary regular N-gon;
-- arbitrary N-point Star;
-- Arrow;
-- Chevron;
-- ChamferedRectangle;
-- Callout with configurable tail;
-- Tag with optional punched hole;
-- Cloud;
-- Document;
-- Database/cylinder;
-- RingSegment;
-- Pie.
-
-A new named silhouette normally belongs here, not in `UiGeometry`.
-
-### UiDraw
-
-Owns drawing policy and appearance:
-
-- styled surfaces;
-- Draw/Painter seams;
-- exact circular-arc painting;
-- raster cache;
-- gradients/fills;
-- shadows;
-- skins;
-- `UiPainterShapePath()`.
-
-Geometry types do not own colour, theme state or cache policy.
-
-## 4. Normal-control decision
-
-For a normal control:
-
-1. If direct `Draw` or native Painter already expresses the primitive, use it.
-2. If a reusable silhouette exists, use `UiShapes`.
-3. If no stock silhouette fits, author a `UiShapePath`.
-4. Flatten only when explicit points are actually required.
-
-Example:
+Stock silhouettes include Polygon/RoundedPolygon, Rectangle/RoundedRectangle/
+Capsule/Ellipse, regular N-gons, stars, arrows, chevrons, chamfers, callouts, tags
+with holes, cloud/document/database, RingSegment and Pie. Add a generally useful
+silhouette to UiShapes; a genuinely private shape can be a local UiShapePath.
 
 ```cpp
-UiShapePath bubble = UiShapes::Callout(
-    Rectf(8, 8, 152, 72),
-    UiShapeSide::Bottom,
-    0.70, 18.0, 10.0, 8.0);
-
+UiShapePath shape = UiShapes::RoundedRectangle(Rectf(0, 0, width, height), radius);
 p.Begin();
-UiPainterShapePath(p, bubble);
+UiPainterShapePath(p, shape);
 p.Fill(face);
 p.End();
 ```
 
-## 5. Dense-scene exception
+UiPainterShapePath forwards supported circular Arc and cubic commands natively.
+Its authored elliptical-arc path uses UiGeometry flattening where no verified
+direct Painter command is available. Flatten only for a consumer that needs
+explicit points: hit testing, routing, clipping, retained geometry or a backend seam.
 
-**Normal controls can use `UiShapes`; dense scenes such as Graph may go
-directly to `UiGeometry`.**
+Authored polygon vertices are semantic topology. Do not silently simplify them.
+Generated-polyline simplification needs a declared combined budget: flattening at
+0.35 and independently simplifying at 0.35 is not a 0.35 end-to-end guarantee.
 
-Do not allocate thousands of temporary authored command objects just to force a
-high-count scene through every abstraction layer.
+## Circular controls and clipping
 
-Graph is the canonical example: its projected paths may use `UiGeometry`
-directly because that preserves the same 0.35 px contract with less allocation.
+UiProgressRing/UiChartRing use native stroked arcs through UiPaintCircularArc.
+Filled wedges/donut sections use UiShapes::Pie/RingSegment. A complete RingSegment
+has opposite-winding outer/inner contours so a stroke does not reveal a fake radial
+bridge; ArcBandPath's single bridged contour is a fill-oriented helper.
 
-This is deliberate architecture, not a special exemption from quality.
+Paint and hit testing share the appropriate prepared shape/capacity. Keep state
+balanced and valid for zero/tiny rectangles, large dimensions, reversal and both
+orientations. Corner clipping must cover all participating layers, not just the
+first and last item. Test seams, fractional AA coverage, explicit None, alpha and
+selected outlines against actual pixels where deterministic.
 
-## 6. Native curves stay native
+## Raster lifetime and cache policy
 
-Painter already flattens its verified native curves appropriately.
+Audit temporary buffers, masks, blur, gradients, asset decoding, 9-slice composition,
+cache keys and image lifetime separately from curve complexity. Stable repeated
+AA work is a cache candidate only when all pixel-affecting inputs form an exact
+key, size/memory are bounded and reuse beats rerasterization. Include resolved
+colors/state, dimensions, radius/stroke, fill/skin/asset revisions and any other
+consumed input. Do not scale exact cached edges from a quantized bucket unless
+that approximation is explicitly part of the policy.
 
-If a control only needs to paint a cubic or circular arc, do not pre-flatten it
-into a large polyline first. `UiPainterShapePath` forwards circular `Arc` and
-cubic commands natively. The Painter API used by this package has no verified
-direct authored elliptical-arc command, so `EllipseArc` is intentionally
-flattened once through `UiGeometry` at the shared positional budget.
+Use transparent premultiplied buffers correctly; clear newly allocated buffers.
+A cache admission failure needs a bounded correct fallback, not an unbounded image
+allocation under another name. Remember retained Image handles may keep memory
+alive outside the cache's entry budget. Arbitrarily unique per-item images/styles
+are not free merely because the cache has a size limit.
 
-Use explicit UiGeometry points only when another consumer actually needs points,
-for example:
+## Measurement and invalidation
 
-- hit testing;
-- clipping;
-- routing;
-- a custom backend seam;
-- retained explicit scene geometry.
+GetMinSize, GetContentSize, width-aware measurement, Layout, paint and hit testing
+must agree on the same geometry vocabulary. Expensive text/image preparation moves
+to the narrowest appropriate invalidation seam. A small ordinary control may have
+cheap measurement; high-scale views must not remeasure every record on every Paint.
 
-## 7. Semantic positions are not tessellation vertices
+Geometry changes invalidate layout and paint. Color-only changes invalidate paint.
+A global theme revision refreshes inherited styles; explicit custom styles stay
+explicit. No model mutation, event emission, loading or timer startup inside Paint.
+Do not add a second per-item layout cache when prepared geometry can own the result.
 
-Adaptive flattening is allowed to change point count.
+## Large views: logical size is not live visual size
 
-Therefore a label, edit handle, midpoint or anchor must not use
-`path[path.GetCount()/2]` or another vertex-index shortcut.
+The semantic model feeds visible/overscan/spatial candidates, bounded prepared
+presentation and then Paint/HitTest. A 100,000-row model must not create 100,000
+controls or renderer objects. List/Gallery/Table use direct arithmetic for regular
+layouts; Tree may retain a flattened visible projection; irregular Graph uses a
+retained broad phase. Introduce a new spatial tree only when measured workloads
+justify replacing the current strategy.
 
-Derive semantic positions from geometry:
+UiItemRenderData carries presentation, not universal domain semantics. UiItemRender
+is a lightweight non-Ctrl renderer inside a rectangle assigned by its view. Pools
+are bounded to useful visible/overscan surfaces; renderer Layout prepares data,
+Paint/HitTest consume it. Tree disclosure, Table headers/editing, Menu commands,
+Dropdown selection and Graph ports/routes remain with their own views.
 
-- arc length;
-- analytic intersection;
-- authored parameters;
-- stable semantic anchors.
+A local record/appearance update should not rebuild uniform grid geometry or an
+entire hierarchy/spatial projection. Structural changes may rebuild the structure
+they invalidate. Explicit Select All, export, filtering and structural rebuild can
+be O(N); ordinary scrolling, hover and hit testing must not silently become O(N).
+Use bulk/ranged model notifications for a semantic batch. Do not duplicate the
+model to solve a rendering problem.
 
-`UiGeometry::PointAtPolylineFraction()` exists for visible arc-length positions.
+Prepare expensive assets at the visible-range seam with stable keys and bounded
+providers/caches. A transient actual editor is an explicit sparse escape hatch,
+not one child Ctrl per ordinary logical item. Model replacement reconciles that
+editor and view identity; inactive model notifications must not revive old state.
 
-## 8. Authored topology versus generated detail
+## Three distinct LOD questions
 
-Discrete authored vertices are semantic shape topology and are not simplified
-implicitly.
+Population LOD chooses which objects need presentation. Presentation LOD chooses
+which information is useful at projected size. Geometry LOD chooses explicit curve
+detail at final pixels. None changes semantic topology or authored values.
 
-Generated curve/polyline detail may be simplified only inside a declared
-combined error budget. Do not flatten a curve at the full 0.35 px allowance and
-then spend another independent 0.35 px simplification allowance while claiming a
-0.35 px end-to-end result. `SimplifyPolyline` is for generated/sample
-polylines whose simplification allowance is itself the contract.
+Identity survives simplification: a diamond stays a diamond and a connector stays
+attached to the same endpoints. Rich details/shadows/secondary text can disappear
+before primary identity; a proxy is not fabricated readable content or a tiny
+working editor. Thresholds and actual projected footprint are different inputs.
 
-This distinction keeps a triangle a triangle while allowing a large smooth curve
-to receive more points than a 6-pixel curve.
+A camera change need not rebuild a compatible retained scene. Project from one
+immutable exact baseline, not repeatedly rounded output. Unsafe coverage/capacity/
+representation/LOD changes require exact fallback; quiet may trigger one exact
+settle. Public SetZoom/SetPan/Fit remain exact unless explicitly documented.
+Graph's named-component scale-reuse boundary remains documented separately; generic
+camera principles are not proof that that path already reuses every wheel frame.
 
-## 9. DPI
+Dirty-region paint and hit testing use the same broad-phase authority. Query
+intersecting candidates and then exact-test; do not add a second full-viewport scan.
+For huge marquee previews, deferring expensive preview work until release may be
+appropriate without changing committed semantic selection.
 
-`UiGeometry`, `UiShapePath` and `UiShapes` accept final pixel-space values.
+## Evidence, idle behavior and future backends
 
-Apply DPI exactly once and apply any view/camera transform before asking the
-geometry layer to decide explicit detail.
+A static control with no animation/mutation/invalidation should settle idle.
+Caret blinking and deliberate animation are exceptions with explicit lifecycle.
+Before optimizing Paint, find any unwanted Refresh/timer loop. Disabled diagnostics
+return before allocating strings, scanning data or scheduling another callback.
 
-There is intentionally no global DPI setting inside UiGeometry.
+Prefer structural evidence: candidates/prepared/painted counts, layout/build serials,
+renderer/active-control counts, cache hits/misses and path vertices. Timings are
+machine/workload-specific evidence, not a portable FPS assertion. Record cold/warm
+conditions, DPI, compiler, dataset and complete input-event cost, not only Paint.
+Run only the relevant performance path for a changed subsystem.
 
-## 10. Circular controls
-
-`UiProgressRing` and `UiChartRing` demonstrate an important choice.
-
-Their visible rings are stroked arcs, so they keep one exact native Painter arc
-through `UiPaintCircularArc` rather than converting the stroke into explicit
-ring polygons.
-
-`UiShapes::RingSegment` and `UiShapes::Pie` exist for controls that actually
-need a **filled radial silhouette**. A full `UiShapes::RingSegment` uses
-separate opposite-winding outer/inner closed contours, so a stroke never exposes
-an artificial radial bridge. The lower-level `UiGeometry::ArcBandPath` returns
-one explicit bridged polyline and is therefore a fill-oriented geometry helper;
-do not use that single contour as a stroked annulus contract.
-
-Choose the representation required by the control, not the most abstract API.
-
-## 11. Raster work is separate from geometry work
-
-Geometry answers **where** the shape is and how much curve detail can affect the
-image.
-
-Raster policy answers **how pixels are produced/reused**.
-
-Audit separately:
-
-- temporary ImageBuffers;
-- blur;
-- masks;
-- gradients;
-- immutable-image analysis;
-- 9-slice composition;
-- raster-cache keys and lifetime;
-- animation rasters.
-
-Do not put raster caching or colour/theme state into UiGeometry/UiShapePath.
-
-## 12. Shared raster-cache rule
-
-Stable repeated antialiased presentation is a strong cache candidate when:
-
-- all raster-affecting inputs can form an exact key;
-- requested size is bounded by cache policy;
-- the cached image is reused enough to beat rerasterization;
-- caching does not hide a dirty-region/invalidation defect.
-
-Animation normally uses live bounded raster work unless a stable frame/result can
-truthfully be reused.
-
-## 13. Future backend direction
-
-`upp_Ui` has no hard dependency on `upp_render` and does not require
-OpenGL/Vulkan for acceptable control performance.
-
-A future GPU backend should consume the same presentation boundaries:
-
-- retained semantic scene;
-- camera transform;
-- rect/rounded rect;
-- ellipse/arc/ring;
-- line/polyline/path;
-- text;
-- image/tint;
-- 9-slice;
-- gradient;
-- clip;
-- opacity/layer.
-
-The geometry contract remains useful regardless of backend.
-
-## 14. New control checklist
-
-Before publishing drawing code, verify:
-
-- final pixels drive generated curve detail;
-- direct Draw/native Painter was considered first;
-- an existing `UiShapes` silhouette was considered before local shape code;
-- broadly reusable silhouettes are added to `UiShapes`;
-- custom continuous curves use native Painter or `UiShapePath`, not fixed
-  sampling;
-- explicit points obey `UiGeometry::ErrorPx()`;
-- semantic positions do not depend on tessellation indexes;
-- dense scenes may use `UiGeometry` directly when that avoids real overhead;
-- raster/cache/blur policy remains outside geometry;
-- a static control does not repaint continuously.
-
-The current deterministic foundations are exercised by
-`UiGeometryContractTest`, `UiShapePathTest` and the control/Graph regression
-packages.
+No hard OpenGL/Vulkan/upp_render dependency is required by this library. A future
+backend should consume the same retained semantic/presentation seams rather than
+force controls into another model. Source simplification or fewer files is never
+proof of runtime speed.

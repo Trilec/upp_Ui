@@ -1,157 +1,115 @@
-# 02 — Ui Theme Guide
+# 02 — Theme and Style
 
-Authoritative current theme/style knowledge for the `Ui` library, grounded in
-`UiTheme.h` and `UiStyle.h`.
+UiStyle provides value-only style primitives. UiTheme maps context and semantic
+roles into concrete family styles. A control either follows those defaults or owns
+an explicit custom-style snapshot. There is no separate demo-only theme system.
 
-## Architecture: three layers
+## Minimal baseline and roles
 
-1. **Style primitives** (`UiStyle.h`) — `StyledPalette`, `StyledMetrics`,
-   `StyledSkin`, `UiFill`, shadow/highlight, geometry helpers.
-2. **Theme context/resolver** (`UiTheme.h`) — `UiThemeContext` (preset + mode),
-   semantic roles, and the `Resolve*()` helpers that build concrete control
-   styles.
-3. **Per-control overrides** — `SetCustomStyle(...)` on the control owns an
-   explicit local style that is not overwritten by theme revisions.
+The universal semantic roles are `UiRole::Standard`, `Subtle`, `Accent`, `Alert`.
+Every themeable visible control must give each role sensible Minimal Light/Dark
+behavior. A role is emphasis, not an interaction state, renderer type or LOD.
 
-## Theme lifecycle and modes
+| Role | Meaning |
+| --- | --- |
+| Standard | ordinary readable presentation and hierarchy |
+| Subtle | reduced emphasis without losing readable/interactive affordances |
+| Accent | emphasis using the theme's accent family |
+| Alert | warning/destructive emphasis with usable contrast |
 
-```cpp
-enum class UiThemePreset { Minimal, Pill, Linear, Solid, Outline, Compact, Layered };
-enum class UiThemeMode   { Light, Dark, System };
-```
+Different families apply emphasis to different parts. A label does not need a
+button's filled face. Pure layouts, nonvisual models and helper geometry have no
+invented colored face. Actual swatch/image/series data is separate from surrounding
+control decoration; Alert must not alter a color being edited.
 
-- `UiThemeContext` holds `preset` + `mode` and serializes.
-- `UiThemeMode::System` resolves to Light in `ResolveEffectiveMode` (dark-follows-
-  system is not yet wired on every platform).
-- A theme revision counter lets controls invalidate cached themed styles when the
-  context changes. Controls that are still theme-driven refresh; explicit custom
-  styles are never overwritten.
+Family vocabulary remains supported: UiButtonRole, UiToolButtonRole, UiEditRole,
+UiPanelRole and UiLabelRole. Typography roles (Body, Headline, Subheadline, Title,
+Caption, Badge, Footnote; UiTextSize Body/H1/H2/H3) are distinct from universal
+semantic emphasis. Label emphasis is geometry-neutral, not a hidden margin change.
 
-## Semantic roles
+Inherited RangeSegments palettes now distinguish all four roles: Standard retains
+series colors, Accent uses the accent ramp, Subtle a light-to-mid-dark neutral ramp,
+and Alert a theme-primary-to-orange ramp. Inherited tonal ramps span the actual
+segment count. Explicit segment colors win; an authored Series palette retains
+its deterministic cycle/tint behavior. These are range defaults, not a demand that
+all controls have orange endpoints.
 
-`UiRole { Standard, Subtle, Accent, Alert }` is the universal semantic role. Each
-control family maps it to a family role:
+## Theme context and lifecycle
 
-- `UiRole -> UiButtonRole` (Standard, Accent, Subtle, Icon, Danger);
-- `UiRole -> UiToolButtonRole` (Standard, Subtle, Accent, Alert);
-- `UiRole -> UiEditRole` (Field, Subtle, Strong);
-- `UiRole -> UiPanelRole` (Surface, Subtle, Strong);
-- `UiLabelRole` (Body, Headline, Subheadline, Title, Caption, Badge, Footnote).
+UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered.
+UiThemeMode: Light, Dark, System. System currently resolves to Light where the
+platform-following policy is not wired; do not advertise universal OS-mode tracking.
+UiThemeContext stores preset/mode and supports serialization.
 
-Use roles consistently instead of hard-coding application RGB values in paint
-paths. Default colours belong in `StyleDefault()` or role construction.
+The theme revision invalidates cached inherited styles. Theme-driven controls
+re-resolve when context changes; explicit custom styles are not overwritten.
+Read effective style through the control's documented style API. Never mutate the
+shared StyleDefault. Presets tune family structure/metrics and role palettes through
+the existing resolvers; do not introduce a parallel per-control theme registry.
+
+The normal lifecycle is StyleDefault, GetStyle/effective resolution,
+SetCustomStyle, ClearCustomStyle, HasCustomStyle, and OnStyleChanged invalidation.
+Convenience styling setters may create a **complete snapshot**, not a per-field
+live override. The header/family API must say which. ClearCustomStyle restores the
+current theme, not the theme that happened to exist before the override.
+
+A builder offering per-field inheritance owns an authored recipe: resolve a fresh
+base and apply active authored fields. It must not silently freeze every inherited
+color. That recipe is host/demo state, not a second production theme authority.
 
 ## Style primitives
 
-`StyledPalette` per state slot (`ST_NORMAL`, `ST_HOT`, `ST_PRESSED`,
-`ST_DISABLED`):
+StyledPalette has four slots: ST_NORMAL, ST_HOT, ST_PRESSED, ST_DISABLED. Each has
+face (UiFill), frame, ink and icon. ResolveStyledState selects the interaction slot;
+selection/focus/read-only semantics remain explicit for the control.
 
-- `face[4]` — `UiFill` (None / Solid / Image);
-- `frame[4]`, `ink[4]`, `icon[4]` — colours.
+StyledMetrics contains font/use-font, content margin, radius, frame width/visibility,
+face visibility, dashed frame/pattern, focus and shadow/highlight. StyledSkin describes
+image-backed nine-slice drawing: `slice` affects painting; `content_inset` affects
+geometry. Use the actual family image-mode behavior, not an invented second fit mode.
 
-`StyledMetrics`:
+UiFill::None means intentionally no face. Solid and image-backed fills are explicit
+choices. Inherited/absent override is different from an explicit None. Never substitute
+OS light-face colors merely because a resolved fill is transparent. UiTab's active
+cap/strip fix preserves that distinction and has a native pixel regression.
 
-- `text_font`/`use_text_font`;
-- `content_margin` (geometry-only outer spacing; non-negative);
-- `radius`, `frame_width`, `frame_enabled`, `face_enabled`;
-- `dashed` + `dash_pattern`;
-- focus: `focus_enabled`, `focus_margin`, `focus_alpha`, `focus_color`;
-- `shadow` (`StyledShadow`) and `highlight` (`StyledHighlight`).
+The common geometry is outer -> shadow-adjusted surface -> frame/skin-adjusted face
+-> content margin. UiStyledInnerRect and UiStyledOuterSizeFromContent own that seam.
+Layout, hit testing and generated code must agree on it. Apply DPI exactly once.
 
-`StyledSkin` (image-backed 9-slice):
+## Colors, icons and decoration
 
-- `base`, `slice` (drawing thickness), `content_inset` (geometry thickness),
-  `image_mode` (`Fill` scales, `Fit` preserves aspect and crops).
+Default palette colors belong in StyleDefault or role construction, not arbitrary
+RGB substitutions in Paint. Existing LtColor/DkColor/DisabledColor helpers produce
+state variants; the resolved role must remain distinguishable and readable.
+MinimalRole(mode, role), ApplyPalette and the established dark-palette path are the
+shared vocabulary, not four local copies of each control.
 
-## Surfaces/backgrounds and borders
+UiIconRenderMode is Auto, MonoTint or PreserveColor. Icon ink falls back to normal
+ink when no explicit icon color is supplied. PreserveColor is appropriate when an
+image's colors carry content; mono action glyphs should use the state-aware tint.
+A demo must check actual icons, not just the presence of a generic placeholder.
 
-- Face = fill (None/Solid/Image); frame = border colour with
-  `frame_width`/`frame_enabled`; `dashed` frames use a dash pattern.
-- `UiFill::None()` means no face; `UiFill::Solid(color)` a solid face;
-  `UiFill::ImageFill(img)` an image face.
-- Canonical geometry: `outer -> surface (shadow) -> face (frame + skin inset)
-  -> content (content_margin)`. `UiStyledInnerRect` / `UiStyledOuterSizeFromContent`
-  are the shared entry points.
+StyledShadow supports enabled, distance/offset, alpha/color, inset, hard/curve modes
+and ShadowSoft/Tight/Linear/Gamma recipes. Margins include shadow geometry. Focus
+and highlight use their existing metric contracts. Do not expose an override field
+in PropertyEditor unless the actual paint path consumes it.
 
-## Text roles
+## Runtime mode changes and validation
 
-Text size roles (`UiTextSize`: Body, H1, H2, H3) tune label fonts.
-`ApplyLabelUniversalRole` sets ink from the role; semantic label roles stay
-geometry-neutral (no hidden margins).
+Change UiTheme context through its API, update the host's native Light/Dark bridge
+when needed, and refresh the complete shell and PropertyEditor palette. Do not call
+SwapDarkLight blindly on every paint or on an unchanged mode. The canonical demo
+shows the explicit host-level transition; reusable controls follow their theme.
 
-## State colours
+For each themeable control inspect Minimal x four roles x Light/Dark, then Light ->
+Dark -> Light without reconstruction. Exercise relevant normal/hot/pressed/disabled,
+selected/focused/read-only states, small sizes and representative DPI. Validate
+explicit custom styles, ClearCustomStyle, None/transparent faces, image colors,
+icon contrast and live theme revision. Other declared presets must remain buildable
+and receive regression checks proportional to changed common code.
 
-`ResolveStyledState(enabled, hot, pressed)` picks the palette state.
-`LtColor`/`DkColor`/`DisabledColor` derive hot/pressed/disabled from a base.
-
-## Light/dark handling
-
-`ApplyDarkPalette` remaps a `StyledPalette` for dark mode
-(`ForceDarkFace`/`ForceDarkFrame`/`ForceDarkInk`). `MinimalRole(mode, role)`
-returns the canonical light/dark role palette; `ApplyPalette` writes it into a
-`StyledPalette`. Controls follow the active mode automatically through the
-theme resolver.
-
-## Icons and tinting
-
-- `UiIconRenderMode::Auto | MonoTint | PreserveColor`. `UiResolveIconColor`
-  falls back to `ink` when `icon` is null.
-- `CtrlStyled::SetIconColor(base, hot_pct, press_pct)` derives state icons from
-  a base colour.
-
-## Shadows/elevation
-
-`StyledShadow` (in metrics): enabled, distance, offset, alpha, color, inset,
-mode (`SHADOW_CURVE`/`SHADOW_HARD`), Bézier `ShadowCurve`. Presets:
-`ShadowSoft()`, `ShadowTight()`, `ShadowLinear()`, `ShadowGamma(gamma)`.
-Shadow margins are included in minimum sizing (`UiStyledShadowMargins`).
-
-## Metrics/sizing
-
-- Radius, frame width, content margin, and shadow all contribute to
-  `GetMinSize()`.
-- `CtrlStyled` convenience API: `SetMargin`, `SetInset`, `SetRadius`,
-  `SetFrameWidth`, `EnableFrame/EnableFace`, `SetShowFocus`,
-  `EnableShadow/SetShadow*`, `SetFill9Slice`, `SetFaceQuadGradient`,
-  `SetBackgroundImage`.
-
-## Custom-control style resolution
-
-The standard control-owned style lifecycle:
-
-```cpp
-static const Style& StyleDefault();          // canonical defaults
-const Style& GetEffectiveStyle() const;      // themed or custom
-UiControl& SetCustomStyle(const Style& style);
-UiControl& ClearCustomStyle();
-bool HasCustomStyle() const;
-void OnStyleChanged();                       // invalidate + refresh
-```
-
-Controls cache a themed style keyed by `theme_revision_`; when the theme context
-changes and the control has no custom style, the cached themed style is
-re-resolved. Never mutate `StyleDefault()`.
-
-## Runtime theme changes
-
-Change the theme context, bump the revision, and controls still theme-driven
-refresh. A global theme change must be visible immediately for standard-role
-controls with no authored overrides; an authored override creates a custom style
-for that node and is preserved.
-
-## Avoiding hard-coded colours
-
-Use semantic roles and the theme resolver. If a surface needs a specific look,
-author it in `StyleDefault()` or the theme role construction, not in `Paint()`.
-The Designer theme-override concept mirrors this: absent override = "Use theme"
-(inheritance); explicit `None` = intentionally absent; `Solid`/`Gradient`/
-`Image`/`Nine-slice`/`Dashed` = authored choices.
-
-## Theme presets
-
-The seven presets (`Minimal`, `Pill`, `Linear`, `Solid`, `Outline`, `Compact`,
-`Layered`) are implemented as `Resolve<Family>Base(preset)` helpers that retune
-`StyleDefault()` per control family, plus role-tuning helpers
-(`TuneProgressBarRole`, `TuneMinimalGroupPanel`, etc.). `Pill` and `Minimal`
-are role-tuned theme families; the other presets are more mechanical geometry/
-colour variants.
+A numeric palette inequality or successful Paint call is not visual acceptance.
+Native pixel tests can protect concrete seams; human review still owns readability
+and affordance judgments. Record gaps in the release inventory/ACTIVE_WORK rather
+than marking every role PASS because SetRole compiles.

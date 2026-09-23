@@ -1,199 +1,168 @@
 # 00 — U++ Coding Guide
 
-Reusable U++ engineering practice for the `upp_Ui` library family. This guide is
-the first thing to read before touching any control, demo, or package in this
-repository, and it is intended to be copyable into another U++ project.
+Reusable engineering rules for the Ui library family. Read this before changing a
+control, demo or package. The Controls Guide describes the public surface; the
+Theme, Models, Demo, PropertyEditor and Drawing guides own their respective
+contracts. Graph usage and Graph development are separate guides.
 
-## Packages and `.upp` membership
+## Packages and dependencies
 
-- A `.upp` package is the build unit. A **library** package has no `main` and no
-  `mainconfig`. An **EXE** package declares `GUI_APP_MAIN` / `CONSOLE_APP_MAIN`
-  and `mainconfig "" = "GUI"` (or `"CONSOLE"`).
-- The `uses` list names every package the code depends on. Missing uses are a
-  build error in the same way a missing include is. Do not rely on transitive
-  `uses` to satisfy direct source dependencies.
-- Keep `file` lists in the same order as the headers/sources they declare, and
-  keep them complete. A header that is included via `#include <Pkg/Header.h>`
-  must exist at that package path.
-- `plugin/png`, `plugin/jpg`, `plugin/bmp` are required for image file I/O in
-  EXEs.
-- One package, one responsibility. Do not fold unrelated controls into the `Ui`
-  package just to avoid creating a sibling package.
+A `.upp` file defines a package. A library has no application entry point and no
+`mainconfig`. A runnable test/demo supplies `GUI_APP_MAIN` or `CONSOLE_APP_MAIN`
+and an appropriate configuration. Do not add `main`/`WinMain` to a library merely
+to make an executable build command link. Compile libraries through a real caller.
 
-## C++ source/header organisation
+Declare direct package dependencies in `uses` and direct header dependencies in
+source. Keep `.upp` file membership complete, including internal `.inc` parts
+that TheIDE should expose. Production never depends on demos/tests. Headless
+packages may use Core/Draw where required but never acquire CtrlCore/CtrlLib/Ui
+merely to reuse a GUI helper. Image import/export callers declare the relevant
+`plugin/png`, `plugin/jpg` or `plugin/bmp` package.
 
-- Header: includes, `namespace Upp {`, public API, private members at the
-  bottom, `} // namespace Upp`, include guard.
-- Use the `_Package_Header_h_` include-guard convention (`_Ui_UiLabel_h_`).
-- Keep `Paint()`, `Layout()`, and event handlers in the `.cpp`. Inline tiny
-  trivial getters in the header only.
-- A control `Ctrl` derived type declares `typedef T CLASSNAME;` so `THISBACK`
-  bindings work.
-- Document purpose, intent, thread context, and a short usage note in the
-  header comment block before the code.
+Use the actual assembly `.var` and installed build method. The repository's
+`GitHubOut.var` is the maintainer's Windows configuration, not a portable path
+promise. Record the U++ build and external dependency revisions when validating.
+Build output belongs in the assembly output directory or a temporary evidence
+directory, never among source files. See [Getting Started](../GETTING_STARTED.md).
 
-## U++ naming and style
+## Source organization and comments
 
-- Public API follows U++ PascalCase: `SetX()` / `GetX()` paired state,
-  `WhenX` public callbacks, `SetData()` / `GetData()` for data-binding controls,
-  typed `SetValue()` / `GetValue()` only where the family convention exists.
-- Use `SetText()`/`GetText()` for primary visible text, `SetTitle()`/`GetTitle()`
-  for titled containers, `SetSubTitle()`/`GetSubTitle()` consistently.
-- Shared vocabulary enums: `UiAlign`, `UiCrossAlign`, `UiDirection`,
-  `UiIconRenderMode`. Do not accumulate aliases for the same operation.
-- Use the shared style vocabulary (`StyledPalette`, `StyledMetrics`,
-  `StyledSkin`, `UiTheme` role resolvers) rather than local parallel systems.
+Headers have an include guard, necessary includes, `namespace Upp`, public API,
+then private state. Use `_Package_Header_h_` guards. A Ctrl type using THISBACK
+has `typedef T CLASSNAME;`. Keep substantial Paint/Layout/event implementations
+in `.cpp`; tiny getters can remain inline. `.inc` is appropriate for deliberate
+single-translation-unit implementation parts, not a second production copy.
+Do not mechanically convert `.inc` to `.h` or fragment an already small control.
 
-## Ctrl ownership and lifetime
+Each public control header explains author/license, purpose, intended usage,
+GUI-thread context, non-obvious ownership and a short example. Document range,
+null, normalization and callback semantics beside the relevant public methods.
+Implementation comments explain invariants and reasons, not obvious assignments.
+Remove stale alternative implementations and misleading comments, not useful
+rationale. Header comments refer to the library release identity in `UiVersion.h`;
+individual controls do not maintain independent release counters.
 
-- Parent controls own child `Ctrl` instances. Never add one control to more than
-  one parent; never create parent/child cycles.
-- Prefer value members and `One<T>` for unique heap ownership. Avoid raw
-  `new`/`delete` in ordinary control code.
-- Use `Ptr<>` guards for callbacks that might outlive the call stack.
-- Stop timers and animations on hide/remove/destroy. Composite constructors need
-  regression coverage for direct construction and destruction.
-- Do **not** use arbitrary integers with `Ctrl::SetTimeCallback()` /
-  `Ctrl::KillTimeCallback()`. Ctrl timer ids are internal byte-offset identifiers,
-  not application-defined handles; large or invented ids can assert in Debug and
-  can address invalid Ctrl state.
-- Prefer an owned `TimeCallback` member for delayed or one-shot work. Use
-  `KillSet()` when replacing a pending callback and `Kill()` during cancellation
-  or teardown.
-- Repeating custom frame clocks should own their timer state. In `Ui`, use
-  `UiFrameTicker` for one-callback-at-a-time animation/frame stepping instead of
-  repeatedly scheduling raw Ctrl timer ids. The shared `Animation` package is
-  preferred where its interpolation/lifecycle model already fits the control.
+Public API follows U++ naming: SetX/GetX, WhenX events, SetData/GetData for binding.
+Keep family vocabulary stable: SetText for primary text, SetTitle/SetSubTitle for
+container identity, UiDirection/UiAlign for direction/alignment. Convenience
+fluent APIs are allowed where the family already uses them. Do not add aliases
+or meaningless getters simply to force spelling symmetry. Changing a public
+contract requires its callers, tests, generated C++ and documentation to change
+in the same coherent slice; discuss disruptive changes before publishing them.
 
-## Callbacks and `When...` conventions
+New demo/application names should expose responsibility: `tc_header`,
+`box_header_actions`, `pnl_preview`, `stk_pages`, `btn_copy`, `lbl_caption`,
+`pe_inspector`, `pe_model_inspector`, `edit_code`, `str_code`, `img_preview`,
+`val_icon`, `ctx_theme`. Do not churn established member names for cosmetics.
 
-- User callbacks fire only after public state is committed. Inside a
-  selection/change callback the caller must be able to read the new state
-  through the corresponding getter.
-- Document whether programmatic setters fire user-action callbacks.
-- Callbacks run on the GUI thread unless documented otherwise.
-- Bind with `THISBACK`, capture by value or with `Ptr<>`; never capture a
-  possibly-dead `this` raw.
-- Model-driven controls use the request-first pattern (`WhenXRequest`) when the
-  application owns semantic state — see `03_UI_MODEL_GUIDE.md`.
+## Parenting is not C++ ownership
 
-## Value / ValueArray / ValueMap
+Adding a Ctrl to a parent establishes its GUI relationship; it does **not**
+transfer responsibility for deleting the C++ object. Removing it detaches it.
+Prefer member controls, `One<T>` or an explicitly owning `Array<T>`. Never infer
+heap ownership merely from Add/SetContent/SetModel. A borrowed child/model must
+have an explicit lifetime contract; use `Ptr<Ctrl>` for potentially destroyed
+controls and confirm the current parent before resizing/detaching borrowed
+content. Reject self/ancestor parenting before changing existing content.
 
-- `Value` is the U++ variant for data-binding and property values; use it for
-  `SetData()`/`GetData()`, property models, and control payloads where the type
-  is not statically fixed.
-- Validate enum values and ranges when loading persisted `Value` payloads.
-- `ValueArray`/`ValueMap` are the serializable container forms used in models
-  and JSON round-trips.
+Do not attach one control to two parents or introduce parent cycles. Composite
+construction/destruction, child removal/reparenting and model replacement are
+regression-test cases. External models must outlive their active binding unless
+the API explicitly supplies a lifetime-safe detach mechanism.
 
-## U++ containers
+## Callbacks, capture and timers
 
-- `Vector<T>` for arrays, `Array<T>` for objects with ownership, `VectorMap<K,V>`
-  for ordered key/value maps, `Index<T>` for sets, `One<T>` for unique heap
-  ownership. Use `pick()` to transfer ownership where appropriate.
-- Prefer `Array` + `One` over raw owning pointers in control-owned member
-  collections.
+A committed notification observes the new public state. A request event reports
+intent before an application-owned model mutation. These are different contracts;
+see [Models](03_UI_MODEL_GUIDE.md). State whether programmatic setters emit user
+events. Keep preview, commit and cancellation distinct; do not manufacture a
+second commit on capture loss. Document whether a cancelled live edit rolls back
+or retains its last live value.
 
-## Dependency direction
+A user callback may synchronously rebuild or destroy the originating control.
+Copy an in-flight callback before dispatch where reconfiguration can clear it;
+guard subsequent member access with a lifetime-aware pointer. Capture by value
+where appropriate and never leave an unguarded delayed raw `this`. Rebinding
+must ignore inactive/old model notifications, including address reuse.
 
-- Library packages depend only on other libraries, never on EXE packages.
-- Headless/model packages must not `#include <Ui/...>` or `<CtrlLib/...>`.
-  Only packages that legitimately build GUI may reference `Ui`/`CtrlLib`.
-- Tests depend on production packages; production packages never depend on tests.
+Use owned TimeCallback/UiFrameTicker or the established Animation facility.
+Cancel work on hide/remove/destroy where it no longer has a purpose. Ctrl timer
+IDs are internal byte-offset identifiers, not arbitrary application handles;
+do not invent large integer IDs. A replaced one-shot uses KillSet, not an
+accumulating queue. Idle controls need no repeating clock; caret blinking and
+intentional animation have explicit ownership and stop conditions.
 
-## DPI-aware GUI code
+## Values, validation and semantic authority
 
-- Apply `DPI(...)` exactly once per value; never double-scale.
-- Geometry setters call `RefreshLayout()` + `Refresh()`; visual-only setters call
-  `Refresh()`.
-- `GetMinSize()`, `GetContentSize()`, width-aware measurement, `Layout()`,
-  preview, and generated code must agree on the same geometry vocabulary:
-  frame, skin content inset, content margin, container inset, gap, item spacing,
-  content gap.
+Use typed values where fixed; U++ Value/ValueArray/ValueMap are appropriate for
+binding, property models and durable payloads. Validate types, enums, ranges,
+finite numbers and Null sentinels before mutation. Validate imports into a
+candidate before replacing live state. ASSERT protects programmer invariants;
+it is not Release input validation. Preserve incomplete numeric text locally
+until a complete value can be committed.
 
-## Geometry and shape construction
+Prefer Vector, Array, VectorMap, Index, One and pick/clone with clear ownership.
+One concern has one semantic authority. View projections and raster/geometry
+caches are disposable derivatives, not parallel editable models. Do not restore
+retired RefreshFromModel-style synchronization when model notifications suffice.
+Persistence schema versions are independent from the library release version;
+never reset or increment a schema for a cosmetic release-number change.
 
-All new control drawing follows `07_UI_DRAWING_GUIDE.md`.
+## Geometry, themes and rendering
 
-Use this decision order:
+Apply DPI exactly once. Fit/Fixed/Expand are sizing modes; alignment positions
+within an allocation. GetMinSize/GetContentSize/Layout, hit testing and generated
+code must agree on frames, skin insets, content margins, gaps and item spacing.
+Geometry-affecting setters invalidate layout and paint; visual-only setters
+invalidate paint. An unchanged setter should avoid needless work.
 
-1. direct `Draw` or native Painter for simple paint-only primitives;
-2. `UiShapes` for reusable stock silhouettes in normal controls;
-3. `UiShapePath` for an authored silhouette that is not already a stock shape;
-4. `UiGeometry` for final-pixel mathematical operations and explicit adaptive
-   points when points are genuinely required;
-5. dense/high-count scenes may call `UiGeometry` directly when constructing an
-   intermediate `UiShapePath` would add unnecessary allocation/work.
+Every themeable visible control has meaningful Minimal Standard/Subtle/Accent/
+Alert behavior in Light and Dark. Family typography roles and actual content
+colors remain distinct from semantic emphasis. Pure layout/value helpers do not
+need invented colored faces. Follow [Theme](02_UI_THEME_GUIDE.md).
 
-**Normal controls can use `UiShapes`; dense scenes such as Graph may go
-directly to `UiGeometry`.** This is the repository-wide rule.
+Paint must not mutate models, emit semantic callbacks, open resources or start
+clocks. Keep clipping balanced and handle empty/tiny rectangles. Direct Draw is
+appropriate for simple straight geometry/text; native Painter supplies smooth
+curves. Reuse bounded exact rasters when beneficial. Do not impose full-control
+buffers on every widget. The shared final-device-pixel geometry budget is 0.35 px
+within its documented numeric envelope, not a guarantee of identical backend
+stroke/AA pixels. See [Drawing](07_UI_DRAWING_GUIDE.md).
 
-Never add a control-local segment/sample count, radius-proportional subdivision,
-or fixed curve point count. Geometry error is library-owned at 0.35 final device
-pixels. Apply DPI/view transforms before final-pixel geometry decisions, and do
-not derive semantic handles/labels/anchors from tessellation vertex indexes.
+## Review and release acceptance
 
-Raster concerns (blur, masks, gradients, temporary buffers and caching) remain a
-separate rendering concern.
+Audit every concrete public control, not only controls with convenient demos.
+Check API/ownership, four-role behavior, input/callback/cancellation, rendering
+cost, source docs, canonical demo, generated C++ and relevant tests. Inheritance
+can share implementation review but does not waive specialized behavior checks.
+The machine-readable [release inventory](../tests/ui_release_inventory.json)
+records coverage and unresolved work; an untested row is not a PASS.
 
-## State ownership and avoiding duplicated authorities
+Debug and Release must compile. A non-BLITZ/header-isolation build catches hidden
+include dependencies; also preserve the supported BLITZ path. Keep diagnostics
+and tests deterministic and fail on nonzero exit, missing summary or zero executed
+checks. Do not delete a legitimate regression merely to reduce target count.
+A replacement demo/test must retain the old useful coverage before removal.
 
-- One authoritative source of state per concern. A view model is a projection,
-  never the source of truth for application-owned data.
-- Avoid "mutate silently, notify afterward" APIs. Use request-first mutation
-  when a command/undo/validation layer exists.
-- Do not let hover/pressed visuals masquerade as committed selection.
-- In retained high-scale views, prefer storing evaluated layout in the retained
-  geometry record that consumes it rather than creating a `layout result -> second
-  per-item cache` pipeline. Shared template definitions may be cached once; prepared
-  per-item geometry should remain a single authority. UiGraph's concrete rule is
-  documented in `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md`.
+Version changes come from `Ui/UiVersion.h`. The release candidate is not a claim
+that all platform/visual gates passed. Public 1.0 compatibility starts only after
+the declared release surface and known limitations are accepted. Independently
+versioned sibling packages retain their own version histories.
 
-## Assertions and error handling
+## Publishing and recovery
 
-- Favor status-returning APIs for expected failures; log errors.
-- Use `ASSERT` for programmer invariants in Debug builds; do not rely on it for
-  runtime data validation.
-- `Paint()` is render-only: no model mutation, no event emission, no timer
-  startup, balanced clipping/draw state, valid for empty and tiny rectangles.
+Refresh remote main, inspect complete touched source/callers/tests, implement a
+coherent slice, review the full diff, run git diff --check, publish and verify the
+remote commit/diff/ancestry. Rebase only the intended changes onto a newer main;
+never overwrite concurrent work or force-push it backwards.
 
-## Testing philosophy
+Keep ACTIVE_WORK.md at no more than 100 lines: BASE / TASK / TOUCHED / STATUS /
+PUBLISHED / VALIDATION / NEXT ACTION for current work only. Store contracts in
+these guides, history in Git and validation logs outside source. PUBLISHED may
+identify the containing commit by a stable git-log path to avoid a self-referential
+SHA. Preserve concurrent workstreams and their outstanding validation boundaries.
 
-- Control/test packages should protect current public behaviour and current
-  regression coverage. Deterministic smoke tests verify exact output.
-- Do not delete legitimate tests merely to reduce file count.
-- Keep tests deterministic: no timestamps, no environment-dependent output in
-  golden comparisons.
-
-## Debug/Release expectations
-
-- Debug builds include full assertions and checks; Release builds compile clean
-  with optimizations and no asserts.
-- Both configurations must compile; do not introduce Debug-only APIs that break
-  Release.
-- Generated/build output never lives in source directories; it goes to the
-  assembly output folder (`build/`, `out/`) which is git-ignored.
-
-## Clean, reviewable implementations
-
-- Keep controls small; split helpers into sibling packages when they grow.
-- Review style code for redundant default-setting calls; setting a field that
-  does not change behaviour is bloat.
-- When removing or replacing a public API, sweep demos and sibling controls for
-  stale calls in the same pass.
-
-## Reading order
-
-1. `00_UPP_CODING_GUIDE.md` (this guide);
-2. `01_UI_CONTROLS_GUIDE.md` — control catalogue and usage;
-3. `02_UI_THEME_GUIDE.md` — theme and style system;
-4. `03_UI_MODEL_GUIDE.md` — model authority, mutation and identity;
-5. `04_UI_DEMO_GUIDE.md` — executable documentation and demo design;
-6. `05_UI_PROPERTY_EDITOR_GUIDE.md` — PropertyEditor and override layout;
-7. `06_UI_SCALE_AND_LOD_GUIDE.md` — large datasets, virtualization and LOD;
-8. `07_UI_DRAWING_GUIDE.md` — Draw/Painter/cache/geometry/shape architecture;
-9. `08_UIGRAPH_GUIDE.md` — Graph model, rendering, routing and hierarchy;
-10. `UIGRAPH_NODE_LAYOUT_ARCHITECTURE.md` — retained Graph node-layout/cache and template direction;
-11. `09_UIDOC_GUIDE.md` — document model/view/reuse architecture.
-
-When this guide and an older document conflict, current code and this guide win.
+Give the validator one copy-paste task: latest branch, required ancestor, exact
+commands, expected summaries, focused manual checks, stop conditions, evidence
+and allowed minor fix policy. Source-reviewed, compiled, runtime-tested and
+visually accepted are separate evidence. Report only the states actually proved.

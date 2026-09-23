@@ -1,377 +1,152 @@
-# 03 — Ui Model Guide
+# 03 — Models and Data
 
-`upp_Ui` uses models where they remove duplicated state or allow data to be
-shared, switched, virtualized, or presented by more than one view. A programmer
-should not need to manage a separate model object for the simple case.
+Models remove duplicated semantic state and support shared views. A programmer
+should not need a separate model object for a simple control. PropertyEditor
+schema, adapters and editing transactions are in its [guide](05_UI_PROPERTY_EDITOR_GUIDE.md).
 
-For PropertyEditor schema/factory/transaction details, continue with
-`05_UI_PROPERTY_EDITOR_GUIDE.md`.
+## The active-model contract
 
-## The normal model-backed control contract
-
-The genuine model views share one programmer-facing rule:
-
-> `Model()` always returns the model currently driving the control.
-
-The control always owns an internal model. If the application never supplies a
-model, that internal model is active automatically.
+`Model()` always returns the model currently driving a genuine model-backed
+control. Each such control owns an internal model by default:
 
 ```cpp
 UiList list;
 list.Model().Add("Apple");
 list.Model().Add("Banana");
-list.Model().Add("Orange");
 ```
 
-There is no separate non-model `UiList` variant and no model refresh call. Model
-mutation emits the change notification that keeps the view synchronized.
-
-When application code needs to own or share the data, bind an external model:
+External binding is a non-owning switch, not a data copy or merge:
 
 ```cpp
-UiListModel fruit;
+UiListModel fruit; // outlives the active binding
 UiList list;
-
 list.SetModel(fruit);
 list.Model().Add("Apple", 100);
-list.Model().Add("Banana", 200);
-```
-
-After `SetModel(fruit)`, `list.Model()` and `fruit` are the same object:
-
-```cpp
 ASSERT(&list.Model() == &fruit);
+list.UseInternalModel(); // retained internal data is still present
 ```
 
-The same ownership vocabulary is used by:
-
-- `UiList` -> `UiListModel`
-- `UiGallery` -> `UiListModel`
-- `UiTree` -> `UiTreeModel`
-- `UiTable` -> `UiTableModel`
-- `UiDropdown` -> `UiListModel`
-- `UiMenu` -> `UiMenuModel`
-- `UiNodeGraph` -> `UiGraphModel`
-- `UiDoc` -> `UiDocCore`
-
-Each exposes:
-
-```cpp
-ModelType& Model();
-const ModelType& Model() const;
-Control& SetModel(ModelType& model);
-Control& UseInternalModel();
-bool IsUsingInternalModel() const;
-Control& ClearModel();
-```
-
-`UiDocCore` deliberately remains a document-specific model rather than inheriting
-`UiDataModelBase` or flattening document state into `UiModelItem`. Its
-`UiDocCoreTransaction`, `UiDocApplyResult` and position-map notifications carry
-richer positional-edit semantics needed by document views. The ownership
-vocabulary is shared; the domain model and change payload remain appropriate to
-the domain. See `09_UIDOC_GUIDE.md`.
-
-## Switching models
-
-Switching changes which model drives the view. It never copies, merges, or
-implicitly clears data.
-
-```cpp
-UiList list;
-list.Model().Add("Internal A");
-list.Model().Add("Internal B");
-
-UiListModel database_a;
-database_a.Add("Database A / 1");
-list.SetModel(database_a);      // List now presents database_a
-
-UiListModel database_b;
-database_b.Add("Database B / 1");
-list.SetModel(database_b);      // O(1) ownership switch; no item copy
-
-list.UseInternalModel();        // Internal A/B are still there
-```
-
-This makes switching between datasets/databases natural while preserving a
-simple local-data mode.
-
-`IsUsingInternalModel()` reports which ownership mode is active:
-
-```cpp
-if(list.IsUsingInternalModel())
-    Cout() << "local data";
-```
-
-`ClearModel()` means exactly one thing:
-
-> clear the currently active model, without changing which model is active.
-
-```cpp
-list.SetModel(database_a);
-list.ClearModel();              // clears database_a
-ASSERT(&list.Model() == &database_a);
-```
-
-To clear the retained internal model after using an external model, switch to it
-explicitly and clear it:
-
-```cpp
-list.UseInternalModel().ClearModel();
-```
-
-There is deliberately no implicit transfer from one model to another.
-
-## Why there is no separate widget-only family
-
-The internal model already gives the simple control experience:
-
-```cpp
-UiList list;
-list.Model().Add("One");
-```
-
-An external model is an ownership/sharing option, not a different widget type.
-Maintaining a second set of non-model widgets would create parallel state,
-duplicate APIs, and different code paths for the same interaction.
-
-The model also enables high-scale views to keep logical record count independent
-of live `Ctrl`/renderer count. See `06_UI_SCALE_AND_LOD_GUIDE.md`.
-
-## Controls that deliberately do not need a model
-
-Not every control becomes better by adding a model object.
-
-- `UiAccordion` is a composite container whose sections own real child controls.
-- `UiMatrixSelector` is a small bounded value/preset selector.
-- `UiColorMatrix` is one compact multi-colour value/editor.
-
-These are not "widget versions" of hidden model controls. Their state is already
-the direct value/composition the application is editing. Creating separate model
-classes for them would add indirection without sharing or scale benefit.
-
-## One authoritative state
-
-For model-backed views:
-
-- the active model owns semantic record state;
-- the control owns interaction state: viewport, hover, pressed state, local
-  selection visuals, drag threshold, insertion/drop chrome and transient editor
-  lifetime;
-- renderer instances own prepared presentation geometry only;
-- no control maintains a parallel item mirror;
-- switching models changes the active pointer and resets view state as needed,
-  not record state;
-- callbacks from previously bound inactive models are ignored by the view.
-
-For `UiDoc`, caret, selection, scroll position, active object and paragraph/layout
-caches are view state. Text, style runs, blocks, annotations, resources, embeds,
-anchors, revisions and Undo/Redo history are `UiDocCore` state. Multiple UiDoc
-views can therefore share one document model while retaining independent view
-state.
-
-This is why retired synchronization APIs such as `RefreshFromModel()` must not
-return. If model data changes through its public mutation API, its change event is
-the synchronization path.
-
-## Request-first mutation contract
-
-For user operations that may change application-owned data, the control computes
-and reports intent before mutation:
-
-1. The user performs an operation.
-2. The control computes the proposed target.
-3. The control emits a request event, such as `WhenReorderRequest`.
-4. Rejected -> nothing changes.
-5. Handled -> the owner performed or scheduled the change.
-6. Unhandled + internal mutation enabled -> the control may mutate the active
-   model directly.
-7. The model notification updates every bound view.
-
-Shared request structs include:
-
-- `UiReorderRequest` — List/Dropdown reorder.
-- `UiTreeMoveRequest` — Tree reparent/move.
-- `UiMenuActionRequest` — Menu semantic action.
-- `UiTableEditRequest` — Table edit.
-- Graph request structures for node moves, connections and deletion.
-
-Simple/local use can allow internal mutation:
-
-```cpp
-control.EnableInternalMutation(true);
-```
-
-Command-driven applications can disable it and handle the request:
-
-```cpp
-control.EnableInternalMutation(false);
-control.WhenReorderRequest = [=](UiReorderRequest& r) {
-    r.handled = true;
-    Dispatch(MoveItemCommand(r.from, r.before));
-};
-```
-
-"Mutate silently, notify afterward" is not the target architecture.
-
-`UiDoc` now shares the model-ownership contract, but its richer request-first
-user-edit interception is deliberately a separate future policy layer. Any such
-layer must carry or produce `UiDocCoreTransaction`; it must not introduce a
-second document store or weaken the existing revision/position-map contract.
-
-## Stable identity and values
-
-Use model IDs/data payloads for program logic rather than display labels.
-Display text can change, localize, or be rendered differently without changing
-identity.
-
-For shared `UiModelItem` records, `data` is the normal application payload while
-`text`, `description`, `right_text`, image/icon, check state and columns are
-presentation-oriented record fields.
-
-Graph, Menu, Tree, Table and UiDoc keep their domain-specific model structures
-where those structures carry real semantics. Sharing the ownership vocabulary
-does not force every domain into `UiListModel` or `UiModelItem`.
-
-## Model lifetime
-
-An external model passed to `SetModel(model)` is non-owning from the control's
-point of view. It must outlive the period during which the control uses it.
-
-The internal model is owned by the control and always exists. `UseInternalModel()`
-is therefore lifetime-safe and requires no allocation.
-
-Mutate bound models on the GUI thread unless the application provides its own
-synchronization.
-
-## PropertyEditor is a specialized model consumer
-
-`PropertyEditorModel` is a headless property schema/value model with additional
-normalization, validation, preview/commit/reset and impact semantics. It is not a
-reason to duplicate the normal List/Tree/Table control family.
-
-`PropertyEditorItem` has a stable `id`, human `label`, optional grouping/help/unit
-metadata, current/default value, validation hooks and refresh-impact information.
-
-`PropertyEditorModel` emits specialized events including:
-
-- `WhenStructureChanged`
-- `WhenValueChanged(id)`
-- `WhenPreview(id, value)`
-- `WhenCommit(id, value)`
-- `WhenReset(id)`
-- `WhenGroupMetadataChanged`
-
-`PropertyEditor` forwards interaction through its preview/commit/reset/override
-and selection events. See `05_UI_PROPERTY_EDITOR_GUIDE.md` for the full contract.
-
-## Avoiding feedback loops
-
-- Do not mutate the same model property recursively from its own change handler
-  without a guard.
-- Model notifications are observations; request events are authorization.
-- Do not keep a second array/view-model mirror merely to feed a control.
-- Do not call refresh/sync helpers after normal model mutation; the model event is
-  authoritative.
-
-## Scale rules
-
-Model ownership simplicity must not weaken virtualization:
-
-- ordinary List/Gallery/Table/Tree viewport work remains proportional to visible
-  or overscan content;
-- model switching never copies N records merely to display them;
-- renderer pools remain bounded independently of logical record count;
-- explicit full-model operations such as Select All may be O(N), but scrolling,
-  painting, hover and hit testing may not become O(N).
-
-UiDoc uses a different scale shape: document state remains sparse and paragraph
-layout stays viewport-driven/cached rather than allocating a child control or
-persistent geometry object per character. Binding an external UiDocCore does not
-copy document records or create another layout model.
-
-The deterministic scale tests remain the authority for these invariants.
-
-## Current model families
-
-| Control/view | Semantic model | Identity shape |
+The shared vocabulary is Model (const/non-const), SetModel, UseInternalModel,
+IsUsingInternalModel and ClearModel. ClearModel clears the **currently active**
+model; it does not switch to the internal model. Model changes publish the
+notification that updates bound views; no RefreshFromModel call is necessary.
+
+| Control | Model | Identity |
 | --- | --- | --- |
-| UiList / UiGallery / UiDropdown | `UiListModel` | sequential index + optional stable item data key |
-| UiTree | `UiTreeModel` | stable tree node ref |
-| UiTable | `UiTableModel` | row/column coordinate/range |
-| UiMenu | `UiMenuModel` | stable menu node ref + command semantics |
-| UiNodeGraph | `UiGraphModel` | stable graph IDs/refs |
-| UiDoc | `UiDocCore` | document positions/anchors + transaction mapping |
+| UiList / UiGallery / UiDropdown | UiListModel | sequential index; optional stable application data key |
+| UiTree | UiTreeModel | stable node reference |
+| UiTable | UiTableModel | row/column coordinate and range |
+| UiMenu | UiMenuModel | stable menu node and command semantics |
+| UiNodeGraph | UiGraphModel | graph IDs/references |
+| UiDoc | UiDocCore | document positions/anchors and transaction mapping |
 
-The shared ownership vocabulary does not force these domains into one record
-type. A model is shared where semantics are genuinely shared, not for naming
-symmetry.
+Sharing ownership vocabulary does not force every domain into UiModelItem.
+There is no separate widget-only List/Tree/Table family: the internal model
+already supplies that experience. Small bounded value controls such as
+UiMatrixSelector, UiColorMatrix and UiRangeSegments need no extra model object.
+UiAccordion is a real-child composition, not a hidden list-view alternative.
 
-## Publishing mutable model changes
+## Authority and lifetime
 
-If a model exposes mutable record access, the edit is incomplete until it
-publishes the change.
+Semantic records belong to the active model. Views own viewport, hover, focus,
+selection visuals, gestures, transient editors and derived presentation. Shared
+renderers own only prepared content inside the rectangle the view gives them.
+Do not keep another item collection in a control merely to synchronize it.
 
-Current examples include:
+External models must outlive active use. Bound mutations run on the GUI thread
+unless the host provides synchronization. Rebinding reconciles interaction state
+without clearing/copying either dataset. Notifications from inactive models are
+ignored. Weak observer identity distinguishes a fresh model from an old object
+that occupied the same address. See the coding guide for Ctrl parenting, which
+does not by itself transfer C++ ownership.
+
+## Request-first user mutation
+
+A control first computes and emits intent. Rejected means no change; handled
+means the host performed/scheduled the edit; unhandled plus enabled internal
+mutation permits the control to edit the active model. Model notification then
+updates every bound view. Observations are not authorization.
+
+Examples: UiReorderRequest, UiTreeMoveRequest, UiMenuActionRequest,
+UiTableEditRequest and Graph move/connect/delete/route requests. Simple local use
+may EnableInternalMutation(true). Command-driven hosts disable it and implement
+the corresponding When...Request. Do not mutate first and ask permission later.
+
+UiDoc's positional transaction model is already authoritative; a richer generic
+request interception layer for all user edits remains a separate future policy,
+not an implemented List-style request contract. It must preserve UiDocCoreTransaction.
+
+## Mutable records and notification scope
+
+Publish mutable record edits through the model's mutation/Touch API:
 
 ```cpp
-UiListModel::Touch(first, count);
-UiTreeModel::Touch(node);
-UiTableModel::TouchCell(row, col);
-UiTableModel::TouchHeader(axis, index);
-UiMenuModel::Touch(node);
-UiGraphModel::TouchNode(id);
-UiGraphModel::TouchEdge(id);
+// Examples from the relevant model families:
+// list.Model().Touch(first, count);
+// tree.Model().Touch(node);
+// table.Model().TouchCell(row, column);
+// table.Model().TouchHeader(axis, index);
+// menu.Model().Touch(node);
+// graph.Model().TouchNode(node_id);
+// graph.Model().TouchEdge(edge_id);
 ```
 
-For one semantic batch, prefer one truthful ranged/bulk notification rather than
-calling `Set()` once per record.
+Prefer one truthful ranged/bulk event per semantic batch. Presentation-only edits
+do not justify rebuilding an entire projection. Guard feedback loops rather than
+recursively mutating a property from its own notification.
 
-Views then react at the narrowest correct scope. A presentation-only update does
-not justify rebuilding an entire projection/spatial scene.
+Do not use display labels as application identity. Sequential views remap indices
+on insertion/removal/move; application data keys can restore identity after a full
+reset. Tree/Menu/Graph keep their native stable references. Table remains coordinate
+based unless its public model is deliberately changed. UiDoc uses position maps.
 
-## Identity under structural mutation
+## Scale boundary
 
-Sequential views use the shared sequential remapping helpers for ordinary
-insert/erase/move operations. Stable application identity may live in
-`UiModelItem::data` when selection must be restored across a full reset/reorder.
+Logical size is independent from live Ctrl/renderer count. List/Gallery/Table use
+visible-range arithmetic; Tree may retain a visible hierarchy projection. Normal
+scroll/paint/hit work is bounded to useful visible/overscan content. Explicit
+Select All/export/filter/structural rebuild can legitimately be O(N). Model switches
+must not copy N records just to display them. Images are prepared for visible
+items and signalled through bounded model notifications, not eagerly decoded for
+all records. See [Drawing and Performance](07_UI_DRAWING_GUIDE.md).
 
-Tree, Menu and Graph retain their domain stable IDs instead of being forced
-through sequential remapping.
+## UiDoc: document-specific contract
 
-Table remains coordinate/range based unless its model contract is deliberately
-changed to introduce stable row identity.
+UiDocCore owns positional text, sparse style runs, blocks, annotations, resources,
+embeds/inline images, tables, anchors/metadata, revisioned transactions, position
+maps, undo/redo and import/export. UiDoc is its Ctrl view, with independent caret,
+selection, viewport, active object and paragraph/layout caches. Several views can
+share one model without copying the document.
 
-UiDoc uses `UiDocPositionMap` from document transactions.
+UiDocCoreTransaction, UiDocApplyResult and UiDocPositionMap express actual
+positional edits. A committed transaction remaps each active view's transient
+state and invalidates deleted active objects. History depth is model policy;
+changing a theme must never change shared document history.
 
-## Observer lifetime
+Agents edit against an expected revision, apply a bounded transaction, inspect
+its result and allow bound views to consume it. Pixel positions are disposable
+view geometry, not durable document identity. Resources remain model/provider
+semantics rather than a second editor-owned store. Preserve the current sparse,
+paragraph-cached/viewport-driven implementation; do not allocate a Ctrl per character.
 
-External models are non-owning. Rebinding/deduplication must be lifetime-aware,
-not based only on raw addresses, because a destroyed model can be replaced by a
-new object at the same address.
+The existing engine is not U++ RichText. A **future**, separately authorized
+extraction may separate UiDocView (layout/geometry/mapping), UiDocRenderer (painting)
+and UiDocEditSession (caret/semantic commands) from UiDoc's platform input/focus/
+clipboard/capture host. Those names describe direction, not shipped replacement
+APIs. Extract from proven implementation without inventing another document model,
+then validate the full document suite before using it in a Timeline or other dense
+view. Do not build a second compact document engine or one live UiDoc per card.
 
-The shared collection/graph models use weak identity/observer bookkeeping for
-this reason. A fresh object must always receive a fresh observer.
+## PropertyEditor: specialized schema, not application authority
 
-## Scale relationship
+PropertyEditorModel stores typed property values, defaults, mixed/inherited state,
+help/group/unit metadata, validation and refresh-impact information. It emits
+WhenStructureChanged, WhenValueChanged, WhenPreview, WhenCommit, WhenReset and
+WhenGroupMetadataChanged. The visual editor owns editing lifetime and delegates
+application commands/undo to the host. Core stores custom adapter/provider IDs
+without importing concrete GUI or domain implementations.
 
-Model semantics and large-view performance are deliberately separate concerns.
-Do not add a second data store to solve a rendering problem.
-
-For viewport-bounded renderer pools, mutation scope, spatial indexing and LOD,
-read `06_UI_SCALE_AND_LOD_GUIDE.md`.
-
-## Common mistakes
-
-- Exposing internal-model implementation details in ordinary usage instead of
-  using `Model()`.
-- Clearing or copying the old model when `SetModel()` is called.
-- Assuming `ClearModel()` switches ownership.
-- Keeping a parallel item container in the control.
-- Restoring retired `RefreshFromModel()`-style synchronization.
-- Matching application records by display label instead of stable data/ID.
-- Using a view as the source of application-owned semantic truth.
-- Flattening a domain model such as UiDocCore or UiGraphModel into UiModelItem
-  merely for type uniformity.
-- Freezing a theme-derived style accidentally while configuring a model view;
-  use semantic theme defaults unless a local custom style is intentional.
+Use one active semantic collection for a demo Data page. PropertyEditor rows may
+project that collection; they must not become a competing editable collection
+with a separate synchronization protocol. Clear ownership is more important than
+making unlike domain model classes inherit the same base.

@@ -191,7 +191,7 @@ Color UiRangeSegments::ResolveSegmentColor(int index, const UiRangeSegment& segm
 String UiRangeSegments::FormatValueLabel(double value) const
 {
     if(value_display_ == ValueDisplay::Percent) {
-        double pct = max_ > min_ ? (value - min_) * 100.0 / (max_ - min_) : 0.0;
+        double pct = max_ > min_ ? ((value - min_) / (max_ - min_)) * 100.0 : 0.0;
         return FormatDoubleFix(pct, value_precision_) + "%";
     }
     return FormatDoubleFix(value, value_precision_);

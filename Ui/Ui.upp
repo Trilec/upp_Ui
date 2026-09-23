@@ -9,6 +9,8 @@ uses
 	CtrlLib;
 
 file
+	Ui.h,
+	UiVersion.h,
 	UiStyle.h,
 	UiGeometry.h,
 	UiGeometry.cpp,
