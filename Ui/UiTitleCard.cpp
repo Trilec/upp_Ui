@@ -724,22 +724,17 @@ void UiTitleCard::Paint(Draw& w)
         int th = split ? max(1, style.card_line_thickness) : 0;
         int gap = split ? max(0, style.card_line_gap) : 0;
         int cell_gap = max(0, style.content_cell_gap);
-        Size heading = GetHeadingMinSize();
-        int heading_w = max(0, min(content.GetWidth(), heading.cx));
         bool cell_right = split ? style.card_line_side == UiAlign::RIGHT
                                 : style.text_align_h != UiAlign::RIGHT;
         int total_gap = cell_gap + gap + th;
-        Rect cell_r;
-        Rect heading_r;
+        // Paint uses the same reserved child lane as Layout, including narrow cards.
+        Rect cell_r = GetContentCellRect(content);
+        Rect heading_r = content;
         if(cell_right) {
-            heading_r = RectC(content.left, content.top, heading_w, content.GetHeight());
-            int cell_x = content.left + heading_w + total_gap;
-            cell_r = RectC(cell_x, content.top, max(0, content.right - cell_x), content.GetHeight());
+            heading_r.right = max(content.left, cell_r.left - total_gap);
         }
         else {
-            int cell_w = max(0, content.GetWidth() - heading_w - total_gap);
-            cell_r = RectC(content.left, content.top, cell_w, content.GetHeight());
-            heading_r = RectC(content.right - heading_w, content.top, heading_w, content.GetHeight());
+            heading_r.left = min(content.right, cell_r.right + total_gap);
         }
 
         Rect media_r = GetMediaRect(heading_r);
@@ -892,13 +887,11 @@ void UiTitleCard::Paint(Draw& w)
 
         if(!split && style.card_line && style.card_line_length != NONE &&
            (style.card_line_side == UiAlign::TOP || style.card_line_side == UiAlign::BOTTOM)) {
-            int len = max(0, content.GetWidth());
+            int len = max(0, heading_r.GetWidth());
             if(style.card_line_length == SMALL)
                 len = min(len, DPI(40));
             else if(style.card_line_length == MEDIUM)
-                len = min(len, content.GetWidth() * 60 / 100);
-            else
-                len = max(0, len - DPI(8));
+                len = min(len, title_size_.cx);
 
             if(len > 0) {
                 Color lc = style.card_line_color_enabled && !IsNull(style.card_line_color)
@@ -906,7 +899,9 @@ void UiTitleCard::Paint(Draw& w)
                                : Blend(ink, SColorShadow(), 80);
                 int th = max(1, style.card_line_thickness);
                 int gap = max(0, style.card_line_gap);
-                int x = content.left + max(0, (content.GetWidth() - len) / 2);
+                int x = heading_r.left;
+                if(style.text_align_h == UiAlign::CENTER) x += max(0, (heading_r.GetWidth() - len) / 2);
+                else if(style.text_align_h == UiAlign::RIGHT) x = heading_r.right - len;
                 int y = style.card_line_side == UiAlign::TOP
                       ? content.top + gap
                       : content.bottom - gap - th;
@@ -1075,7 +1070,7 @@ void UiTitleCard::Paint(Draw& w)
         if(style.card_line_length == SMALL)
             len = min(len, DPI(40));
         else if(style.card_line_length == MEDIUM)
-            len = min(len, (vertical ? line_content.GetHeight() : line_content.GetWidth()) * 60 / 100);
+            len = min(len, vertical ? text_block_size_.cy : title_size_.cx);
         else if(!vertical)
             len = max(0, line_content.GetWidth() - DPI(8));
 
@@ -1093,7 +1088,9 @@ void UiTitleCard::Paint(Draw& w)
                 DrawLine(w, x, y, len, lc, th, style.card_line_style, true);
             }
             else {
-                int x = line_content.left + max(0, (line_content.GetWidth() - len) / 2);
+                int x = line_content.left;
+                if(style.text_align_h == UiAlign::CENTER) x += max(0, (line_content.GetWidth() - len) / 2);
+                else if(style.text_align_h == UiAlign::RIGHT) x = line_content.right - len;
                 int line_y = style.card_line_side == UiAlign::TOP
                            ? layout_content.top - gap - th
                            : layout_content.bottom + gap;

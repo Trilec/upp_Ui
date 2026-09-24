@@ -283,8 +283,8 @@ Size UiGridLayout::NaturalItemSize(const Item& it) const
         sz = max(sz, measure.min);
     }
     sz = max(sz, it.min_size);
-    if(!it.fixed.IsEmpty())
-        sz = max(sz, it.fixed);
+    if(it.fixed.cx > 0) sz.cx = max(it.min_size.cx, it.fixed.cx);
+    if(it.fixed.cy > 0) sz.cy = max(it.min_size.cy, it.fixed.cy);
     sz.cx = min(sz.cx, it.max_size.cx);
     sz.cy = min(sz.cy, it.max_size.cy);
     if(unified) {
@@ -351,6 +351,10 @@ static void UiDistributeGridTrackSpace(Vector<int>& sizes, const Vector<int>& fl
     int inner = max(0, available - gap * max(0, count - 1));
     for(int i = 0; i < count; i++)
         sizes[i] = max(sizes[i], floors[i]);
+
+    // A negative constraint means natural measurement, not a zero-sized viewport.
+    if(available < 0)
+        return;
 
     int total = 0;
     for(int v : sizes)
@@ -453,10 +457,10 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
         }
         Size want = NaturalItemSize(it);
         int width = want.cx;
-        if(width_dependent)
+        if(width_dependent && it.fixed.cx <= 0)
             width = available.cx > 0 ? measure.min.cx : measure.preferred.cx;
         col_widths[it.col] = max(col_widths[it.col], width);
-        if(!width_dependent)
+        if(!width_dependent || it.fixed.cy > 0)
             row_heights[it.row] = max(row_heights[it.row], want.cy);
         if(it.scale_x)
             expand_cols[it.col] = true;
@@ -480,7 +484,7 @@ void UiGridLayout::ComputeTrackSizes(Size available, Vector<int>& col_widths, Ve
         if(!it.ctrl || it.row < 0 || it.col < 0 || it.row >= rows || it.col >= cols)
             continue;
         UiLayoutMeasureResult measure = UiMeasureLayout(*it.ctrl, {col_widths[it.col]});
-        if(measure.width_dependent)
+        if(measure.width_dependent && it.fixed.cy <= 0)
             row_heights[it.row] = max(row_heights[it.row], max(0, measure.measured.cy));
     }
     UiDistributeGridTrackSpace(row_heights, row_floors, expand_rows, available.cy, gap);
@@ -727,7 +731,7 @@ Size UiGridLayout::GetMinSize() const
 {
     int gap = this->gap;
     Vector<int> col_widths, row_heights;
-    ComputeTrackSizes(Size(0, 0), col_widths, row_heights);
+    ComputeTrackSizes(Size(-1, -1), col_widths, row_heights);
     int w = inset.left + inset.right + gap * max(0, col_widths.GetCount() - 1);
     for(int v : col_widths)
         w += v;
@@ -742,7 +746,7 @@ int UiGridLayout::MeasureHeightForWidth(int total_width) const
     int gap = this->gap;
     int inner_w = max(0, total_width - inset.left - inset.right);
     Vector<int> col_widths, row_heights;
-    ComputeTrackSizes(Size(inner_w, 0), col_widths, row_heights);
+    ComputeTrackSizes(Size(inner_w, -1), col_widths, row_heights);
     int h = inset.top + inset.bottom + gap * max(0, row_heights.GetCount() - 1);
     for(int v : row_heights)
         h += v;
