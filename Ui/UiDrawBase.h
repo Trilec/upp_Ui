@@ -1283,9 +1283,6 @@ inline void UiPaintStyledBackground(Draw& w,
                 }
                 ImageBuffer ib(sz);
                 Fill(~ib, RGBAZero(), ib.GetLength());
-                Rect cutoff = seed;
-                cutoff.Deflate(1, 1);
-                double cutoff_rad = max(0.0, rad - 1.0);
                 bool smooth_shells = false;
                 {
                     BufferPainter p(ib, MODE_ANTIALIASED);
@@ -1335,16 +1332,14 @@ inline void UiPaintStyledBackground(Draw& w,
                 }
                 if(smooth_shells && extent > 1)
                     FastBlur(ib, 1);
-                {
-                    BufferPainter p(ib, MODE_ANTIALIASED);
-                    RGBA erase = RGBAZero();
-                    p.Begin();
-                    if(rad > 0)
-                        p.RoundedRectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0, min<double>(cutoff_rad, min(cutoff.GetWidth(), cutoff.GetHeight()) / 2.0));
-                    else
-                        p.Rectangle(cutoff.left + 0.5, cutoff.top + 0.5, cutoff.GetWidth() - 1.0, cutoff.GetHeight() - 1.0);
-                    p.Fill(erase);
-                    p.End();
+                // Source-over painting with transparent ink does not erase pixels.
+                // Apply the existing cutout mask explicitly so a transparent or
+                // partially painted control cannot reveal its own solid shadow.
+                for(int i = 0; i < ib.GetLength(); ++i) {
+                    int keep = 255 - (~cutoff_ib)[i].a;
+                    RGBA& pixel = (~ib)[i];
+                    pixel.a = (pixel.a * keep + 127) / 255;
+                    if(!pixel.a) pixel = RGBAZero();
                 }
                 Premultiply(ib);
                 img = Image(ib);

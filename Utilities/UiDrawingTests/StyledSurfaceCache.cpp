@@ -132,6 +132,21 @@ int RunStyledSurfaceCacheSuite()
     t.Expect(shadow_second.hits >= shadow_first.hits + 2,
              "repeated shadowed surface reuses both body and shadow cache work");
 
+    ImageDraw transparent_draw(120, 100);
+    transparent_draw.DrawRect(0, 0, 120, 100, White());
+    StyledMetrics hard = Metrics(0);
+    hard.face_enabled = hard.frame_enabled = false;
+    hard.shadow.enabled = true; hard.shadow.mode = SHADOW_HARD;
+    hard.shadow.distance = 1; hard.shadow.offset_x = hard.shadow.offset_y = 5;
+    hard.shadow.alpha = 255; hard.shadow.color = Black();
+    UiPaintStyledBackground(transparent_draw, RectC(15,15,80,60), palette, hard, skin, ST_NORMAL, false);
+    Image rendered = transparent_draw;
+    t.Expect(rendered[45][50].r == 255 && rendered[45][50].g == 255,
+             "hard outer shadow leaves transparent control interior clear");
+    Rect shadow_surface = UiStyledSurfaceRect(RectC(15,15,80,60), hard);
+    t.Expect(rendered[shadow_surface.CenterPoint().y][shadow_surface.right + 3].r < 64,
+             "hard outer shadow retains visible offset outside control");
+
     Cout() << "\nUI_STYLED_SURFACE_CACHE_STATS"
            << " entries=" << shadow_second.entries
            << " bytes=" << shadow_second.bytes
