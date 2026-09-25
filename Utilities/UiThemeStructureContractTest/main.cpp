@@ -65,7 +65,21 @@ void CheckContext(const UiThemeContext& ctx, const String& label)
     for(UiTabVisual visual : {UITAB_CLASSIC, UITAB_UNDERLINE, UITAB_SEGMENTED, UITAB_RAIL, UITAB_DOCUMENT}) {
         const UiTab::Style tab = UiTheme::ResolveTab(ctx, UiRole::Accent, visual);
         Check(tab.visual == visual, label + " Tab visual=" + AsString((int)visual));
+        const UiTab::Style alert = UiTheme::ResolveTab(ctx, UiRole::Alert, visual);
+        const Color ink = alert.tab_palette.ink[ST_PRESSED];
+        Check(ink.GetR() > ink.GetB(), label + " Alert Tab retains role ink across visuals");
+        Check(alert.active_frame_color.GetR() > alert.active_frame_color.GetB(),
+              label + " Alert Tab active frame retains role colour");
     }
+
+    const UiTree::Style alert_tree = UiTheme::ResolveTree(ctx, UiRole::Alert);
+    const UiTree::Style default_tree = UiTheme::ResolveTree(ctx);
+    const UiList::Style alert_list = UiTheme::ResolveList(ctx, UiRole::Alert);
+    Check(alert_tree.selected_face == alert_list.selected_face &&
+          alert_tree.selected_face.GetR() > alert_tree.selected_face.GetB(),
+          label + " Alert collections share red selection defaults");
+    Check(alert_tree.metrics.radius == default_tree.metrics.radius,
+          label + " Tree role preserves geometry");
 
     const UiButton::Style button_default = UiButton::StyleDefault();
     const UiButton::Style icon_button = UiTheme::ResolveButton(ctx, UiButtonRole::Icon);

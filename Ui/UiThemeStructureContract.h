@@ -67,7 +67,14 @@ inline void Preserve(UiTab::Style& s, UiTabVisual visual)
     // Minimal/Pill role tuning historically forced the Underline family after
     // the caller had already selected a visual. Reapply the requested visual
     // recipe so geometry and paint-mode flags agree with s.visual as well.
+    const StyledPalette palette = s.palette, tab_palette = s.tab_palette;
+    const Color active_frame_color = s.active_frame_color;
     s = UiThemeDetail::ApplyTabVisual(s, visual);
+    // Restoring the authored visual must not replace role/mode colours with
+    // the visual helper's Light/Standard defaults (notably Underline ink).
+    s.palette = palette;
+    s.tab_palette = tab_palette;
+    s.active_frame_color = active_frame_color;
     s.visual = visual;
 }
 

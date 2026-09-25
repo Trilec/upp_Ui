@@ -1140,6 +1140,8 @@ inline void TuneProgressBarRole(UiProgressBar::Style& s, UiThemeMode mode, UiRol
         break;
     case UiRole::Alert:
         fill = dark ? Color(248, 113, 113) : Color(220, 38, 38);
+        track = dark ? Color(69, 10, 10) : Color(254, 242, 242);
+        frame = dark ? Color(127, 29, 29) : Color(254, 202, 202);
         break;
     case UiRole::Standard:
     default:
@@ -2417,6 +2419,7 @@ inline void TuneMinimalTab(UiTab::Style& s, UiThemeMode mode, UiRole role = UiRo
     }
     else
         s.tab_font.Bold();
+    s.active_frame_color = indicator;
     for(int i = 0; i < 4; i++) {
         s.palette.face[i] = UiFill::None();
         s.palette.frame[i] = Null;
@@ -2429,6 +2432,13 @@ inline void TuneMinimalTab(UiTab::Style& s, UiThemeMode mode, UiRole role = UiRo
     s.tab_palette.ink[ST_HOT] = standard.ink;
     s.tab_palette.ink[ST_PRESSED] = standard.ink_pressed;
     s.tab_palette.ink[ST_DISABLED] = standard.ink_disabled;
+    if(role == UiRole::Accent || role == UiRole::Alert) {
+        const Color emphasis = role == UiRole::Alert
+            ? (dark ? Color(248, 113, 113) : red600)
+            : (dark ? Color(96, 165, 250) : blue600);
+        s.tab_palette.ink[ST_HOT] = emphasis;
+        s.tab_palette.ink[ST_PRESSED] = emphasis;
+    }
     s.tab_palette.icon[ST_NORMAL] = s.tab_palette.ink[ST_NORMAL];
     s.tab_palette.icon[ST_HOT] = s.tab_palette.ink[ST_HOT];
     s.tab_palette.icon[ST_PRESSED] = s.tab_palette.ink[ST_PRESSED];
@@ -2583,6 +2593,7 @@ public:
     static UiTitleCard::Style ResolveTitleCard(UiRole role) { return ResolveTitleCard(GetContext(), role); }
     static UiTitleCard::Style ResolveTitleCard() { return ResolveTitleCard(GetContext()); }
     static UiTree::Style ResolveTree() { return ResolveTree(GetContext()); }
+    static UiTree::Style ResolveTree(UiRole role) { return ResolveTree(GetContext(), role); }
     static UiList::Style ResolveList() { return ResolveList(GetContext()); }
     static UiList::Style ResolveList(UiRole role) { return ResolveList(GetContext(), role); }
     static UiMenu::Style ResolveMenu() { return ResolveMenu(GetContext()); }
@@ -2780,6 +2791,19 @@ public:
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
+        if(role != UiRole::Accent) {
+            UiToggle::Style colors = s;
+            UiThemeDetail::TuneMinimalToggle(colors, normalized.mode, role);
+            s.palette = colors.palette;
+            s.track_palette = colors.track_palette;
+            s.thumb_palette = colors.thumb_palette;
+            s.track_metrics.face_enabled = colors.track_metrics.face_enabled;
+            s.track_metrics.frame_enabled = colors.track_metrics.frame_enabled;
+            s.track_metrics.frame_width = colors.track_metrics.frame_width;
+            s.thumb_metrics.face_enabled = colors.thumb_metrics.face_enabled;
+            s.thumb_metrics.frame_enabled = colors.thumb_metrics.frame_enabled;
+            s.thumb_metrics.frame_width = colors.thumb_metrics.frame_width;
+        }
         return s;
     }
 
@@ -2988,6 +3012,12 @@ public:
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.tab_palette, normalized.mode);
+        if(role != UiRole::Standard) {
+            UiTab::Style colors = s;
+            UiThemeDetail::TuneMinimalTab(colors, normalized.mode, role);
+            s.tab_palette = colors.tab_palette;
+            s.active_frame_color = colors.active_frame_color;
+        }
         return s;
     }
 
@@ -3102,10 +3132,50 @@ public:
             return s;
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
+        if(role != UiRole::Standard) {
+            UiThemeContext reference = normalized;
+            reference.preset = UiThemePreset::Minimal;
+            const UiTitleCard::Style colors = ResolveTitleCard(reference, role);
+            s.palette = colors.palette;
+            s.title_color = colors.title_color;
+            s.subtitle_color = colors.subtitle_color;
+            s.copy_color = colors.copy_color;
+            s.card_line_color = colors.card_line_color;
+            s.transparent = colors.transparent;
+            s.metrics.face_enabled = colors.metrics.face_enabled;
+            s.metrics.frame_enabled = colors.metrics.frame_enabled;
+        }
         return s;
     }
 
     static UiTree::Style ResolveTree(const UiThemeContext& ctx)
+    {
+        return ResolveTree(ctx, UiRole::Standard);
+    }
+
+    static UiTree::Style ResolveTree(const UiThemeContext& ctx, UiRole role)
+    {
+        UiTree::Style s = ResolveTreeBase(ctx);
+        // Collection roles share colour defaults; tree geometry and authored
+        // styles stay independent. Apply overrides after resolving this base.
+        const UiList::Style colors = ResolveList(ctx, role);
+        for(int i = 0; i < 4; i++) {
+            s.palette.frame[i] = colors.palette.frame[i];
+            s.palette.ink[i] = colors.palette.ink[i];
+            s.palette.icon[i] = colors.palette.icon[i];
+        }
+        s.ink = colors.ink;
+        s.disabled_ink = colors.disabled_ink;
+        s.hot_face = colors.hot_face; s.hot_frame = colors.hot_frame; s.hot_ink = colors.hot_ink;
+        s.selected_face = colors.selected_face; s.selected_frame = colors.selected_frame; s.selected_ink = colors.selected_ink;
+        s.line_color = colors.separator_color;
+        s.glyph_color = colors.muted_ink;
+        s.glyph_hot_color = colors.hot_ink;
+        s.glyph_selected_color = colors.selected_ink;
+        return s;
+    }
+
+    static UiTree::Style ResolveTreeBase(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         UiTree::Style s = UiTree::StyleDefault();
@@ -3373,6 +3443,19 @@ public:
             s.metadata_default = UiThemeDetail::ForceDarkInk(s.metadata_default);
             s.check_frame = UiThemeDetail::ForceDarkFrame(s.check_frame);
             s.check_fill = UiThemeDetail::ForceDarkInk(s.check_fill);
+        }
+        if(role != UiRole::Standard) {
+            UiThemeContext reference = normalized;
+            reference.preset = UiThemePreset::Minimal;
+            const UiList::Style colors = ResolveList(reference, role);
+            s.palette = colors.palette;
+            s.ink = colors.ink; s.disabled_ink = colors.disabled_ink; s.muted_ink = colors.muted_ink;
+            s.hot_face = colors.hot_face; s.hot_frame = colors.hot_frame; s.hot_ink = colors.hot_ink;
+            s.selected_face = colors.selected_face; s.selected_frame = colors.selected_frame; s.selected_ink = colors.selected_ink;
+            s.separator_color = colors.separator_color;
+            s.badge_face = colors.badge_face; s.badge_frame = colors.badge_frame; s.badge_ink = colors.badge_ink;
+            s.metadata_default = colors.metadata_default;
+            s.check_frame = colors.check_frame; s.check_fill = colors.check_fill;
         }
         return s;
     }

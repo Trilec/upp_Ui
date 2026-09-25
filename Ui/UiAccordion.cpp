@@ -257,33 +257,7 @@ void UiAccordion::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    Style resolved = StyleDefault();
-    UiPanel::Style panel = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    resolved.palette = panel.palette;
-    resolved.metrics.radius = max(DPI(8), panel.metrics.radius);
-    resolved.transparent = true;
-    resolved.metrics.frame_width = 0;
-    resolved.metrics.frame_enabled = false;
-    resolved.metrics.face_enabled = false;
-    resolved.metrics.shadow.enabled = false;
-    resolved.body_style = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    resolved.body_style.transparent = true;
-    resolved.body_style.metrics.face_enabled = false;
-    resolved.body_style.metrics.frame_enabled = false;
-    resolved.body_style.metrics.frame_width = 0;
-    resolved.body_style.metrics.radius = 0;
-    resolved.body_style.metrics.focus_enabled = false;
-    resolved.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
-    resolved.body_style.metrics.shadow.enabled = false;
-    resolved.header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
-    resolved.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-    resolved.header_style.hover_enabled = false;
-    resolved.header_style.metrics.focus_enabled = false;
-    resolved.header_style.title_line = false;
-    resolved.header_style.card_line = true;
-    resolved.header_style.media_tint_mono = true;
-    resolved.header_style.title_font = SansSerifZ(11).Bold();
-    resolved.header_style.subtitle_font = SansSerifZ(8);
+    Style resolved = UiTheme::ResolveAccordion();
     style_ = resolved;
     theme_revision_ = revision;
 

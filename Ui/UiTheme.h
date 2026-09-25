@@ -19,11 +19,38 @@
 #undef UiTheme
 
 #include <Ui/UiThemeStructureContract.h>
+#include <Ui/UiAccordion.h>
 
 namespace Upp {
 
 class UiTheme : public UiThemeRaw {
 public:
+    static UiAccordion::Style ResolveAccordion(UiRole role = UiRole::Standard)
+    {
+        UiAccordion::Style s = UiAccordion::StyleDefault();
+        const UiPanel::Style panel = ResolvePanel(role);
+        s.palette = panel.palette;
+        s.metrics.radius = max(DPI(8), panel.metrics.radius);
+        s.transparent = true;
+        s.metrics.frame_width = 0;
+        s.metrics.frame_enabled = s.metrics.face_enabled = s.metrics.shadow.enabled = false;
+        s.body_style = ResolvePanel(role);
+        s.body_style.transparent = true;
+        s.body_style.metrics.face_enabled = s.body_style.metrics.frame_enabled = false;
+        s.body_style.metrics.frame_width = s.body_style.metrics.radius = 0;
+        s.body_style.metrics.focus_enabled = s.body_style.metrics.shadow.enabled = false;
+        s.body_style.metrics.content_margin = Rect(0, 0, 0, 0);
+        s.header_style = ResolveTitleCard(role);
+        s.header_style.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
+        s.header_style.hover_enabled = s.header_style.metrics.focus_enabled = false;
+        s.header_style.title_line = false;
+        s.header_style.card_line = true;
+        s.header_style.media_tint_mono = true;
+        s.header_style.title_font = SansSerifZ(11).Bold();
+        s.header_style.subtitle_font = SansSerifZ(8);
+        return s;
+    }
+
     static UiButton::Style ResolveButton(UiRole role)
     {
         return UiThemeStructureContract::Preserved(UiThemeRaw::ResolveButton(role));
