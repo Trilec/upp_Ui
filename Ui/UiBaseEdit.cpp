@@ -911,12 +911,10 @@ UiBaseEdit::SideItem* UiBaseEdit::FindSideById(int id)
 void UiBaseEdit::LayoutSides()
 {
     const Style& style = GetEffectiveStyle();
-    // Base rect for chrome/side controls:
-    // - GetView() subtracts U++ frames like scrollbars
-    // - We remove only the styled frame here (NOT text padding)
-    Rect chrome = GetView();
-    int  fw     = max(0, style.metrics.frame_width);
-    chrome.Deflate(fw, fw);
+    // Use the same decorated face as the ordinary text path. Side controls
+    // must also reserve shadows, the resolved frame and skin insets.
+    // Text padding is applied after laying out the sides below.
+    Rect chrome = UiStyledFaceRect(GetView(), style.metrics, style.skin);
 
     text_rect_ = Rect(0, 0, 0, 0);
 
