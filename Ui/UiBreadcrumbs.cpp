@@ -41,6 +41,15 @@ UiBreadcrumbs::Style UiBreadcrumbs::ResolveThemeStyle()
     return s;
 }
 
+UiBreadcrumbs::Style UiBreadcrumbs::ResolveThemeStyle(UiRole role)
+{
+    Style s = ResolveThemeStyle();
+    s.text_role = s.current_role = role;
+    s.current_underline = Null;
+    ResolveRoleStyle(s, UiTheme::GetContext().mode);
+    return s;
+}
+
 UiBreadcrumbs::UiBreadcrumbs()
     : style_(StyleDefault())
     , themed_style_(StyleDefault())
@@ -117,8 +126,7 @@ void UiBreadcrumbs::OnStyleChanged()
 
 UiBreadcrumbs& UiBreadcrumbs::SetCustomStyle(const Style& s)
 {
-    style_ = s;
-    ResolveRoleStyle(style_, UiTheme::GetContext().mode);
+    style_ = s; // Explicit custom colours must not be replaced by role defaults.
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;

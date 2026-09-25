@@ -100,7 +100,8 @@ void UiTable::RebuildColumnGeometry()
 
 Rect UiTable::GetViewportRect() const
 {
-    Rect r = GetSize();
+    const Style& style = GetEffectiveStyle();
+    Rect r = UiStyledFaceRect(GetSize(), style.metrics, style.skin);
     int sb = ScrollBarSize();
     if(vscroll_.IsShown())
         r.right -= sb;
@@ -388,19 +389,20 @@ void UiTable::Layout()
     SyncModel();
     SyncThemeStyle();
     const int sb = ScrollBarSize();
-    Rect r = GetSize();
+    const Style& style = GetEffectiveStyle();
+    Rect r = UiStyledFaceRect(GetSize(), style.metrics, style.skin);
 
     SyncScrollBars();
     bool show_h = hscroll_.IsShown();
     bool show_v = vscroll_.IsShown();
 
     if(show_h)
-        hscroll_.SetRect(0, r.bottom - sb, r.GetWidth() - (show_v ? sb : 0), sb);
+        hscroll_.SetRect(r.left, r.bottom - sb, r.GetWidth() - (show_v ? sb : 0), sb);
     else
         hscroll_.SetRect(0, 0, 0, 0);
 
     if(show_v)
-        vscroll_.SetRect(r.right - sb, 0, sb, r.GetHeight() - (show_h ? sb : 0));
+        vscroll_.SetRect(r.right - sb, r.top, sb, r.GetHeight() - (show_h ? sb : 0));
     else
         vscroll_.SetRect(0, 0, 0, 0);
 

@@ -69,21 +69,42 @@ static void TestGeometry(TestCtx& t)
 
     p.Set(50, 100);
     UiProgressBar::Geometry g50 = p.GetGeometry(Size(200, 20));
-    t.Expect(g50.fill.GetWidth() == 100, "50 percent fill width is half");
+    t.Expect(g50.fill.GetWidth() == (g50.content.GetWidth() + 1) / 2, "50 percent fill width is half");
 
     p.Set(100, 100);
     UiProgressBar::Geometry g100 = p.GetGeometry(Size(200, 20));
-    t.Expect(g100.fill.GetWidth() == 200, "100 percent fill width is full");
+    t.Expect(g100.fill == g100.content, "100 percent fill width is full");
 
     p.SetOrientation(UiProgressBar::Orientation::Vertical).Set(50, 100);
     UiProgressBar::Geometry gv = p.GetGeometry(Size(20, 200));
     t.Expect(gv.vertical, "explicit vertical geometry is vertical");
-    t.Expect(gv.fill.GetHeight() == 100, "vertical 50 percent fill height is half");
-    t.Expect(gv.fill.bottom == gv.track.bottom, "vertical fill grows bottom-to-top");
+    t.Expect(gv.fill.GetHeight() == (gv.content.GetHeight() + 1) / 2, "vertical 50 percent fill height is half");
+    t.Expect(gv.fill.bottom == gv.content.bottom, "vertical fill grows bottom-to-top");
 
     p.SetOrientation(UiProgressBar::Orientation::Auto);
     UiProgressBar::Geometry ga = p.GetGeometry(Size(20, 200));
     t.Expect(ga.vertical, "tall auto geometry is vertical");
+
+    UiProgressBar::Style styled = p.GetStyle();
+    styled.track_metrics.frame_enabled = true;
+    styled.track_metrics.frame_width = 3;
+    styled.track_metrics.shadow.enabled = true;
+    styled.track_metrics.shadow.mode = SHADOW_HARD;
+    styled.track_metrics.shadow.distance = 1;
+    styled.track_metrics.shadow.offset_x = 5;
+    styled.track_metrics.shadow.offset_y = 5;
+    p.SetCustomStyle(styled).SetOrientation(UiProgressBar::Orientation::Horizontal).Set(100, 100);
+    auto shadow = p.GetGeometry(Size(200, 40));
+    t.Expect(shadow.fill == shadow.content && shadow.fill.right <= 191 && shadow.fill.bottom <= 31,
+             "full progress excludes frame and hard shadow on both axes");
+    p.Set(68, 100);
+    auto partial = p.GetGeometry(Size(200, 40));
+    t.Expect(partial.fill.left == shadow.content.left && partial.fill.right < shadow.content.right,
+             "partial progress uses decorated interior origin and extent");
+    p.SetIndeterminate();
+    auto moving = p.GetGeometry(Size(200, 40));
+    t.Expect(moving.fill.left >= moving.content.left && moving.fill.right <= moving.content.right,
+             "indeterminate chunk stays inside decorated track");
 }
 
 static void TestTextAndIndeterminate(TestCtx& t)

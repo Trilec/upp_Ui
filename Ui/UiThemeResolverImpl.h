@@ -2637,6 +2637,25 @@ public:
         s.resize_guide = s.active_border;
         return s;
     }
+    static UiTable::Style ResolveTable(UiRole role)
+    {
+        UiTable::Style s = ResolveTable();
+        const auto surface = ResolvePanel(role);
+        const auto text = ResolveLabel(role);
+        const auto selection = ResolveList(role);
+        const auto edge = ResolveDropdown(role);
+        s.palette = surface.palette;
+        s.metrics = surface.metrics;
+        if(surface.palette.face[ST_NORMAL].IsSolid()) s.table_bg = surface.palette.face[ST_NORMAL].color;
+        if(surface.palette.face[ST_HOT].IsSolid()) s.header_bg = surface.palette.face[ST_HOT].color;
+        if(edge.palette.face[ST_HOT].IsSolid()) s.header_hot_bg = edge.palette.face[ST_HOT].color;
+        s.row_header_bg = s.header_bg;
+        s.header_ink = s.cell_ink = text.palette.ink[ST_NORMAL];
+        s.muted_ink = text.palette.ink[ST_DISABLED];
+        s.selection_bg = s.active_bg = selection.selected_face;
+        s.active_border = s.selection_border = s.resize_guide = edge.palette.frame[ST_PRESSED];
+        return s;
+    }
     static UiDoc::Style ResolveDoc()
     {
         UiThemeContext ctx = GetContext();

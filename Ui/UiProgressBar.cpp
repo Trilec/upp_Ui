@@ -303,45 +303,46 @@ UiProgressBar::Geometry UiProgressBar::BuildGeometry(Size size, int phase_px) co
     g.total = total_;
     g.percent = GetPercent();
 
-    g.content = UiApplyThicknessRect(g.outer, UiNonNegativeThickness(style.content_inset));
-    if(g.content.right <= g.content.left)
-        g.content.right = g.content.left;
-    if(g.content.bottom <= g.content.top)
-        g.content.bottom = g.content.top;
-    g.track = g.content;
+    // Track owns the outer shadow and frame. Fill and text use only its
+    // interior, so progress cannot paint over either decoration.
+    g.track = UiApplyThicknessRect(g.outer, UiNonNegativeThickness(style.content_inset));
+    g.content = UiStyledInnerRect(g.track, style.track_metrics, style.track_skin);
+    g.content = UiProgressClipRect_(g.content, g.track);
+    if(g.content.right < g.content.left) g.content.right = g.content.left;
+    if(g.content.bottom < g.content.top) g.content.bottom = g.content.top;
 
-    if(g.track.IsEmpty()) {
-        g.fill = g.track;
+    if(g.content.IsEmpty()) {
+        g.fill = g.content;
         return g;
     }
 
     if(g.indeterminate) {
         int span = max(DPI(8), style.indeterminate_span);
-        int travel = max(1, (g.vertical ? g.track.GetHeight() : g.track.GetWidth()) + span);
+        int travel = max(1, (g.vertical ? g.content.GetHeight() : g.content.GetWidth()) + span);
         if(phase_px < 0) {
             int duration = max(120, style.indeterminate_duration_ms);
             phase_px = (int)(((int64)(msecs() - animation_start_ms_) * travel) / duration) % travel;
         }
         if(g.vertical) {
-            int bottom = g.track.bottom - phase_px + span / 2;
-            g.fill = Rect(g.track.left, bottom - span, g.track.right, bottom);
+            int bottom = g.content.bottom - phase_px + span / 2;
+            g.fill = Rect(g.content.left, bottom - span, g.content.right, bottom);
         }
         else {
-            int left = g.track.left + phase_px - span;
-            g.fill = Rect(left, g.track.top, left + span, g.track.bottom);
+            int left = g.content.left + phase_px - span;
+            g.fill = Rect(left, g.content.top, left + span, g.content.bottom);
         }
-        g.fill = UiProgressClipRect_(g.fill, g.track);
+        g.fill = UiProgressClipRect_(g.fill, g.content);
         return g;
     }
 
     double ratio = GetRatio();
     if(g.vertical) {
-        int h = (int)std::round(g.track.GetHeight() * ratio);
-        g.fill = Rect(g.track.left, g.track.bottom - h, g.track.right, g.track.bottom);
+        int h = (int)std::round(g.content.GetHeight() * ratio);
+        g.fill = Rect(g.content.left, g.content.bottom - h, g.content.right, g.content.bottom);
     }
     else {
-        int w = (int)std::round(g.track.GetWidth() * ratio);
-        g.fill = Rect(g.track.left, g.track.top, g.track.left + w, g.track.bottom);
+        int w = (int)std::round(g.content.GetWidth() * ratio);
+        g.fill = Rect(g.content.left, g.content.top, g.content.left + w, g.content.bottom);
     }
     return g;
 }
@@ -363,11 +364,12 @@ void UiProgressBar::PaintText(Draw& w, const Rect& content, const Rect& fill,
     int y = content.top + (content.GetHeight() - tsz.cy) / 2;
 
     w.Clip(content);
+    if(!fill.IsEmpty()) w.ExcludeClip(fill);
     w.DrawText(x, y, text, style.font, style.empty_text);
     w.End();
 
     if(!fill.IsEmpty()) {
-        w.Clip(fill);
+        w.Clip(UiStyledFaceRect(fill, style.fill_metrics, style.fill_skin));
         w.DrawText(x, y, text, style.font, style.filled_text);
         w.End();
     }

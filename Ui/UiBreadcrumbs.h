@@ -127,6 +127,7 @@ public:
     const Style& GetCustomStyle() const { return style_; }
     static const Style& StyleDefault();
     static Style ResolveThemeStyle();
+    static Style ResolveThemeStyle(UiRole role);
 
     StyledPalette& StyledPaletteRef() { return StyleEdit().palette; }
     StyledMetrics& StyledMetricsRef() { return StyleEdit().metrics; }
