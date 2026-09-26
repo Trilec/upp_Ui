@@ -144,6 +144,9 @@ void UiList::Paint(Draw& w)
 {
     SyncModel();
     const Style& style = GetEffectiveStyle();
+    // Theme-only changes invalidate row renderers without a model revision.
+    if(item_render_pool_.IsEmpty())
+        PrepareItemRenders();
 
     StyledPalette viewport_palette = style.palette;
     StyledMetrics viewport_metrics = style.metrics;

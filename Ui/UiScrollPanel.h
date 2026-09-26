@@ -129,6 +129,7 @@ private:
 
     UiScrollBar sbx_;
     UiScrollBar sby_;
+    ParentCtrl viewport_;
     ParentCtrl content_;
 
     Point origin_ = Point(0, 0);

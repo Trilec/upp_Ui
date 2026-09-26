@@ -35,11 +35,13 @@ const UiScrollPanel::Style& UiScrollPanel::StyleDefault()
 UiScrollPanel::UiScrollPanel()
     : style_(StyleDefault())
 {
-    Add(content_);
+    Add(viewport_);
+    viewport_.Add(content_);
     Add(sbx_);
     Add(sby_);
 
     content_.Transparent();
+    viewport_.Transparent();
 
     sbx_.SetDirection(UiDirection::H);
     sby_.SetDirection(UiDirection::V);
@@ -335,8 +337,10 @@ void UiScrollPanel::ApplyScroll()
     int minx = content_bounds_.left;
     int miny = content_bounds_.top;
 
-    content_.SetRect(view.left - origin_.x - minx,
-                     view.top - origin_.y - miny,
+    // Clip scrolled children to the viewport, not the whole decorated control.
+    viewport_.SetRect(view);
+    content_.SetRect(-origin_.x - minx,
+                     -origin_.y - miny,
                      content_size_.cx,
                      content_size_.cy);
 }
@@ -370,7 +374,8 @@ void UiScrollPanel::Layout()
     // the next scroll-panel measurement pass.
     content_size_ = seed_size;
     content_bounds_ = Rect(0, 0, seed_size.cx, seed_size.cy);
-    content_.SetRect(seed_view.left, seed_view.top, seed_size.cx, seed_size.cy);
+    viewport_.SetRect(seed_view);
+    content_.SetRect(0, 0, seed_size.cx, seed_size.cy);
     content_.Layout();
     content_bounds_ = MeasureContentBounds();
 

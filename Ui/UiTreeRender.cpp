@@ -469,6 +469,10 @@ void UiTree::Paint(Draw& w)
         return;
     const Style& style = GetEffectiveStyle();
     StyledState st = IsEnabled() && IsShowEnabled() ? ST_NORMAL : ST_DISABLED;
+    // A theme revision can discard prepared renderers without changing the
+    // model or geometry. Rebind visible rows before painting that revision.
+    if(prepared_render_range_.IsEmpty())
+        PrepareItemRenders();
     UiPaintStyledBackground(w, outer, style.palette, style.metrics, style.skin, st, false);
 
     last_paint_item_count_ = 0;

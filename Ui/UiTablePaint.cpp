@@ -130,9 +130,19 @@ void UiTable::Paint(Draw& w)
 
     const Style& style = GetEffectiveStyle();
     StyledState st = IsEnabled() && IsShowEnabled() ? ST_NORMAL : ST_DISABLED;
+    if(cell_render_pool_.IsEmpty())
+        PrepareItemRenders();
     UiPaintStyledSurface(w, outer, style.palette, style.metrics, style.skin,
                          st, HasFocus(), false, false);
-    w.DrawRect(GetViewportRect(), style.table_bg);
+    // The viewport fill belongs to the same rounded face as the table surface.
+    // A rectangular fill here paints over the surface's rounded corners.
+    StyledPalette viewport_palette;
+    viewport_palette.face[ST_NORMAL] = UiFill::Solid(style.table_bg);
+    StyledMetrics viewport_metrics;
+    viewport_metrics.face_enabled = true;
+    viewport_metrics.frame_enabled = false;
+    viewport_metrics.radius = max(0, style.metrics.radius - style.metrics.frame_width);
+    UiPaintFaceFrameDash(w, GetViewportRect(), viewport_palette, viewport_metrics, ST_NORMAL);
 
     Rect corner = GetCornerRect();
     if(!corner.IsEmpty())

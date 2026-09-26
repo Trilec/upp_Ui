@@ -254,7 +254,48 @@ void BorrowedHostContract(Checks& t)
 GUI_APP_MAIN
 {
     Checks t;
+    {
+        UiTable table; table.SetRect(0, 0, 160, 100);
+        auto style = table.GetStyle();
+        style.metrics.radius = 18; style.metrics.shadow.enabled = false;
+        style.metrics.frame_width = 1; style.table_bg = Blue();
+        style.show_row_headers = false; style.show_column_headers = false;
+        table.SetCustomStyle(style); table.Layout();
+        ImageDraw draw(160, 100); draw.DrawRect(0, 0, 160, 100, Magenta());
+        table.Paint(draw); Image image = draw;
+        t.Expect(image[2][2] != Blue() && image[40][80] == Blue(),
+                 "table viewport fill preserves rounded corners");
+        UiScrollPanel scroll; UiLabel tall; scroll.SetRect(0, 0, 180, 100);
+        auto scroll_style = scroll.GetStyle();
+        scroll_style.metrics.content_margin = Rect(8, 8, 8, 8);
+        scroll.SetCustomStyle(scroll_style);
+        scroll.Content().Add(tall); tall.SetRect(0, 0, 120, 400);
+        scroll.Layout(); scroll.SetScrollPos(Point(0, 80));
+        const Ctrl* clip = scroll.Content().GetParent();
+        t.Expect(clip && clip != &scroll && clip->GetRect() == scroll.GetViewportRect() &&
+                 scroll.Content().GetRect().top == -scroll.GetScrollPos().y,
+                 "scrolling children are clipped to the viewport rather than frame lanes");
+    }
     NumericContract(t);
+    {
+        UiThemeContext previous = UiTheme::GetContext();
+        UiThemeContext context = previous; context.mode = UiThemeMode::Light;
+        UiTheme::Set(context);
+        UiTree tree; tree.SetRootVisible(false); tree.SetRect(0,0,200,100);
+        tree.Model().AddChild(tree.Model().Root(), UiModelItem("Visible tree row"));
+        UiList list; list.SetRect(0,0,200,100); list.Model().Add("Visible list row", 1);
+        UiTable table; table.SetRect(0,0,200,100); table.Model().SetSize(1,1);
+        tree.Layout(); list.Layout(); table.Layout();
+        for(auto mode : {UiThemeMode::Dark, UiThemeMode::Light}) {
+            context.mode = mode; UiTheme::Set(context);
+            ImageDraw draw(200,100);
+            tree.Paint(draw); list.Paint(draw); table.Paint(draw);
+            t.Expect(tree.GetLiveItemRenderCount()>0, "tree keeps visible text renderers after a theme-only paint");
+            t.Expect(list.GetLiveItemRenderCount()>0, "list keeps visible text renderers after a theme-only paint");
+            t.Expect(table.GetLiveCellRenderCount()>0, "table keeps visible cell renderers after a theme-only paint");
+        }
+        UiTheme::Set(previous);
+    }
     CallbackContract(t);
     RoleContract(t);
     RasterContract(t);
