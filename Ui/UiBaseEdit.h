@@ -140,7 +140,7 @@ public:
         bool show_tabs         = false;
         bool show_spaces       = false;
         bool show_line_endings = false;
-        bool show_readonly_bg  = true; // Use Paper_Readonly color
+        bool show_readonly_bg  = true; // Keep the normal themed face when read-only
 
         bool  underline_enabled = false;
         int   underline_width   = 1;
@@ -203,6 +203,10 @@ protected:
     mutable uint64 theme_revision_ = 0;
     bool        has_custom_style_ = false;
     ScrollBars  sb_;
+    ScrollBar::Style scrollbar_style_;
+    StaticRect scrollbar_corner_;
+    uint64 scrollbar_theme_revision_ = 0;
+    void SyncScrollBarTheme();
     Scroller    scroller_;
     Size        font_size_ {0, 0};   // Cached font size
     int64       cursor_      = 0;

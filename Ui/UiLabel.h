@@ -103,6 +103,8 @@ private:
     mutable Style themed_style_;
     mutable uint64 theme_revision_ = 0;
     bool   has_custom_style_ = false;
+    bool align_h_override_ = false, align_v_override_ = false;
+    UiAlign align_h_ = UiAlign::LEFT, align_v_ = UiAlign::CENTER;
 
     String text_;
     wchar  accesskey_ = 0;

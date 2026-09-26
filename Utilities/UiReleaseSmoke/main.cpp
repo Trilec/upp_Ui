@@ -255,6 +255,42 @@ GUI_APP_MAIN
 {
     Checks t;
     {
+        struct EditProbe : UiMultiEdit {
+            const ScrollBar::Style& ScrollStyle() const { return scrollbar_style_; }
+            Point ScrollPosition() const { return GetScrollPos(); }
+        } edit;
+        auto previous=UiTheme::GetContext();
+        edit.SetRect(0,0,180,80);
+        String lines; for(int i=0;i<60;++i) lines << "Activity line\n";
+        edit.SetTextUtf8(lines); edit.SetReadOnly();
+        for(auto mode : {UiThemeMode::Dark,UiThemeMode::Light}) {
+            UiTheme::Set(UiThemePreset::Minimal,mode); edit.Layout();
+            t.Expect(edit.ScrollStyle().bgcolor==UiTheme::ResolveEdit().palette.face[ST_NORMAL].color &&
+                     edit.ScrollStyle().vthumb[ST_NORMAL]==UiTheme::ResolveScrollBar().thumb_palette.face[ST_NORMAL].color,
+                     "editor scrollbar resolves theme track and thumb on appearance changes");
+        }
+        edit.MouseWheel(Point(40,40),-120,0);
+        t.Expect(edit.ScrollPosition().y>0,"read-only activity keeps working mouse-wheel scrolling");
+        UiTheme::Set(previous);
+    }
+    {
+        auto previous=UiTheme::GetContext();
+        UiTheme::Set(UiThemePreset::Minimal,UiThemeMode::Light);
+        UiLabel label; label.SetAlign(UiAlign::RIGHT,UiAlign::TOP);
+        for(auto mode : {UiThemeMode::Dark,UiThemeMode::Light}) {
+            UiTheme::Set(UiThemePreset::Minimal,mode);
+            t.Expect(label.GetStyle().palette.ink[ST_NORMAL]==UiTheme::ResolveLabel().palette.ink[ST_NORMAL] &&
+                     label.GetStyle().align_h==UiAlign::RIGHT && label.GetStyle().align_v==UiAlign::TOP,
+                     "label alignment does not freeze theme colours");
+            UiMultiEdit edit; edit.SetRect(0,0,160,80); edit.SetReadOnly();
+            auto style=edit.GetStyle(); style.palette.face[ST_NORMAL]=UiFill::Solid(Color(31,42,53));
+            edit.SetCustomStyle(style); edit.Layout();
+            ImageDraw draw(160,80); draw.DrawRect(0,0,160,80,Magenta()); edit.Paint(draw); Image image=draw;
+            t.Expect(image[40][80]==Color(31,42,53),"read-only editor preserves authored background instead of OS paper");
+        }
+        UiTheme::Set(previous);
+    }
+    {
         UiTable table; table.SetRect(0, 0, 160, 100);
         auto style = table.GetStyle();
         style.metrics.radius = 18; style.metrics.shadow.enabled = false;

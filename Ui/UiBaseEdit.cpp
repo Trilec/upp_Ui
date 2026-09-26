@@ -126,6 +126,31 @@ const UiBaseEdit::Style& UiBaseEdit::GetEffectiveStyle() const
     return themed_style_;
 }
 
+void UiBaseEdit::SyncScrollBarTheme()
+{
+    const uint64 revision = UiTheme::GetRevision();
+    if(scrollbar_theme_revision_ == revision) return;
+    scrollbar_theme_revision_ = revision;
+    // Preserve the editor's existing line/pixel scroll model and native frame
+    // geometry, but resolve its track and thumb through the shared Ui theme.
+    const auto scroll = UiTheme::ResolveScrollBar();
+    const auto edit = UiTheme::ResolveEdit();
+    Color paper = edit.palette.face[ST_NORMAL].color;
+    scrollbar_style_ = ScrollBar::StyleDefault();
+    scrollbar_style_.bgcolor = paper;
+    scrollbar_style_.arrowsize = 0;
+    for(int i=0;i<4;++i) {
+        Color track = scroll.track_palette.face[i].IsSolid() ? scroll.track_palette.face[i].color : paper;
+        Color thumb = scroll.thumb_palette.face[i].color;
+        scrollbar_style_.vupper[i] = scrollbar_style_.vlower[i] = track;
+        scrollbar_style_.hupper[i] = scrollbar_style_.hlower[i] = track;
+        scrollbar_style_.vthumb[i] = scrollbar_style_.hthumb[i] = thumb;
+    }
+    scrollbar_corner_.Color(paper);
+    sb_.SetStyle(scrollbar_style_);
+    sb_.x.Refresh(); sb_.y.Refresh();
+}
+
 static bool UiBaseEditNeedsTransparentBackpaint(const UiBaseEdit::Style& s)
 {
     return !s.metrics.face_enabled
@@ -179,6 +204,7 @@ UiBaseEdit::UiBaseEdit()
     BackPaint();
 
     AddFrame(sb_);
+    sb_.Box(scrollbar_corner_);
     sb_.WhenScroll << [=] { Scroll(); WhenScroll(); };
     sb_.SetLine(DPI(16));
     scroller_.Set(sb_);
@@ -800,6 +826,7 @@ int UiBaseEdit::GetSingleLineYOffset() const
 
 void UiBaseEdit::Layout()
 {
+    SyncScrollBarTheme();
     LTIMING("UiBaseEdit::Layout");
 
     text_rect_ = Rect(0, 0, 0, 0);
@@ -1664,6 +1691,7 @@ void UiBaseEdit::UpdateVisualState()
 
 void UiBaseEdit::Paint(Draw& w)
 {
+    SyncScrollBarTheme();
     const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::Paint");
 
@@ -1682,7 +1710,9 @@ void UiBaseEdit::Paint(Draw& w)
     const StyledSkin& skin      = style.skin;
 
     if(IsReadOnly() && style.show_readonly_bg) {
-        UiFill ro = UiFill::Solid(SColorFace());
+        // Read-only is an editing policy, not a switch to the OS palette.
+        // Keep the resolved/custom face paired with its themed ink.
+        UiFill ro = style.palette.face[ST_NORMAL];
         paint_palette.face[ST_NORMAL]  = ro;
         paint_palette.face[ST_HOT]     = ro;
         paint_palette.face[ST_PRESSED] = ro;
@@ -1712,12 +1742,11 @@ void UiBaseEdit::Paint(Draw& w)
 
     if(!m.face_enabled && !(skin.enabled && !IsNull(skin.base))
        && IsReadOnly() && style.show_readonly_bg)
-        w.DrawRect(text_r, SColorFace());
+        if(paint_palette.face[st].IsSolid())
+            w.DrawRect(text_r, paint_palette.face[st].color);
 
     Color text_bg = Null;
-    if(IsReadOnly() && style.show_readonly_bg)
-        text_bg = SColorFace();
-    else if(paint_palette.face[st].IsSolid())
+    if(paint_palette.face[st].IsSolid())
         text_bg = paint_palette.face[st].color;
     if(!IsNull(text_bg))
         w.DrawRect(text_r, text_bg);

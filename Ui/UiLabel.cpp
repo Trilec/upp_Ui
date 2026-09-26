@@ -232,6 +232,8 @@ void UiLabel::SyncThemeStyle()
         return;
 
     themed_style_ = UiTheme::ResolveLabel();
+    if(align_h_override_) themed_style_.align_h = align_h_;
+    if(align_v_override_) themed_style_.align_v = align_v_;
     theme_revision_ = revision;
     RebuildTextLinesFromStyle(themed_style_);
     minsize_dirty_ = true;
@@ -241,6 +243,7 @@ void UiLabel::SyncThemeStyle()
 
 UiLabel& UiLabel::SetCustomStyle(const Style& s)
 {
+    align_h_override_ = align_v_override_ = false;
     style_ = s;
     has_custom_style_ = true;
     OnStyleChanged();
@@ -1066,23 +1069,27 @@ UiLabel& UiLabel::SetIconSide(UiAlign where)
 
 UiLabel& UiLabel::SetAlign(UiAlign h, UiAlign v)
 {
-    Style& style = StyleEdit();
-    style.align_h = h;
-    style.align_v = v;
+    if(has_custom_style_) { style_.align_h = h; style_.align_v = v; }
+    else { align_h_override_ = align_v_override_ = true; align_h_ = h; align_v_ = v; }
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetAlignH(UiAlign h)
 {
-    StyleEdit().align_h = h;
+    if(has_custom_style_) style_.align_h = h;
+    else { align_h_override_ = true; align_h_ = h; }
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
 
 UiLabel& UiLabel::SetAlignV(UiAlign v)
 {
-    StyleEdit().align_v = v;
+    if(has_custom_style_) style_.align_v = v;
+    else { align_v_override_ = true; align_v_ = v; }
+    InvalidateStyleCache();
     OnStyleChanged();
     return *this;
 }
