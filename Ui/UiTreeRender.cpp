@@ -453,10 +453,11 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
         focus.face_enabled = false;
         focus.frame_enabled = true;
         focus.frame_width = max(DPI(1), style.metrics.focus_margin);
+        focus.radius = style.row_radius;
         UiPaintFocusShape(w, row_box, focus, ST_NORMAL,
                           IsNull(style.metrics.focus_color) ? Color(65, 167, 248) : style.metrics.focus_color,
-                          0, style.metrics.focus_margin, style.metrics.focus_alpha,
-                          style.metrics.focus_margin, max(1.0, (double)style.metrics.focus_margin));
+                          max(DPI(1), style.metrics.focus_margin), 0, style.metrics.focus_alpha,
+                          0, max(1.0, (double)style.metrics.focus_margin));
     }
 }
 

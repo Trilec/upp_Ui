@@ -1128,7 +1128,7 @@ inline void UiPaintFocusShape(Draw& w,
     Fill(~ib, RGBAZero(), ib.GetLength());
     {
         BufferPainter p(ib, MODE_ANTIALIASED);
-        double inset_px = 0.5;
+        double inset_px = max(0.5, stroke_override * 0.5);
         double x = inset_px;
         double y = inset_px;
         double wdt = sz.cx - 2 * inset_px;
@@ -1145,9 +1145,8 @@ inline void UiPaintFocusShape(Draw& w,
             p.Rectangle(x, y, wdt, hgt);
         if(metrics.dashed && !metrics.dash_pattern.IsEmpty())
             p.Dash(metrics.dash_pattern, 0.0);
-        RGBA c = color;
-        c.a = (byte)clamp(alpha, 0, 255);
-        p.Stroke(stroke_w, c);
+        p.Opacity(clamp(alpha, 0, 255) / 255.0);
+        p.Stroke(stroke_w, color);
         p.End();
     }
     w.DrawImage(outer.left, outer.top, ib);
