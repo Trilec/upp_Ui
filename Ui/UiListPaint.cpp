@@ -229,8 +229,12 @@ void UiList::Layout()
 Size UiList::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    int rows_h = style.row_height * 4 + max(0, style.item_spacing) * 3;
-    return UiStyledOuterSizeFromContent(Size(DPI(180), max(DPI(80), rows_h)), style.metrics, style.skin);
+    // Fit follows the current model, not a four-row placeholder. Keep one
+    // usable row when empty; an explicit layout constraint can cap large lists.
+    int rows = max(1, model_ ? model_->GetCount() : 0);
+    int rows_h = UiUniformContentExtent(rows, max(DPI(18), style.row_height),
+                                       max(0, style.item_spacing));
+    return UiStyledOuterSizeFromContent(Size(DPI(180), rows_h), style.metrics, style.skin);
 }
 
 } // namespace Upp

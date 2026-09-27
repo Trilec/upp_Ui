@@ -96,7 +96,7 @@ private:
     bool pending_separator_ = false;
 
     int split_width_ = DPI(30);
-    int split_icon_size_ = DPI(16);
+    int split_icon_size_ = DPI(12);
     int split_content_gap_ = DPI(4);
     int popup_min_width_ = DPI(180);
     int popup_max_items_ = 10;

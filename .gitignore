@@ -8,6 +8,10 @@
 
 # Local helper scripts and scratch
 scripts/*
+!scripts/PackageSkills.py
+!scripts/InstallSkills.py
+/skills/backup/
+**/__pycache__/
 *.ps1
 *.log
 

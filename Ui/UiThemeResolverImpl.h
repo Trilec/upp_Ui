@@ -3361,6 +3361,13 @@ public:
             s.hot_ink = s.ink;
             s.selected_ink = s.ink;
             s.metadata_default = role == UiRole::Alert ? red500 : role == UiRole::Accent ? blue500 : slate500;
+            // Selection must remain distinguishable from hover and the canvas,
+            // including when focus moves to an inspector. Collection controls
+            // share these defaults; authored theme overrides remain authoritative.
+            s.selected_face = role == UiRole::Alert
+                ? Color(185, 28, 28) : Color(29, 78, 216);
+            s.selected_frame = s.selected_face;
+            s.selected_ink = White();
             s.palette.ink[ST_DISABLED] = s.disabled_ink;
             s.palette.icon[ST_DISABLED] = s.disabled_ink;
             if(UiThemeDetail::IsPillPreset(normalized.preset))

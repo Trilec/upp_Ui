@@ -1956,7 +1956,9 @@ inline Image UiGetCachedAACircleImage(Size sz, Color fill)
 
         BufferPainter p(ib, MODE_ANTIALIASED);
         p.Begin();
-        p.Ellipse(0.5, 0.5, max(1.0, qsz.cx - 1.0), max(1.0, qsz.cy - 1.0));
+        p.Ellipse(qsz.cx / 2.0, qsz.cy / 2.0,
+                  max(0.5, (qsz.cx - 1.0) / 2.0),
+                  max(0.5, (qsz.cy - 1.0) / 2.0));
         p.Fill(fill);
         p.End();
         return Image(ib);

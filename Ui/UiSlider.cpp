@@ -279,7 +279,9 @@ Rect UiSlider::GetTrackRect() const
 
     const int track_major = max(DPI(20), style.track_size.cx);
     const int track_cross = max(1, style.track_size.cy);
-    const int pad = max(DPI(8), track_cross * 2 + DPI(2));
+    const int major = dir_ == UiDirection::H ? outer.GetWidth() : outer.GetHeight();
+    const int thumb_major = max(DPI(6), dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy);
+    const int pad = min(major / 2, max(max(DPI(8), track_cross * 2 + DPI(2)), (thumb_major + 1) / 2));
     if(dir_ == UiDirection::H) {
         int available = max(0, outer.GetWidth() - 2 * pad);
         int width = expand_track_ ? available : min(available, track_major);
@@ -330,6 +332,8 @@ Rect UiSlider::GetThumbRect() const
     const Style& style = GetEffectiveStyle();
     Rect tr = GetTrackRect();
     Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    thumb.cx = min(thumb.cx, max(0, GetSize().cx));
+    thumb.cy = min(thumb.cy, max(0, GetSize().cy));
     int pos = ValueToPos(value_);
 
     if(dir_ == UiDirection::H)

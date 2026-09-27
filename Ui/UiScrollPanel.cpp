@@ -343,19 +343,34 @@ void UiScrollPanel::ApplyScroll()
                      -origin_.y - miny,
                      content_size_.cx,
                      content_size_.cy);
+    if(origin_ != notified_origin_) {
+        notified_origin_ = origin_;
+        WhenScroll();
+    }
 }
 
-void UiScrollPanel::MouseWheel(Point, int zdelta, dword)
+UiScrollBar* UiScrollPanel::GetScrollBarAt(Point p)
+{
+    if(sby_.IsShown() && sby_.GetRect().Contains(p)) return &sby_;
+    if(sbx_.IsShown() && sbx_.GetRect().Contains(p)) return &sbx_;
+    return nullptr;
+}
+
+void UiScrollPanel::MouseWheel(Point, int zdelta, dword keyflags)
 {
     if(mode_ == UIPANELSCROLL_NONE)
         return;
-    if(!sby_.IsShown() && mode_ != UIPANELSCROLL_HORIZONTAL)
+    const bool horizontal = mode_ == UIPANELSCROLL_HORIZONTAL ||
+                            ((keyflags & K_SHIFT) && sbx_.IsShown()) ||
+                            (!sby_.IsShown() && sbx_.IsShown());
+    if(horizontal ? !sbx_.IsShown() : !sby_.IsShown())
         return;
 
     Rect view = GetViewportRect();
     int rows = max(1, view.GetHeight() / max(DPI(18), sby_.GetMinSize().cy));
     int step = max(DPI(24), rows * DPI(10));
-    origin_.y -= sgn(zdelta) * step;
+    if(horizontal) origin_.x -= sgn(zdelta) * step;
+    else origin_.y -= sgn(zdelta) * step;
     UpdateScrollbars();
     ApplyScroll();
     Refresh();

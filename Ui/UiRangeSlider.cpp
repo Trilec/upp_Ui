@@ -363,7 +363,9 @@ Rect UiRangeSlider::GetTrackRect() const
     // such as UiRangeSliderEdit where the fields remain fixed and the slider is
     // expected to consume the remainder.
     int track_cross = max(1, style.track_size.cy);
-    int pad = max(DPI(8), track_cross * 2 + DPI(2));
+    int major = dir_ == UiDirection::H ? outer.GetWidth() : outer.GetHeight();
+    int thumb_major = max(DPI(6), dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy);
+    int pad = min(major / 2, max(max(DPI(8), track_cross * 2 + DPI(2)), (thumb_major + 1) / 2));
     if(dir_ == UiDirection::H) {
         int width = max(0, outer.GetWidth() - 2 * pad);
         int y = outer.CenterPoint().y - track_cross / 2;
@@ -417,6 +419,8 @@ Rect UiRangeSlider::GetThumbRect(Handle handle) const
     Size thumb = bound ? Size(max(DPI(9), style.thumb_size.cx / 2),
                               max(DPI(9), style.thumb_size.cy / 2))
                        : Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    thumb.cx = min(thumb.cx, max(0, GetSize().cx));
+    thumb.cy = min(thumb.cy, max(0, GetSize().cy));
     int pos = ValueToPos(GetHandleValue(handle));
 
     if(dir_ == UiDirection::H)

@@ -1,5 +1,6 @@
 #include <Ui/UiDateTime.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiIcons.h>
 
 namespace Upp {
 
@@ -84,7 +85,7 @@ UiDateTime::UiDateTime()
     Add(editor_);
     Add(picker_button_);
 
-    picker_button_.SetText("▾")
+    picker_button_.SetIcon(ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48())
                   .SetContentInset(0)
                   .ClickFocus(false);
 
@@ -747,6 +748,13 @@ void UiDateTime::ApplyStyle()
     editor_.SetEditable(editable_);
     editor_.SetClipboardPolicy(copy_allowed_, paste_allowed_ && editable_);
     picker_button_.SetCustomStyle(style.button);
+    const int indicator = UiTheme::ResolveDropdown().indicator_size;
+    const int side = indicator > 0 ? indicator : DPI(14);
+    const Size glyph = ICON_NAVIGATION_OUTLINED_ARROW_DROP_DOWN_48().GetSize();
+    const double scale = double(side) / max(glyph.cx, glyph.cy);
+    picker_button_.SetIconSize(max(1, int(glyph.cx * scale + 0.5)),
+                              max(1, int(glyph.cy * scale + 0.5)))
+                  .SetIconScaleToContent(false);
     picker_button_.Show(editable_);
 }
 

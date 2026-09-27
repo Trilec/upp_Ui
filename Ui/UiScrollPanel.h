@@ -94,6 +94,9 @@ public:
 
     Point GetScrollPos() const { return origin_; }
     UiScrollPanel& SetScrollPos(Point p);
+    // Exposes only scrollbar hit-testing, without leaking viewport ownership.
+    UiScrollBar* GetScrollBarAt(Point p);
+    Event<> WhenScroll;
 
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
@@ -133,6 +136,7 @@ private:
     ParentCtrl content_;
 
     Point origin_ = Point(0, 0);
+    Point notified_origin_ = Point(0, 0);
     Size  content_size_ = Size(0, 0);
     Rect  content_bounds_ = Rect(0, 0, 0, 0);
 
