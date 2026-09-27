@@ -102,7 +102,7 @@ void PropertyEditor::Layout()
     if(style_.show_filter) {
         filter_.Show();
         const int horizontal_pad = min(style_.cell_padding, DPI(4));
-        const int vertical_pad = DPI(1);
+        const int vertical_pad = DPI(4);
         filter_.SetRect(r.left + horizontal_pad,
                         r.top + vertical_pad,
                         max(0, r.GetWidth() - 2 * horizontal_pad),

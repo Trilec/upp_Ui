@@ -48,7 +48,7 @@ struct PropertyEditorStyle {
     int frame_width = 1;
     int row_height = DPI(28);
     int group_height = DPI(30);
-    int filter_height = DPI(36);
+    int filter_height = DPI(42);
     int filter_gap = DPI(10);
     int cell_padding = DPI(6);
     int label_width = DPI(150);

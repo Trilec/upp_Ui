@@ -326,7 +326,8 @@ bool PropertyEditor::IsColorDropTarget(int display_index) const
     if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return false;
     const PropertyEditorItem& item = (*model_)[row.model_index];
-    return item.kind == PropertyEditorKind::Color && item.enabled &&
+    return (item.kind == PropertyEditorKind::Color ||
+            item.kind == PropertyEditorKind::FillRecipe) && item.enabled &&
            !item.read_only && (item.value_editable || item.overrideable);
 }
 
@@ -343,7 +344,8 @@ bool PropertyEditor::CommitColorText(const String& property_id,
         return false;
 
     PropertyEditorItem *item = model_->Find(property_id);
-    if(!item || item->kind != PropertyEditorKind::Color ||
+    if(!item || (item->kind != PropertyEditorKind::Color &&
+                 item->kind != PropertyEditorKind::FillRecipe) ||
        !item->enabled || item->read_only)
         return false;
 
@@ -363,9 +365,16 @@ bool PropertyEditor::CommitColorText(const String& property_id,
     if(!item->value_editable)
         return false;
 
+    Value dropped = color;
+    if(item->kind == PropertyEditorKind::FillRecipe) {
+        ValueMap recipe;
+        recipe.Set("mode", "Solid");
+        recipe.Set("solid", color);
+        dropped = recipe;
+    }
     BeginTransaction(property_id);
     String error;
-    if(!model_->Commit(property_id, color, &error)) {
+    if(!model_->Commit(property_id, dropped, &error)) {
         EndTransaction();
         return false;
     }
@@ -524,7 +533,11 @@ void PropertyEditor::DragEnter()
 void PropertyEditor::DragAndDrop(Point p, PasteClip& clip)
 {
     const int row = FindDisplayRow(p);
-    if(!IsColorDropTarget(row) || !AcceptText(clip)) {
+    // AcceptText returns false during drag-over even when it accepts the
+    // format; its return value means that an actual paste is taking place.
+    if(IsColorDropTarget(row))
+        AcceptText(clip);
+    if(!IsColorDropTarget(row) || !clip.IsAccepted()) {
         clip.Reject();
         if(color_drop_display_row_ != -1) {
             color_drop_display_row_ = -1;
