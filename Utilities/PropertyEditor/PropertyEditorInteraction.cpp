@@ -90,6 +90,8 @@ void PropertyEditor::ActivateRow(int display_index)
     if(row.group || row.model_index < 0)
         return;
     const PropertyEditorItem& item = (*model_)[row.model_index];
+    if(!item.enabled || item.read_only)
+        return;
 
     if(PeIsTextBoolean(item) && item.enabled && item.value_editable && !item.read_only) {
         const String property_id = item.id;
@@ -313,7 +315,7 @@ void PropertyEditor::ToggleOverride(int display_index)
     if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
         return;
     PropertyEditorItem& item = (*model_)[row.model_index];
-    if(!item.overrideable)
+    if(!item.overrideable || item.read_only)
         return;
     WhenOverride(item.id, !item.override_active);
 }
@@ -352,12 +354,14 @@ bool PropertyEditor::CommitColorText(const String& property_id,
     if(item->overrideable && !item->override_active) {
         if(!allow_override_activation)
             return false;
-        WhenOverride(property_id, true);
         Ptr<PropertyEditor> self = this;
+        const uint64 generation = model_binding_generation_;
         const String deferred_text = text;
-        PostCallback([self, property_id, deferred_text] {
-            if(self)
-                self->CommitColorText(property_id, deferred_text, false);
+        const String deferred_id = property_id;
+        WhenOverride(deferred_id, true);
+        Upp::PostCallback([self, generation, deferred_id, deferred_text] {
+            if(self && self->model_binding_generation_ == generation)
+                self->CommitColorText(deferred_id, deferred_text, false);
         });
         return true;
     }
@@ -413,6 +417,8 @@ void PropertyEditor::LeftDown(Point p, dword)
 
     selected_display_row_ = row;
     const PropertyEditorItem& item = (*model_)[rows_[row].model_index];
+    if(item.read_only)
+        return;
     if(item.overrideable && GetOverrideRect(row).Contains(p)) {
         ToggleOverride(row);
         return;

@@ -139,6 +139,9 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
     DeactivateEditor();
     EndTransaction();
     model_ = model;
+    ++model_binding_generation_;
+    color_drop_display_row_ = -1;
+    structure_refresh_pending_ = false;
     property_expanded_.Clear();
     selected_display_row_ = -1;
     hover_display_row_ = -1;
@@ -146,16 +149,17 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
     if(model_) {
         Ptr<PropertyEditor> self = this;
         PropertyEditorModel *source = model_;
-        model_->WhenStructureChanged << [self, source] {
-            if(self)
+        const uint64 generation = model_binding_generation_;
+        model_->WhenStructureChanged << [self, source, generation] {
+            if(self && self->model_binding_generation_ == generation)
                 self->ModelStructureChanged(source);
         };
-        model_->WhenValueChanged << [self, source](String id) {
-            if(self)
+        model_->WhenValueChanged << [self, source, generation](String id) {
+            if(self && self->model_binding_generation_ == generation)
                 self->ModelValueChanged(source, id);
         };
-        model_->WhenGroupMetadataChanged << [self, source](String) {
-            if(self)
+        model_->WhenGroupMetadataChanged << [self, source, generation](String) {
+            if(self && self->model_binding_generation_ == generation)
                 self->ModelGroupMetadataChanged(source);
         };
     }

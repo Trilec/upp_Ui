@@ -289,7 +289,8 @@ public:
     Event<String> WhenGroupMetadataChanged;
 
 private:
-    bool Apply(const String& id, const Value& candidate, bool final_commit, String *error);
+    bool Apply(const String& id, const Value& candidate, bool final_commit, String *error,
+               bool inherited = false);
 
     Array<PropertyEditorItem> items_;
     int structure_revision_ = 0;

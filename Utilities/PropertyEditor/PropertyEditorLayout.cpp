@@ -32,23 +32,12 @@ static Vector<int> PePropertyOrder(const PropertyEditorModel& model)
     for(int i = 0; i < order.GetCount(); i++)
         order[i] = i;
 
-    // Stable insertion sort keeps raw model order as the tie-breaker while
-    // allowing callers to intentionally group presentation through sort_order.
-    for(int i = 1; i < order.GetCount(); i++) {
-        const int current = order[i];
-        int j = i;
-        while(j > 0) {
-            const int previous = order[j - 1];
-            const int previous_sort = model[previous].sort_order;
-            const int current_sort = model[current].sort_order;
-            if(previous_sort < current_sort ||
-               (previous_sort == current_sort && previous < current))
-                break;
-            order[j] = previous;
-            j--;
-        }
-        order[j] = current;
-    }
+    // Explicit model-index tie breaking preserves authored order without
+    // quadratic insertion work for large, reverse-sorted schemas.
+    Sort(order, [&](int a, int b) {
+        return model[a].sort_order == model[b].sort_order
+             ? a < b : model[a].sort_order < model[b].sort_order;
+    });
     return order;
 }
 

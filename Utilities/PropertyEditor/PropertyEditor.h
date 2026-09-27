@@ -230,6 +230,7 @@ private:
     void ModelGroupMetadataChanged(PropertyEditorModel *source);
 
     PropertyEditorModel *model_ = nullptr;
+    uint64 model_binding_generation_ = 0;
     PropertyEditorFactory *factory_ = nullptr;
 
     PropertyEditorStyle style_;

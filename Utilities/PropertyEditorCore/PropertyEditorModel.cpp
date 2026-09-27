@@ -537,24 +537,26 @@ bool PropertyEditorModel::Reset(const String& id, String *error)
         return false;
     }
 
+    // Notifications can rebuild the model, including the caller's id storage.
+    const String property_id = id;
+    const Value default_value = item->default_value;
     String local_error;
-    if(!Apply(id, item->default_value, true, &local_error)) {
+    if(!Apply(property_id, default_value, true, &local_error, true)) {
         if(error) *error = local_error;
         return false;
     }
 
-    item->inherited = true;
-    ValueChanged(id);
-    WhenReset(id);
+    WhenReset(property_id);
     if(error) error->Clear();
     return true;
 }
 
-bool PropertyEditorModel::Apply(const String& id,
+bool PropertyEditorModel::Apply(const String& property_id,
                                 const Value& candidate,
                                 bool final_commit,
-                                String *error)
+                                String *error, bool inherited)
 {
+    const String id = property_id;
     PropertyEditorItem* item = Find(id);
     if(!item) {
         if(error) *error = "Unknown property: " + id;
@@ -581,7 +583,7 @@ bool PropertyEditorModel::Apply(const String& id,
     item->validation_error.Clear();
     item->value = normalized;
     item->mixed = false;
-    item->inherited = false;
+    item->inherited = inherited;
     ValueChanged(id);
 
     if(final_commit)

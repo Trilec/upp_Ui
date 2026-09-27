@@ -7,6 +7,12 @@ using namespace Upp;
 static int checks = 0;
 static int fails = 0;
 
+class CountingPropertyEditor : public PropertyEditor {
+public:
+    int layout_calls = 0;
+    void Layout() override { ++layout_calls; PropertyEditor::Layout(); }
+};
+
 class PropertyEditorTestCustomEditor : public PropertyValueEditor {
 public:
     typedef PropertyEditorTestCustomEditor CLASSNAME;
@@ -390,6 +396,75 @@ CONSOLE_APP_MAIN
     numeric_override_editor.MouseWheel(Point(numeric_style.frame_width + DPI(8), numeric_y), 120, 0);
     Check((int)numeric_override_model.Find("thickness")->value == numeric_after_wheel,
           "wheel outside the active numeric value surface does not edit the property");
+
+    // Reset must publish the completed inherited value once, and callbacks
+    // may replace every item before Reset returns (as Inspector hosts do).
+    PropertyEditorModel reset_model;
+    reset_model.AddInteger("reset", "Reset", 9).SetDefault(2);
+    int reset_notifications = 0;
+    String reset_committed_id, reset_finished_id;
+    reset_model.WhenValueChanged = [&](String id) {
+        ++reset_notifications;
+        Check(id == "reset" && reset_model.Find(id)->inherited &&
+              (int)reset_model.Find(id)->value == 2,
+              "reset observers see the final inherited value");
+        reset_model.Clear(false);
+        reset_model.AddInteger("reset", "Replacement", 77);
+    };
+    reset_model.WhenCommit = [&](String id, Value value) {
+        reset_committed_id = id;
+        Check((int)value == 2, "reset commit retains its value after schema replacement");
+    };
+    reset_model.WhenReset = [&](String id) { reset_finished_id = id; };
+    Check(reset_model.Reset(reset_model.Find("reset")->id, &error),
+          "reset tolerates a model rebuild and an aliased property id");
+    Check(reset_notifications == 1 && reset_committed_id == "reset" && reset_finished_id == "reset",
+          "reset delivers one value notification with stable event identities");
+    Check((int)reset_model.Find("reset")->value == 77 && !reset_model.Find("reset")->inherited,
+          "reset never writes through a stale pointer into the replacement schema");
+
+    override_model.Find("surface")->read_only = true;
+    override_model.Find("surface")->enabled = true;
+    const int readonly_requests = mouse_requests;
+    mouse_override_editor.LeftDown(Point(mouse_override_x, mouse_y), 0);
+    mouse_override_editor.LeftDown(Point(mouse_body_x, mouse_y), 0);
+    mouse_override_editor.Key(K_ENTER, 1);
+    mouse_override_editor.Key(K_SPACE, 1);
+    Check(mouse_requests == readonly_requests,
+          "read-only overrides cannot activate through mouse or keyboard");
+
+    PropertyEditorModel first_binding, second_binding;
+    first_binding.AddText("one", "One", "a");
+    second_binding.AddText("two", "Two", "b");
+    CountingPropertyEditor rebound_editor;
+    rebound_editor.SetRect(0, 0, 320, 180);
+    rebound_editor.SetModel(&first_binding);
+    rebound_editor.layout_calls = 0;
+    first_binding.StructureChanged();
+    const int once = rebound_editor.layout_calls;
+    for(int i = 0; i < 20; ++i) {
+        rebound_editor.SetModel(&second_binding);
+        rebound_editor.SetModel(&first_binding);
+    }
+    rebound_editor.layout_calls = 0;
+    first_binding.StructureChanged();
+    Check(once > 0 && rebound_editor.layout_calls == once,
+          "rebinding to a previous model does not multiply layout notifications");
+    rebound_editor.layout_calls = 0;
+    second_binding.StructureChanged();
+    Check(rebound_editor.layout_calls == 0, "detached models do not rebuild the current editor");
+
+    PropertyEditorModel sorted_model;
+    for(int i = 0; i < 512; ++i)
+        sorted_model.AddText(AsString(i), AsString(i), "").sort_order = (511 - i) / 2;
+    PropertyEditor sorted_editor;
+    sorted_editor.SetRect(0, 0, 320, 180);
+    sorted_editor.SetModel(&sorted_model);
+    sorted_editor.SelectProperty("510");
+    sorted_editor.Key(K_DOWN, 1);
+    Check(sorted_editor.GetSelectedPropertyId() == "511", "equal sort keys retain authored order");
+    sorted_editor.Key(K_DOWN, 1);
+    Check(sorted_editor.GetSelectedPropertyId() == "508", "reverse-sorted schema navigates by sort key");
 
     const UiThemeContext saved_theme = UiTheme::GetContext();
     for(UiThemePreset preset : {UiThemePreset::Minimal, UiThemePreset::Pill,
