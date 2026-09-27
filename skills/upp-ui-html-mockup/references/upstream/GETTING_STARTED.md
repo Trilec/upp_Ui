@@ -30,13 +30,15 @@ From the maintainer checkout in PowerShell:
 
 ```powershell
 Set-Location E:\apps\github\upp_Ui
-& 'E:\upp-18468\umk.exe' '.\GitHubOut.var' 'examples/UiLabelDemo' 'CLANGx64' -b +GUI '.\build\UiLabelDemo.exe'
+& 'E:\upp-18468\umk.exe' 'E:/apps/github/upp_Ui,E:/apps/github/upp_statemachine,E:/apps/github/upp_animation,E:/upp-18468/uppsrc' 'examples/UiLabelDemo' 'CLANGx64' --out-dir './build/cache' -b +GUI './build/UiLabelDemo.exe'
 if ($LASTEXITCODE) { throw 'UiLabelDemo build failed' }
 & '.\build\UiLabelDemo.exe'
 ```
 
-UMK accepts an assembly name, a full .var path or an explicit nest list. Use the
-full .var path when assembly discovery is ambiguous. Debug is the default; `-r`
+Use the comma-separated nest list with the installed UMK. Its command-line help
+does not promise `.var` path loading; passing `GitHubOut.var` directly to this
+build reports a missing package. TheIDE can use the `.var` assembly; give UMK
+the equivalent nests and an explicit artifact directory. Debug is the default; `-r`
 selects Release and `-b` BLITZ. `-a` is rebuild-all, not a library-link workaround.
 TheIDE users open an assembly with the same nests, select UiLabelDemo and run it.
 

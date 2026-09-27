@@ -105,7 +105,14 @@ function Assert-Inventory($Inventory) {
 function Build-Target([string]$Package, [string]$Config, [string]$VarFile = $AssemblyFile) {
     $tag = ($Package -replace '[^a-zA-Z0-9_.-]', '_') + '-' + $Config
     $exe = Join-Path $script:evidence ($tag + '.exe')
-    $args = @($VarFile, $Package, $Method)
+    # The installed UMK consumes nest directories, not a .var filename.
+    # Parse each supplied assembly, including the generated header-probe one.
+    $assemblyText = Get-Content -Raw -LiteralPath $VarFile
+    $nestMatch = [regex]::Match($assemblyText, 'UPP\s*=\s*"([^"]+)"')
+    $outputMatch = [regex]::Match($assemblyText, 'OUTPUT\s*=\s*"([^"]+)"')
+    if (!$nestMatch.Success -or !$outputMatch.Success) { throw "Invalid assembly: $VarFile" }
+    $nestArgument = ($nestMatch.Groups[1].Value -split ';' | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() }) -join ','
+    $args = @($nestArgument, $Package, $Method, '--out-dir', $outputMatch.Groups[1].Value)
     $flags = ''
     if ($Blitz) { $flags += 'b' }
     if ($Config -eq 'Release') { $flags += 'r' }
@@ -124,7 +131,7 @@ function Build-Target([string]$Package, [string]$Config, [string]$VarFile = $Ass
 }
 function Run-Test([string]$Exe, [string]$Summary, [long]$MinimumCount = 1) {
     $stdout = $Exe + '.stdout.log'; $stderr = $Exe + '.stderr.log'
-    $p = Start-Process -FilePath $Exe -WorkingDirectory $Repo -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+    $p = Start-Process -FilePath $Exe -WorkingDirectory $Repo -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
     if (!$p.WaitForExit($TimeoutSeconds * 1000)) {
         # Only our own exact process is terminated, never an already open demo.
         $p.Kill()

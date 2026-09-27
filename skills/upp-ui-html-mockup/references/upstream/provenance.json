@@ -2,10 +2,10 @@
   "source_repository": "upp_Ui",
   "version_header": "#ifndef _Ui_UiVersion_h_\n#define _Ui_UiVersion_h_\n\n/*\n    Ui release identity\n    ===================\n    Author: C Edwards (dodobar)\n    License: Apache License 2.0 (see LICENSE).\n\n    One version for the Ui library, not a separate counter for each control.\n    An RC identifier does not certify platform/visual acceptance. Independently\n    versioned sibling packages and serialized-data schemas retain their versions.\n    No GUI dependency; safe to include in build and diagnostic tools.\n*/\n#define UPP_UI_VERSION \"1.0.0-rc.1\"\n\nnamespace Upp {\ninline const char* UiGetVersion() { return UPP_UI_VERSION; }\n}\n\n#endif\n",
   "sha256": {
-    "docs/01_UI_CONTROLS_GUIDE.md": "871bafb6f3791f45381f7facdaeb00c335368c2246b33281018862e3ecf19253",
+    "docs/01_UI_CONTROLS_GUIDE.md": "469763042d916d504845bcf666c1598fd3c487fae1109c0f702cd7dbcbefafe2",
     "docs/02_UI_THEME_GUIDE.md": "0ac2043c4e3dd63aa6a29ffaabdb8c0827579961708db1b787311783bf8c9c64",
     "LICENSE": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
-    "GETTING_STARTED.md": "5332823d3449eae8d39332def37ac7eb66bfa1993d235cbd885fccf393c1f976"
+    "GETTING_STARTED.md": "58f04fe448fa583e82acc62c02bd5e24b519b21e4fc4662553247686374d84a0"
   },
   "note": "Working-tree snapshots; headers and examples are resolved in the target checkout."
 }

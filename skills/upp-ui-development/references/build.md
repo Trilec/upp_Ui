@@ -10,11 +10,14 @@ E:/apps/github/upp_Ui. These are examples to verify, never universal paths.
 The Ui repository's GitHubOut.var records Ui, examples, Animation, statemachine
 and uppsrc nests. Designer has its own assembly/package; it is not a Ui dependency.
 
-UMK shape: `umk <assembly-or-var-path> <main-package> <method> <flags> <output>`.
+UMK shape: `umk <comma-separated-nests> <main-package> <method> <flags> <output>`.
+Use the installed tool's help: this workstation's UMK does not resolve a `.var`
+file passed as the assembly argument. Translate its UPP nests to a comma-separated
+argument and use `--out-dir` for the artifact cache.
 For example, from the Ui checkout:
 
 ```powershell
-& 'E:/upp-18468/umk.exe' './GitHubOut.var' 'examples/UiLabelDemo' 'CLANGx64' -br +GUI './build/UiLabelDemo.exe'
+& 'E:/upp-18468/umk.exe' 'E:/apps/github/upp_Ui,E:/apps/github/upp_statemachine,E:/apps/github/upp_animation,E:/upp-18468/uppsrc' 'examples/UiLabelDemo' 'CLANGx64' --out-dir './build/cache' -br +GUI './build/UiLabelDemo.exe'
 if ($LASTEXITCODE) { throw 'Build failed' }
 ```
 

@@ -73,7 +73,7 @@ A shell using a control does not substitute for its behavioral/property coverage
 | [UiColorPicker](../Ui/UiColorPicker/UiColorPicker.h) | Multi-slot color editing, palettes and image/screen picking. | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiDropdown](../Ui/UiDropdown.h) | Collapsed choice and model-backed popup. | [UiDropdownDemo](../examples/UiDropdownDemo) |
 | [UiMenu](../Ui/UiMenu.h) | Command/check/radio/submenu model presentation. | [UiMenuDemo](../examples/UiMenuDemo) |
-| [UiPanel](../Ui/UiPanel.h) | Styled single-root content host, not a flow layout. | [UiPanelDemo](../examples/UiPanelDemo) |
+| [UiPanel](../Ui/UiPanel.h) | Styled surface with ordinary child parenting; use a layout child to arrange content. | [UiPanelDemo](../examples/UiPanelDemo) |
 | [UiDirectContentHost](../Ui/UiDirectContentHost.h) | Borrowed single child with independent Fit/Fixed/Expand axes. | family coverage to accept |
 | [UiGroupPanel](../Ui/UiGroupPanel.h) | Titled frame with separate header and body root slots. | [UiPanelDemo](../examples/UiPanelDemo) |
 | [UiTitleCard](../Ui/UiTitleCard.h) | Title/subtitle/media with an adjacent content cell. | [UiTitleCardDemo](../examples/UiTitleCardDemo) |
@@ -120,6 +120,19 @@ Mask validators/formatters, password visibility, multiline whitespace and numeri
 spin behavior need separate family cases. Clipboard, Unicode, focus loss, Escape,
 readonly/disabled transitions and partial exponents are acceptance inputs, not
 just a successful constructor.
+
+## Date/time and color fields
+
+UiDateTime provides local date, time and combined date/time modes with locale or
+ISO formatting, optional seconds and 12/24-hour display. It does not perform
+time-zone conversion. Editable and presentation-only modes have separate frame
+and clipboard policies; read the public header for null and range constraints.
+Its picker uses the dropdown arrow artwork with preserved aspect ratio.
+
+UiColorMatrix holds one to eight related colors and opens one UiColorPicker for
+the complete set. Theme roles style the surrounding surface; they do not recolor
+the authored swatches. Use the picker directly when the application needs its
+larger editing surface rather than a compact multi-color field.
 
 ## Scalar sliders, intervals and segmented ranges
 
@@ -254,6 +267,13 @@ is rejected. UiStack and UiTab own page-selection semantics; UiAccordion owns
 section/collapse/reorder semantics. Layout helpers are not replacements for those
 page states. Hidden pages must not be accidentally re-shown by flow participation.
 
+UiScrollPanel's scrolling children belong under Content(). GetViewportRect is the
+visible allocation and GetContentSize is the measured content extent. WhenScroll
+reports a changed scroll origin after applying it, including programmatic changes;
+GetScrollBarAt accepts panel-local coordinates and returns a borrowed scrollbar
+for interaction routing. Wheel input uses the horizontal axis when it is the only
+available scrollbar, or with Shift when horizontal scrolling is available.
+
 ## Progress, rings and custom painting
 
 UiProgressRing is one current amount/total, optional percent/custom center text,
@@ -281,6 +301,10 @@ selection, disclosure, command/check/radio state and editing remain appropriate 
 the domain. GetMinSize/Layout/paint never allocate one Ctrl per logical item.
 UiDoc/UiDocCore ownership, transactions and future extraction are in the Models
 Guide. Graph usage and retained development have their own two guides.
+
+UiList's natural height follows the active model's row count, with at least one
+row when empty, plus styling insets. It no longer reserves four placeholder rows.
+Constrain the containing layout or viewport when a large list must stay bounded.
 
 Supporting public surfaces include UiBaseEdit and UiIndicatorBase, UiAxis,
 UiLayoutCursor/UiMeasure, UiStyle/UiTheme, UiGeometry/UiShapePath/UiShapes/UiDraw,

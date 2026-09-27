@@ -17,6 +17,10 @@ control and its reference example. Full demos are self-contained packages with a
 live preview, production PropertyEditor and C++ examples; UiLabelDemo defines the
 reference shell.
 
+For AI-assisted work, see [Skills](skills/README.md): packaged native U++/Ui
+development guidance and HTML mockups grounded in the available controls. Each
+ZIP includes its instructions and supporting references.
+
 ## Release status
 
 The current Ui release identity is defined only in [UiVersion.h](Ui/UiVersion.h).
@@ -24,6 +28,8 @@ The release-readiness pass is in progress: a release-candidate identifier is **n
 a certificate that every control, demo, generated recipe or platform has passed.
 See [ACTIVE_WORK](docs/ACTIVE_WORK.md) for current published/validated boundaries
 and the [coverage register](tests/ui_release_inventory.json) for remaining gates.
+The [50-control audit](tests/CONTROL_AUDIT.md) records current findings, reproduced
+defects and test results, including checks that still need manual validation.
 
 The maintainer's validation environment is Windows, U++18468 and CLANGx64. Recent
 source changes still require that native gate. Do not infer Linux/macOS acceptance
@@ -55,6 +61,8 @@ packages and regression executables. `examples/` contains demos and specialized
 authoring tools. `tests/` contains additional tests, assets and the release inventory.
 `scripts/` contains focused validation entry points. `docs/` contains the nine guides
 above plus ACTIVE_WORK (maximum 100 lines).
+`skills/` contains the maintained skill sources and uploadable ZIPs; local backups
+are excluded from Git.
 
 ## Validate a published implementation slice
 

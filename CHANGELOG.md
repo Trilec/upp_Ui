@@ -8,6 +8,15 @@ schema versions are independent. No platform PASS is implied by this file.
 
 ### Correctness and rendering
 
+- UiList natural height follows its active model rather than a four-row placeholder.
+- Collection selection uses stronger contrast while preserving authored overrides.
+- UiScrollPanel exposes scroll notifications and scrollbar hit-testing, and supports
+  horizontal-only and Shift-wheel scrolling.
+- Slider track endpoints reserve room for themed thumbs. Shared cached circle
+  rendering now passes centre/radii to Painter correctly.
+- DateTime and SplitButton default carets match Dropdown sizing; DateTime preserves
+  the arrow image's aspect ratio.
+
 - UiRangeSegments separates Accent, Subtle and Alert tonal palettes, spans inherited
   ramps across the actual segment count, and preserves authored palette semantics.
 - Range input rejects invalid/non-finite scalar domains and malformed typed values;
@@ -21,6 +30,11 @@ schema versions are independent. No platform PASS is implied by this file.
   parent cycles. Parenting is not C++ deletion ownership.
 
 ### Release engineering and documentation
+
+- Packaged U++/Ui development and Ui-grounded HTML mockup skills, with repeatable
+  packaging/install scripts and portable documentation snapshots.
+- Explicit Ptr observer, owning One/Array, safe relocation and callback lifetime
+  guidance replaces misconceptions from the legacy prompt collection.
 
 - Central Ui release identity; reproducible surgical/header/demo/full validation
   entry points and a per-control coverage register rather than scattered audit files.

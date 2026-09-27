@@ -3,6 +3,26 @@
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 Keep this recovery index <=100 lines. Contracts belong in the nine reader guides.
 
+## All-controls audit — 2026-09-27
+
+REPORT: [50-control register and findings](../tests/CONTROL_AUDIT.md).
+STATUS: first-pass audit complete; production repairs remain open. Six defects
+reproduced; callback/child-lifetime risks identified; UiDoc geometry test fails 1/34.
+EVIDENCE: 22 native targets built; 18 pass, 1 fails, 1 lacks summary, 2 interactive.
+DOCS: catalogue/links checked; UMK nest-list instructions and runner corrected.
+
+## Designer-driven control repairs and skills — 2026-09-27
+
+TASK: list Fit sizing, selection contrast, scrolling integration, slider/caret
+geometry and cached circle rendering; portable development/mockup skills.
+STATUS: implemented; earlier checkpoints below retain their separate open gates.
+VALIDATION: Designer AssistantDesignerTests 318 checks / 0 failures; native
+Designer visual checks for carets, circles and collapsed toolbars. This is not a
+new full-library, Graph or cross-platform acceptance pass.
+DOC REVIEW: all 50 inventory controls have catalogue entries; local reader links
+checked; recent control contracts and skill entry points added. Skill ZIP contents
+and authored reference links verified. Latest sources remain authoritative.
+
 ## Release hygiene — UI-RC-HYGIENE-01
 
 BASE: `297beabdea87e3cc2c32282968e262ef68392abb` / main.
