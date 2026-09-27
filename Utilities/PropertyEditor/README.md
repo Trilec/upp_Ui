@@ -30,6 +30,12 @@ Version: **1.1.0**
 
 `PropertyEditorCore` remains the authority for schema, normalization and validation. The visual package maps semantic metadata to production `Ui` controls through `PropertyEditorFactory`; applications remain responsible for commands, undo, theme/document ownership and domain-specific resource browsers.
 
+Compact Boolean cells retain the theme's checkbox indicator geometry and colours,
+while the property row owns outer spacing and background. Standalone checkbox
+capsule margins must not shrink the indicator inside a fixed-height value cell.
+Boolean callbacks emit Boolean values (or Null for a mixed indeterminate state),
+not UiCheckBox's integer state codes. Numeric/slider mode actions use UiToolButton.
+
 ## Built-in editors
 
 Core/basic presentations:

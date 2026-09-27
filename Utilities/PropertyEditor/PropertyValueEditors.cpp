@@ -384,13 +384,8 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("")
-               .SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(16), DPI(16))
-               .SetIconRenderMode(UiIconRenderMode::MonoTint)
-               .SetContentInset(DPI(1));
-        toggle_.Tip("Switch between numeric entry and slider");
-        toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        ConfigurePropertyAction(toggle_, ICON_DESIGN_SLIDERS_48(),
+                                "Switch between numeric entry and slider");
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;
             UpdateVisible();
@@ -505,7 +500,7 @@ private:
 
     PropertyCommitIntEdit edit_;
     UiSlider slider_;
-    UiButton toggle_;
+    UiToolButton toggle_;
     bool syncing_ = false;
     bool enabled_ = true;
     bool bounded_ = false;
@@ -588,13 +583,8 @@ public:
         Add(toggle_);
         slider_.SetCustomStyle(UiTheme::ResolveSlider());
         slider_.ExpandTrack();
-        toggle_.SetText("")
-               .SetIcon(ICON_DESIGN_SLIDERS_48())
-               .SetIconSize(DPI(16), DPI(16))
-               .SetIconRenderMode(UiIconRenderMode::MonoTint)
-               .SetContentInset(DPI(1));
-        toggle_.Tip("Switch between numeric entry and slider");
-        toggle_.SetCustomStyle(UiTheme::ResolveButton(UiButtonRole::Subtle));
+        ConfigurePropertyAction(toggle_, ICON_DESIGN_SLIDERS_48(),
+                                "Switch between numeric entry and slider");
         toggle_.WhenAction = [=] {
             slider_mode_ = !slider_mode_;
             UpdateVisible();
@@ -709,7 +699,7 @@ private:
 
     PropertyCommitFloatEdit edit_;
     UiSlider slider_;
-    UiButton toggle_;
+    UiToolButton toggle_;
     bool syncing_ = false;
     bool enabled_ = true;
     bool bounded_ = false;
@@ -726,11 +716,20 @@ public:
     {
         Add(option_.SizePos());
         option_.SetText(String());
-        option_.SetCustomStyle(UiTheme::ResolveCheckBox(UICHECKVIS_CLASSIC));
+        UiCheckBox::Style style = UiTheme::ResolveCheckBox(UICHECKVIS_CLASSIC);
+        // The property row already owns the cell surface and spacing. Embed
+        // only the themed indicator, without a standalone checkbox's outer
+        // capsule/margins squeezing it into a short, wide mark in compact rows.
+        style.metrics.face_enabled = false;
+        style.metrics.frame_enabled = false;
+        style.metrics.shadow.enabled = false;
+        style.metrics.content_margin = Rect(0, 0, 0, 0);
+        style.skin.content_inset = Rect(0, 0, 0, 0);
+        option_.SetCustomStyle(style);
         option_.WhenAction = [=] {
             if(syncing_)
                 return;
-            Value v = option_.GetData();
+            Value v = GetEditorValue();
             // Preview callbacks may rebuild the owning PropertyEditor and
             // tear down this inline editor. Snapshot both callbacks before
             // dispatch so that teardown cannot clear the commit callback

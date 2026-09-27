@@ -391,6 +391,36 @@ CONSOLE_APP_MAIN
     Check((int)numeric_override_model.Find("thickness")->value == numeric_after_wheel,
           "wheel outside the active numeric value surface does not edit the property");
 
+    const UiThemeContext saved_theme = UiTheme::GetContext();
+    for(UiThemePreset preset : {UiThemePreset::Minimal, UiThemePreset::Pill,
+        UiThemePreset::Linear, UiThemePreset::Solid, UiThemePreset::Outline,
+        UiThemePreset::Compact, UiThemePreset::Layered}) {
+        for(UiThemeMode mode : {UiThemeMode::Light, UiThemeMode::Dark}) {
+            UiTheme::Set(preset, mode);
+            PropertyEditorItem item; item.kind = PropertyEditorKind::Boolean;
+            auto boolean = PropertyEditorFactory::Global().Create(item);
+            boolean->Configure(item);
+            boolean->SetEditorValue(false, false);
+            boolean->SetRect(0, 0, DPI(160), DPI(24));
+            boolean->Layout();
+            UiCheckBox* box = dynamic_cast<UiCheckBox*>(boolean->GetFirstChild());
+            Check(box != nullptr, "Boolean editor uses the reusable checkbox");
+            if(box) {
+                const auto& style = box->GetStyle();
+                const Rect inner = UiStyledInnerRect(Size(DPI(160), DPI(24)), style.metrics, style.skin);
+                Check(inner.Height() >= style.indicator_size && style.indicator_size >= DPI(16),
+                      "all presets retain full-size Boolean indicator in compact rows");
+                Value committed;
+                boolean->WhenCommit = [&](Value v) { committed = v; };
+                box->SetState(UICHECK_CHECKED);
+                Check(committed.Is<bool>() && (bool)committed, "checked editor commits typed true");
+                box->SetState(UICHECK_UNCHECKED);
+                Check(committed.Is<bool>() && !(bool)committed, "unchecked editor commits typed false");
+            }
+        }
+    }
+    UiTheme::Set(saved_theme.preset, saved_theme.mode);
+
     Cout() << "PropertyEditorTests: Checks: " << checks
            << " Fails: " << fails << "\n";
 
