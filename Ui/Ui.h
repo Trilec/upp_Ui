@@ -79,6 +79,7 @@
 #include <Ui/UiTab.h>
 #include <Ui/UiTitleCard.h>
 #include <Ui/UiMediaFit.h>
+#include <Ui/UiTag.h>
 #include <Ui/UiBadge.h>
 #include <Ui/UiMediaCard.h>
 #include <Ui/UiDropdown.h>

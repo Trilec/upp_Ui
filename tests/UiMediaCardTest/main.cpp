@@ -40,108 +40,169 @@ void TestFitGeometry()
     const UiMediaFitGeometry contain =
         UiComputeMediaFit(Size(200, 100), square, UiMediaFit::Contain);
     Check(contain.source == RectC(0, 0, 200, 100),
-          "Contain keeps the complete source");
+          "Contain keeps complete source");
     Check(contain.target == RectC(0, 25, 100, 50),
-          "Contain centers the fitted target");
+          "Contain centers fitted target");
 
     const UiMediaFitGeometry cover =
         UiComputeMediaFit(Size(200, 100), square, UiMediaFit::Cover);
     Check(cover.target == square,
-          "Cover fills the complete target");
+          "Cover fills target");
     Check(cover.source == RectC(50, 0, 100, 100),
-          "Cover crops the wide source symmetrically");
+          "Cover crops wide source symmetrically");
 }
 
-void TestCardLayout()
+void TestDefaultSurfaceContract()
 {
-    UiThemeContext context = UiTheme::GetContext();
-    context.preset = UiThemePreset::Minimal;
-    context.mode = UiThemeMode::Light;
-    UiTheme::Set(context);
-
     UiMediaCard card;
-    card.SetRect(0, 0, 180, 220);
+    const UiMediaCard::Style& style = card.GetStyle();
+
+    Check(!style.metrics.face_enabled,
+          "Card background is optional and off by default");
+    Check(!style.metrics.frame_enabled,
+          "Card border is optional and off by default");
+    Check(style.media_metrics.face_enabled,
+          "Media background is on by default");
+    Check(style.media_metrics.frame_enabled,
+          "Media border is independent and on by default");
+    Check(!style.header_style.metrics.face_enabled
+          && !style.header_style.metrics.frame_enabled,
+          "Header surface is transparent and frameless by default");
+    Check(!style.footer_style.metrics.face_enabled
+          && !style.footer_style.metrics.frame_enabled,
+          "Footer surface is transparent and frameless by default");
+}
+
+void TestStructureAndLayers()
+{
+    UiMediaCard card;
+    card.SetRect(0, 0, 240, 320);
     card.SetImage(MakeTestImage(Size(320, 180)))
-        .SetTitle("SH030 take 03")
-        .SetSubTitle("1536 x 864")
-        .SetMetadata("AURORA / SQ020")
-        .SetLabelSide(UiAlign::BOTTOM)
-        .SetMediaFit(UiMediaFit::Cover);
+        .SetHeader("Image processing", "Harbour / convert EXR")
+        .SetFooter("EXR / JPEG", "v012", "1536 x 864")
+        .SetMediaAspect(Size(16, 9));
 
-    UiBadgeData left(
-        "IMAGE", UiRole::Subtle, UiBadgeVariant::Filled);
-    UiBadgeData right(
-        "READY", UiRole::Accent, UiBadgeVariant::Soft);
+    UiTagData kind("IMAGE", UiRole::Subtle, UiTagVariant::Filled);
+    kind.id = "kind";
+    UiTagData ready("READY", UiRole::Accent, UiTagVariant::Soft);
+    ready.id = "ready";
+    ready.actionable = true;
+    ready.value = 17;
 
-    card.AddBadge(left, UiMediaBadgeAnchor::TopLeft);
-    card.AddBadge(right, UiMediaBadgeAnchor::TopRight);
+    card.AddTopTag(kind, UiAlign::LEFT)
+        .AddTopTag(ready, UiAlign::RIGHT);
+
+    UiTagData take("take 03", UiRole::Standard, UiTagVariant::Soft);
+    card.AddBottomTag(take, UiAlign::RIGHT);
+
+    UiTagData overlay("LOADING", UiRole::Accent, UiTagVariant::Filled);
+    card.SetOverlay(overlay, UiAlign::CENTER, UiAlign::CENTER);
+
     card.Layout();
 
     const UiMediaCardPresentation& p = card.GetPresentation();
-    Check(!p.media.IsEmpty(),
-          "Media region is prepared");
-    Check(!p.text.IsEmpty() && p.text.top > p.media.top,
-          "Bottom labels receive a separate text region");
-    Check(!p.prepared_title.IsEmpty(),
-          "Title is prepared before Paint");
+
+    Check(p.header.visible && !p.header.bounds.IsEmpty(),
+          "Header reserves structural space");
+    Check(p.footer.visible && !p.footer.bounds.IsEmpty(),
+          "Footer reserves structural space");
+    Check(!p.media.IsEmpty()
+          && p.header.bounds.bottom <= p.media.top
+          && p.media.bottom <= p.footer.bounds.top,
+          "Media stays between header and footer");
     Check(!p.media_image.IsEmpty(),
-          "Scaled/cropped media is prepared before Paint");
-    Check(p.badges.GetCount() == 2,
-          "Visible semantic badges are prepared");
-    Check(p.badges[0].bounds.top >= p.media.top
-          && p.badges[0].bounds.left >= p.media.left,
-          "Top-left badge stays inside media bounds");
-    Check(p.badges[1].bounds.right <= p.media.right,
-          "Top-right badge stays inside media bounds");
+          "Media image is prepared before Paint");
+    Check(p.top_tags.GetCount() == 2,
+          "Top tag band prepares left and right tags");
+    Check(p.bottom_tags.GetCount() == 1,
+          "Bottom tag band is independent");
+    Check(p.overlay.visible
+          && p.media_content.Contains(p.overlay.bounds.CenterPoint()),
+          "Overlay is positioned inside media without consuming it");
 }
 
-void TestAlternateSidesAndEmptyState()
+void TestOptionalBandsAndEmptyState()
 {
     UiMediaCard card;
-    card.SetRect(0, 0, 220, 150);
-    card.SetTitle("Camera reference")
-        .SetSubTitle("50 mm")
-        .SetMetadata("frame 138")
-        .SetLabelSide(UiAlign::RIGHT)
-        .SetEmptyCue("+");
+    card.SetRect(0, 0, 180, 210);
+    card.ClearHeader()
+        .SetFooter("Reference 1", "Drop or choose media")
+        .SetEmptyCue("+")
+        .SetMediaAspect(Size(1, 1));
     card.Layout();
 
     const UiMediaCardPresentation& p = card.GetPresentation();
-    Check(!p.text.IsEmpty() && p.text.left >= p.media.right,
-          "Right labels are laid out beside media");
+
+    Check(!p.header.visible && p.header.bounds.IsEmpty(),
+          "Absent header reserves no geometry");
+    Check(p.footer.visible,
+          "Footer remains independently available");
     Check(!p.prepared_empty_text.IsEmpty(),
-          "Empty-state cue is prepared without an image");
+          "Empty media cue is prepared");
     Check(card.GetMinSize().cx > 0 && card.GetMinSize().cy > 0,
-          "MediaCard has a useful minimum size");
+          "MediaCard reports useful minimum size");
 }
 
-void TestBadgeCapacityAndHit()
+void TestTagHitIdentity()
 {
     UiMediaCard card;
     card.SetRect(0, 0, 180, 180);
     card.SetEmptyCue("+");
 
-    UiBadgeData a(
-        "IMAGE", UiRole::Subtle, UiBadgeVariant::Filled);
-    a.id = "a";
-    a.actionable = true;
-    a.value = 7;
+    UiTagData action("READY", UiRole::Accent, UiTagVariant::Soft);
+    action.id = "ready";
+    action.actionable = true;
+    action.value = 23;
 
-    UiBadgeData b(
-        "READY", UiRole::Accent, UiBadgeVariant::Outline);
-    b.id = "b";
-
-    card.AddBadge(a, UiMediaBadgeAnchor::TopLeft)
-        .AddBadge(b, UiMediaBadgeAnchor::BottomRight);
+    card.AddTopTag(action, UiAlign::RIGHT);
     card.Layout();
 
     const UiMediaCardPresentation& p = card.GetPresentation();
-    Check(p.badges.GetCount() == 2,
-          "Opposing badge anchors can coexist");
+    Check(p.top_tags.GetCount() == 1,
+          "Action tag is prepared");
 
-    const Point hit = p.badges[0].bounds.CenterPoint();
-    Check(card.HitTestBadge(hit) == 0,
-          "Badge hit testing returns source badge identity");
+    const UiTagPresentation *hit =
+        card.FindTagAt(p.top_tags[0].bounds.CenterPoint());
+
+    Check(hit && hit->id == "ready"
+          && hit->actionable && (int)hit->value == 23,
+          "Tag hit preserves id, actionability and payload");
+}
+
+void TestRendererSharesPresentation()
+{
+    UiItemRenderData item;
+    item.title = "Take 04";
+    item.description = "Image rework";
+    item.right_text = "v014";
+    item.image = MakeTestImage(Size(320, 180));
+    item.role = UiRole::Standard;
+
+    UiMediaCardRender render;
+    render.SetResolver(
+        [](const UiItemRenderData&, UiMediaCardData& card) {
+            UiTagData kind("IMAGE", UiRole::Subtle, UiTagVariant::Filled);
+            card.top_tags.Add().tag = kind;
+            card.top_tags.Top().align = UiAlign::LEFT;
+        });
+
+    render.SetData(item);
+    render.PrepareLayout(RectC(0, 0, 180, 200), UiDirection::V);
+
+    const UiMediaCardPresentation& p = render.GetPresentation();
+
+    Check(p.footer.visible && !p.footer.prepared_title.IsEmpty(),
+          "Renderer maps item title into shared footer presentation");
+    Check(!p.media_image.IsEmpty(),
+          "Renderer uses the same prepared media path");
+    Check(p.top_tags.GetCount() == 1,
+          "Renderer resolver can add semantic tags");
+
+    One<UiItemRender> clone = render.Clone();
+    clone->SetData(item);
+    clone->PrepareLayout(RectC(0, 0, 180, 200), UiDirection::V);
+    Check(clone->GetMinSize().cx > 0,
+          "Renderer clone remains usable by pooled model views");
 }
 
 } // namespace
@@ -149,9 +210,11 @@ void TestBadgeCapacityAndHit()
 CONSOLE_APP_MAIN
 {
     TestFitGeometry();
-    TestCardLayout();
-    TestAlternateSidesAndEmptyState();
-    TestBadgeCapacityAndHit();
+    TestDefaultSurfaceContract();
+    TestStructureAndLayers();
+    TestOptionalBandsAndEmptyState();
+    TestTagHitIdentity();
+    TestRendererSharesPresentation();
 
     Cout() << checks << " checks, "
            << failures << " failures\n";

@@ -27,15 +27,6 @@ UiMediaFit ParseFit(const String& s)
     return s == "Contain" ? UiMediaFit::Contain : UiMediaFit::Cover;
 }
 
-UiAlign ParseSide(const String& s)
-{
-    if(s == "Top") return UiAlign::TOP;
-    if(s == "Left") return UiAlign::LEFT;
-    if(s == "Right") return UiAlign::RIGHT;
-    if(s == "None") return UiAlign::DEFAULT;
-    return UiAlign::BOTTOM;
-}
-
 Size ParseAspect(const String& s)
 {
     if(s == "4:3") return Size(4, 3);
@@ -44,13 +35,24 @@ Size ParseAspect(const String& s)
     return Size(1, 1);
 }
 
-String SideCode(const String& s)
+void ParseOverlayPosition(const String& value, UiAlign& h, UiAlign& v)
 {
-    if(s == "Top") return "TOP";
-    if(s == "Left") return "LEFT";
-    if(s == "Right") return "RIGHT";
-    if(s == "None") return "DEFAULT";
-    return "BOTTOM";
+    h = UiAlign::CENTER;
+    v = UiAlign::CENTER;
+
+    if(value.Find("Left") >= 0) h = UiAlign::LEFT;
+    if(value.Find("Right") >= 0) h = UiAlign::RIGHT;
+    if(value.Find("Top") >= 0) v = UiAlign::TOP;
+    if(value.Find("Bottom") >= 0) v = UiAlign::BOTTOM;
+}
+
+String AlignCode(UiAlign align)
+{
+    if(align == UiAlign::LEFT) return "LEFT";
+    if(align == UiAlign::RIGHT) return "RIGHT";
+    if(align == UiAlign::TOP) return "TOP";
+    if(align == UiAlign::BOTTOM) return "BOTTOM";
+    return "CENTER";
 }
 
 String CppString(const String& s)
@@ -81,7 +83,7 @@ Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
     return fill.IsSolid() && !IsNull(fill.color) ? fill.color : fallback;
 }
 
-Image MakePreviewImage()
+Image MakePreviewImage(int seed = 0)
 {
     const Size size(960, 540);
     ImageBuffer out(size);
@@ -89,14 +91,16 @@ Image MakePreviewImage()
     for(int y = 0; y < size.cy; y++) {
         RGBA *row = out[y];
         for(int x = 0; x < size.cx; x++) {
-            int r = 34 + x * 54 / size.cx + y * 16 / size.cy;
-            int g = 48 + x * 34 / size.cx + y * 42 / size.cy;
-            int b = 74 + (size.cx - x) * 58 / size.cx + y * 22 / size.cy;
+            int r = 30 + (x * (48 + seed * 3)) / size.cx + y * 14 / size.cy;
+            int g = 44 + x * 34 / size.cx + y * (38 + seed * 2) / size.cy;
+            int b = 70 + (size.cx - x) * (54 + seed * 2) / size.cx + y * 20 / size.cy;
+
             if(y > 330) {
-                r = 27 + x * 16 / size.cx;
-                g = 31 + x * 14 / size.cx;
-                b = 39 + x * 18 / size.cx;
+                r = 25 + x * 18 / size.cx;
+                g = 30 + x * 14 / size.cx;
+                b = 38 + x * 20 / size.cx;
             }
+
             row[x] = RGBA(Color(clamp(r, 0, 255),
                                 clamp(g, 0, 255),
                                 clamp(b, 0, 255)));
@@ -104,17 +108,19 @@ Image MakePreviewImage()
         }
     }
 
+    int cx = 700 - seed * 17;
     for(int y = 130; y < 260; y++) {
         RGBA *row = out[y];
-        for(int x = 670; x < 800; x++) {
-            int dx = x - 735;
+        for(int x = max(0, cx - 70); x < min(size.cx, cx + 70); x++) {
+            int dx = x - cx;
             int dy = y - 195;
             if(dx * dx + dy * dy < 58 * 58) {
-                row[x] = RGBA(Color(221, 157, 86));
+                row[x] = RGBA(Color(220, 150 + seed * 4, 82 + seed * 3));
                 row[x].a = 255;
             }
         }
     }
+
     return Image(out);
 }
 
@@ -126,7 +132,7 @@ public:
     {
         Title("UiMediaCard Demo");
         Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1280), DPI(800));
+        SetRect(0, 0, DPI(1320), DPI(840));
 
         UiThemeContext ctx = UiTheme::GetContext();
         ctx.preset = UiThemePreset::Minimal;
@@ -141,6 +147,7 @@ public:
         BuildInspector();
         BuildOverrides();
         ConfigureEditors();
+        BuildGallerySample();
         ConnectEvents();
 
         SelectPage(0);
@@ -156,7 +163,7 @@ public:
 
         const int top = r.top + DPI(80);
         const int body_h = max(0, r.bottom - top);
-        const int rail_w = min(DPI(430), max(DPI(360), r.GetWidth() / 3));
+        const int rail_w = min(DPI(440), max(DPI(370), r.GetWidth() / 3));
         const int gap = DPI(12);
         const int preview_w = max(0, r.GetWidth() - rail_w - gap);
 
@@ -164,33 +171,53 @@ public:
         right_.SetRect(r.left + preview_w + gap, top, rail_w, body_h);
 
         Size ps = preview_.GetSize();
-        const int caption_h = DPI(52);
-        Rect area = RectC(DPI(20), DPI(18),
-                          max(0, ps.cx - DPI(40)),
-                          max(0, ps.cy - caption_h - DPI(24)));
+        const int caption_h = DPI(48);
+        const int gallery_h = min(DPI(160), max(DPI(120), ps.cy / 4));
+        const int gallery_gap = DPI(12);
 
-        const int wanted_w = max(DPI(150), (int)InspectorValue("width", 340));
-        const int wanted_h = max(DPI(150), (int)InspectorValue("height", 390));
+        Rect top_area = RectC(DPI(18), DPI(16),
+                              max(0, ps.cx - DPI(36)),
+                              max(0, ps.cy - caption_h - gallery_h
+                                           - gallery_gap - DPI(22)));
+
+        const int wanted_w = max(DPI(170), (int)InspectorValue("width", 360));
+        const int wanted_h = max(DPI(180), (int)InspectorValue("height", 430));
         const int sample_gap = DPI(18);
-        const int sample_w = min(DPI(220), max(DPI(160), area.GetWidth() / 3));
-        const int main_max_w = max(DPI(160), area.GetWidth() - sample_w - sample_gap);
+        const int sample_w =
+            min(DPI(240), max(DPI(175), top_area.GetWidth() / 3));
+        const int main_max_w =
+            max(DPI(170), top_area.GetWidth() - sample_w - sample_gap);
         const int main_w = min(wanted_w, main_max_w);
-        const int main_h = min(wanted_h, area.GetHeight());
+        const int main_h = min(wanted_h, top_area.GetHeight());
 
-        card_.SetRect(area.left,
-                      area.top + max(0, (area.GetHeight() - main_h) / 2),
+        card_.SetRect(top_area.left,
+                      top_area.top + max(0, (top_area.GetHeight() - main_h) / 2),
                       main_w, main_h);
 
-        const int sample_x = area.left + main_w + sample_gap;
-        empty_card_.SetRect(sample_x,
-                            area.top + max(0, (area.GetHeight() - DPI(205)) / 2),
-                            max(0, area.right - sample_x),
-                            min(DPI(205), area.GetHeight()));
+        const int sample_x = top_area.left + main_w + sample_gap;
+        const int actual_sample_w = max(0, top_area.right - sample_x);
+        const int small_gap = DPI(10);
+        const int small_h =
+            max(DPI(115), (top_area.GetHeight() - small_gap) / 2);
 
-        caption_.SetRect(0, max(0, ps.cy - caption_h), ps.cx, caption_h);
+        empty_card_.SetRect(sample_x, top_area.top,
+                            actual_sample_w, small_h);
+        full_card_.SetRect(sample_x, top_area.top + small_h + small_gap,
+                           actual_sample_w,
+                           max(0, top_area.bottom
+                                  - (top_area.top + small_h + small_gap)));
+
+        gallery_.SetRect(DPI(18),
+                         max(0, ps.cy - caption_h - gallery_h),
+                         max(0, ps.cx - DPI(36)),
+                         max(0, gallery_h - DPI(6)));
+
+        caption_.SetRect(0, max(0, ps.cy - caption_h),
+                         ps.cx, caption_h);
 
         Size rs = right_.GetSize();
-        tools_.SetRect(DPI(4), DPI(4), max(0, rs.cx - DPI(8)), DPI(36));
+        tools_.SetRect(DPI(4), DPI(4),
+                       max(0, rs.cx - DPI(8)), DPI(36));
         pages_.SetRect(DPI(4), DPI(44),
                        max(0, rs.cx - DPI(8)),
                        max(0, rs.cy - DPI(48)));
@@ -201,7 +228,7 @@ private:
     {
         Add(header_);
         header_.SetTitle("UiMediaCard")
-               .SetSubTitle("Media-first card with PropertyEditor, semantic badges and prepared image geometry")
+               .SetSubTitle("Header + media + non-consuming tags/overlay + footer; live Ctrl and pooled renderer share one presentation")
                .ShowTitleLine(false)
                .SetContentInset(DPI(8))
                .SetContentCell(header_actions_);
@@ -211,11 +238,14 @@ private:
         header_actions_.AddSpacer(1).Expand(1);
 
         theme_.SetIcon(ICON_ACTION_LIGHT_MODE_48())
-              .SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark theme");
+              .SetIconSize(DPI(16), DPI(16))
+              .Tip("Toggle light/dark theme");
         help_.SetIcon(ICON_DESIGN_HELP_48())
-             .SetIconSize(DPI(16), DPI(16)).Tip("About this demo");
+             .SetIconSize(DPI(16), DPI(16))
+             .Tip("About this demo");
         exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48())
-             .SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+             .SetIconSize(DPI(16), DPI(16))
+             .Tip("Close demo");
 
         header_actions_.Add(theme_).Fixed(DPI(34));
         header_actions_.Add(help_).Fixed(DPI(34));
@@ -227,9 +257,17 @@ private:
         Add(preview_);
         preview_.Add(card_);
         preview_.Add(empty_card_);
+        preview_.Add(full_card_);
+        preview_.Add(gallery_);
         preview_.Add(caption_);
 
-        caption_.SetText("Inspector drives the main card. The smaller card shows the same control in its empty reference state.")
+        gallery_.SetItemSize(Size(DPI(132), DPI(136)))
+                .SetGap(DPI(7))
+                .SetInset(DPI(5))
+                .SetOverscanRows(1);
+
+        caption_.SetText(
+            "Main card is PropertyEditor-driven. Right samples show media-border-only and full-card surfaces. Gallery below uses UiMediaCardRender.")
                 .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
@@ -239,7 +277,8 @@ private:
         right_.Add(tools_);
         right_.Add(pages_);
 
-        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2), 0, DPI(2), 0))
+        tools_.SetGap(DPI(4))
+              .SetInset(Rect(DPI(2), 0, DPI(2), 0))
               .SetAlignItems(UiCrossAlign::Center);
 
         inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48())
@@ -265,54 +304,103 @@ private:
         overrides_page_.Add(overrides_.SizePos());
 
         code_page_.Add(code_);
-        code_.HSizePos(DPI(6), DPI(6)).VSizePos(DPI(42), DPI(6));
+        code_.HSizePos(DPI(6), DPI(6))
+             .VSizePos(DPI(42), DPI(6));
         code_.SetReadOnly();
-        code_page_.Add(copy_.RightPos(DPI(8), DPI(32)).TopPos(DPI(6), DPI(30)));
+
+        code_page_.Add(copy_.RightPos(DPI(8), DPI(32))
+                            .TopPos(DPI(6), DPI(30)));
         copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48())
-             .SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
+             .SetIconSize(DPI(16), DPI(16))
+             .Tip("Copy generated C++");
     }
 
     void BuildInspector()
     {
-        inspector_model_.AddText("title", "Title", "SH030 take 03", "Content");
-        inspector_model_.AddText("subtitle", "Subtitle", "1536 x 864 - Flux", "Content");
-        inspector_model_.AddText("metadata", "Metadata", "AURORA / SQ020", "Content");
-        inspector_model_.AddChoice("media", "Media", "Preview image", "Content")
-                        .AddChoice("Preview image", "Preview image")
-                        .AddChoice("Empty state", "Empty state");
-        inspector_model_.AddText("empty_text", "Empty cue", "+", "Content");
+        inspector_model_.AddBoolean(
+            "header.show", "Show header", true, "Header");
+        inspector_model_.AddText(
+            "header.title", "Title", "Image processing", "Header");
+        inspector_model_.AddText(
+            "header.subtitle", "Subtitle", "Harbour / convert EXR", "Header");
+        inspector_model_.AddText(
+            "header.metadata", "Metadata", "", "Header");
 
-        inspector_model_.AddChoice("role", "Role", "Standard", "Presentation")
-                        .AddChoice("Standard", "Standard")
-                        .AddChoice("Subtle", "Subtle")
-                        .AddChoice("Accent", "Accent")
-                        .AddChoice("Alert", "Alert");
-        inspector_model_.AddChoice("fit", "Media fit", "Cover", "Presentation")
-                        .AddChoice("Cover", "Cover")
-                        .AddChoice("Contain", "Contain");
-        inspector_model_.AddChoice("label_side", "Label side", "Bottom", "Presentation")
-                        .AddChoice("Bottom", "Bottom")
-                        .AddChoice("Top", "Top")
-                        .AddChoice("Left", "Left")
-                        .AddChoice("Right", "Right")
-                        .AddChoice("None", "None");
-        inspector_model_.AddChoice("aspect", "Media aspect", "1:1", "Presentation")
-                        .AddChoice("1:1", "1:1")
-                        .AddChoice("4:3", "4:3")
-                        .AddChoice("3:2", "3:2")
-                        .AddChoice("16:9", "16:9");
-        inspector_model_.AddBoolean("badges", "Show badges", true, "Presentation");
+        inspector_model_.AddChoice(
+            "media", "Media", "Preview image", "Media")
+            .AddChoice("Preview image", "Preview image")
+            .AddChoice("Empty state", "Empty state");
+        inspector_model_.AddText(
+            "empty_text", "Empty cue", "+", "Media");
+        inspector_model_.AddChoice(
+            "fit", "Fit", "Cover", "Media")
+            .AddChoice("Cover", "Cover")
+            .AddChoice("Contain", "Contain");
+        inspector_model_.AddChoice(
+            "aspect", "Aspect", "16:9", "Media")
+            .AddChoice("1:1", "1:1")
+            .AddChoice("4:3", "4:3")
+            .AddChoice("3:2", "3:2")
+            .AddChoice("16:9", "16:9");
 
-        inspector_model_.AddNumericInt("width", "Preview width", 340, 150, 620, 1, "Layout").SetUnit("px");
-        inspector_model_.AddNumericInt("height", "Preview height", 390, 150, 620, 1, "Layout").SetUnit("px");
+        inspector_model_.AddBoolean(
+            "tags.top", "Top tags", true, "Tags / Overlay");
+        inspector_model_.AddBoolean(
+            "tags.bottom", "Bottom tags", true, "Tags / Overlay");
+        inspector_model_.AddBoolean(
+            "overlay.show", "Show overlay", false, "Tags / Overlay");
+        inspector_model_.AddText(
+            "overlay.text", "Overlay text", "PROCESSING 68%", "Tags / Overlay");
+        inspector_model_.AddChoice(
+            "overlay.position", "Position", "Center", "Tags / Overlay")
+            .AddChoice("Top Left", "Top Left")
+            .AddChoice("Top Center", "Top Center")
+            .AddChoice("Top Right", "Top Right")
+            .AddChoice("Center Left", "Center Left")
+            .AddChoice("Center", "Center")
+            .AddChoice("Center Right", "Center Right")
+            .AddChoice("Bottom Left", "Bottom Left")
+            .AddChoice("Bottom Center", "Bottom Center")
+            .AddChoice("Bottom Right", "Bottom Right");
 
-        inspector_model_.AddBoolean("selected", "Selected", false, "Behaviour");
-        inspector_model_.AddBoolean("selectable", "Selectable", true, "Behaviour");
-        inspector_model_.AddBoolean("enabled", "Enabled", true, "Behaviour");
+        inspector_model_.AddBoolean(
+            "footer.show", "Show footer", true, "Footer");
+        inspector_model_.AddText(
+            "footer.title", "Title", "EXR / JPEG", "Footer");
+        inspector_model_.AddText(
+            "footer.subtitle", "Subtitle", "v012", "Footer");
+        inspector_model_.AddText(
+            "footer.metadata", "Metadata", "1536 x 864", "Footer");
 
-        inspector_model_.SetGroupSubtitle("Content", "display data only; file/import ownership remains outside UiMediaCard");
-        inspector_model_.SetGroupSubtitle("Presentation", "authored composition layered over the current semantic theme role");
-        inspector_model_.SetGroupSubtitle("Behaviour", "card-level interaction; badges can independently opt into actions");
+        inspector_model_.AddChoice(
+            "role", "Role", "Standard", "Presentation")
+            .AddChoice("Standard", "Standard")
+            .AddChoice("Subtle", "Subtle")
+            .AddChoice("Accent", "Accent")
+            .AddChoice("Alert", "Alert");
+
+        inspector_model_.AddNumericInt(
+            "width", "Preview width", 360, 170, 660, 1, "Layout")
+            .SetUnit("px");
+        inspector_model_.AddNumericInt(
+            "height", "Preview height", 430, 180, 660, 1, "Layout")
+            .SetUnit("px");
+
+        inspector_model_.AddBoolean(
+            "selected", "Selected", false, "Behaviour");
+        inspector_model_.AddBoolean(
+            "selectable", "Selectable", true, "Behaviour");
+        inspector_model_.AddBoolean(
+            "enabled", "Enabled", true, "Behaviour");
+
+        inspector_model_.SetGroupSubtitle(
+            "Header", "optional structural band; absent data consumes no space");
+        inspector_model_.SetGroupSubtitle(
+            "Tags / Overlay", "painted over media and never consume media geometry");
+        inspector_model_.SetGroupSubtitle(
+            "Footer", "optional structural band; transparent by default");
+        inspector_model_.SetGroupSubtitle(
+            "Presentation", "semantic theme role before explicit local overrides");
         inspector_model_.StructureChanged();
     }
 
@@ -321,40 +409,94 @@ private:
         UiMediaCard probe;
         UiMediaCard::Style base = probe.GetStyle();
 
-        MarkOverride(override_model_.AddColor("card.face", "Face",
-            FaceColor(base.palette, ST_NORMAL, Color(250,250,251)), "Card Surface"));
-        MarkOverride(override_model_.AddColor("card.frame", "Frame",
+        MarkOverride(override_model_.AddBoolean(
+            "card.background", "Background",
+            base.metrics.face_enabled, "Card Surface"));
+        MarkOverride(override_model_.AddBoolean(
+            "card.border", "Border",
+            base.metrics.frame_enabled, "Card Surface"));
+        MarkOverride(override_model_.AddColor(
+            "card.face", "Face",
+            FaceColor(base.palette, ST_NORMAL, Color(250,250,251)),
+            "Card Surface"));
+        MarkOverride(override_model_.AddColor(
+            "card.frame", "Frame",
             base.palette.frame[ST_NORMAL], "Card Surface"));
-        MarkOverride(override_model_.AddNumericInt("card.radius", "Radius",
+        MarkOverride(override_model_.AddNumericInt(
+            "card.radius", "Radius",
             base.metrics.radius, 0, 40, 1, "Card Surface").SetUnit("px"));
 
-        MarkOverride(override_model_.AddColor("media.face", "Face",
-            FaceColor(base.media_palette, ST_NORMAL, Color(234,237,241)), "Media Surface"));
-        MarkOverride(override_model_.AddColor("media.frame", "Frame",
+        MarkOverride(override_model_.AddBoolean(
+            "media.background", "Background",
+            base.media_metrics.face_enabled, "Media Surface"));
+        MarkOverride(override_model_.AddBoolean(
+            "media.border", "Border",
+            base.media_metrics.frame_enabled, "Media Surface"));
+        MarkOverride(override_model_.AddColor(
+            "media.face", "Face",
+            FaceColor(base.media_palette, ST_NORMAL, Color(234,237,241)),
+            "Media Surface"));
+        MarkOverride(override_model_.AddColor(
+            "media.frame", "Frame",
             base.media_palette.frame[ST_NORMAL], "Media Surface"));
-        MarkOverride(override_model_.AddNumericInt("media.radius", "Radius",
+        MarkOverride(override_model_.AddNumericInt(
+            "media.radius", "Radius",
             base.media_metrics.radius, 0, 40, 1, "Media Surface").SetUnit("px"));
 
-        MarkOverride(override_model_.AddColor("title.ink", "Title ink",
-            base.title_ink[ST_NORMAL], "Typography"));
-        MarkOverride(override_model_.AddColor("subtitle.ink", "Subtitle ink",
-            base.subtitle_ink[ST_NORMAL], "Typography"));
-        MarkOverride(override_model_.AddColor("metadata.ink", "Metadata ink",
-            base.metadata_ink[ST_NORMAL], "Typography"));
-        MarkOverride(override_model_.AddNumericInt("title.height", "Title size",
-            base.title_font.GetHeight(), 7, 32, 1, "Typography").SetUnit("px"));
+        MarkOverride(override_model_.AddBoolean(
+            "header.background", "Background",
+            base.header_style.metrics.face_enabled, "Header Surface"));
+        MarkOverride(override_model_.AddBoolean(
+            "header.border", "Border",
+            base.header_style.metrics.frame_enabled, "Header Surface"));
+        MarkOverride(override_model_.AddColor(
+            "header.face", "Face",
+            FaceColor(base.header_style.palette, ST_NORMAL, Color(250,250,251)),
+            "Header Surface"));
+        MarkOverride(override_model_.AddColor(
+            "header.frame", "Frame",
+            base.header_style.palette.frame[ST_NORMAL], "Header Surface"));
 
-        MarkOverride(override_model_.AddNumericInt("spacing.media_text", "Media / text",
-            base.media_text_gap, 0, 30, 1, "Spacing").SetUnit("px"));
-        MarkOverride(override_model_.AddNumericInt("badge.inset", "Badge inset",
-            base.badge_inset, 0, 30, 1, "Badges").SetUnit("px"));
-        MarkOverride(override_model_.AddNumericInt("badge.radius", "Badge radius",
-            base.badge_style[(int)UiRole::Standard].metrics.radius,
-            0, 20, 1, "Badges").SetUnit("px"));
+        MarkOverride(override_model_.AddBoolean(
+            "footer.background", "Background",
+            base.footer_style.metrics.face_enabled, "Footer Surface"));
+        MarkOverride(override_model_.AddBoolean(
+            "footer.border", "Border",
+            base.footer_style.metrics.frame_enabled, "Footer Surface"));
+        MarkOverride(override_model_.AddColor(
+            "footer.face", "Face",
+            FaceColor(base.footer_style.palette, ST_NORMAL, Color(250,250,251)),
+            "Footer Surface"));
+        MarkOverride(override_model_.AddColor(
+            "footer.frame", "Frame",
+            base.footer_style.palette.frame[ST_NORMAL], "Footer Surface"));
 
-        override_model_.SetGroupSubtitle("Card Surface", "outer themed interaction surface");
-        override_model_.SetGroupSubtitle("Media Surface", "media well behind image, empty state and badges");
-        override_model_.SetGroupSubtitle("Badges", "painted overlay presentations rather than child controls");
+        MarkOverride(override_model_.AddNumericInt(
+            "section.gap", "Section gap",
+            base.section_gap, 0, 30, 1, "Spacing").SetUnit("px"));
+        MarkOverride(override_model_.AddNumericInt(
+            "tag.inset", "Tag inset",
+            base.tag_inset, 0, 30, 1, "Tags").SetUnit("px"));
+        MarkOverride(override_model_.AddNumericInt(
+            "tag.gap", "Tag gap",
+            base.tag_gap, 0, 20, 1, "Tags").SetUnit("px"));
+        MarkOverride(override_model_.AddNumericInt(
+            "tag.radius", "Tag radius",
+            base.tag_style[(int)UiRole::Standard].metrics.radius,
+            0, 20, 1, "Tags").SetUnit("px"));
+        MarkOverride(override_model_.AddNumericInt(
+            "overlay.radius", "Overlay radius",
+            base.overlay_style[(int)UiRole::Standard].metrics.radius,
+            0, 20, 1, "Overlay").SetUnit("px"));
+
+        override_model_.SetGroupSubtitle(
+            "Card Surface", "whole card face/frame; transparent and frameless by default");
+        override_model_.SetGroupSubtitle(
+            "Media Surface", "independent media face/frame; bordered by default");
+        override_model_.SetGroupSubtitle(
+            "Header Surface", "optional band surface; text-only by default");
+        override_model_.SetGroupSubtitle(
+            "Footer Surface", "optional band surface; text-only by default");
         override_model_.StructureChanged();
     }
 
@@ -373,6 +515,42 @@ private:
         overrides_.SetStyle(style);
     }
 
+    void BuildGallerySample()
+    {
+        Vector<UiModelItem> items;
+        for(int i = 0; i < 12; i++) {
+            UiModelItem item(Format("Take %02d", i + 1), i);
+            item.description = i % 3 == 0 ? "Image create" : "Image rework";
+            item.right_text = Format("v%03d", 10 + i);
+            item.image = MakePreviewImage(i % 5);
+            item.icon = item.image;
+            item.data = i;
+            items.Add(pick(item));
+        }
+
+        gallery_model_.AddRange(items);
+        gallery_.SetModel(gallery_model_);
+
+        gallery_render_.SetResolver(
+            [=](const UiItemRenderData& item, UiMediaCardData& card) {
+                UiTagData kind("IMAGE", UiRole::Subtle, UiTagVariant::Filled);
+                card.top_tags.Add().tag = kind;
+                card.top_tags.Top().align = UiAlign::LEFT;
+
+                UiTagData ready("READY", UiRole::Accent, UiTagVariant::Soft);
+                card.top_tags.Add().tag = ready;
+                card.top_tags.Top().align = UiAlign::RIGHT;
+
+                if(AsString(item.title).EndsWith("03")) {
+                    UiTagData loading("LOADING", UiRole::Accent, UiTagVariant::Soft);
+                    card.overlay.content = loading;
+                    card.overlay.visible = true;
+                }
+            });
+
+        gallery_.SetItemRender(gallery_render_);
+    }
+
     void ConnectEvents()
     {
         auto changed = [=](String, Value) { ApplyProjection(); };
@@ -381,9 +559,12 @@ private:
         overrides_.WhenPreview = changed;
         overrides_.WhenCommit = changed;
 
-        inspector_.WhenReset = [=](String id) { ResetProperty(inspector_model_, id); };
-        overrides_.WhenReset = [=](String id) { ResetProperty(override_model_, id); };
-        overrides_.WhenOverride = [=](String id, bool active) { SetOverrideActive(id, active); };
+        inspector_.WhenReset =
+            [=](String id) { ResetProperty(inspector_model_, id); };
+        overrides_.WhenReset =
+            [=](String id) { ResetProperty(override_model_, id); };
+        overrides_.WhenOverride =
+            [=](String id, bool active) { SetOverrideActive(id, active); };
 
         inspector_mode_.WhenAction = [=] { SelectPage(0); };
         overrides_mode_.WhenAction = [=] { SelectPage(1); };
@@ -391,26 +572,34 @@ private:
 
         theme_.WhenAction = [=] { ToggleTheme(); };
         help_.WhenAction = [=] {
-            PromptOK("UiMediaCard reference demo\n\nInspector authors content, layout and interaction. Theme Overrides remain inherited until explicitly enabled. Code is regenerated from the same PropertyEditor state.");
+            PromptOK(
+                "UiMediaCard reference demo\n\n"
+                "Header and Footer reserve structure only when present. "
+                "Card, Header and Footer may be transparent/frameless while the "
+                "Media region keeps its own border. Top/Bottom Tags and Overlay "
+                "paint above media without consuming it. The Gallery uses the "
+                "same prepared presentation through UiMediaCardRender.");
         };
         exit_.WhenAction = [=] { Break(); };
         copy_.WhenAction = [=] { WriteClipboardText(generated_); };
 
         card_.WhenAction = [=] {
-            caption_.SetText("Card action fired. Drag/release now follows U++ capture teardown without recursive CancelMode.");
+            caption_.SetText("Card action fired.");
         };
-        card_.WhenBadgeAction = [=](String id, Value) {
-            caption_.SetText("Badge action: " + id);
+        card_.WhenTagAction = [=](String id, Value) {
+            caption_.SetText("Tag action: " + id);
         };
     }
 
-    Value InspectorValue(const String& id, const Value& fallback = Value()) const
+    Value InspectorValue(const String& id,
+                         const Value& fallback = Value()) const
     {
         const PropertyEditorItem *item = inspector_model_.Find(id);
         return item ? item->value : fallback;
     }
 
-    Value OverrideValue(const String& id, const Value& fallback = Value()) const
+    Value OverrideValue(const String& id,
+                        const Value& fallback = Value()) const
     {
         const PropertyEditorItem *item = override_model_.Find(id);
         return item ? item->value : fallback;
@@ -449,19 +638,40 @@ private:
                 override_model_.SetValue(id, value, false);
         };
 
-        set("card.face", FaceColor(style.palette, ST_NORMAL, Color(250,250,251)));
+        set("card.background", style.metrics.face_enabled);
+        set("card.border", style.metrics.frame_enabled);
+        set("card.face",
+            FaceColor(style.palette, ST_NORMAL, Color(250,250,251)));
         set("card.frame", style.palette.frame[ST_NORMAL]);
         set("card.radius", style.metrics.radius);
-        set("media.face", FaceColor(style.media_palette, ST_NORMAL, Color(234,237,241)));
+
+        set("media.background", style.media_metrics.face_enabled);
+        set("media.border", style.media_metrics.frame_enabled);
+        set("media.face",
+            FaceColor(style.media_palette, ST_NORMAL, Color(234,237,241)));
         set("media.frame", style.media_palette.frame[ST_NORMAL]);
         set("media.radius", style.media_metrics.radius);
-        set("title.ink", style.title_ink[ST_NORMAL]);
-        set("subtitle.ink", style.subtitle_ink[ST_NORMAL]);
-        set("metadata.ink", style.metadata_ink[ST_NORMAL]);
-        set("title.height", style.title_font.GetHeight());
-        set("spacing.media_text", style.media_text_gap);
-        set("badge.inset", style.badge_inset);
-        set("badge.radius", style.badge_style[(int)UiRole::Standard].metrics.radius);
+
+        set("header.background", style.header_style.metrics.face_enabled);
+        set("header.border", style.header_style.metrics.frame_enabled);
+        set("header.face",
+            FaceColor(style.header_style.palette, ST_NORMAL, Color(250,250,251)));
+        set("header.frame", style.header_style.palette.frame[ST_NORMAL]);
+
+        set("footer.background", style.footer_style.metrics.face_enabled);
+        set("footer.border", style.footer_style.metrics.frame_enabled);
+        set("footer.face",
+            FaceColor(style.footer_style.palette, ST_NORMAL, Color(250,250,251)));
+        set("footer.frame", style.footer_style.palette.frame[ST_NORMAL]);
+
+        set("section.gap", style.section_gap);
+        set("tag.inset", style.tag_inset);
+        set("tag.gap", style.tag_gap);
+        set("tag.radius",
+            style.tag_style[(int)UiRole::Standard].metrics.radius);
+        set("overlay.radius",
+            style.overlay_style[(int)UiRole::Standard].metrics.radius);
+
         overrides_.RefreshModel();
     }
 
@@ -469,115 +679,203 @@ private:
     {
         auto face = [&](const char *id, StyledPalette& palette) {
             if(OverrideActive(id))
-                palette.face[ST_NORMAL] = UiFill::Solid(Color(OverrideValue(id)));
+                palette.face[ST_NORMAL] =
+                    UiFill::Solid(Color(OverrideValue(id)));
         };
         auto color = [&](const char *id, Color& target) {
             if(OverrideActive(id))
                 target = Color(OverrideValue(id));
         };
 
+        if(OverrideActive("card.background"))
+            style.metrics.face_enabled =
+                (bool)OverrideValue("card.background");
+        if(OverrideActive("card.border"))
+            style.metrics.frame_enabled =
+                (bool)OverrideValue("card.border");
         face("card.face", style.palette);
         color("card.frame", style.palette.frame[ST_NORMAL]);
         if(OverrideActive("card.radius"))
-            style.metrics.radius = max(0, (int)OverrideValue("card.radius"));
+            style.metrics.radius =
+                max(0, (int)OverrideValue("card.radius"));
 
+        if(OverrideActive("media.background"))
+            style.media_metrics.face_enabled =
+                (bool)OverrideValue("media.background");
+        if(OverrideActive("media.border"))
+            style.media_metrics.frame_enabled =
+                (bool)OverrideValue("media.border");
         face("media.face", style.media_palette);
         color("media.frame", style.media_palette.frame[ST_NORMAL]);
         if(OverrideActive("media.radius"))
-            style.media_metrics.radius = max(0, (int)OverrideValue("media.radius"));
+            style.media_metrics.radius =
+                max(0, (int)OverrideValue("media.radius"));
 
-        color("title.ink", style.title_ink[ST_NORMAL]);
-        color("subtitle.ink", style.subtitle_ink[ST_NORMAL]);
-        color("metadata.ink", style.metadata_ink[ST_NORMAL]);
-        if(OverrideActive("title.height"))
-            style.title_font.Height(max(7, (int)OverrideValue("title.height")));
+        if(OverrideActive("header.background"))
+            style.header_style.metrics.face_enabled =
+                (bool)OverrideValue("header.background");
+        if(OverrideActive("header.border"))
+            style.header_style.metrics.frame_enabled =
+                (bool)OverrideValue("header.border");
+        face("header.face", style.header_style.palette);
+        color("header.frame", style.header_style.palette.frame[ST_NORMAL]);
 
-        if(OverrideActive("spacing.media_text"))
-            style.media_text_gap = max(0, (int)OverrideValue("spacing.media_text"));
-        if(OverrideActive("badge.inset"))
-            style.badge_inset = max(0, (int)OverrideValue("badge.inset"));
-        if(OverrideActive("badge.radius")) {
-            int radius = max(0, (int)OverrideValue("badge.radius"));
+        if(OverrideActive("footer.background"))
+            style.footer_style.metrics.face_enabled =
+                (bool)OverrideValue("footer.background");
+        if(OverrideActive("footer.border"))
+            style.footer_style.metrics.frame_enabled =
+                (bool)OverrideValue("footer.border");
+        face("footer.face", style.footer_style.palette);
+        color("footer.frame", style.footer_style.palette.frame[ST_NORMAL]);
+
+        if(OverrideActive("section.gap"))
+            style.section_gap =
+                max(0, (int)OverrideValue("section.gap"));
+        if(OverrideActive("tag.inset"))
+            style.tag_inset =
+                max(0, (int)OverrideValue("tag.inset"));
+        if(OverrideActive("tag.gap"))
+            style.tag_gap =
+                max(0, (int)OverrideValue("tag.gap"));
+        if(OverrideActive("tag.radius")) {
+            int radius = max(0, (int)OverrideValue("tag.radius"));
             for(int i = 0; i < 4; i++)
-                style.badge_style[i].metrics.radius = radius;
+                style.tag_style[i].metrics.radius = radius;
+        }
+        if(OverrideActive("overlay.radius")) {
+            int radius = max(0, (int)OverrideValue("overlay.radius"));
+            for(int i = 0; i < 4; i++)
+                style.overlay_style[i].metrics.radius = radius;
         }
     }
 
-    void ConfigureBadges()
+    void ConfigureTagsAndOverlay()
     {
-        card_.ClearBadges();
-        if(!(bool)InspectorValue("badges", true))
-            return;
+        card_.ClearTags().ClearOverlay();
 
-        UiBadgeData kind("IMAGE", UiRole::Subtle, UiBadgeVariant::Filled);
-        kind.id = "kind";
-        card_.AddBadge(kind, UiMediaBadgeAnchor::TopLeft);
+        if((bool)InspectorValue("tags.top", true)) {
+            UiTagData kind("IMAGE", UiRole::Subtle, UiTagVariant::Filled);
+            kind.id = "kind";
+            card_.AddTopTag(kind, UiAlign::LEFT);
 
-        UiBadgeData ready("READY", UiRole::Accent, UiBadgeVariant::Soft);
-        ready.id = "ready";
-        ready.actionable = true;
-        ready.value = "ready";
-        card_.AddBadge(ready, UiMediaBadgeAnchor::TopRight);
+            UiTagData ready("READY", UiRole::Accent, UiTagVariant::Soft);
+            ready.id = "ready";
+            ready.actionable = true;
+            ready.value = "ready";
+            card_.AddTopTag(ready, UiAlign::RIGHT);
+        }
 
-        UiBadgeData take("take 03", UiRole::Standard, UiBadgeVariant::Soft);
-        take.id = "take";
-        card_.AddBadge(take, UiMediaBadgeAnchor::BottomRight);
+        if((bool)InspectorValue("tags.bottom", true)) {
+            UiTagData take("take 03", UiRole::Standard, UiTagVariant::Soft);
+            take.id = "take";
+            card_.AddBottomTag(take, UiAlign::RIGHT);
+        }
+
+        if((bool)InspectorValue("overlay.show", false)) {
+            UiAlign h, v;
+            ParseOverlayPosition(
+                AsString(InspectorValue("overlay.position", "Center")),
+                h, v);
+
+            UiTagData overlay(
+                AsString(InspectorValue("overlay.text", "PROCESSING 68%")),
+                UiRole::Accent, UiTagVariant::Filled);
+            overlay.id = "overlay";
+            card_.SetOverlay(overlay, h, v);
+        }
     }
 
-    void ConfigureEmptyExample()
+    void ConfigureSamples()
     {
         empty_card_.ClearCustomStyle().SetRole(UiRole::Subtle);
-        UiMediaCard::Style style = empty_card_.GetStyle();
-        style.label_side = UiAlign::BOTTOM;
-        style.media_fit = UiMediaFit::Contain;
-        style.media_aspect = Size(1, 1);
+        UiMediaCard::Style empty_style = empty_card_.GetStyle();
+        empty_style.media_aspect = Size(1, 1);
 
-        empty_card_.SetCustomStyle(style)
+        empty_card_.SetCustomStyle(empty_style)
                    .ClearImage()
+                   .ClearHeader()
+                   .SetFooter("Reference 1", "Drop or choose media")
                    .SetEmptyCue("+")
-                   .SetTitle("Reference 1")
-                   .SetSubTitle("Drop or choose media")
-                   .SetMetadata("")
-                   .SetSelected(false)
-                   .SetSelectable(true)
-                   .ClearBadges();
+                   .ClearTags()
+                   .ClearOverlay();
 
-        UiBadgeData kind("IMAGE", UiRole::Subtle, UiBadgeVariant::Outline);
-        empty_card_.AddBadge(kind, UiMediaBadgeAnchor::TopLeft);
+        UiTagData image("IMAGE", UiRole::Subtle, UiTagVariant::Outline);
+        empty_card_.AddTopTag(image, UiAlign::LEFT);
+
+        full_card_.ClearCustomStyle().SetRole(UiRole::Accent);
+        UiMediaCard::Style full_style = full_card_.GetStyle();
+        full_style.media_aspect = Size(16, 9);
+        full_style.metrics.face_enabled = true;
+        full_style.metrics.frame_enabled = true;
+        full_style.header_style.metrics.face_enabled = true;
+
+        full_card_.SetCustomStyle(full_style)
+                  .SetImage(MakePreviewImage(3))
+                  .SetHeader("Full card", "Header surface enabled")
+                  .SetFooter("Media + footer", "Card border enabled")
+                  .ClearTags()
+                  .ClearOverlay();
+
+        UiTagData state("READY", UiRole::Accent, UiTagVariant::Soft);
+        full_card_.AddTopTag(state, UiAlign::RIGHT);
     }
 
     void ApplyProjection()
     {
-        UiRole role = ParseRole(AsString(InspectorValue("role", "Standard")));
+        UiRole role =
+            ParseRole(AsString(InspectorValue("role", "Standard")));
 
         card_.ClearCustomStyle().SetRole(role);
         UiMediaCard::Style style = card_.GetStyle();
-        style.media_fit = ParseFit(AsString(InspectorValue("fit", "Cover")));
-        style.label_side = ParseSide(AsString(InspectorValue("label_side", "Bottom")));
-        style.media_aspect = ParseAspect(AsString(InspectorValue("aspect", "1:1")));
+
+        style.media_fit =
+            ParseFit(AsString(InspectorValue("fit", "Cover")));
+        style.media_aspect =
+            ParseAspect(AsString(InspectorValue("aspect", "16:9")));
 
         SyncInheritedOverrides(style);
         ApplyOverrides(style);
         card_.SetCustomStyle(style);
 
-        if(AsString(InspectorValue("media", "Preview image")) == "Empty state")
+        if(AsString(InspectorValue("media", "Preview image"))
+           == "Empty state")
             card_.ClearImage();
         else
             card_.SetImage(preview_image_);
 
-        card_.SetEmptyCue(AsString(InspectorValue("empty_text", "+")))
-             .SetTitle(AsString(InspectorValue("title", "SH030 take 03")))
-             .SetSubTitle(AsString(InspectorValue("subtitle", "1536 x 864 - Flux")))
-             .SetMetadata(AsString(InspectorValue("metadata", "AURORA / SQ020")))
-             .SetSelected((bool)InspectorValue("selected", false))
-             .SetSelectable((bool)InspectorValue("selectable", true));
+        card_.SetEmptyCue(
+                 AsString(InspectorValue("empty_text", "+")))
+             .SetSelected(
+                 (bool)InspectorValue("selected", false))
+             .SetSelectable(
+                 (bool)InspectorValue("selectable", true));
+
+        if((bool)InspectorValue("header.show", true))
+            card_.SetHeader(
+                AsString(InspectorValue("header.title", "Image processing")),
+                AsString(InspectorValue("header.subtitle", "Harbour / convert EXR")),
+                AsString(InspectorValue("header.metadata", "")));
+        else
+            card_.ClearHeader();
+
+        if((bool)InspectorValue("footer.show", true))
+            card_.SetFooter(
+                AsString(InspectorValue("footer.title", "EXR / JPEG")),
+                AsString(InspectorValue("footer.subtitle", "v012")),
+                AsString(InspectorValue("footer.metadata", "1536 x 864")));
+        else
+            card_.ClearFooter();
 
         card_.Enable((bool)InspectorValue("enabled", true));
-        ConfigureBadges();
-        ConfigureEmptyExample();
+
+        ConfigureTagsAndOverlay();
+        ConfigureSamples();
 
         UpdateGeneratedCode();
         UpdateThemeIcon();
+
+        gallery_.RefreshLayout();
         RefreshLayout();
         Refresh();
     }
@@ -586,67 +884,71 @@ private:
     {
         String role = AsString(InspectorValue("role", "Standard"));
         String fit = AsString(InspectorValue("fit", "Cover"));
-        String side = AsString(InspectorValue("label_side", "Bottom"));
-        Size aspect = ParseAspect(AsString(InspectorValue("aspect", "1:1")));
+        Size aspect =
+            ParseAspect(AsString(InspectorValue("aspect", "16:9")));
 
         String out;
         out << "UiMediaCard card;\n"
             << "card.SetRole(UiRole::" << role << ");\n"
             << "UiMediaCard::Style style = card.GetStyle();\n"
             << "style.media_fit = UiMediaFit::" << fit << ";\n"
-            << "style.label_side = UiAlign::" << SideCode(side) << ";\n"
-            << Format("style.media_aspect = Size(%d, %d);\n", aspect.cx, aspect.cy);
+            << Format("style.media_aspect = Size(%d, %d);\n",
+                      aspect.cx, aspect.cy);
 
-        if(OverrideActive("card.face"))
-            out << "style.palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("card.face"))) << ");\n";
-        if(OverrideActive("card.frame"))
-            out << "style.palette.frame[ST_NORMAL] = " << CppColor(Color(OverrideValue("card.frame"))) << ";\n";
-        if(OverrideActive("card.radius"))
-            out << Format("style.metrics.radius = %d;\n", (int)OverrideValue("card.radius"));
-        if(OverrideActive("media.face"))
-            out << "style.media_palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("media.face"))) << ");\n";
-        if(OverrideActive("media.frame"))
-            out << "style.media_palette.frame[ST_NORMAL] = " << CppColor(Color(OverrideValue("media.frame"))) << ";\n";
-        if(OverrideActive("media.radius"))
-            out << Format("style.media_metrics.radius = %d;\n", (int)OverrideValue("media.radius"));
-        if(OverrideActive("title.ink"))
-            out << "style.title_ink[ST_NORMAL] = " << CppColor(Color(OverrideValue("title.ink"))) << ";\n";
-        if(OverrideActive("subtitle.ink"))
-            out << "style.subtitle_ink[ST_NORMAL] = " << CppColor(Color(OverrideValue("subtitle.ink"))) << ";\n";
-        if(OverrideActive("metadata.ink"))
-            out << "style.metadata_ink[ST_NORMAL] = " << CppColor(Color(OverrideValue("metadata.ink"))) << ";\n";
-        if(OverrideActive("title.height"))
-            out << Format("style.title_font.Height(%d);\n", (int)OverrideValue("title.height"));
-        if(OverrideActive("spacing.media_text"))
-            out << Format("style.media_text_gap = %d;\n", (int)OverrideValue("spacing.media_text"));
-        if(OverrideActive("badge.inset"))
-            out << Format("style.badge_inset = %d;\n", (int)OverrideValue("badge.inset"));
-        if(OverrideActive("badge.radius"))
-            out << Format("for(int i = 0; i < 4; i++) style.badge_style[i].metrics.radius = %d;\n",
-                          (int)OverrideValue("badge.radius"));
+        if(OverrideActive("card.background"))
+            out << "style.metrics.face_enabled = "
+                << ((bool)OverrideValue("card.background") ? "true" : "false")
+                << ";\n";
+        if(OverrideActive("card.border"))
+            out << "style.metrics.frame_enabled = "
+                << ((bool)OverrideValue("card.border") ? "true" : "false")
+                << ";\n";
+        if(OverrideActive("media.border"))
+            out << "style.media_metrics.frame_enabled = "
+                << ((bool)OverrideValue("media.border") ? "true" : "false")
+                << ";\n";
+        if(OverrideActive("header.background"))
+            out << "style.header_style.metrics.face_enabled = "
+                << ((bool)OverrideValue("header.background") ? "true" : "false")
+                << ";\n";
+        if(OverrideActive("footer.background"))
+            out << "style.footer_style.metrics.face_enabled = "
+                << ((bool)OverrideValue("footer.background") ? "true" : "false")
+                << ";\n";
 
-        out << "card.SetCustomStyle(style)\n"
-            << "    .SetTitle(" << CppString(AsString(InspectorValue("title", String()))) << ")\n"
-            << "    .SetSubTitle(" << CppString(AsString(InspectorValue("subtitle", String()))) << ")\n"
-            << "    .SetMetadata(" << CppString(AsString(InspectorValue("metadata", String()))) << ");\n";
+        out << "card.SetCustomStyle(style);\n";
 
-        if(AsString(InspectorValue("media", "Preview image")) == "Empty state")
-            out << "card.ClearImage().SetEmptyCue(" << CppString(AsString(InspectorValue("empty_text", "+"))) << ");\n";
-        else
-            out << "card.SetImage(image);\n";
+        if((bool)InspectorValue("header.show", true))
+            out << "card.SetHeader("
+                << CppString(AsString(InspectorValue("header.title", ""))) << ", "
+                << CppString(AsString(InspectorValue("header.subtitle", ""))) << ", "
+                << CppString(AsString(InspectorValue("header.metadata", ""))) << ");\n";
 
-        if((bool)InspectorValue("badges", true)) {
-            out << "\nUiBadgeData kind(\"IMAGE\", UiRole::Subtle, UiBadgeVariant::Filled);\n"
-                << "card.AddBadge(kind, UiMediaBadgeAnchor::TopLeft);\n"
-                << "UiBadgeData state(\"READY\", UiRole::Accent, UiBadgeVariant::Soft);\n"
-                << "card.AddBadge(state, UiMediaBadgeAnchor::TopRight);\n";
+        out << "card.SetImage(image);\n";
+
+        if((bool)InspectorValue("tags.top", true)) {
+            out << "UiTagData kind(\"IMAGE\", UiRole::Subtle, UiTagVariant::Filled);\n"
+                << "card.AddTopTag(kind, UiAlign::LEFT);\n"
+                << "UiTagData ready(\"READY\", UiRole::Accent, UiTagVariant::Soft);\n"
+                << "card.AddTopTag(ready, UiAlign::RIGHT);\n";
         }
-        if((bool)InspectorValue("selected", false))
-            out << "card.SetSelected();\n";
-        if(!(bool)InspectorValue("selectable", true))
-            out << "card.SetSelectable(false);\n";
-        if(!(bool)InspectorValue("enabled", true))
-            out << "card.Enable(false);\n";
+
+        if((bool)InspectorValue("overlay.show", false)) {
+            UiAlign h, v;
+            ParseOverlayPosition(
+                AsString(InspectorValue("overlay.position", "Center")), h, v);
+            out << "UiTagData overlay("
+                << CppString(AsString(InspectorValue("overlay.text", "")))
+                << ", UiRole::Accent, UiTagVariant::Filled);\n"
+                << "card.SetOverlay(overlay, UiAlign::"
+                << AlignCode(h) << ", UiAlign::" << AlignCode(v) << ");\n";
+        }
+
+        if((bool)InspectorValue("footer.show", true))
+            out << "card.SetFooter("
+                << CppString(AsString(InspectorValue("footer.title", ""))) << ", "
+                << CppString(AsString(InspectorValue("footer.subtitle", ""))) << ", "
+                << CppString(AsString(InspectorValue("footer.metadata", ""))) << ");\n";
 
         generated_ = out;
         code_.SetData(generated_);
@@ -664,7 +966,8 @@ private:
     void ToggleTheme()
     {
         UiThemeContext ctx = UiTheme::GetContext();
-        ctx.mode = ctx.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
+        ctx.mode = ctx.mode == UiThemeMode::Dark
+                 ? UiThemeMode::Light : UiThemeMode::Dark;
         UiTheme::Set(ctx);
         ApplyProjection();
     }
@@ -682,7 +985,10 @@ private:
     UiToolButton theme_, help_, exit_;
 
     UiPanel preview_;
-    UiMediaCard card_, empty_card_;
+    UiMediaCard card_, empty_card_, full_card_;
+    UiGallery gallery_;
+    UiListModel gallery_model_;
+    UiMediaCardRender gallery_render_;
     UiLabel caption_;
     Image preview_image_ = MakePreviewImage();
 

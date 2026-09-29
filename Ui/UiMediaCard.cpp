@@ -5,20 +5,20 @@
 namespace Upp {
 namespace {
 
-Color MediaCardInk(const Color colors[4], StyledState state, Color fallback)
+Color MediaInk(const Color colors[4], StyledState state, Color fallback)
 {
     const Color c = colors[(int)state];
     return IsNull(c) ? fallback : c;
 }
 
-Color MediaCardPaletteInk(const StyledPalette& palette, StyledState state,
-                          Color fallback)
+Color PaletteInk(const StyledPalette& palette,
+                 StyledState state, Color fallback)
 {
     const Color c = palette.ink[(int)state];
     return IsNull(c) ? fallback : c;
 }
 
-String MediaCardOneLine(const String& text)
+String OneLine(const String& text)
 {
     String out = text;
     out.Replace("\r", " ");
@@ -26,12 +26,12 @@ String MediaCardOneLine(const String& text)
     return out;
 }
 
-WString MediaCardEllipsize(const String& source, Font font, int width)
+WString Ellipsize(const String& source, Font font, int width)
 {
     if(source.IsEmpty() || width <= 0)
         return WString();
 
-    WString text = MediaCardOneLine(source).ToWString();
+    WString text = OneLine(source).ToWString();
     if(GetTextSize(text, font).cx <= width)
         return text;
 
@@ -51,15 +51,15 @@ WString MediaCardEllipsize(const String& source, Font font, int width)
     return text.Left(lo) + ellipsis;
 }
 
-bool MediaCardLabelSide(UiAlign side)
-{
-    return side == UiAlign::TOP || side == UiAlign::BOTTOM
-        || side == UiAlign::LEFT || side == UiAlign::RIGHT;
-}
-
-int MediaCardRoleIndex(UiRole role)
+int RoleIndex(UiRole role)
 {
     return clamp((int)role, 0, 3);
+}
+
+UiAlign NormalTagAlign(UiAlign align)
+{
+    return align == UiAlign::CENTER || align == UiAlign::RIGHT
+         ? align : UiAlign::LEFT;
 }
 
 Rect FitAuthoredAspect(const Rect& area, Size ratio)
@@ -70,60 +70,689 @@ Rect FitAuthoredAspect(const Rect& area, Size ratio)
     const double aspect = (double)ratio.cx / ratio.cy;
     int width = area.GetWidth();
     int height = max(1, (int)std::floor(width / aspect + 0.5));
+
     if(height > area.GetHeight()) {
         height = area.GetHeight();
         width = max(1, (int)std::floor(height * aspect + 0.5));
     }
+
     return RectC(area.left + (area.GetWidth() - width) / 2,
                  area.top + (area.GetHeight() - height) / 2,
                  width, height);
+}
+
+Size BandContentSize(const UiMediaBandData& data,
+                     const UiMediaBandStyle& style)
+{
+    if(!data.HasContent())
+        return Size(0, 0);
+
+    int width = 0;
+    int height = 0;
+    int lines = 0;
+
+    auto add = [&](const String& text, Font font) {
+        if(text.IsEmpty())
+            return;
+        const Size size = GetTextSize(OneLine(text), font);
+        width = max(width, size.cx);
+        if(lines++)
+            height += max(0, style.text_gap);
+        height += size.cy;
+    };
+
+    add(data.title, style.title_font);
+    add(data.subtitle, style.subtitle_font);
+    add(data.metadata, style.metadata_font);
+    return Size(width, height);
+}
+
+Size MeasureBand(const UiMediaBandData& data,
+                 const UiMediaBandStyle& style)
+{
+    const Size content = BandContentSize(data, style);
+    if(content.cx <= 0 && content.cy <= 0)
+        return Size(0, 0);
+    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
+}
+
+UiMediaBandPresentation PrepareBand(const UiMediaBandData& data,
+                                    const UiMediaBandStyle& style,
+                                    const Rect& bounds)
+{
+    UiMediaBandPresentation out;
+    if(!data.HasContent() || bounds.IsEmpty())
+        return out;
+
+    out.bounds = bounds;
+    out.visible = true;
+
+    const Rect content =
+        UiStyledInnerRect(bounds, style.metrics, style.skin);
+    if(content.IsEmpty()) {
+        out.visible = false;
+        return out;
+    }
+
+    struct Line {
+        const String *source;
+        Font font;
+        Rect *rect;
+        WString *prepared;
+    };
+
+    Line lines[] = {
+        { &data.title, style.title_font,
+          &out.title, &out.prepared_title },
+        { &data.subtitle, style.subtitle_font,
+          &out.subtitle, &out.prepared_subtitle },
+        { &data.metadata, style.metadata_font,
+          &out.metadata, &out.prepared_metadata },
+    };
+
+    int total_height = 0;
+    int count = 0;
+    for(const Line& line : lines) {
+        if(line.source->IsEmpty())
+            continue;
+        if(count++)
+            total_height += max(0, style.text_gap);
+        total_height += line.font.GetCy();
+    }
+
+    int y = content.top
+          + max(0, (content.GetHeight() - total_height) / 2);
+    bool first = true;
+
+    for(const Line& line : lines) {
+        if(line.source->IsEmpty())
+            continue;
+
+        if(!first)
+            y += max(0, style.text_gap);
+        first = false;
+
+        const int height =
+            min(line.font.GetCy(), max(0, content.bottom - y));
+        if(height <= 0)
+            break;
+
+        *line.rect = RectC(content.left, y, content.GetWidth(), height);
+        *line.prepared =
+            Ellipsize(*line.source, line.font, content.GetWidth());
+        y += height;
+    }
+
+    return out;
+}
+
+void PaintBand(Draw& w,
+               const UiMediaBandPresentation& p,
+               const UiMediaBandStyle& style,
+               StyledState state)
+{
+    if(!p.visible || p.bounds.IsEmpty())
+        return;
+
+    UiPaintStyledBackground(w, p.bounds,
+                            style.palette, style.metrics, style.skin,
+                            state, false);
+
+    if(!p.prepared_title.IsEmpty() && !p.title.IsEmpty())
+        w.DrawText(p.title.left, p.title.top,
+                   p.prepared_title, style.title_font,
+                   MediaInk(style.title_ink, state,
+                            PaletteInk(style.palette, state, SColorText())));
+
+    if(!p.prepared_subtitle.IsEmpty() && !p.subtitle.IsEmpty())
+        w.DrawText(p.subtitle.left, p.subtitle.top,
+                   p.prepared_subtitle, style.subtitle_font,
+                   MediaInk(style.subtitle_ink, state,
+                            PaletteInk(style.palette, state, SColorText())));
+
+    if(!p.prepared_metadata.IsEmpty() && !p.metadata.IsEmpty())
+        w.DrawText(p.metadata.left, p.metadata.top,
+                   p.prepared_metadata, style.metadata_font,
+                   MediaInk(style.metadata_ink, state,
+                            PaletteInk(style.palette, state, SColorText())));
+}
+
+UiMediaBandStyle ResolveBandStyle(UiRole role)
+{
+    UiMediaBandStyle out;
+
+    const UiPanel::Style panel = UiTheme::ResolvePanel(role);
+    const UiLabel::Style title =
+        UiTheme::ResolveLabel(role, UiTextSize::H3);
+    const UiLabel::Style subtitle =
+        UiTheme::ResolveLabel(UiRole::Subtle);
+    const UiLabel::Style metadata =
+        UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::H3);
+
+    out.palette = panel.palette;
+    out.metrics = panel.metrics;
+    out.skin = panel.skin;
+
+    // Bands are structural by default: text can float around a separately
+    // bordered media region without creating another box.
+    out.metrics.face_enabled = false;
+    out.metrics.frame_enabled = false;
+    out.metrics.focus_enabled = false;
+    out.metrics.shadow.enabled = false;
+    out.metrics.highlight.enabled = false;
+    out.metrics.content_margin =
+        Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+
+    out.title_font = title.font;
+    out.title_font.Bold();
+    out.subtitle_font = subtitle.font;
+    out.metadata_font = metadata.font;
+
+    for(int st = 0; st < 4; st++) {
+        out.title_ink[st] =
+            !IsNull(title.palette.ink[st])
+            ? title.palette.ink[st] : panel.palette.ink[st];
+        out.subtitle_ink[st] =
+            !IsNull(subtitle.palette.ink[st])
+            ? subtitle.palette.ink[st] : panel.palette.ink[st];
+        out.metadata_ink[st] =
+            !IsNull(metadata.palette.ink[st])
+            ? metadata.palette.ink[st] : out.subtitle_ink[st];
+    }
+
+    return out;
+}
+
+Rect AlignInside(Rect area, Size size, UiAlign horizontal, UiAlign vertical)
+{
+    if(area.IsEmpty() || size.cx <= 0 || size.cy <= 0)
+        return Rect();
+
+    size.cx = min(size.cx, area.GetWidth());
+    size.cy = min(size.cy, area.GetHeight());
+
+    int x = area.left;
+    if(horizontal == UiAlign::RIGHT)
+        x = area.right - size.cx;
+    else if(horizontal == UiAlign::CENTER)
+        x = area.left + (area.GetWidth() - size.cx) / 2;
+
+    int y = area.top;
+    if(vertical == UiAlign::BOTTOM)
+        y = area.bottom - size.cy;
+    else if(vertical == UiAlign::CENTER)
+        y = area.top + (area.GetHeight() - size.cy) / 2;
+
+    return RectC(x, y, size.cx, size.cy);
+}
+
+void PrepareTagBand(const Vector<UiMediaCardTag>& source,
+                    const UiMediaCard::Style& style,
+                    const Rect& media,
+                    bool top,
+                    Vector<UiTagPresentation>& out)
+{
+    out.Clear();
+    if(source.IsEmpty() || media.IsEmpty())
+        return;
+
+    const int inset = max(0, style.tag_inset);
+    const int gap = max(0, style.tag_gap);
+    const int top_y = media.top + inset;
+    const int bottom_y = media.bottom - inset;
+
+    int left = media.left + inset;
+    int right = media.right - inset;
+
+    Vector<int> centers;
+
+    auto prepare_at = [&](int index, bool from_right) {
+        const UiMediaCardTag& item = source[index];
+        const int role = RoleIndex(item.tag.role);
+        const int available = max(0, right - left);
+        const Size size =
+            UiMeasureTag(item.tag, style.tag_style[role], available);
+        if(size.cx <= 0 || size.cy <= 0 || size.cx > available)
+            return;
+
+        const int x = from_right ? right - size.cx : left;
+        const int y = top ? top_y : bottom_y - size.cy;
+        const Rect box = RectC(x, y, size.cx, size.cy);
+
+        UiTagPresentation prepared =
+            UiPrepareTag(item.tag, style.tag_style[role],
+                         box, &style.media_palette);
+        if(!prepared.visible)
+            return;
+
+        out.Add(prepared);
+        if(from_right)
+            right = box.left - gap;
+        else
+            left = box.right + gap;
+    };
+
+    for(int i = 0; i < source.GetCount(); i++) {
+        const UiAlign align = NormalTagAlign(source[i].align);
+        if(align == UiAlign::LEFT)
+            prepare_at(i, false);
+        else if(align == UiAlign::CENTER)
+            centers.Add(i);
+    }
+
+    for(int i = source.GetCount() - 1; i >= 0; i--)
+        if(NormalTagAlign(source[i].align) == UiAlign::RIGHT)
+            prepare_at(i, true);
+
+    int total = 0;
+    Vector<Size> center_sizes;
+    center_sizes.SetCount(centers.GetCount());
+
+    for(int i = 0; i < centers.GetCount(); i++) {
+        const UiMediaCardTag& item = source[centers[i]];
+        const int role = RoleIndex(item.tag.role);
+        center_sizes[i] =
+            UiMeasureTag(item.tag, style.tag_style[role],
+                         max(0, right - left));
+        if(center_sizes[i].cx <= 0 || center_sizes[i].cy <= 0) {
+            total = INT_MAX;
+            break;
+        }
+        if(i)
+            total += gap;
+        if(total < INT_MAX - center_sizes[i].cx)
+            total += center_sizes[i].cx;
+    }
+
+    if(total <= right - left) {
+        int x = left + ((right - left) - total) / 2;
+        for(int i = 0; i < centers.GetCount(); i++) {
+            const UiMediaCardTag& item = source[centers[i]];
+            const int role = RoleIndex(item.tag.role);
+            const Size size = center_sizes[i];
+            const int y = top ? top_y : bottom_y - size.cy;
+            const Rect box = RectC(x, y, size.cx, size.cy);
+            UiTagPresentation prepared =
+                UiPrepareTag(item.tag, style.tag_style[role],
+                             box, &style.media_palette);
+            if(prepared.visible)
+                out.Add(prepared);
+            x += size.cx + gap;
+        }
+    }
+}
+
+UiTagPresentation PrepareOverlay(const UiMediaOverlayData& overlay,
+                                 const UiMediaCard::Style& style,
+                                 const Rect& media)
+{
+    if(!overlay.visible || !overlay.content.visible || media.IsEmpty())
+        return UiTagPresentation();
+
+    const int role = RoleIndex(overlay.content.role);
+    Rect area = media.Deflated(max(0, style.overlay_inset));
+    if(area.IsEmpty())
+        return UiTagPresentation();
+
+    const Size size =
+        UiMeasureTag(overlay.content, style.overlay_style[role],
+                     max(0, area.GetWidth()));
+    const Rect box =
+        AlignInside(area, size, overlay.align_h, overlay.align_v);
+    return UiPrepareTag(overlay.content,
+                        style.overlay_style[role],
+                        box, &style.media_palette);
+}
+
+void PrepareMedia(const UiMediaCardData& data,
+                  const UiMediaCard::Style& style,
+                  UiMediaCardPresentation& out)
+{
+    out.media_image = Image();
+    out.media_image_rect = Rect();
+    out.empty_icon_rect = Rect();
+    out.empty_text_rect = Rect();
+    out.prepared_empty_text.Clear();
+
+    if(out.media_content.IsEmpty())
+        return;
+
+    if(!IsNull(data.image)) {
+        const UiMediaFitGeometry fit =
+            UiComputeMediaFit(data.image.GetSize(),
+                              out.media_content, style.media_fit);
+        if(fit.IsValid()
+           && fit.target.GetWidth() <= 4096
+           && fit.target.GetHeight() <= 4096) {
+            const Rect full =
+                RectC(0, 0, data.image.GetWidth(), data.image.GetHeight());
+            Image source =
+                fit.source == full ? data.image : Crop(data.image, fit.source);
+            out.media_image =
+                CachedRescale(source, fit.target.GetSize());
+            out.media_image_rect = fit.target;
+        }
+        return;
+    }
+
+    const Image icon =
+        !IsNull(data.empty_icon) ? data.empty_icon : data.fallback_icon;
+
+    if(!IsNull(icon)) {
+        const int side =
+            min(style.empty_icon_size,
+                min(out.media_content.GetWidth(),
+                    out.media_content.GetHeight()));
+        if(side > 0) {
+            out.empty_icon_rect = RectC(
+                out.media_content.left
+                    + (out.media_content.GetWidth() - side) / 2,
+                out.media_content.top
+                    + (out.media_content.GetHeight() - side) / 2,
+                side, side);
+        }
+    }
+
+    if(!data.empty_text.IsEmpty()) {
+        const Font font = style.footer_style.title_font;
+        out.prepared_empty_text =
+            Ellipsize(data.empty_text, font,
+                      max(0, out.media_content.GetWidth() - DPI(12)));
+        const Size ts = GetTextSize(out.prepared_empty_text, font);
+
+        if(!out.empty_icon_rect.IsEmpty()) {
+            const int y =
+                min(out.media_content.bottom - ts.cy,
+                    out.empty_icon_rect.bottom + DPI(5));
+            out.empty_text_rect = RectC(
+                out.media_content.left
+                    + max(0, (out.media_content.GetWidth() - ts.cx) / 2),
+                y, min(ts.cx, out.media_content.GetWidth()), ts.cy);
+        }
+        else {
+            out.empty_text_rect = RectC(
+                out.media_content.left
+                    + max(0, (out.media_content.GetWidth() - ts.cx) / 2),
+                out.media_content.top
+                    + max(0, (out.media_content.GetHeight() - ts.cy) / 2),
+                min(ts.cx, out.media_content.GetWidth()),
+                min(ts.cy, out.media_content.GetHeight()));
+        }
+    }
+}
+
+void PaintMediaFrameOnTop(Draw& w,
+                          const Rect& rect,
+                          const UiMediaCard::Style& style,
+                          StyledState state)
+{
+    if(rect.IsEmpty() || !style.media_metrics.frame_enabled)
+        return;
+
+    StyledMetrics metrics = style.media_metrics;
+    metrics.face_enabled = false;
+    metrics.focus_enabled = false;
+    UiPaintStyledBackground(w, rect,
+                            style.media_palette, metrics,
+                            style.media_skin, state, false);
 }
 
 } // namespace
 
 const UiMediaCard::Style& UiMediaCard::StyleDefault()
 {
-    static Style s;
+    static Style style;
     ONCELOCK {
         for(int st = 0; st < 4; st++) {
-            s.palette.face[st] = UiFill::Solid(Color(250, 250, 251));
-            s.palette.frame[st] = Color(214, 219, 226);
-            s.palette.ink[st] = Color(24, 32, 43);
-            s.media_palette.face[st] = UiFill::Solid(Color(234, 237, 241));
-            s.media_palette.frame[st] = Color(214, 219, 226);
-            s.media_palette.ink[st] = Color(91, 100, 112);
-            s.title_ink[st] = Color(24, 32, 43);
-            s.subtitle_ink[st] = Color(92, 101, 113);
-            s.metadata_ink[st] = Color(118, 126, 138);
+            style.palette.face[st] = UiFill::Solid(Color(250, 250, 251));
+            style.palette.frame[st] = Color(214, 219, 226);
+            style.palette.ink[st] = Color(24, 32, 43);
+
+            style.media_palette.face[st] =
+                UiFill::Solid(Color(234, 237, 241));
+            style.media_palette.frame[st] = Color(190, 198, 208);
+            style.media_palette.ink[st] = Color(91, 100, 112);
         }
-        s.palette.face[ST_HOT] = UiFill::Solid(Color(246, 248, 251));
-        s.palette.face[ST_PRESSED] = UiFill::Solid(Color(237, 242, 248));
-        s.palette.face[ST_DISABLED] = UiFill::Solid(Color(247, 248, 250));
-        s.palette.ink[ST_DISABLED] = Color(150, 157, 167);
-        s.title_ink[ST_DISABLED] = s.subtitle_ink[ST_DISABLED]
-                                  = s.metadata_ink[ST_DISABLED]
-                                  = Color(150, 157, 167);
 
-        s.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
-        s.metrics.radius = DPI(9);
-        s.metrics.frame_width = DPI(1);
-        s.metrics.face_enabled = true;
-        s.metrics.frame_enabled = true;
-        s.metrics.focus_enabled = true;
-        s.metrics.shadow.enabled = false;
+        style.metrics.content_margin =
+            Rect(DPI(3), DPI(3), DPI(3), DPI(3));
+        style.metrics.face_enabled = false;
+        style.metrics.frame_enabled = false;
+        style.metrics.focus_enabled = true;
+        style.metrics.radius = DPI(9);
+        style.metrics.shadow.enabled = false;
 
-        s.media_metrics.content_margin = Rect(0, 0, 0, 0);
-        s.media_metrics.radius = DPI(6);
-        s.media_metrics.frame_width = DPI(1);
-        s.media_metrics.face_enabled = true;
-        s.media_metrics.frame_enabled = true;
-        s.media_metrics.focus_enabled = false;
-        s.media_metrics.shadow.enabled = false;
+        style.media_metrics.content_margin =
+            Rect(DPI(1), DPI(1), DPI(1), DPI(1));
+        style.media_metrics.face_enabled = true;
+        style.media_metrics.frame_enabled = true;
+        style.media_metrics.frame_width = DPI(1);
+        style.media_metrics.radius = DPI(7);
+        style.media_metrics.focus_enabled = false;
+        style.media_metrics.shadow.enabled = false;
 
-        for(int role = 0; role < 4; role++)
-            s.badge_style[role] = UiBadgeStyle();
+        style.header_style.metrics.face_enabled = false;
+        style.header_style.metrics.frame_enabled = false;
+        style.footer_style.metrics.face_enabled = false;
+        style.footer_style.metrics.frame_enabled = false;
+
+        for(int role = 0; role < 4; role++) {
+            style.tag_style[role] = UiTagStyle();
+            style.overlay_style[role] = UiTagStyle();
+        }
     }
-    return s;
+    return style;
+}
+
+UiMediaCard::Style UiResolveMediaCardStyle(UiRole role)
+{
+    UiMediaCard::Style out = UiMediaCard::StyleDefault();
+
+    const UiPanel::Style card = UiTheme::ResolvePanel(role);
+    const UiPanel::Style media = UiTheme::ResolvePanel(UiRole::Subtle);
+
+    out.palette = card.palette;
+    out.metrics = card.metrics;
+    out.skin = card.skin;
+
+    // Default card is intentionally transparent/frameless so a caller can have
+    // only the media well boxed while header/footer text floats around it.
+    out.metrics.content_margin =
+        Rect(DPI(3), DPI(3), DPI(3), DPI(3));
+    out.metrics.face_enabled = false;
+    out.metrics.frame_enabled = false;
+    out.metrics.focus_enabled = true;
+    out.metrics.shadow.enabled = false;
+    out.metrics.radius = max(DPI(8), out.metrics.radius);
+
+    out.media_palette = media.palette;
+    out.media_metrics = media.metrics;
+    out.media_skin = media.skin;
+    out.media_metrics.content_margin =
+        Rect(DPI(1), DPI(1), DPI(1), DPI(1));
+    out.media_metrics.face_enabled = true;
+    out.media_metrics.frame_enabled = true;
+    out.media_metrics.frame_width =
+        max(DPI(1), out.media_metrics.frame_width);
+    out.media_metrics.radius = DPI(7);
+    out.media_metrics.focus_enabled = false;
+    out.media_metrics.shadow.enabled = false;
+
+    out.header_style = ResolveBandStyle(role);
+    out.footer_style = ResolveBandStyle(role);
+
+    for(int r = 0; r < 4; r++) {
+        out.tag_style[r] = UiResolveTagStyle((UiRole)r);
+        out.overlay_style[r] = UiResolveTagStyle((UiRole)r);
+        out.overlay_style[r].metrics.content_margin =
+            Rect(DPI(8), DPI(4), DPI(8), DPI(4));
+        out.overlay_style[r].metrics.radius = DPI(6);
+        Font f = UiTheme::ResolveLabel((UiRole)r, UiTextSize::H3).font;
+        f.Bold();
+        out.overlay_style[r].font = f;
+    }
+
+    const UiThemeContext context = UiTheme::GetContext();
+    if(context.preset == UiThemePreset::Compact) {
+        out.metrics.content_margin =
+            Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+        out.section_gap = DPI(4);
+        out.tag_gap = DPI(3);
+        out.tag_inset = DPI(4);
+        out.overlay_inset = DPI(6);
+        out.empty_icon_size = DPI(24);
+        out.min_media_extent = DPI(44);
+    }
+
+    return out;
+}
+
+Size UiMeasureMediaCard(const UiMediaCardData& data,
+                        const UiMediaCard::Style& style)
+{
+    const Size header = MeasureBand(data.header, style.header_style);
+    const Size footer = MeasureBand(data.footer, style.footer_style);
+
+    int media_w = max(DPI(40), style.min_media_extent);
+    int media_h = max(DPI(40), style.min_media_extent);
+    if(style.media_aspect.cx > 0 && style.media_aspect.cy > 0)
+        media_h = max(DPI(40),
+            media_w * style.media_aspect.cy / max(1, style.media_aspect.cx));
+
+    int width = max(media_w, max(header.cx, footer.cx));
+    int height = media_h;
+    if(header.cy > 0)
+        height += header.cy + max(0, style.section_gap);
+    if(footer.cy > 0)
+        height += footer.cy + max(0, style.section_gap);
+
+    return UiStyledOuterSizeFromContent(
+        Size(width, height), style.metrics, style.skin);
+}
+
+UiMediaCardPresentation UiPrepareMediaCard(
+    const UiMediaCardData& data,
+    const UiMediaCard::Style& style,
+    const Rect& bounds)
+{
+    UiMediaCardPresentation out;
+    out.outer = bounds;
+    out.content =
+        UiStyledInnerRect(bounds, style.metrics, style.skin);
+
+    if(out.content.IsEmpty())
+        return out;
+
+    Rect body = out.content;
+    const Size header_size =
+        MeasureBand(data.header, style.header_style);
+    const Size footer_size =
+        MeasureBand(data.footer, style.footer_style);
+
+    if(header_size.cy > 0 && body.GetHeight() > 0) {
+        const int h = min(header_size.cy, body.GetHeight());
+        const Rect rect = RectC(body.left, body.top, body.GetWidth(), h);
+        out.header = PrepareBand(data.header, style.header_style, rect);
+        body.top += h;
+        if(body.top < body.bottom)
+            body.top = min(body.bottom,
+                           body.top + max(0, style.section_gap));
+    }
+
+    if(footer_size.cy > 0 && body.GetHeight() > 0) {
+        const int h = min(footer_size.cy, body.GetHeight());
+        const Rect rect =
+            RectC(body.left, body.bottom - h, body.GetWidth(), h);
+        out.footer = PrepareBand(data.footer, style.footer_style, rect);
+        body.bottom -= h;
+        if(body.top < body.bottom)
+            body.bottom = max(body.top,
+                              body.bottom - max(0, style.section_gap));
+    }
+
+    out.media = FitAuthoredAspect(body, style.media_aspect);
+    out.media_content =
+        UiStyledInnerRect(out.media,
+                          style.media_metrics, style.media_skin);
+
+    PrepareMedia(data, style, out);
+    PrepareTagBand(data.top_tags, style,
+                   out.media_content, true, out.top_tags);
+    PrepareTagBand(data.bottom_tags, style,
+                   out.media_content, false, out.bottom_tags);
+    out.overlay =
+        PrepareOverlay(data.overlay, style, out.media_content);
+
+    return out;
+}
+
+void UiPaintMediaCard(Draw& w,
+                      const UiMediaCardData& data,
+                      const UiMediaCard::Style& style,
+                      const UiMediaCardPresentation& p,
+                      StyledState state,
+                      bool focused)
+{
+    UiPaintStyledSurface(w, p.outer,
+                         style.palette, style.metrics, style.skin,
+                         state, focused, false, false);
+
+    PaintBand(w, p.header, style.header_style, state);
+    PaintBand(w, p.footer, style.footer_style, state);
+
+    if(!p.media.IsEmpty())
+        UiPaintStyledBackground(w, p.media,
+                                style.media_palette,
+                                style.media_metrics,
+                                style.media_skin,
+                                state, false);
+
+    if(!p.media_image.IsEmpty() && !p.media_image_rect.IsEmpty())
+        w.DrawImage(p.media_image_rect.left,
+                    p.media_image_rect.top,
+                    p.media_image);
+    else {
+        const Image icon =
+            !IsNull(data.empty_icon) ? data.empty_icon : data.fallback_icon;
+
+        if(!IsNull(icon) && !p.empty_icon_rect.IsEmpty())
+            w.DrawImage(p.empty_icon_rect, icon);
+
+        if(!p.prepared_empty_text.IsEmpty()
+           && !p.empty_text_rect.IsEmpty()) {
+            const Color ink =
+                PaletteInk(style.media_palette, state, SColorText());
+            w.DrawText(p.empty_text_rect.left,
+                       p.empty_text_rect.top,
+                       p.prepared_empty_text,
+                       style.footer_style.title_font,
+                       ink);
+        }
+    }
+
+    for(const UiTagPresentation& tag : p.top_tags)
+        UiPaintTag(w, tag, state);
+    for(const UiTagPresentation& tag : p.bottom_tags)
+        UiPaintTag(w, tag, state);
+
+    // Overlay is the final media-content layer and never consumes media space.
+    UiPaintTag(w, p.overlay, state);
+
+    PaintMediaFrameOnTop(w, p.media, style, state);
+}
+
+UiMediaCardData UiMakeMediaCardData(const UiItemRenderData& item)
+{
+    UiMediaCardData out;
+    out.image = !IsNull(item.image) ? item.image : item.icon;
+    out.footer.title = item.title;
+    out.footer.subtitle =
+        !item.subtitle.IsEmpty() ? item.subtitle : item.description;
+    out.footer.metadata = item.right_text;
+    out.enabled = item.enabled;
+    out.value = item.value;
+    out.data = item.data;
+    return out;
 }
 
 UiMediaCard::UiMediaCard()
@@ -149,67 +778,6 @@ UiMediaCard::Style& UiMediaCard::StyleEdit()
     return style_;
 }
 
-UiMediaCard::Style UiMediaCard::ResolveThemeStyle() const
-{
-    Style out = StyleDefault();
-
-    const UiPanel::Style card = UiTheme::ResolvePanel(role_);
-    const UiPanel::Style media = UiTheme::ResolvePanel(UiRole::Subtle);
-    const UiLabel::Style title = UiTheme::ResolveLabel(role_, UiTextSize::H3);
-    const UiLabel::Style subtitle = UiTheme::ResolveLabel(UiRole::Subtle);
-    const UiLabel::Style metadata =
-        UiTheme::ResolveLabel(UiRole::Subtle, UiTextSize::H3);
-
-    out.palette = card.palette;
-    out.metrics = card.metrics;
-    out.skin = card.skin;
-    out.metrics.content_margin = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
-    out.metrics.radius = max(DPI(8), out.metrics.radius);
-    out.metrics.frame_enabled = true;
-    out.metrics.frame_width = max(DPI(1), out.metrics.frame_width);
-    out.metrics.focus_enabled = true;
-    out.metrics.shadow.enabled = false;
-
-    out.media_palette = media.palette;
-    out.media_metrics = media.metrics;
-    out.media_skin = media.skin;
-    out.media_metrics.content_margin = Rect(0, 0, 0, 0);
-    out.media_metrics.radius = DPI(6);
-    out.media_metrics.frame_enabled = true;
-    out.media_metrics.frame_width = max(DPI(1), out.media_metrics.frame_width);
-    out.media_metrics.focus_enabled = false;
-    out.media_metrics.shadow.enabled = false;
-
-    out.title_font = title.font;
-    out.title_font.Bold();
-    out.subtitle_font = subtitle.font;
-    out.metadata_font = metadata.font;
-
-    for(int st = 0; st < 4; st++) {
-        out.title_ink[st] = !IsNull(title.palette.ink[st])
-                          ? title.palette.ink[st] : card.palette.ink[st];
-        out.subtitle_ink[st] = !IsNull(subtitle.palette.ink[st])
-                             ? subtitle.palette.ink[st] : card.palette.ink[st];
-        out.metadata_ink[st] = !IsNull(metadata.palette.ink[st])
-                             ? metadata.palette.ink[st] : out.subtitle_ink[st];
-    }
-
-    for(int role = 0; role < 4; role++)
-        out.badge_style[role] = UiResolveBadgeStyle((UiRole)role);
-
-    const UiThemeContext context = UiTheme::GetContext();
-    if(context.preset == UiThemePreset::Compact) {
-        out.metrics.content_margin = Rect(DPI(4), DPI(4), DPI(4), DPI(4));
-        out.media_text_gap = DPI(5);
-        out.text_gap = DPI(1);
-        out.badge_gap = DPI(3);
-        out.badge_inset = DPI(4);
-        out.empty_icon_size = DPI(24);
-        out.min_media_extent = DPI(44);
-    }
-    return out;
-}
-
 void UiMediaCard::SyncThemeStyle()
 {
     if(has_custom_style_)
@@ -219,9 +787,8 @@ void UiMediaCard::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    themed_style_ = ResolveThemeStyle();
+    themed_style_ = UiResolveMediaCardStyle(role_);
     theme_revision_ = revision;
-    presentation_dirty_ = true;
     RefreshLayout();
 }
 
@@ -229,6 +796,7 @@ const UiMediaCard::Style& UiMediaCard::GetEffectiveStyle() const
 {
     if(has_custom_style_)
         return style_;
+
     const_cast<UiMediaCard *>(this)->SyncThemeStyle();
     return themed_style_;
 }
@@ -297,27 +865,6 @@ UiMediaCard& UiMediaCard::SetFallbackIcon(const Image& image)
     return *this;
 }
 
-UiMediaCard& UiMediaCard::SetTitle(const String& text)
-{
-    data_.title = text;
-    InvalidatePresentation();
-    return *this;
-}
-
-UiMediaCard& UiMediaCard::SetSubTitle(const String& text)
-{
-    data_.subtitle = text;
-    InvalidatePresentation();
-    return *this;
-}
-
-UiMediaCard& UiMediaCard::SetMetadata(const String& text)
-{
-    data_.metadata = text;
-    InvalidatePresentation();
-    return *this;
-}
-
 UiMediaCard& UiMediaCard::SetEmptyCue(const String& text, const Image& icon)
 {
     data_.empty_text = text;
@@ -326,30 +873,145 @@ UiMediaCard& UiMediaCard::SetEmptyCue(const String& text, const Image& icon)
     return *this;
 }
 
-UiMediaCard& UiMediaCard::ClearBadges()
+UiMediaCard& UiMediaCard::SetHeader(const String& title,
+                                    const String& subtitle,
+                                    const String& metadata)
 {
-    data_.badges.Clear();
+    data_.header.title = title;
+    data_.header.subtitle = subtitle;
+    data_.header.metadata = metadata;
+    data_.header.visible = true;
     InvalidatePresentation();
     return *this;
 }
 
-UiMediaCard& UiMediaCard::AddBadge(const UiBadgeData& badge,
-                                   UiMediaBadgeAnchor anchor)
+UiMediaCard& UiMediaCard::ClearHeader()
 {
-    UiMediaCardBadge& item = data_.badges.Add();
-    item.badge = badge;
-    item.anchor = anchor;
+    data_.header.Clear();
     InvalidatePresentation();
     return *this;
 }
 
-UiMediaCard& UiMediaCard::SetLabelSide(UiAlign side)
+UiMediaCard& UiMediaCard::ShowHeader(bool show)
 {
-    if(side != UiAlign::DEFAULT && !MediaCardLabelSide(side))
-        return *this;
+    data_.header.visible = show;
+    InvalidatePresentation();
+    return *this;
+}
 
-    StyleEdit().label_side = side;
-    OnStyleChanged();
+UiMediaCard& UiMediaCard::SetFooter(const String& title,
+                                    const String& subtitle,
+                                    const String& metadata)
+{
+    data_.footer.title = title;
+    data_.footer.subtitle = subtitle;
+    data_.footer.metadata = metadata;
+    data_.footer.visible = true;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ClearFooter()
+{
+    data_.footer.Clear();
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ShowFooter(bool show)
+{
+    data_.footer.visible = show;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::SetTitle(const String& text)
+{
+    data_.footer.title = text;
+    data_.footer.visible = true;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::SetSubTitle(const String& text)
+{
+    data_.footer.subtitle = text;
+    data_.footer.visible = true;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::SetMetadata(const String& text)
+{
+    data_.footer.metadata = text;
+    data_.footer.visible = true;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ClearTopTags()
+{
+    data_.top_tags.Clear();
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ClearBottomTags()
+{
+    data_.bottom_tags.Clear();
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ClearTags()
+{
+    data_.top_tags.Clear();
+    data_.bottom_tags.Clear();
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::AddTopTag(const UiTagData& tag, UiAlign align)
+{
+    UiMediaCardTag& item = data_.top_tags.Add();
+    item.tag = tag;
+    item.align = NormalTagAlign(align);
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::AddBottomTag(const UiTagData& tag, UiAlign align)
+{
+    UiMediaCardTag& item = data_.bottom_tags.Add();
+    item.tag = tag;
+    item.align = NormalTagAlign(align);
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::SetOverlay(const UiTagData& content,
+                                     UiAlign horizontal,
+                                     UiAlign vertical)
+{
+    data_.overlay.content = content;
+    data_.overlay.align_h = horizontal;
+    data_.overlay.align_v = vertical;
+    data_.overlay.visible = true;
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ClearOverlay()
+{
+    data_.overlay = UiMediaOverlayData();
+    InvalidatePresentation();
+    return *this;
+}
+
+UiMediaCard& UiMediaCard::ShowOverlay(bool show)
+{
+    data_.overlay.visible = show;
+    InvalidatePresentation();
     return *this;
 }
 
@@ -383,316 +1045,34 @@ UiMediaCard& UiMediaCard::SetSelected(bool selected)
 UiMediaCard& UiMediaCard::SetSelectable(bool selectable)
 {
     selectable_ = selectable;
+
     if(selectable_)
         WantFocus();
     else {
         NoWantFocus();
         selected_ = false;
     }
+
     Refresh();
     return *this;
 }
 
 void UiMediaCard::InvalidatePresentation()
 {
-    presentation_dirty_ = true;
     RefreshLayout();
     Refresh();
 }
 
-Size UiMediaCard::MeasureTextBlock(const Style& style) const
-{
-    if(style.label_side == UiAlign::DEFAULT)
-        return Size(0, 0);
-
-    int width = 0;
-    int height = 0;
-
-    auto add = [&](const String& text, Font font) {
-        if(text.IsEmpty())
-            return;
-        const Size ts = GetTextSize(MediaCardOneLine(text), font);
-        width = max(width, ts.cx);
-        if(height)
-            height += max(0, style.text_gap);
-        height += ts.cy;
-    };
-
-    add(data_.title, style.title_font);
-    add(data_.subtitle, style.subtitle_font);
-    add(data_.metadata, style.metadata_font);
-    return Size(width, height);
-}
-
 Size UiMediaCard::GetMinSize() const
 {
-    const Style& style = GetEffectiveStyle();
-    const Size text = MeasureTextBlock(style);
-
-    int media_width = max(DPI(40), style.min_media_extent);
-    int media_height = max(DPI(40), style.min_media_extent);
-    if(style.media_aspect.cx > 0 && style.media_aspect.cy > 0)
-        media_height = max(DPI(40),
-            media_width * style.media_aspect.cy / max(1, style.media_aspect.cx));
-
-    Size content(media_width, media_height);
-    if(text.cx > 0 || text.cy > 0) {
-        const int gap = max(0, style.media_text_gap);
-        if(style.label_side == UiAlign::TOP || style.label_side == UiAlign::BOTTOM) {
-            content.cx = max(content.cx, min(text.cx, DPI(220)));
-            content.cy += gap + text.cy;
-        }
-        else if(style.label_side == UiAlign::LEFT || style.label_side == UiAlign::RIGHT) {
-            content.cx += gap + min(text.cx, DPI(120));
-            content.cy = max(content.cy, text.cy);
-        }
-    }
-    return UiStyledOuterSizeFromContent(content, style.metrics, style.skin);
-}
-
-void UiMediaCard::LayoutText(const Rect& rect, const Style& style)
-{
-    presentation_.title = Rect();
-    presentation_.subtitle = Rect();
-    presentation_.metadata = Rect();
-    presentation_.prepared_title.Clear();
-    presentation_.prepared_subtitle.Clear();
-    presentation_.prepared_metadata.Clear();
-
-    if(rect.IsEmpty())
-        return;
-
-    struct Line {
-        const String *source;
-        Font font;
-        Rect *box;
-        WString *prepared;
-    };
-
-    Line lines[] = {
-        { &data_.title, style.title_font, &presentation_.title, &presentation_.prepared_title },
-        { &data_.subtitle, style.subtitle_font, &presentation_.subtitle, &presentation_.prepared_subtitle },
-        { &data_.metadata, style.metadata_font, &presentation_.metadata, &presentation_.prepared_metadata },
-    };
-
-    int total_height = 0;
-    int visible_lines = 0;
-    for(const Line& line : lines) {
-        if(line.source->IsEmpty())
-            continue;
-        if(visible_lines++)
-            total_height += max(0, style.text_gap);
-        total_height += line.font.GetCy();
-    }
-
-    int y = rect.top + max(0, (rect.GetHeight() - total_height) / 2);
-    bool first = true;
-    for(const Line& line : lines) {
-        if(line.source->IsEmpty())
-            continue;
-
-        if(!first)
-            y += max(0, style.text_gap);
-        first = false;
-
-        const int height = min(line.font.GetCy(), max(0, rect.bottom - y));
-        if(height <= 0)
-            break;
-
-        *line.box = RectC(rect.left, y, rect.GetWidth(), height);
-        *line.prepared = MediaCardEllipsize(*line.source, line.font, rect.GetWidth());
-        y += height;
-    }
-}
-
-void UiMediaCard::PrepareMedia(const Style& style)
-{
-    presentation_.media_image = Image();
-    presentation_.media_image_rect = Rect();
-    presentation_.empty_icon_rect = Rect();
-    presentation_.empty_text_rect = Rect();
-    presentation_.prepared_empty_text.Clear();
-
-    if(presentation_.media.IsEmpty())
-        return;
-
-    if(!IsNull(data_.image)) {
-        const UiMediaFitGeometry fit =
-            UiComputeMediaFit(data_.image.GetSize(), presentation_.media, style.media_fit);
-        if(fit.IsValid() && fit.target.GetWidth() <= 4096 && fit.target.GetHeight() <= 4096) {
-            const Rect full_source = RectC(0, 0, data_.image.GetWidth(), data_.image.GetHeight());
-            Image source = fit.source == full_source ? data_.image : Crop(data_.image, fit.source);
-            presentation_.media_image = CachedRescale(source, fit.target.GetSize());
-            presentation_.media_image_rect = fit.target;
-        }
-        return;
-    }
-
-    const Image icon = !IsNull(data_.empty_icon) ? data_.empty_icon : data_.fallback_icon;
-    if(!IsNull(icon)) {
-        const int side = min(style.empty_icon_size,
-                             min(presentation_.media.GetWidth(), presentation_.media.GetHeight()));
-        if(side > 0) {
-            presentation_.empty_icon_rect = RectC(
-                presentation_.media.left + (presentation_.media.GetWidth() - side) / 2,
-                presentation_.media.top + (presentation_.media.GetHeight() - side) / 2,
-                side, side);
-        }
-    }
-
-    if(!data_.empty_text.IsEmpty()) {
-        presentation_.prepared_empty_text = MediaCardEllipsize(
-            data_.empty_text, style.title_font, max(0, presentation_.media.GetWidth() - DPI(12)));
-
-        const Size ts = GetTextSize(presentation_.prepared_empty_text, style.title_font);
-        if(!presentation_.empty_icon_rect.IsEmpty()) {
-            const int y = min(presentation_.media.bottom - ts.cy,
-                              presentation_.empty_icon_rect.bottom + DPI(5));
-            presentation_.empty_text_rect = RectC(
-                presentation_.media.left + max(0, (presentation_.media.GetWidth() - ts.cx) / 2),
-                y, min(ts.cx, presentation_.media.GetWidth()), ts.cy);
-        }
-        else {
-            presentation_.empty_text_rect = RectC(
-                presentation_.media.left + max(0, (presentation_.media.GetWidth() - ts.cx) / 2),
-                presentation_.media.top + max(0, (presentation_.media.GetHeight() - ts.cy) / 2),
-                min(ts.cx, presentation_.media.GetWidth()),
-                min(ts.cy, presentation_.media.GetHeight()));
-        }
-    }
-}
-
-void UiMediaCard::PrepareBadges(const Style& style)
-{
-    presentation_.badges.Clear();
-    presentation_.badge_source_indices.Clear();
-
-    if(presentation_.media.IsEmpty())
-        return;
-
-    int top_left = presentation_.media.left + max(0, style.badge_inset);
-    int top_right = presentation_.media.right - max(0, style.badge_inset);
-    int bottom_left = top_left;
-    int bottom_right = top_right;
-    const int top_y = presentation_.media.top + max(0, style.badge_inset);
-    const int bottom_y = presentation_.media.bottom - max(0, style.badge_inset);
-    const int gap = max(0, style.badge_gap);
-
-    for(int i = 0; i < data_.badges.GetCount(); i++) {
-        const UiMediaCardBadge& entry = data_.badges[i];
-        if(!entry.badge.visible)
-            continue;
-
-        const int role = MediaCardRoleIndex(entry.badge.role);
-        const int max_width = max(0, presentation_.media.GetWidth() - style.badge_inset * 2);
-        const Size size = UiMeasureBadge(entry.badge, style.badge_style[role], max_width);
-        if(size.cx <= 0 || size.cy <= 0)
-            continue;
-
-        Rect box;
-        switch(entry.anchor) {
-        case UiMediaBadgeAnchor::TopLeft:
-            if(top_left + size.cx > top_right) continue;
-            box = RectC(top_left, top_y, size.cx, size.cy);
-            top_left = box.right + gap;
-            break;
-        case UiMediaBadgeAnchor::TopRight:
-            if(top_right - size.cx < top_left) continue;
-            box = RectC(top_right - size.cx, top_y, size.cx, size.cy);
-            top_right = box.left - gap;
-            break;
-        case UiMediaBadgeAnchor::BottomLeft:
-            if(bottom_left + size.cx > bottom_right) continue;
-            box = RectC(bottom_left, bottom_y - size.cy, size.cx, size.cy);
-            bottom_left = box.right + gap;
-            break;
-        case UiMediaBadgeAnchor::BottomRight:
-            if(bottom_right - size.cx < bottom_left) continue;
-            box = RectC(bottom_right - size.cx, bottom_y - size.cy, size.cx, size.cy);
-            bottom_right = box.left - gap;
-            break;
-        }
-
-        UiBadgePresentation prepared = UiPrepareBadge(
-            entry.badge, style.badge_style[role], box, &style.media_palette);
-        if(prepared.visible) {
-            presentation_.badges.Add(prepared);
-            presentation_.badge_source_indices.Add(i);
-        }
-    }
-}
-
-void UiMediaCard::RebuildPresentation()
-{
-    presentation_ = UiMediaCardPresentation();
-
-    const Style& style = GetEffectiveStyle();
-    const Rect outer(Point(0, 0), GetSize());
-    presentation_.outer = outer;
-    presentation_.content = UiStyledInnerRect(outer, style.metrics, style.skin);
-
-    if(presentation_.content.IsEmpty()) {
-        presentation_dirty_ = false;
-        return;
-    }
-
-    const Size natural_text = MeasureTextBlock(style);
-    Rect media_area = presentation_.content;
-    Rect text;
-    const bool has_text = (natural_text.cx > 0 || natural_text.cy > 0)
-                       && style.label_side != UiAlign::DEFAULT;
-
-    if(has_text) {
-        const int gap = max(0, style.media_text_gap);
-
-        if(style.label_side == UiAlign::TOP || style.label_side == UiAlign::BOTTOM) {
-            const int available = max(0, presentation_.content.GetHeight()
-                - min(style.min_media_extent, presentation_.content.GetHeight()));
-            const int reserve = min(natural_text.cy, available);
-            if(reserve > 0) {
-                if(style.label_side == UiAlign::TOP) {
-                    text = RectC(presentation_.content.left, presentation_.content.top,
-                                 presentation_.content.GetWidth(), reserve);
-                    media_area.top = min(presentation_.content.bottom, text.bottom + gap);
-                }
-                else {
-                    text = RectC(presentation_.content.left, presentation_.content.bottom - reserve,
-                                 presentation_.content.GetWidth(), reserve);
-                    media_area.bottom = max(presentation_.content.top, text.top - gap);
-                }
-            }
-        }
-        else if(style.label_side == UiAlign::LEFT || style.label_side == UiAlign::RIGHT) {
-            const int available = max(0, presentation_.content.GetWidth()
-                - min(style.min_media_extent, presentation_.content.GetWidth()));
-            const int reserve = min(natural_text.cx,
-                min(available, presentation_.content.GetWidth() * 45 / 100));
-            if(reserve > 0) {
-                if(style.label_side == UiAlign::LEFT) {
-                    text = RectC(presentation_.content.left, presentation_.content.top,
-                                 reserve, presentation_.content.GetHeight());
-                    media_area.left = min(presentation_.content.right, text.right + gap);
-                }
-                else {
-                    text = RectC(presentation_.content.right - reserve, presentation_.content.top,
-                                 reserve, presentation_.content.GetHeight());
-                    media_area.right = max(presentation_.content.left, text.left - gap);
-                }
-            }
-        }
-    }
-
-    presentation_.media = FitAuthoredAspect(media_area, style.media_aspect);
-    presentation_.text = text;
-    LayoutText(text, style);
-    PrepareMedia(style);
-    PrepareBadges(style);
-    presentation_dirty_ = false;
+    return UiMeasureMediaCard(data_, GetEffectiveStyle());
 }
 
 void UiMediaCard::Layout()
 {
-    RebuildPresentation();
+    presentation_ =
+        UiPrepareMediaCard(data_, GetEffectiveStyle(),
+                           Rect(Point(0, 0), GetSize()));
 }
 
 StyledState UiMediaCard::ResolveState() const
@@ -708,66 +1088,26 @@ StyledState UiMediaCard::ResolveState() const
 
 void UiMediaCard::Paint(Draw& w)
 {
-    const Style& style = GetEffectiveStyle();
-    const StyledState state = ResolveState();
-    const bool focused = HasFocus() && selectable_;
-
-    UiPaintStyledSurface(w, presentation_.outer,
-                         style.palette, style.metrics, style.skin,
-                         state, focused, false, false);
-
-    if(!presentation_.media.IsEmpty())
-        UiPaintStyledBackground(w, presentation_.media,
-                                style.media_palette, style.media_metrics,
-                                style.media_skin, state, false);
-
-    if(!presentation_.media_image.IsEmpty() && !presentation_.media_image_rect.IsEmpty()) {
-        w.DrawImage(presentation_.media_image_rect.left,
-                    presentation_.media_image_rect.top,
-                    presentation_.media_image);
-    }
-    else {
-        const Image icon = !IsNull(data_.empty_icon) ? data_.empty_icon : data_.fallback_icon;
-        if(!IsNull(icon) && !presentation_.empty_icon_rect.IsEmpty())
-            w.DrawImage(presentation_.empty_icon_rect, icon);
-
-        if(!presentation_.prepared_empty_text.IsEmpty()
-           && !presentation_.empty_text_rect.IsEmpty()) {
-            const Color ink = MediaCardPaletteInk(style.media_palette, state, SColorText());
-            w.DrawText(presentation_.empty_text_rect.left,
-                       presentation_.empty_text_rect.top,
-                       presentation_.prepared_empty_text, style.title_font, ink);
-        }
-    }
-
-    for(const UiBadgePresentation& badge : presentation_.badges)
-        UiPaintBadge(w, badge, state);
-
-    if(!presentation_.prepared_title.IsEmpty() && !presentation_.title.IsEmpty())
-        w.DrawText(presentation_.title.left, presentation_.title.top,
-                   presentation_.prepared_title, style.title_font,
-                   MediaCardInk(style.title_ink, state,
-                       MediaCardPaletteInk(style.palette, state, SColorText())));
-
-    if(!presentation_.prepared_subtitle.IsEmpty() && !presentation_.subtitle.IsEmpty())
-        w.DrawText(presentation_.subtitle.left, presentation_.subtitle.top,
-                   presentation_.prepared_subtitle, style.subtitle_font,
-                   MediaCardInk(style.subtitle_ink, state,
-                       MediaCardPaletteInk(style.palette, state, SColorText())));
-
-    if(!presentation_.prepared_metadata.IsEmpty() && !presentation_.metadata.IsEmpty())
-        w.DrawText(presentation_.metadata.left, presentation_.metadata.top,
-                   presentation_.prepared_metadata, style.metadata_font,
-                   MediaCardInk(style.metadata_ink, state,
-                       MediaCardPaletteInk(style.palette, state, SColorText())));
+    UiPaintMediaCard(w, data_, GetEffectiveStyle(),
+                     presentation_, ResolveState(),
+                     HasFocus() && selectable_);
 }
 
-int UiMediaCard::HitTestBadge(Point p) const
+const UiTagPresentation* UiMediaCard::FindTagAt(Point p) const
 {
-    for(int i = presentation_.badges.GetCount() - 1; i >= 0; i--)
-        if(presentation_.badges[i].bounds.Contains(p))
-            return presentation_.badge_source_indices[i];
-    return -1;
+    if(presentation_.overlay.visible
+       && presentation_.overlay.bounds.Contains(p))
+        return &presentation_.overlay;
+
+    for(int i = presentation_.top_tags.GetCount() - 1; i >= 0; i--)
+        if(presentation_.top_tags[i].bounds.Contains(p))
+            return &presentation_.top_tags[i];
+
+    for(int i = presentation_.bottom_tags.GetCount() - 1; i >= 0; i--)
+        if(presentation_.bottom_tags[i].bounds.Contains(p))
+            return &presentation_.bottom_tags[i];
+
+    return nullptr;
 }
 
 void UiMediaCard::MouseEnter(Point p, dword flags)
@@ -792,7 +1132,11 @@ void UiMediaCard::LeftDown(Point p, dword flags)
         return;
 
     pressed_ = true;
-    pressed_badge_ = HitTestBadge(p);
+    pressed_tag_id_.Clear();
+
+    if(const UiTagPresentation *tag = FindTagAt(p))
+        if(tag->enabled && tag->actionable && !tag->id.IsEmpty())
+            pressed_tag_id_ = tag->id;
 
     if(selectable_)
         SetFocus();
@@ -808,32 +1152,29 @@ void UiMediaCard::LeftUp(Point p, dword flags)
         return;
 
     const bool inside = Rect(Point(0, 0), GetSize()).Contains(p);
-    const int release_badge = HitTestBadge(p);
-    const int pressed_badge = pressed_badge_;
-
+    const String pressed_tag = pressed_tag_id_;
     pressed_ = false;
-    pressed_badge_ = -1;
+    pressed_tag_id_.Clear();
+
     if(HasCapture())
         ReleaseCapture();
 
-    // ReleaseCapture can synchronously invoke CancelMode on Win32. Restore the
-    // post-release hover state only after capture teardown has completed.
     hot_ = inside && IsEnabled() && data_.enabled;
     Refresh();
 
-    if(inside && pressed_badge >= 0
-       && pressed_badge == release_badge
-       && pressed_badge < data_.badges.GetCount()) {
-        const UiBadgeData& badge = data_.badges[pressed_badge].badge;
-        if(badge.enabled && badge.actionable) {
-            const String id = badge.id;
-            const Value value = badge.value;
-            WhenBadgeAction(id, value);
-            return;
+    if(inside && !pressed_tag.IsEmpty()) {
+        if(const UiTagPresentation *tag = FindTagAt(p)) {
+            if(tag->enabled && tag->actionable
+               && tag->id == pressed_tag) {
+                const String id = tag->id;
+                const Value value = tag->value;
+                WhenTagAction(id, value);
+                return;
+            }
         }
     }
 
-    if(inside && pressed_badge < 0)
+    if(inside && pressed_tag.IsEmpty())
         WhenAction();
 
     Ctrl::LeftUp(p, flags);
@@ -864,13 +1205,111 @@ void UiMediaCard::LostFocus()
 void UiMediaCard::CancelMode()
 {
     pressed_ = false;
-    pressed_badge_ = -1;
+    pressed_tag_id_.Clear();
     hot_ = false;
 
-    // Capture teardown owns ReleaseCapture(). Calling ReleaseCapture() from
-    // CancelMode() recursively re-enters CancelMode() on Win32/U++.
+    // Capture teardown owns ReleaseCapture(). Calling ReleaseCapture() here
+    // recursively re-enters CancelMode() on Win32/U++.
     Refresh();
     Ctrl::CancelMode();
+}
+
+UiMediaCardRender::UiMediaCardRender()
+{
+}
+
+UiMediaCardRender& UiMediaCardRender::SetCardStyle(
+    const UiMediaCard::Style& style)
+{
+    custom_card_style_ = style;
+    has_custom_card_style_ = true;
+    InvalidateLayout();
+    return *this;
+}
+
+UiMediaCardRender& UiMediaCardRender::ClearCardStyle()
+{
+    if(!has_custom_card_style_)
+        return *this;
+
+    has_custom_card_style_ = false;
+    InvalidateLayout();
+    return *this;
+}
+
+UiMediaCardRender& UiMediaCardRender::SetResolver(
+    Function<void(const UiItemRenderData&, UiMediaCardData&)> resolver)
+{
+    resolver_ = resolver;
+    InvalidateLayout();
+    return *this;
+}
+
+UiMediaCardData UiMediaCardRender::ResolveCardData() const
+{
+    UiMediaCardData out = UiMakeMediaCardData(Data());
+    if(resolver_)
+        resolver_(Data(), out);
+    return out;
+}
+
+UiMediaCard::Style UiMediaCardRender::ResolveCardStyle() const
+{
+    return has_custom_card_style_
+         ? custom_card_style_
+         : UiResolveMediaCardStyle(Data().role);
+}
+
+One<UiItemRender> UiMediaCardRender::Clone() const
+{
+    UiMediaCardRender *render = new UiMediaCardRender;
+    One<UiItemRender> out = render;
+
+    CopyConfigurationTo(*render);
+    render->resolver_ = resolver_;
+
+    if(has_custom_card_style_)
+        render->SetCardStyle(custom_card_style_);
+
+    return out;
+}
+
+Size UiMediaCardRender::GetContentSize() const
+{
+    const UiMediaCardData data = ResolveCardData();
+    const UiMediaCard::Style style = ResolveCardStyle();
+    return UiMeasureMediaCard(data, style);
+}
+
+Size UiMediaCardRender::GetMinSize() const
+{
+    const UiMediaCardData data = ResolveCardData();
+    const UiMediaCard::Style style = ResolveCardStyle();
+    return UiMeasureMediaCard(data, style);
+}
+
+void UiMediaCardRender::Layout()
+{
+    card_data_ = ResolveCardData();
+    resolved_card_style_ = ResolveCardStyle();
+    presentation_ =
+        UiPrepareMediaCard(card_data_, resolved_card_style_, Bounds());
+}
+
+void UiMediaCardRender::Paint(
+    Draw& w, const UiItemRenderState& state) const
+{
+    UiPaintMediaCard(w, card_data_, resolved_card_style_,
+                     presentation_, ResolveStyledState(state),
+                     state.focused);
+}
+
+UiItemRenderHit UiMediaCardRender::HitTest(Point p) const
+{
+    UiItemRenderHit hit;
+    if(Bounds().Contains(p))
+        hit.part = UIITEMPART_BODY;
+    return hit;
 }
 
 } // namespace Upp

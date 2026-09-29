@@ -2,76 +2,50 @@
 #define _Ui_UiBadge_h_
 
 /*
-    UiBadge presentation
+    Compatibility header
     ====================
 
-    Lightweight badge/tag data and prepared painting helpers. Hosts own placement
-    and interaction; high-scale views do not need one Ctrl per badge.
+    UiBadge was the initial name used while UiMediaCard was being prototyped.
+    The generic presentation primitive is now UiTag. Keep these aliases so code
+    written against the short-lived prototype does not fail abruptly.
 */
 
-#include <CtrlLib/CtrlLib.h>
-#include <Ui/UiStyle.h>
-#include <Ui/UiDraw.h>
+#include <Ui/UiTag.h>
 
 namespace Upp {
 
-enum class UiRole : byte;
+using UiBadgeVariant = UiTagVariant;
+using UiBadgeData = UiTagData;
+using UiBadgeStyle = UiTagStyle;
+using UiBadgePresentation = UiTagPresentation;
 
-enum class UiBadgeVariant : byte {
-    Soft,
-    Filled,
-    Outline
-};
+inline UiBadgeStyle UiResolveBadgeStyle(UiRole role)
+{
+    return UiResolveTagStyle(role);
+}
 
-struct UiBadgeData : Moveable<UiBadgeData> {
-    String id;
-    String text;
-    Image  icon;
-    UiRole role;
-    UiBadgeVariant variant = UiBadgeVariant::Soft;
-    bool visible = true;
-    bool enabled = true;
-    bool actionable = false;
-    Value value;
+inline Size UiMeasureBadge(const UiBadgeData& data,
+                           const UiBadgeStyle& style,
+                           int max_width = INT_MAX)
+{
+    return UiMeasureTag(data, style, max_width);
+}
 
-    UiBadgeData();
-    UiBadgeData(const String& text, UiRole role,
-                UiBadgeVariant variant = UiBadgeVariant::Soft);
-};
+inline UiBadgePresentation UiPrepareBadge(
+    const UiBadgeData& data,
+    const UiBadgeStyle& style,
+    const Rect& bounds,
+    const StyledPalette *parent_palette = nullptr)
+{
+    return UiPrepareTag(data, style, bounds, parent_palette);
+}
 
-struct UiBadgeStyle : Moveable<UiBadgeStyle> {
-    StyledPalette palette;
-    StyledMetrics metrics;
-    StyledSkin    skin;
-    Font font;
-    int icon_size = DPI(12);
-    int content_gap = DPI(3);
-
-    void Serialize(Stream& s)
-    {
-        s % palette % metrics % skin % font % icon_size % content_gap;
-    }
-};
-
-struct UiBadgePresentation : Moveable<UiBadgePresentation> {
-    Rect bounds;
-    Rect icon;
-    Rect text;
-    WString prepared_text;
-    Image icon_image;
-    UiBadgeStyle style;
-    bool visible = false;
-    bool enabled = true;
-};
-
-UiBadgeStyle UiResolveBadgeStyle(UiRole role);
-Size UiMeasureBadge(const UiBadgeData& data, const UiBadgeStyle& style,
-                    int max_width = INT_MAX);
-UiBadgePresentation UiPrepareBadge(const UiBadgeData& data,
-                                   const UiBadgeStyle& style,
-                                   const Rect& bounds,
-                                   const StyledPalette *parent_palette = nullptr);
-void UiPaintBadge(Draw& w, const UiBadgePresentation& badge, StyledState state);
+inline void UiPaintBadge(Draw& w,
+                         const UiBadgePresentation& badge,
+                         StyledState state)
+{
+    UiPaintTag(w, badge, state);
+}
 
 } // namespace Upp
 

@@ -77,6 +77,7 @@ A shell using a control does not substitute for its behavioral/property coverage
 | [UiDirectContentHost](../Ui/UiDirectContentHost.h) | Borrowed single child with independent Fit/Fixed/Expand axes. | family coverage to accept |
 | [UiGroupPanel](../Ui/UiGroupPanel.h) | Titled frame with separate header and body root slots. | [UiPanelDemo](../examples/UiPanelDemo) |
 | [UiTitleCard](../Ui/UiTitleCard.h) | Title/subtitle/media with an adjacent content cell. | [UiTitleCardDemo](../examples/UiTitleCardDemo) |
+| [UiMediaCard](../Ui/UiMediaCard.h) | Optional header/footer around media with non-consuming tags/overlay; shared live/render presentation. | [UiMediaCardDemo](../examples/UiMediaCardDemo) |
 | [UiStack](../Ui/UiStack.h) | Exclusive page hosting and measurement. | family coverage to accept |
 | [UiAccordion](../Ui/UiAccordion.h) | Collapsible real-child sections with optional reorder. | [UiAccordionDemo](../examples/UiAccordionDemo) |
 | [UiScrollPanel](../Ui/UiScrollPanel.h) | Bounded viewport around one content root. | [UiScrollPanelDemo](../examples/UiScrollPanelDemo) |
@@ -251,6 +252,15 @@ UiPanel/UiScrollPanel/UiTitleCard each host one content root; UiTitleCard uses i
 adjacent SetContentCell. UiGroupPanel has independently replaceable header-content
 and body-content roots. Use a box/grid/absolute layout inside a root for several
 children. Parenting still does not imply deletion ownership.
+
+UiMediaCard is a media-centric presentation rather than a general child host. Header
+and Footer are optional prepared text bands; absent content reserves no geometry.
+The default card/header/footer surfaces are transparent and frameless, while the
+Media surface owns an independent face/frame/radius, so a common tile can show only
+a bordered image with free-standing footer text. Top/Bottom UiTag groups and the
+3x3-aligned Overlay paint over Media without consuming its layout. UiMediaCardRender
+uses the same prepared UiMediaCardPresentation through UiItemRender for Gallery/List
+scale; it does not allocate a child-control tree per item.
 
 GroupPanel header placement supports Top/Bottom/Left/Right, mode Outside/Center/
 Inside, identity alignment and separate header-child alignment. Opposite/trailing

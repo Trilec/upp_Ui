@@ -5,69 +5,131 @@
     UiMediaCard
     ===========
 
-    Purpose
-    - Reusable media-first card for small interactive references and a shared
-      presentation contract for later model-view renderers.
+    Media-centric presentation with four structural ideas:
+      Header (optional, consumes space)
+      Media  (main image/content region)
+      Overlay + top/bottom Tags (do not consume media space)
+      Footer (optional, consumes space)
 
-    Intent
-    - Keep media, labels and compact overlay badges domain-neutral.
-    - Prepare image scaling, text fitting and badge geometry outside Paint().
-    - Keep file import, AI assets and application validation in the host.
+    The live Ctrl and UiMediaCardRender share one prepared presentation.
 */
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
-#include <Ui/UiBadge.h>
+#include <Ui/UiTag.h>
 #include <Ui/UiMediaFit.h>
+#include <Ui/UiItemRender.h>
 
 namespace Upp {
 
-enum class UiMediaBadgeAnchor : byte {
-    TopLeft,
-    TopRight,
-    BottomLeft,
-    BottomRight
-};
-
-struct UiMediaCardBadge : Moveable<UiMediaCardBadge> {
-    UiBadgeData badge;
-    UiMediaBadgeAnchor anchor = UiMediaBadgeAnchor::TopLeft;
-};
-
-struct UiMediaCardData {
-    Image image;
-    Image fallback_icon;
+struct UiMediaBandData {
     String title;
     String subtitle;
     String metadata;
+    bool visible = true;
+
+    bool HasContent() const
+    {
+        return visible
+            && (!title.IsEmpty() || !subtitle.IsEmpty() || !metadata.IsEmpty());
+    }
+
+    void Clear()
+    {
+        title.Clear();
+        subtitle.Clear();
+        metadata.Clear();
+    }
+};
+
+struct UiMediaCardTag : Moveable<UiMediaCardTag> {
+    UiTagData tag;
+    UiAlign align = UiAlign::LEFT;
+};
+
+struct UiMediaOverlayData {
+    UiTagData content;
+    UiAlign align_h = UiAlign::CENTER;
+    UiAlign align_v = UiAlign::CENTER;
+    bool visible = false;
+};
+
+struct UiMediaCardData {
+    UiMediaBandData header;
+
+    Image image;
+    Image fallback_icon;
     Image empty_icon;
     String empty_text = "+";
-    WithDeepCopy<Vector<UiMediaCardBadge>> badges;
+
+    WithDeepCopy<Vector<UiMediaCardTag>> top_tags;
+    WithDeepCopy<Vector<UiMediaCardTag>> bottom_tags;
+    UiMediaOverlayData overlay;
+
+    UiMediaBandData footer;
+
     bool enabled = true;
     Value value;
     Value data;
+};
+
+struct UiMediaBandStyle : Moveable<UiMediaBandStyle> {
+    StyledPalette palette;
+    StyledMetrics metrics;
+    StyledSkin skin;
+
+    Font title_font = SansSerifZ(11).Bold();
+    Font subtitle_font = SansSerifZ(9);
+    Font metadata_font = SansSerifZ(8);
+
+    Color title_ink[4] = { Null, Null, Null, Null };
+    Color subtitle_ink[4] = { Null, Null, Null, Null };
+    Color metadata_ink[4] = { Null, Null, Null, Null };
+
+    int text_gap = DPI(2);
+
+    void Serialize(Stream& s)
+    {
+        s % palette % metrics % skin
+          % title_font % subtitle_font % metadata_font;
+        for(int st = 0; st < 4; st++)
+            s % title_ink[st] % subtitle_ink[st] % metadata_ink[st];
+        s % text_gap;
+    }
+};
+
+struct UiMediaBandPresentation : Moveable<UiMediaBandPresentation> {
+    Rect bounds;
+    Rect title;
+    Rect subtitle;
+    Rect metadata;
+
+    WString prepared_title;
+    WString prepared_subtitle;
+    WString prepared_metadata;
+
+    bool visible = false;
 };
 
 struct UiMediaCardPresentation {
     Rect outer;
     Rect content;
     Rect media;
-    Rect text;
-    Rect title;
-    Rect subtitle;
-    Rect metadata;
+    Rect media_content;
+
+    UiMediaBandPresentation header;
+    UiMediaBandPresentation footer;
+
     Rect media_image_rect;
     Rect empty_icon_rect;
     Rect empty_text_rect;
 
     Image media_image;
-    WString prepared_title;
-    WString prepared_subtitle;
-    WString prepared_metadata;
     WString prepared_empty_text;
 
-    WithDeepCopy<Vector<UiBadgePresentation>> badges;
-    WithDeepCopy<Vector<int>> badge_source_indices;
+    WithDeepCopy<Vector<UiTagPresentation>> top_tags;
+    WithDeepCopy<Vector<UiTagPresentation>> bottom_tags;
+    UiTagPresentation overlay;
 };
 
 class UiMediaCard : public Ctrl, public CtrlStyled<UiMediaCard> {
@@ -75,49 +137,48 @@ public:
     typedef UiMediaCard CLASSNAME;
 
     struct Style : ChStyle<Style> {
+        // Whole-card surface. Transparent/frameless is the default.
         StyledPalette palette;
         StyledMetrics metrics;
-        StyledSkin    skin;
+        StyledSkin skin;
 
+        // Media well. This is independently styled and bordered.
         StyledPalette media_palette;
         StyledMetrics media_metrics;
-        StyledSkin    media_skin;
+        StyledSkin media_skin;
 
-        Font title_font = SansSerifZ(11).Bold();
-        Font subtitle_font = SansSerifZ(9);
-        Font metadata_font = SansSerifZ(8);
-        Color title_ink[4] = { Null, Null, Null, Null };
-        Color subtitle_ink[4] = { Null, Null, Null, Null };
-        Color metadata_ink[4] = { Null, Null, Null, Null };
+        // Header/footer are structural bands with independent optional surfaces.
+        UiMediaBandStyle header_style;
+        UiMediaBandStyle footer_style;
 
-        UiBadgeStyle badge_style[4];
+        // Semantic tags and the one optional media overlay.
+        UiTagStyle tag_style[4];
+        UiTagStyle overlay_style[4];
 
-        UiAlign label_side = UiAlign::BOTTOM;
         UiMediaFit media_fit = UiMediaFit::Cover;
         Size media_aspect = Size(1, 1);
 
-        int media_text_gap = DPI(7);
-        int text_gap = DPI(2);
-        int badge_gap = DPI(4);
-        int badge_inset = DPI(6);
+        int section_gap = DPI(6);
+        int tag_gap = DPI(4);
+        int tag_inset = DPI(6);
+        int overlay_inset = DPI(8);
         int empty_icon_size = DPI(28);
         int min_media_extent = DPI(56);
 
         void Serialize(Stream& s)
         {
-            int ls = (int)label_side;
             int mf = (int)media_fit;
             s % palette % metrics % skin
-              % media_palette % media_metrics % media_skin
-              % title_font % subtitle_font % metadata_font;
-            for(int st = 0; st < 4; st++)
-                s % title_ink[st] % subtitle_ink[st] % metadata_ink[st];
-            for(int role = 0; role < 4; role++)
-                badge_style[role].Serialize(s);
-            s % ls % mf % media_aspect
-              % media_text_gap % text_gap % badge_gap % badge_inset
+              % media_palette % media_metrics % media_skin;
+            header_style.Serialize(s);
+            footer_style.Serialize(s);
+            for(int role = 0; role < 4; role++) {
+                tag_style[role].Serialize(s);
+                overlay_style[role].Serialize(s);
+            }
+            s % mf % media_aspect
+              % section_gap % tag_gap % tag_inset % overlay_inset
               % empty_icon_size % min_media_extent;
-            label_side = (UiAlign)ls;
             media_fit = (UiMediaFit)mf;
         }
     };
@@ -145,16 +206,42 @@ public:
     UiMediaCard& SetImage(const Image& image);
     UiMediaCard& ClearImage();
     UiMediaCard& SetFallbackIcon(const Image& image);
+    UiMediaCard& SetEmptyCue(const String& text,
+                             const Image& icon = Image());
+
+    UiMediaCard& SetHeader(const String& title,
+                           const String& subtitle = String(),
+                           const String& metadata = String());
+    UiMediaCard& ClearHeader();
+    UiMediaCard& ShowHeader(bool show = true);
+
+    UiMediaCard& SetFooter(const String& title,
+                           const String& subtitle = String(),
+                           const String& metadata = String());
+    UiMediaCard& ClearFooter();
+    UiMediaCard& ShowFooter(bool show = true);
+
+    // Convenience/compatibility: the original title fields are now the footer.
     UiMediaCard& SetTitle(const String& text);
     UiMediaCard& SetSubTitle(const String& text);
     UiMediaCard& SetMetadata(const String& text);
-    UiMediaCard& SetEmptyCue(const String& text, const Image& icon = Image());
 
-    UiMediaCard& ClearBadges();
-    UiMediaCard& AddBadge(const UiBadgeData& badge, UiMediaBadgeAnchor anchor);
-    int GetBadgeCount() const { return data_.badges.GetCount(); }
+    UiMediaCard& ClearTopTags();
+    UiMediaCard& ClearBottomTags();
+    UiMediaCard& ClearTags();
+    UiMediaCard& AddTopTag(const UiTagData& tag,
+                           UiAlign align = UiAlign::LEFT);
+    UiMediaCard& AddBottomTag(const UiTagData& tag,
+                              UiAlign align = UiAlign::LEFT);
+    int GetTopTagCount() const { return data_.top_tags.GetCount(); }
+    int GetBottomTagCount() const { return data_.bottom_tags.GetCount(); }
 
-    UiMediaCard& SetLabelSide(UiAlign side);
+    UiMediaCard& SetOverlay(const UiTagData& content,
+                            UiAlign horizontal = UiAlign::CENTER,
+                            UiAlign vertical = UiAlign::CENTER);
+    UiMediaCard& ClearOverlay();
+    UiMediaCard& ShowOverlay(bool show = true);
+
     UiMediaCard& SetMediaFit(UiMediaFit fit);
     UiMediaCard& SetMediaAspect(Size ratio);
 
@@ -163,11 +250,15 @@ public:
     UiMediaCard& SetSelectable(bool selectable = true);
     bool IsSelectable() const { return selectable_; }
 
-    const UiMediaCardPresentation& GetPresentation() const { return presentation_; }
-    int HitTestBadge(Point p) const;
+    const UiMediaCardPresentation& GetPresentation() const
+    {
+        return presentation_;
+    }
+
+    const UiTagPresentation* FindTagAt(Point p) const;
 
     Event<> WhenAction;
-    Event<String, Value> WhenBadgeAction;
+    Event<String, Value> WhenTagAction;
 
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
@@ -185,17 +276,10 @@ private:
     void InvalidateStyleCache();
     Style& StyleEdit();
     void SyncThemeStyle();
-    Style ResolveThemeStyle() const;
     const Style& GetEffectiveStyle() const;
     void OnStyleChanged();
-
     void InvalidatePresentation();
-    void RebuildPresentation();
     StyledState ResolveState() const;
-    Size MeasureTextBlock(const Style& style) const;
-    void LayoutText(const Rect& rect, const Style& style);
-    void PrepareMedia(const Style& style);
-    void PrepareBadges(const Style& style);
 
 private:
     Style style_;
@@ -207,12 +291,66 @@ private:
     UiMediaCardData data_;
     UiMediaCardPresentation presentation_;
 
-    bool presentation_dirty_ = true;
     bool hot_ = false;
     bool pressed_ = false;
     bool selected_ = false;
     bool selectable_ = true;
-    int pressed_badge_ = -1;
+    String pressed_tag_id_;
+};
+
+UiMediaCard::Style UiResolveMediaCardStyle(UiRole role);
+Size UiMeasureMediaCard(const UiMediaCardData& data,
+                        const UiMediaCard::Style& style);
+UiMediaCardPresentation UiPrepareMediaCard(const UiMediaCardData& data,
+                                           const UiMediaCard::Style& style,
+                                           const Rect& bounds);
+void UiPaintMediaCard(Draw& w,
+                      const UiMediaCardData& data,
+                      const UiMediaCard::Style& style,
+                      const UiMediaCardPresentation& presentation,
+                      StyledState state,
+                      bool focused = false);
+
+UiMediaCardData UiMakeMediaCardData(const UiItemRenderData& item);
+
+class UiMediaCardRender : public UiItemRender {
+public:
+    UiMediaCardRender();
+
+    virtual One<UiItemRender> Clone() const override;
+
+    UiMediaCardRender& SetCardStyle(const UiMediaCard::Style& style);
+    UiMediaCardRender& ClearCardStyle();
+    bool HasCardStyle() const { return has_custom_card_style_; }
+
+    UiMediaCardRender& SetResolver(
+        Function<void(const UiItemRenderData&, UiMediaCardData&)> resolver);
+
+    const UiMediaCardPresentation& GetPresentation() const
+    {
+        return presentation_;
+    }
+
+    virtual Size GetContentSize() const override;
+    virtual Size GetMinSize() const override;
+    virtual void Paint(Draw& w, const UiItemRenderState& state) const override;
+    virtual UiItemRenderHit HitTest(Point p) const override;
+
+protected:
+    virtual void Layout() override;
+
+private:
+    UiMediaCardData ResolveCardData() const;
+    UiMediaCard::Style ResolveCardStyle() const;
+
+private:
+    UiMediaCard::Style custom_card_style_;
+    bool has_custom_card_style_ = false;
+    Function<void(const UiItemRenderData&, UiMediaCardData&)> resolver_;
+
+    UiMediaCardData card_data_;
+    UiMediaCard::Style resolved_card_style_;
+    UiMediaCardPresentation presentation_;
 };
 
 } // namespace Upp
