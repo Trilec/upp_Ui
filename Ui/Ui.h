@@ -78,6 +78,9 @@
 #include <Ui/UiScrollPanel.h>
 #include <Ui/UiTab.h>
 #include <Ui/UiTitleCard.h>
+#include <Ui/UiMediaFit.h>
+#include <Ui/UiBadge.h>
+#include <Ui/UiMediaCard.h>
 #include <Ui/UiDropdown.h>
 #include <Ui/UiMenu.h>
 #include <Ui/UiButton.h>

@@ -19,6 +19,8 @@ scripts/*
 *.swp
 *.bak
 .cache/
+.klick-patch.lock
+.klick-patch/
 
 # Debug artifacts
 *.pdb
