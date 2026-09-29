@@ -194,6 +194,10 @@ void PaintBand(Draw& w,
     if(!p.visible || p.bounds.IsEmpty())
         return;
 
+    // Header/Footer are bounded structural regions. Their text must not escape
+    // if a card is forced smaller than its natural minimum size.
+    w.Clip(p.bounds);
+
     UiPaintStyledBackground(w, p.bounds,
                             style.palette, style.metrics, style.skin,
                             state, false);
@@ -215,6 +219,8 @@ void PaintBand(Draw& w,
                    p.prepared_metadata, style.metadata_font,
                    MediaInk(style.metadata_ink, state,
                             PaletteInk(style.palette, state, SColorText())));
+
+    w.End();
 }
 
 UiMediaBandStyle ResolveBandStyle(UiRole role)
@@ -404,6 +410,102 @@ UiTagPresentation PrepareOverlay(const UiMediaOverlayData& overlay,
                         box, &style.media_palette);
 }
 
+int MediaContentRadius(const Rect& media,
+                       const Rect& content,
+                       int outer_radius)
+{
+    if(media.IsEmpty() || content.IsEmpty() || outer_radius <= 0)
+        return 0;
+
+    const int inset = max(
+        max(max(0, content.left - media.left),
+            max(0, media.right - content.right)),
+        max(max(0, content.top - media.top),
+            max(0, media.bottom - content.bottom)));
+
+    return max(0, outer_radius - inset);
+}
+
+Image CachedRoundedMediaClip(const Image& image,
+                             const Rect& image_target,
+                             const Rect& clip_absolute,
+                             int radius)
+{
+    if(IsNull(image) || image_target.IsEmpty() || clip_absolute.IsEmpty()
+       || radius <= 0)
+        return image;
+
+    const Rect clip = RectC(clip_absolute.left - image_target.left,
+                            clip_absolute.top - image_target.top,
+                            clip_absolute.GetWidth(),
+                            clip_absolute.GetHeight());
+
+    return MakeImage(
+        [&] {
+            String key = "UiMediaCardRoundedClip";
+            RawCat(key, image.GetSerialId());
+            RawCat(key, clip.left);
+            RawCat(key, clip.top);
+            RawCat(key, clip.right);
+            RawCat(key, clip.bottom);
+            RawCat(key, radius);
+            return key;
+        },
+        [&] {
+            Image copy = image;
+            ImageBuffer out(copy);
+            const int w = out.GetWidth();
+            const int h = out.GetHeight();
+            const double r = min((double)radius,
+                                 min(clip.GetWidth(), clip.GetHeight()) / 2.0);
+
+            if(r <= 0.0)
+                return Image(out);
+
+            const double inner_left = clip.left + r;
+            const double inner_right = clip.right - r;
+            const double inner_top = clip.top + r;
+            const double inner_bottom = clip.bottom - r;
+
+            for(int y = 0; y < h; y++) {
+                RGBA *row = out[y];
+                const double py = y + 0.5;
+
+                for(int x = 0; x < w; x++) {
+                    const double px = x + 0.5;
+
+                    if(px < clip.left || px >= clip.right
+                       || py < clip.top || py >= clip.bottom) {
+                        row[x].a = 0;
+                        continue;
+                    }
+
+                    const double dx =
+                        px < inner_left ? inner_left - px
+                      : px > inner_right ? px - inner_right : 0.0;
+                    const double dy =
+                        py < inner_top ? inner_top - py
+                      : py > inner_bottom ? py - inner_bottom : 0.0;
+
+                    if(dx <= 0.0 && dy <= 0.0)
+                        continue;
+
+                    const double distance = std::sqrt(dx * dx + dy * dy);
+                    const double coverage =
+                        minmax(r + 0.5 - distance, 0.0, 1.0);
+
+                    if(coverage <= 0.0)
+                        row[x].a = 0;
+                    else if(coverage < 1.0)
+                        row[x].a = (byte)clamp(
+                            (int)std::floor(row[x].a * coverage + 0.5),
+                            0, 255);
+                }
+            }
+            return Image(out);
+        });
+}
+
 void PrepareMedia(const UiMediaCardData& data,
                   const UiMediaCard::Style& style,
                   UiMediaCardPresentation& out)
@@ -424,12 +526,18 @@ void PrepareMedia(const UiMediaCardData& data,
         if(fit.IsValid()
            && fit.target.GetWidth() <= 4096
            && fit.target.GetHeight() <= 4096) {
-            const Rect full =
-                RectC(0, 0, data.image.GetWidth(), data.image.GetHeight());
-            Image source =
-                fit.source == full ? data.image : Crop(data.image, fit.source);
+            // Preserve the original Image identity in the cache key. Cropping
+            // first creates a fresh Image on each layout pass and defeats
+            // CachedRescale reuse.
+            Image prepared =
+                CachedRescale(data.image, fit.target.GetSize(), fit.source);
+
+            const int radius =
+                MediaContentRadius(out.media, out.media_content,
+                                   style.media_metrics.radius);
             out.media_image =
-                CachedRescale(source, fit.target.GetSize());
+                CachedRoundedMediaClip(prepared, fit.target,
+                                       out.media_content, radius);
             out.media_image_rect = fit.target;
         }
         return;
@@ -693,9 +801,16 @@ void UiPaintMediaCard(Draw& w,
                       StyledState state,
                       bool focused)
 {
+    if(p.outer.IsEmpty())
+        return;
+
+    // Paint the card surface first so authored shadows remain available, then
+    // contain every structural/content layer to the actual card allocation.
     UiPaintStyledSurface(w, p.outer,
                          style.palette, style.metrics, style.skin,
                          state, focused, false, false);
+
+    w.Clip(p.outer);
 
     PaintBand(w, p.header, style.header_style, state);
     PaintBand(w, p.footer, style.footer_style, state);
@@ -706,6 +821,11 @@ void UiPaintMediaCard(Draw& w,
                                 style.media_metrics,
                                 style.media_skin,
                                 state, false);
+
+    // Rectangular Draw clipping contains all media children. Rounded image
+    // containment is prepared into media_image alpha before Paint.
+    if(!p.media.IsEmpty())
+        w.Clip(p.media);
 
     if(!p.media_image.IsEmpty() && !p.media_image_rect.IsEmpty())
         w.DrawImage(p.media_image_rect.left,
@@ -738,7 +858,11 @@ void UiPaintMediaCard(Draw& w,
     // Overlay is the final media-content layer and never consumes media space.
     UiPaintTag(w, p.overlay, state);
 
+    if(!p.media.IsEmpty())
+        w.End();
+
     PaintMediaFrameOnTop(w, p.media, style, state);
+    w.End();
 }
 
 UiMediaCardData UiMakeMediaCardData(const UiItemRenderData& item)
@@ -1081,7 +1205,7 @@ StyledState UiMediaCard::ResolveState() const
         return ST_DISABLED;
     if(pressed_ || selected_)
         return ST_PRESSED;
-    if(hot_)
+    if(hot_ || drop_hot_)
         return ST_HOT;
     return ST_NORMAL;
 }
@@ -1112,18 +1236,53 @@ const UiTagPresentation* UiMediaCard::FindTagAt(Point p) const
 
 void UiMediaCard::MouseEnter(Point p, dword flags)
 {
-    hot_ = true;
+    hot_ = IsEnabled() && data_.enabled;
     Refresh();
     Ctrl::MouseEnter(p, flags);
 }
 
 void UiMediaCard::MouseLeave()
 {
-    if(!pressed_) {
+    if(!pressed_ && !drop_hot_) {
         hot_ = false;
         Refresh();
     }
     Ctrl::MouseLeave();
+}
+
+void UiMediaCard::DragEnter()
+{
+    drop_hot_ = IsEnabled() && data_.enabled && (bool)WhenDrop;
+    Refresh();
+    Ctrl::DragEnter();
+}
+
+void UiMediaCard::DragAndDrop(Point p, PasteClip& d)
+{
+    if(!IsEnabled() || !data_.enabled || !WhenDrop) {
+        d.Reject();
+        drop_hot_ = false;
+        Refresh();
+        return;
+    }
+
+    drop_hot_ = true;
+    WhenDrop(d);
+
+    if(d.IsPaste())
+        drop_hot_ = false;
+
+    Refresh();
+    Ctrl::DragAndDrop(p, d);
+}
+
+void UiMediaCard::DragLeave()
+{
+    if(drop_hot_) {
+        drop_hot_ = false;
+        Refresh();
+    }
+    Ctrl::DragLeave();
 }
 
 void UiMediaCard::LeftDown(Point p, dword flags)
@@ -1131,12 +1290,18 @@ void UiMediaCard::LeftDown(Point p, dword flags)
     if(!IsEnabled() || !data_.enabled)
         return;
 
-    pressed_ = true;
-    pressed_tag_id_.Clear();
-
+    String actionable_tag;
     if(const UiTagPresentation *tag = FindTagAt(p))
         if(tag->enabled && tag->actionable && !tag->id.IsEmpty())
-            pressed_tag_id_ = tag->id;
+            actionable_tag = tag->id;
+
+    // A non-selectable card has no body activation/focus contract. Actionable
+    // tags remain independently usable.
+    if(!selectable_ && actionable_tag.IsEmpty())
+        return;
+
+    pressed_ = true;
+    pressed_tag_id_ = actionable_tag;
 
     if(selectable_)
         SetFocus();
@@ -1159,10 +1324,19 @@ void UiMediaCard::LeftUp(Point p, dword flags)
     if(HasCapture())
         ReleaseCapture();
 
-    hot_ = inside && IsEnabled() && data_.enabled;
+    const bool can_activate =
+        inside && IsEnabled() && data_.enabled;
+    hot_ = can_activate;
     Refresh();
 
-    if(inside && !pressed_tag.IsEmpty()) {
+    // Enabled state is rechecked after capture teardown: a host can disable
+    // the card during the press without receiving a stale activation.
+    if(!can_activate) {
+        Ctrl::LeftUp(p, flags);
+        return;
+    }
+
+    if(!pressed_tag.IsEmpty()) {
         if(const UiTagPresentation *tag = FindTagAt(p)) {
             if(tag->enabled && tag->actionable
                && tag->id == pressed_tag) {
@@ -1174,7 +1348,7 @@ void UiMediaCard::LeftUp(Point p, dword flags)
         }
     }
 
-    if(inside && pressed_tag.IsEmpty())
+    if(selectable_ && pressed_tag.IsEmpty())
         WhenAction();
 
     Ctrl::LeftUp(p, flags);
@@ -1207,6 +1381,7 @@ void UiMediaCard::CancelMode()
     pressed_ = false;
     pressed_tag_id_.Clear();
     hot_ = false;
+    drop_hot_ = false;
 
     // Capture teardown owns ReleaseCapture(). Calling ReleaseCapture() here
     // recursively re-enters CancelMode() on Win32/U++.

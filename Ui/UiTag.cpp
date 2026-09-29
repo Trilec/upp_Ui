@@ -195,6 +195,10 @@ void UiPaintTag(Draw& w, const UiTagPresentation& tag, StyledState state)
     if(!tag.visible || tag.bounds.IsEmpty())
         return;
 
+    // Tags can be prepared into very small host regions. Clip the complete
+    // presentation so text/icons never bleed into adjacent media/header/footer.
+    w.Clip(tag.bounds);
+
     const StyledState st = tag.enabled ? state : ST_DISABLED;
     UiPaintStyledBackground(w, tag.bounds, tag.style.palette,
                             tag.style.metrics, tag.style.skin, st, false);
@@ -205,6 +209,8 @@ void UiPaintTag(Draw& w, const UiTagPresentation& tag, StyledState state)
     if(!tag.prepared_text.IsEmpty() && !tag.text.IsEmpty())
         w.DrawText(tag.text.left, tag.text.top,
                    tag.prepared_text, tag.style.font, ink);
+
+    w.End();
 }
 
 } // namespace Upp

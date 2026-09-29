@@ -260,11 +260,19 @@ public:
     Event<> WhenAction;
     Event<String, Value> WhenTagAction;
 
+    // Generic host-owned drop forwarding. UiMediaCard does not interpret file
+    // or asset semantics; the host accepts/rejects the PasteClip and supplies
+    // any resulting media through SetImage/SetCardData.
+    Event<PasteClip&> WhenDrop;
+
     virtual Size GetMinSize() const override;
     virtual void Layout() override;
     virtual void Paint(Draw& w) override;
     virtual void MouseEnter(Point p, dword flags) override;
     virtual void MouseLeave() override;
+    virtual void DragEnter() override;
+    virtual void DragAndDrop(Point p, PasteClip& d) override;
+    virtual void DragLeave() override;
     virtual void LeftDown(Point p, dword flags) override;
     virtual void LeftUp(Point p, dword flags) override;
     virtual bool Key(dword key, int count) override;
@@ -292,6 +300,7 @@ private:
     UiMediaCardPresentation presentation_;
 
     bool hot_ = false;
+    bool drop_hot_ = false;
     bool pressed_ = false;
     bool selected_ = false;
     bool selectable_ = true;

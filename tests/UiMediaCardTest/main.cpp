@@ -169,6 +169,75 @@ void TestTagHitIdentity()
           "Tag hit preserves id, actionability and payload");
 }
 
+void TestRoundedMediaClipAndCacheReuse()
+{
+    UiMediaCardData data;
+    data.image = MakeTestImage(Size(320, 180));
+
+    UiMediaCard card;
+    UiMediaCard::Style style = card.GetStyle();
+    style.media_fit = UiMediaFit::Cover;
+    style.media_aspect = Size(1, 1);
+    style.media_metrics.radius = 18;
+
+    const Rect bounds = RectC(0, 0, 180, 180);
+    UiMediaCardPresentation first =
+        UiPrepareMediaCard(data, style, bounds);
+    UiMediaCardPresentation second =
+        UiPrepareMediaCard(data, style, bounds);
+
+    Check(!first.media_image.IsEmpty(),
+          "Rounded media preparation produces an image");
+    Check(first.media_image.GetSerialId() == second.media_image.GetSerialId(),
+          "Repeated media preparation reuses the cached prepared image");
+
+    if(!first.media_image.IsEmpty()) {
+        const RGBA *top = first.media_image[0];
+        const RGBA *middle =
+            first.media_image[first.media_image.GetHeight() / 2];
+
+        Check(top[0].a < 255,
+              "Rounded media preparation clears/softens corner alpha");
+        Check(middle[first.media_image.GetWidth() / 2].a == 255,
+              "Rounded media preparation preserves center opacity");
+    }
+}
+
+void TestInteractionGuards()
+{
+    UiMediaCard card;
+    card.SetRect(0, 0, 180, 180);
+    int actions = 0;
+    card.WhenAction = [&] { actions++; };
+
+    card.SetSelectable(false);
+    card.LeftDown(Point(40, 40), 0);
+    card.LeftUp(Point(40, 40), 0);
+    Check(actions == 0,
+          "Non-selectable card does not mouse-activate its body");
+
+    card.SetSelectable(true);
+    card.Enable(false);
+    card.LeftDown(Point(40, 40), 0);
+    card.LeftUp(Point(40, 40), 0);
+    Check(actions == 0,
+          "Disabled card does not mouse-activate its body");
+
+    card.Enable(true);
+    card.LeftDown(Point(40, 40), 0);
+    card.Enable(false);
+    card.LeftUp(Point(40, 40), 0);
+    Check(actions == 0,
+          "Card rechecks enabled state before mouse activation");
+
+    card.Enable(true);
+    card.LeftDown(Point(40, 40), 0);
+    card.CancelMode();
+    card.LeftUp(Point(40, 40), 0);
+    Check(actions == 0,
+          "CancelMode clears pending mouse activation");
+}
+
 void TestRendererSharesPresentation()
 {
     UiItemRenderData item;
@@ -214,6 +283,8 @@ CONSOLE_APP_MAIN
     TestStructureAndLayers();
     TestOptionalBandsAndEmptyState();
     TestTagHitIdentity();
+    TestRoundedMediaClipAndCacheReuse();
+    TestInteractionGuards();
     TestRendererSharesPresentation();
 
     Cout() << checks << " checks, "

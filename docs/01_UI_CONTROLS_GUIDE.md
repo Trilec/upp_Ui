@@ -258,9 +258,17 @@ and Footer are optional prepared text bands; absent content reserves no geometry
 The default card/header/footer surfaces are transparent and frameless, while the
 Media surface owns an independent face/frame/radius, so a common tile can show only
 a bordered image with free-standing footer text. Top/Bottom UiTag groups and the
-3x3-aligned Overlay paint over Media without consuming its layout. UiMediaCardRender
-uses the same prepared UiMediaCardPresentation through UiItemRender for Gallery/List
-scale; it does not allocate a child-control tree per item.
+3x3-aligned Overlay paint over Media without consuming its layout. Prepared media is
+contained to the rounded Media surface, while Header/Footer/Tag paint is clipped to
+its authored region. Cover preparation preserves the original Image identity when
+using CachedRescale. UiMediaCardRender uses the same prepared UiMediaCardPresentation
+through UiItemRender for Gallery/List scale; it does not allocate a child-control
+tree per item.
+
+UiMediaCard does not own file, asset or project semantics. WhenDrop forwards a
+PasteClip to the host; the host decides what formats to accept and supplies resulting
+media. This lets application/demo code implement choose/drop behavior without turning
+the generic card into a file picker or viewer.
 
 GroupPanel header placement supports Top/Bottom/Left/Right, mode Outside/Center/
 Inside, identity alignment and separate header-child alignment. Opposite/trailing

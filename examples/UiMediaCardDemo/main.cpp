@@ -172,13 +172,14 @@ public:
 
         Size ps = preview_.GetSize();
         const int caption_h = DPI(48);
-        const int gallery_h = min(DPI(160), max(DPI(120), ps.cy / 4));
-        const int gallery_gap = DPI(12);
+        const int gallery_h = min(DPI(166), max(DPI(126), ps.cy / 4));
+        const int gallery_gap = DPI(10);
+        const int label_h = DPI(18);
 
-        Rect top_area = RectC(DPI(18), DPI(16),
+        Rect top_area = RectC(DPI(18), DPI(16) + label_h,
                               max(0, ps.cx - DPI(36)),
                               max(0, ps.cy - caption_h - gallery_h
-                                           - gallery_gap - DPI(22)));
+                                           - gallery_gap - DPI(22) - label_h));
 
         const int wanted_w = max(DPI(170), (int)InspectorValue("width", 360));
         const int wanted_h = max(DPI(180), (int)InspectorValue("height", 430));
@@ -190,12 +191,17 @@ public:
         const int main_w = min(wanted_w, main_max_w);
         const int main_h = min(wanted_h, top_area.GetHeight());
 
+        editable_label_.SetRect(top_area.left, DPI(14),
+                                main_w, label_h);
         card_.SetRect(top_area.left,
                       top_area.top + max(0, (top_area.GetHeight() - main_h) / 2),
                       main_w, main_h);
 
         const int sample_x = top_area.left + main_w + sample_gap;
         const int actual_sample_w = max(0, top_area.right - sample_x);
+        samples_label_.SetRect(sample_x, DPI(14),
+                               actual_sample_w, label_h);
+
         const int small_gap = DPI(10);
         const int small_h =
             max(DPI(115), (top_area.GetHeight() - small_gap) / 2);
@@ -207,10 +213,13 @@ public:
                            max(0, top_area.bottom
                                   - (top_area.top + small_h + small_gap)));
 
-        gallery_.SetRect(DPI(18),
-                         max(0, ps.cy - caption_h - gallery_h),
+        const int gallery_top =
+            max(0, ps.cy - caption_h - gallery_h);
+        gallery_label_.SetRect(DPI(18), gallery_top,
+                               max(0, ps.cx - DPI(36)), label_h);
+        gallery_.SetRect(DPI(18), gallery_top + label_h,
                          max(0, ps.cx - DPI(36)),
-                         max(0, gallery_h - DPI(6)));
+                         max(0, gallery_h - label_h - DPI(6)));
 
         caption_.SetRect(0, max(0, ps.cy - caption_h),
                          ps.cx, caption_h);
@@ -255,11 +264,21 @@ private:
     void BuildPreview()
     {
         Add(preview_);
+        preview_.Add(editable_label_);
+        preview_.Add(samples_label_);
+        preview_.Add(gallery_label_);
         preview_.Add(card_);
         preview_.Add(empty_card_);
         preview_.Add(full_card_);
         preview_.Add(gallery_);
         preview_.Add(caption_);
+
+        editable_label_.SetText("EDITABLE CARD — controlled by Content / Appearance")
+                       .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        samples_label_.SetText("STATIC COMPARISONS")
+                      .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
+        gallery_label_.SetText("GALLERY RENDERER — UiMediaCardRender")
+                      .SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 
         gallery_.SetItemSize(Size(DPI(132), DPI(136)))
                 .SetGap(DPI(7))
@@ -267,7 +286,7 @@ private:
                 .SetOverscanRows(1);
 
         caption_.SetText(
-            "Main card is PropertyEditor-driven. Right samples show media-border-only and full-card surfaces. Gallery below uses UiMediaCardRender.")
+            "Large left card is inspector-driven: click it to choose an image or drag an image/file onto it. Small right cards are static appearance examples.")
                 .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
     }
 
@@ -281,19 +300,25 @@ private:
               .SetInset(Rect(DPI(2), 0, DPI(2), 0))
               .SetAlignItems(UiCrossAlign::Center);
 
-        inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48())
-                       .SetIconSize(DPI(17), DPI(17))
-                       .SetCheckable().Tip("Inspector");
-        overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48())
-                       .SetIconSize(DPI(17), DPI(17))
-                       .SetCheckable().Tip("Theme Overrides");
-        code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48())
-                  .SetIconSize(DPI(17), DPI(17))
+        inspector_mode_.SetText("Content")
+                       .SetIcon(ICON_DESIGN_TUNE_48())
+                       .SetIconSize(DPI(16), DPI(16))
+                       .SetIconSide(UiAlign::LEFT)
+                       .SetCheckable().Tip("Content and structure");
+        overrides_mode_.SetText("Appearance")
+                       .SetIcon(ICON_DESIGN_FORMAT_PAINT_48())
+                       .SetIconSize(DPI(16), DPI(16))
+                       .SetIconSide(UiAlign::LEFT)
+                       .SetCheckable().Tip("Surface and style overrides");
+        code_mode_.SetText("Code")
+                  .SetIcon(ICON_DESIGN_CODE_BLOCKS_48())
+                  .SetIconSize(DPI(16), DPI(16))
+                  .SetIconSide(UiAlign::LEFT)
                   .SetCheckable().Tip("Generated C++");
 
-        tools_.Add(inspector_mode_).Fixed(DPI(38));
-        tools_.Add(overrides_mode_).Fixed(DPI(38));
-        tools_.Add(code_mode_).Fixed(DPI(38));
+        tools_.Add(inspector_mode_).Fixed(DPI(112));
+        tools_.Add(overrides_mode_).Fixed(DPI(130));
+        tools_.Add(code_mode_).Fixed(DPI(88));
         tools_.AddSpacer(1).Expand(1);
 
         pages_.Add(inspector_page_, "inspector");
@@ -317,27 +342,32 @@ private:
 
     void BuildInspector()
     {
+        // Keep the two structural bands impossible to miss: Header is always
+        // above Media and Footer is always below it.
         inspector_model_.AddBoolean(
-            "header.show", "Show header", true, "Header");
+            "header.show", "Header at top", true, "Structure");
+        inspector_model_.AddBoolean(
+            "footer.show", "Footer at bottom", true, "Structure");
+
         inspector_model_.AddText(
-            "header.title", "Title", "Image processing", "Header");
+            "header.title", "Title", "Image processing", "Header — top");
         inspector_model_.AddText(
-            "header.subtitle", "Subtitle", "Harbour / convert EXR", "Header");
+            "header.subtitle", "Subtitle", "Harbour / convert EXR", "Header — top");
         inspector_model_.AddText(
-            "header.metadata", "Metadata", "", "Header");
+            "header.metadata", "Metadata", "", "Header — top");
 
         inspector_model_.AddChoice(
-            "media", "Media", "Preview image", "Media")
+            "media", "Content", "Preview image", "Media")
             .AddChoice("Preview image", "Preview image")
             .AddChoice("Empty state", "Empty state");
         inspector_model_.AddText(
             "empty_text", "Empty cue", "+", "Media");
         inspector_model_.AddChoice(
-            "fit", "Fit", "Cover", "Media")
+            "fit", "Image fit", "Cover", "Media")
             .AddChoice("Cover", "Cover")
             .AddChoice("Contain", "Contain");
         inspector_model_.AddChoice(
-            "aspect", "Aspect", "16:9", "Media")
+            "aspect", "Media aspect", "16:9", "Media")
             .AddChoice("1:1", "1:1")
             .AddChoice("4:3", "4:3")
             .AddChoice("3:2", "3:2")
@@ -352,7 +382,7 @@ private:
         inspector_model_.AddText(
             "overlay.text", "Overlay text", "PROCESSING 68%", "Tags / Overlay");
         inspector_model_.AddChoice(
-            "overlay.position", "Position", "Center", "Tags / Overlay")
+            "overlay.position", "Overlay position", "Center", "Tags / Overlay")
             .AddChoice("Top Left", "Top Left")
             .AddChoice("Top Center", "Top Center")
             .AddChoice("Top Right", "Top Right")
@@ -363,17 +393,15 @@ private:
             .AddChoice("Bottom Center", "Bottom Center")
             .AddChoice("Bottom Right", "Bottom Right");
 
-        inspector_model_.AddBoolean(
-            "footer.show", "Show footer", true, "Footer");
         inspector_model_.AddText(
-            "footer.title", "Title", "EXR / JPEG", "Footer");
+            "footer.title", "Title", "EXR / JPEG", "Footer — bottom");
         inspector_model_.AddText(
-            "footer.subtitle", "Subtitle", "v012", "Footer");
+            "footer.subtitle", "Subtitle", "v012", "Footer — bottom");
         inspector_model_.AddText(
-            "footer.metadata", "Metadata", "1536 x 864", "Footer");
+            "footer.metadata", "Metadata", "1536 x 864", "Footer — bottom");
 
         inspector_model_.AddChoice(
-            "role", "Role", "Standard", "Presentation")
+            "role", "Theme role", "Standard", "Presentation")
             .AddChoice("Standard", "Standard")
             .AddChoice("Subtle", "Subtle")
             .AddChoice("Accent", "Accent")
@@ -389,18 +417,22 @@ private:
         inspector_model_.AddBoolean(
             "selected", "Selected", false, "Behaviour");
         inspector_model_.AddBoolean(
-            "selectable", "Selectable", true, "Behaviour");
+            "selectable", "Body clickable", true, "Behaviour");
         inspector_model_.AddBoolean(
             "enabled", "Enabled", true, "Behaviour");
 
         inspector_model_.SetGroupSubtitle(
-            "Header", "optional structural band; absent data consumes no space");
+            "Structure", "Header is above Media; Footer is below Media");
         inspector_model_.SetGroupSubtitle(
-            "Tags / Overlay", "painted over media and never consume media geometry");
+            "Header — top", "optional text band above the media region");
         inspector_model_.SetGroupSubtitle(
-            "Footer", "optional structural band; transparent by default");
+            "Media", "click the large card to choose an image, or drag an image/file onto it");
         inspector_model_.SetGroupSubtitle(
-            "Presentation", "semantic theme role before explicit local overrides");
+            "Tags / Overlay", "paint over media and never consume media geometry");
+        inspector_model_.SetGroupSubtitle(
+            "Footer — bottom", "optional text band below the media region");
+        inspector_model_.SetGroupSubtitle(
+            "Presentation", "semantic theme role before explicit Appearance overrides");
         inspector_model_.StructureChanged();
     }
 
@@ -551,6 +583,59 @@ private:
         gallery_.SetItemRender(gallery_render_);
     }
 
+    void UseDemoImage(const Image& image, const String& source)
+    {
+        if(IsNull(image) || image.IsEmpty()) {
+            Exclamation("The selected item is not a supported image.");
+            return;
+        }
+
+        preview_image_ = image;
+        inspector_model_.SetValue("media", "Preview image");
+        inspector_.RefreshModel();
+        ApplyProjection();
+
+        caption_.SetText(source.IsEmpty()
+            ? "Loaded image into the editable card."
+            : "Loaded image into the editable card: " + source);
+    }
+
+    void ChooseDemoImage()
+    {
+        FileSel selector;
+        selector.Type("Images", "*.png *.bmp *.jpg *.jpeg");
+        if(!selector.ExecuteOpen("Choose media for UiMediaCard"))
+            return;
+
+        String path = ~selector;
+        UseDemoImage(StreamRaster::LoadFileAny(path), GetFileName(path));
+    }
+
+    void HandleDemoDrop(PasteClip& clip)
+    {
+        if(IsAvailableImage(clip)) {
+            AcceptImage(clip);
+            clip.SetAction(DND_COPY);
+            if(clip.IsPaste())
+                UseDemoImage(GetImage(clip), "dropped image");
+            return;
+        }
+
+        if(IsAvailableFiles(clip)) {
+            AcceptFiles(clip);
+            clip.SetAction(DND_COPY);
+            if(clip.IsPaste()) {
+                Vector<String> files = GetFiles(clip);
+                if(!files.IsEmpty())
+                    UseDemoImage(StreamRaster::LoadFileAny(files[0]),
+                                 GetFileName(files[0]));
+            }
+            return;
+        }
+
+        clip.Reject();
+    }
+
     void ConnectEvents()
     {
         auto changed = [=](String, Value) { ApplyProjection(); };
@@ -574,18 +659,19 @@ private:
         help_.WhenAction = [=] {
             PromptOK(
                 "UiMediaCard reference demo\n\n"
-                "Header and Footer reserve structure only when present. "
-                "Card, Header and Footer may be transparent/frameless while the "
-                "Media region keeps its own border. Top/Bottom Tags and Overlay "
-                "paint above media without consuming it. The Gallery uses the "
-                "same prepared presentation through UiMediaCardRender.");
+                "CONTENT exposes Structure first: Header is the optional top "
+                "text band and Footer is the optional bottom text band. "
+                "APPEARANCE owns Card, Media, Header and Footer surfaces.\n\n"
+                "Only the large left card is interactive in this demo. Click it "
+                "to choose an image or drop an image/file onto it. The two small "
+                "right cards are deliberately static comparisons. The Gallery "
+                "below demonstrates the pooled UiMediaCardRender path.");
         };
         exit_.WhenAction = [=] { Break(); };
         copy_.WhenAction = [=] { WriteClipboardText(generated_); };
 
-        card_.WhenAction = [=] {
-            caption_.SetText("Card action fired.");
-        };
+        card_.WhenAction = [=] { ChooseDemoImage(); };
+        card_.WhenDrop = [=](PasteClip& clip) { HandleDemoDrop(clip); };
         card_.WhenTagAction = [=](String id, Value) {
             caption_.SetText("Tag action: " + id);
         };
@@ -788,6 +874,7 @@ private:
 
     void ConfigureSamples()
     {
+        // These two cards are static comparison swatches, not editable inputs.
         empty_card_.ClearCustomStyle().SetRole(UiRole::Subtle);
         UiMediaCard::Style empty_style = empty_card_.GetStyle();
         empty_style.media_aspect = Size(1, 1);
@@ -795,8 +882,9 @@ private:
         empty_card_.SetCustomStyle(empty_style)
                    .ClearImage()
                    .ClearHeader()
-                   .SetFooter("Reference 1", "Drop or choose media")
+                   .SetFooter("Empty-state sample", "Static — media border only")
                    .SetEmptyCue("+")
+                   .SetSelectable(false)
                    .ClearTags()
                    .ClearOverlay();
 
@@ -812,8 +900,9 @@ private:
 
         full_card_.SetCustomStyle(full_style)
                   .SetImage(MakePreviewImage(3))
-                  .SetHeader("Full card", "Header surface enabled")
-                  .SetFooter("Media + footer", "Card border enabled")
+                  .SetHeader("Full-surface sample", "Static — header face enabled")
+                  .SetFooter("Media + footer", "Card face / border enabled")
+                  .SetSelectable(false)
                   .ClearTags()
                   .ClearOverlay();
 
@@ -895,26 +984,62 @@ private:
             << Format("style.media_aspect = Size(%d, %d);\n",
                       aspect.cx, aspect.cy);
 
-        if(OverrideActive("card.background"))
-            out << "style.metrics.face_enabled = "
-                << ((bool)OverrideValue("card.background") ? "true" : "false")
-                << ";\n";
-        if(OverrideActive("card.border"))
-            out << "style.metrics.frame_enabled = "
-                << ((bool)OverrideValue("card.border") ? "true" : "false")
-                << ";\n";
-        if(OverrideActive("media.border"))
-            out << "style.media_metrics.frame_enabled = "
-                << ((bool)OverrideValue("media.border") ? "true" : "false")
-                << ";\n";
-        if(OverrideActive("header.background"))
-            out << "style.header_style.metrics.face_enabled = "
-                << ((bool)OverrideValue("header.background") ? "true" : "false")
-                << ";\n";
-        if(OverrideActive("footer.background"))
-            out << "style.footer_style.metrics.face_enabled = "
-                << ((bool)OverrideValue("footer.background") ? "true" : "false")
-                << ";\n";
+        auto emit_bool = [&](const char *id, const char *target) {
+            if(OverrideActive(id))
+                out << target << " = "
+                    << ((bool)OverrideValue(id) ? "true" : "false")
+                    << ";\n";
+        };
+        auto emit_color = [&](const char *id, const char *target) {
+            if(OverrideActive(id))
+                out << target << " = "
+                    << CppColor(Color(OverrideValue(id))) << ";\n";
+        };
+        auto emit_face = [&](const char *id, const char *target) {
+            if(OverrideActive(id))
+                out << target << " = UiFill::Solid("
+                    << CppColor(Color(OverrideValue(id))) << ");\n";
+        };
+        auto emit_int = [&](const char *id, const char *target) {
+            if(OverrideActive(id))
+                out << target << " = "
+                    << (int)OverrideValue(id) << ";\n";
+        };
+
+        emit_bool("card.background", "style.metrics.face_enabled");
+        emit_bool("card.border", "style.metrics.frame_enabled");
+        emit_face("card.face", "style.palette.face[ST_NORMAL]");
+        emit_color("card.frame", "style.palette.frame[ST_NORMAL]");
+        emit_int("card.radius", "style.metrics.radius");
+
+        emit_bool("media.background", "style.media_metrics.face_enabled");
+        emit_bool("media.border", "style.media_metrics.frame_enabled");
+        emit_face("media.face", "style.media_palette.face[ST_NORMAL]");
+        emit_color("media.frame", "style.media_palette.frame[ST_NORMAL]");
+        emit_int("media.radius", "style.media_metrics.radius");
+
+        emit_bool("header.background", "style.header_style.metrics.face_enabled");
+        emit_bool("header.border", "style.header_style.metrics.frame_enabled");
+        emit_face("header.face", "style.header_style.palette.face[ST_NORMAL]");
+        emit_color("header.frame", "style.header_style.palette.frame[ST_NORMAL]");
+
+        emit_bool("footer.background", "style.footer_style.metrics.face_enabled");
+        emit_bool("footer.border", "style.footer_style.metrics.frame_enabled");
+        emit_face("footer.face", "style.footer_style.palette.face[ST_NORMAL]");
+        emit_color("footer.frame", "style.footer_style.palette.frame[ST_NORMAL]");
+
+        emit_int("section.gap", "style.section_gap");
+        emit_int("tag.inset", "style.tag_inset");
+        emit_int("tag.gap", "style.tag_gap");
+
+        if(OverrideActive("tag.radius"))
+            out << "for(int i = 0; i < 4; i++) "
+                << "style.tag_style[i].metrics.radius = "
+                << (int)OverrideValue("tag.radius") << ";\n";
+        if(OverrideActive("overlay.radius"))
+            out << "for(int i = 0; i < 4; i++) "
+                << "style.overlay_style[i].metrics.radius = "
+                << (int)OverrideValue("overlay.radius") << ";\n";
 
         out << "card.SetCustomStyle(style);\n";
 
@@ -923,15 +1048,33 @@ private:
                 << CppString(AsString(InspectorValue("header.title", ""))) << ", "
                 << CppString(AsString(InspectorValue("header.subtitle", ""))) << ", "
                 << CppString(AsString(InspectorValue("header.metadata", ""))) << ");\n";
+        else
+            out << "card.ClearHeader();\n";
 
-        out << "card.SetImage(image);\n";
+        if(AsString(InspectorValue("media", "Preview image")) == "Empty state")
+            out << "card.ClearImage().SetEmptyCue("
+                << CppString(AsString(InspectorValue("empty_text", "+"))) << ");\n";
+        else
+            out << "card.SetImage(image).SetEmptyCue("
+                << CppString(AsString(InspectorValue("empty_text", "+"))) << ");\n";
+
+        out << "card.ClearTags().ClearOverlay();\n";
 
         if((bool)InspectorValue("tags.top", true)) {
             out << "UiTagData kind(\"IMAGE\", UiRole::Subtle, UiTagVariant::Filled);\n"
+                << "kind.id = \"kind\";\n"
                 << "card.AddTopTag(kind, UiAlign::LEFT);\n"
                 << "UiTagData ready(\"READY\", UiRole::Accent, UiTagVariant::Soft);\n"
+                << "ready.id = \"ready\";\n"
+                << "ready.actionable = true;\n"
+                << "ready.value = \"ready\";\n"
                 << "card.AddTopTag(ready, UiAlign::RIGHT);\n";
         }
+
+        if((bool)InspectorValue("tags.bottom", true))
+            out << "UiTagData take(\"take 03\", UiRole::Standard, UiTagVariant::Soft);\n"
+                << "take.id = \"take\";\n"
+                << "card.AddBottomTag(take, UiAlign::RIGHT);\n";
 
         if((bool)InspectorValue("overlay.show", false)) {
             UiAlign h, v;
@@ -940,6 +1083,7 @@ private:
             out << "UiTagData overlay("
                 << CppString(AsString(InspectorValue("overlay.text", "")))
                 << ", UiRole::Accent, UiTagVariant::Filled);\n"
+                << "overlay.id = \"overlay\";\n"
                 << "card.SetOverlay(overlay, UiAlign::"
                 << AlignCode(h) << ", UiAlign::" << AlignCode(v) << ");\n";
         }
@@ -949,6 +1093,18 @@ private:
                 << CppString(AsString(InspectorValue("footer.title", ""))) << ", "
                 << CppString(AsString(InspectorValue("footer.subtitle", ""))) << ", "
                 << CppString(AsString(InspectorValue("footer.metadata", ""))) << ");\n";
+        else
+            out << "card.ClearFooter();\n";
+
+        out << "card.SetSelected("
+            << ((bool)InspectorValue("selected", false) ? "true" : "false")
+            << ");\n"
+            << "card.SetSelectable("
+            << ((bool)InspectorValue("selectable", true) ? "true" : "false")
+            << ");\n"
+            << "card.Enable("
+            << ((bool)InspectorValue("enabled", true) ? "true" : "false")
+            << ");\n";
 
         generated_ = out;
         code_.SetData(generated_);
@@ -985,6 +1141,7 @@ private:
     UiToolButton theme_, help_, exit_;
 
     UiPanel preview_;
+    UiLabel editable_label_, samples_label_, gallery_label_;
     UiMediaCard card_, empty_card_, full_card_;
     UiGallery gallery_;
     UiListModel gallery_model_;
