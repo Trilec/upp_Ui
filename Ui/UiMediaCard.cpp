@@ -815,6 +815,10 @@ void UiMediaCard::LeftUp(Point p, dword flags)
     pressed_badge_ = -1;
     if(HasCapture())
         ReleaseCapture();
+
+    // ReleaseCapture can synchronously invoke CancelMode on Win32. Restore the
+    // post-release hover state only after capture teardown has completed.
+    hot_ = inside && IsEnabled() && data_.enabled;
     Refresh();
 
     if(inside && pressed_badge >= 0
@@ -861,8 +865,10 @@ void UiMediaCard::CancelMode()
 {
     pressed_ = false;
     pressed_badge_ = -1;
-    if(HasCapture())
-        ReleaseCapture();
+    hot_ = false;
+
+    // Capture teardown owns ReleaseCapture(). Calling ReleaseCapture() from
+    // CancelMode() recursively re-enters CancelMode() on Win32/U++.
     Refresh();
     Ctrl::CancelMode();
 }
