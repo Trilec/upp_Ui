@@ -45,6 +45,7 @@ A shell using a control does not substitute for its behavioral/property coverage
 | Control | Purpose | Reference example |
 | --- | --- | --- |
 | [UiLabel](../Ui/UiLabel.h) | Styled text, selection, wrapping, icons and media. | [UiLabelDemo](../examples/UiLabelDemo) |
+| [UiTag](../Ui/UiTag.h) | Ultralight prepared semantic tag/status marker; optional host-routed interaction, text and/or icon. Not a Ctrl. | [UiTagDemo](../examples/UiTagDemo) |
 | [UiButton](../Ui/UiButton.h) | Primary stateful action. | [UiButtonDemo](../examples/UiButtonDemo) |
 | [UiToolButton](../Ui/UiToolButton.h) | Compact toolbar action; used in the reference shell. | [UiLabelDemo](../examples/UiLabelDemo) |
 | [UiSplitButton](../Ui/UiSplitButton.h) | Primary action plus a separate dropdown action. | [UiSplitButtonDemo](../examples/UiSplitButtonDemo) |
@@ -95,6 +96,34 @@ A shell using a control does not substitute for its behavioral/property coverage
 | [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | family coverage to accept |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | family coverage to accept |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
+
+## Prepared presentation primitives
+
+UiTag is intentionally not a Ctrl. Use UiLabel for ordinary display UI and
+UiButton/UiToolButton for independently focusable commands. UiTag is the dense
+presentation path for semantic markers such as READY, ERROR, ACTOR, 4K, time
+codes, and icon-only information/status cues.
+
+UiTagData may contain text, an icon, or both. `interactive` means the owning
+control/view may include that prepared tag in its hit-test/action policy; the tag
+itself owns no Event, focus, capture, animation or child-control lifecycle. Stable
+`id` plus opaque `value` let the host route information/navigation/actions.
+
+Style uses the normal Ui `StyledPalette` and `StyledMetrics` vocabulary: role/state
+face, frame, ink and icon colours; face/frame alpha; frame width/radius; Font;
+content margin; one icon/text gap; explicit icon box; Left/Right icon placement;
+and `UiIconRenderMode` Auto/MonoTint/PreserveColor. Soft, Filled and Outline are
+the compact variants. UiTag deliberately does not carry a nine-slice StyledSkin;
+dense tag backgrounds use `UiFill` (solid or image) prepared into the shared
+raster cache.
+
+`UiPrepareTag` performs measurement, ellipsis, icon aspect-fit/rescale, state
+colour resolution and cached true-alpha face/frame decoration before Paint.
+`UiPaintTag` clips to the authored bounds and consumes only prepared resources.
+Passive tags share one prepared decoration across pointer states; interactive tags
+prepare the states they can enter. This is the intended path for renderer/Graph
+scale. UiGraph may adopt it for readable Tags/Actions only after its own LOD/Micro,
+bounded-item and 10k-node performance contracts are preserved.
 
 ## Edit family
 

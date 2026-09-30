@@ -3,6 +3,11 @@
 Remote main is authoritative. Refresh before editing/publishing; never force-push.
 Keep this recovery index <=100 lines. Contracts belong in the nine reader guides.
 
+## UiTag prepared primitive — 2026-09-30
+BASE: `1ba4b24bc4ed1a38f2a416324f3f762a11bc0d08` / `codex/uitag-hardening`.
+STATUS: implementation/tests/reference demo/docs complete; native visual acceptance pending.
+VALIDATION: UiTag 30/0; MediaCard 35/0; UiTag demo Debug BLITZ/NOBLITZ + Release build PASS.
+NEXT: Curt visually checks UiTagDemo interaction/theme/image-fill presentation; then merge normally.
 ## All-controls audit — 2026-09-27
 
 REPORT: [50-control register and findings](../tests/CONTROL_AUDIT.md).

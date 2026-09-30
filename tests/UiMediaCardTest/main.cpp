@@ -86,7 +86,7 @@ void TestStructureAndLayers()
     kind.id = "kind";
     UiTagData ready("READY", UiRole::Accent, UiTagVariant::Soft);
     ready.id = "ready";
-    ready.actionable = true;
+    ready.interactive = true;
     ready.value = 17;
 
     card.AddTopTag(kind, UiAlign::LEFT)

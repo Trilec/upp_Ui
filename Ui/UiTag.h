@@ -54,7 +54,6 @@ struct UiTagData : Moveable<UiTagData> {
 struct UiTagStyle : Moveable<UiTagStyle> {
     StyledPalette palette;
     StyledMetrics metrics;
-    StyledSkin    skin;
     Font font;
 
     // Explicit icon box. The source image is aspect-fitted into this box during
@@ -64,34 +63,47 @@ struct UiTagStyle : Moveable<UiTagStyle> {
     UiAlign icon_side = UiAlign::LEFT;
     int content_gap = DPI(3);
 
+    // True prepared opacity. Filled normally uses 255. Soft additionally caps
+    // face opacity at soft_face_alpha. Outline disables the face.
+    int face_alpha[4] = { 255, 255, 255, 255 };
+    int frame_alpha[4] = { 255, 255, 255, 255 };
+    int soft_face_alpha = 104;
+
     void Serialize(Stream& s)
     {
-        s % palette % metrics % skin % font
+        s % palette % metrics % font
           % icon_size % icon_render_mode % icon_side % content_gap;
+        for(int st = 0; st < 4; st++)
+            s % face_alpha[st] % frame_alpha[st];
+        s % soft_face_alpha;
     }
 };
 
+// Paint-ready, bounded presentation. It intentionally retains no complete
+// UiTagStyle snapshot per instance. Cached decoration images are shared through
+// UiRasterCache.
 struct UiTagPresentation : Moveable<UiTagPresentation> {
     Rect bounds;
     Rect icon;
     Rect text;
+
     WString prepared_text;
     Image icon_image;
+    Image decoration[4];
 
-    // Temporary implementation shape: this owned style snapshot will be
-    // replaced by the compact prepared paint snapshot defined by the
-    // authoritative UiTag architecture before acceptance.
-    UiTagStyle style;
+    Font font;
+    Color ink[4] = { Null, Null, Null, Null };
+    Color icon_ink[4] = { Null, Null, Null, Null };
 
     String id;
     Value value;
+
     bool interactive = false;
-    bool actionable = false; // compatibility mirror
     bool visible = false;
     bool enabled = true;
     bool tint_icon = false;
 
-    bool IsInteractive() const { return interactive || actionable; }
+    bool IsInteractive() const { return interactive; }
 };
 
 UiTagStyle UiResolveTagStyle(UiRole role);
