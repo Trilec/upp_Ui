@@ -5,8 +5,11 @@
     UiTag presentation
     ==================
 
-    Small semantic tag data plus prepared geometry/paint helpers. Tags are
-    deliberately not child controls in high-scale renderers.
+    Ultralight semantic tag/status presentation.
+
+    UiTag is deliberately not a Ctrl. Hosts own placement, hover/pressed state,
+    hit routing and actions; UiTag owns data -> prepared geometry -> paint only.
+    This keeps it suitable for MediaCard, Gallery renderers and Graph-scale use.
 */
 
 #include <CtrlLib/CtrlLib.h>
@@ -31,12 +34,21 @@ struct UiTagData : Moveable<UiTagData> {
     UiTagVariant variant = UiTagVariant::Soft;
     bool visible = true;
     bool enabled = true;
+
+    // Canonical interaction metadata. UiTag itself never owns events/focus.
+    bool interactive = false;
+
+    // Compatibility with the short-lived first UiTag/UiBadge prototype.
+    // New code must use interactive. Effective interaction is either flag.
     bool actionable = false;
+
     Value value;
 
     UiTagData();
     UiTagData(const String& text, UiRole role,
               UiTagVariant variant = UiTagVariant::Soft);
+
+    bool IsInteractive() const { return interactive || actionable; }
 };
 
 struct UiTagStyle : Moveable<UiTagStyle> {
@@ -44,12 +56,18 @@ struct UiTagStyle : Moveable<UiTagStyle> {
     StyledMetrics metrics;
     StyledSkin    skin;
     Font font;
-    int icon_size = DPI(12);
+
+    // Explicit icon box. The source image is aspect-fitted into this box during
+    // preparation. Zero on either axis falls back to source image size.
+    Size icon_size = Size(DPI(12), DPI(12));
+    UiIconRenderMode icon_render_mode = UiIconRenderMode::MonoTint;
+    UiAlign icon_side = UiAlign::LEFT;
     int content_gap = DPI(3);
 
     void Serialize(Stream& s)
     {
-        s % palette % metrics % skin % font % icon_size % content_gap;
+        s % palette % metrics % skin % font
+          % icon_size % icon_render_mode % icon_side % content_gap;
     }
 };
 
@@ -59,13 +77,21 @@ struct UiTagPresentation : Moveable<UiTagPresentation> {
     Rect text;
     WString prepared_text;
     Image icon_image;
+
+    // Temporary implementation shape: this owned style snapshot will be
+    // replaced by the compact prepared paint snapshot defined by the
+    // authoritative UiTag architecture before acceptance.
     UiTagStyle style;
 
     String id;
     Value value;
-    bool actionable = false;
+    bool interactive = false;
+    bool actionable = false; // compatibility mirror
     bool visible = false;
     bool enabled = true;
+    bool tint_icon = false;
+
+    bool IsInteractive() const { return interactive || actionable; }
 };
 
 UiTagStyle UiResolveTagStyle(UiRole role);
