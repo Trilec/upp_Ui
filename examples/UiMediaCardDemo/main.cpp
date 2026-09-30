@@ -847,7 +847,7 @@ private:
 
             UiTagData ready("READY", UiRole::Accent, UiTagVariant::Soft);
             ready.id = "ready";
-            ready.actionable = true;
+            ready.interactive = true;
             ready.value = "ready";
             card_.AddTopTag(ready, UiAlign::RIGHT);
         }
@@ -1066,7 +1066,7 @@ private:
                 << "card.AddTopTag(kind, UiAlign::LEFT);\n"
                 << "UiTagData ready(\"READY\", UiRole::Accent, UiTagVariant::Soft);\n"
                 << "ready.id = \"ready\";\n"
-                << "ready.actionable = true;\n"
+                << "ready.interactive = true;\n"
                 << "ready.value = \"ready\";\n"
                 << "card.AddTopTag(ready, UiAlign::RIGHT);\n";
         }
