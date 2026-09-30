@@ -151,7 +151,7 @@ void TestTagHitIdentity()
 
     UiTagData action("READY", UiRole::Accent, UiTagVariant::Soft);
     action.id = "ready";
-    action.actionable = true;
+    action.interactive = true;
     action.value = 23;
 
     card.AddTopTag(action, UiAlign::RIGHT);
@@ -165,8 +165,8 @@ void TestTagHitIdentity()
         card.FindTagAt(p.top_tags[0].bounds.CenterPoint());
 
     Check(hit && hit->id == "ready"
-          && hit->actionable && (int)hit->value == 23,
-          "Tag hit preserves id, actionability and payload");
+          && hit->IsInteractive() && (int)hit->value == 23,
+          "Tag hit preserves id, interactivity and payload");
 }
 
 void TestRoundedMediaClipAndCacheReuse()
