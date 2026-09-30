@@ -1292,7 +1292,7 @@ void UiMediaCard::LeftDown(Point p, dword flags)
 
     String actionable_tag;
     if(const UiTagPresentation *tag = FindTagAt(p))
-        if(tag->enabled && tag->actionable && !tag->id.IsEmpty())
+        if(tag->enabled && tag->IsInteractive() && !tag->id.IsEmpty())
             actionable_tag = tag->id;
 
     // A non-selectable card has no body activation/focus contract. Actionable
@@ -1338,7 +1338,7 @@ void UiMediaCard::LeftUp(Point p, dword flags)
 
     if(!pressed_tag.IsEmpty()) {
         if(const UiTagPresentation *tag = FindTagAt(p)) {
-            if(tag->enabled && tag->actionable
+            if(tag->enabled && tag->IsInteractive()
                && tag->id == pressed_tag) {
                 const String id = tag->id;
                 const Value value = tag->value;
