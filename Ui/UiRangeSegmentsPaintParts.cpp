@@ -10,7 +10,7 @@ Color FaceColor(const StyledPalette& p, StyledState st, Color fallback)
     return f.IsSolid() && !IsNull(f.color) ? f.color : fallback;
 }
 
-Color PaletteInk(const StyledPalette& p, StyledState st, Color fallback)
+Color RangeSegmentsPaletteInk(const StyledPalette& p, StyledState st, Color fallback)
 {
     Color c = p.ink[st];
     return IsNull(c) ? fallback : c;
@@ -173,12 +173,12 @@ void UiRangeSegments::PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
     Color face = style.thumb_metrics.face_enabled ? FaceColor(style.thumb_palette, state, Null) : Null;
     Color frame = style.thumb_palette.frame[state];
     if(IsNull(frame))
-        frame = PaletteInk(style.thumb_palette, state, Null);
+        frame = RangeSegmentsPaletteInk(style.thumb_palette, state, Null);
     const int fw = style.thumb_metrics.frame_enabled
                  ? clamp(style.thumb_metrics.frame_width, 0, min(r.GetWidth(), r.GetHeight()) / 2) : 0;
     const int dot = clamp(style.thumb_dot_diameter, 0,
                           max(0, min(r.GetWidth(), r.GetHeight()) - 2 * fw));
-    Color ink = PaletteInk(style.thumb_palette, state, frame);
+    Color ink = RangeSegmentsPaletteInk(style.thumb_palette, state, frame);
     const Size size = r.GetSize();
     auto paint = [=](Painter& p) {
         const double inset = max(0.5, fw * 0.5);
@@ -253,7 +253,7 @@ void UiRangeSegments::PaintValueLabel(Draw& w, const String& text, Point anchor,
     metrics.radius = DPI(4);
     StyledState state = !IsEnabled() || !IsShowEnabled() ? ST_DISABLED : ST_NORMAL;
     UiPaintStyledBackground(w, r, style.value_palette, metrics, StyledSkin(), state, false);
-    Color ink = PaletteInk(style.value_palette, state, SColorText());
+    Color ink = RangeSegmentsPaletteInk(style.value_palette, state, SColorText());
     w.DrawText(r.left + (r.GetWidth() - ts.cx) / 2,
                r.top + (r.GetHeight() - ts.cy) / 2,
                text, font, ink);
