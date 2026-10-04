@@ -1,3 +1,4 @@
+// Self-contained UiTabDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
@@ -79,8 +80,10 @@ public:
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
         theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark");
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
         header_actions_.Add(theme_button_).Fixed(DPI(34));
+        help_button_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Demo help");
+        header_actions_.Add(help_button_).Fixed(DPI(34));
         header_actions_.Add(exit_button_).Fixed(DPI(34));
 
         preview_panel_.Add(tab_);
@@ -108,10 +111,14 @@ public:
         rail_panel_.Add(code_mode_);
         rail_panel_.Add(code_);
         view_bar_.SetGap(DPI(5)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        props_button_.SetText("Properties").SetCheckable().SetChecked(true);
-        code_button_.SetText("Code").SetCheckable();
-        view_bar_.Add(props_button_).Expand(1);
-        view_bar_.Add(code_button_).Expand(1);
+        props_button_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().SetChecked(true);
+        code_button_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(props_button_).Fixed(DPI(38));
+        props_button_.Tip("Inspector"); code_button_.Tip("Generated code"); overrides_button_.Tip("Theme Overrides");
+        overrides_button_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(overrides_button_).Fixed(DPI(38));
+        view_bar_.Add(code_button_).Fixed(DPI(38));
+        view_bar_.AddSpacer(1).Expand(1);
 
         code_mode_.UseInternalModel().Clear()
                   .Add("Usage", "usage")
@@ -134,6 +141,8 @@ public:
         ApplyProjection();
         SetCodeView(false);
     }
+
+    void Paint(Draw& draw) override { draw.DrawRect(GetSize(), window_face_); }
 
     virtual void Layout() override
     {
@@ -160,6 +169,25 @@ public:
         properties_.SetRect(DPI(8), y, max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - y - DPI(8)));
         code_mode_.SetRect(DPI(8), y, max(0, rr.GetWidth() - DPI(16)), DPI(32));
         code_.SetRect(DPI(8), y + DPI(40), max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - y - DPI(48)));
+    }
+
+    void ExportGenerated(const String& directory)
+    {
+        RealizeDirectory(directory);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiTabDemo_single_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiTabDemo_single_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiTabDemo_single_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        ApplyProjection();
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiTabDemo_single_authored.cpp"), code_.GetTextUtf8());
+        }
     }
 
 private:
@@ -250,10 +278,12 @@ private:
 
     void Connect()
     {
-        props_button_.WhenAction = [=] { SetCodeView(false); };
+        props_button_.WhenAction = [=] { SelectStylePage(false); };
         code_button_.WhenAction = [=] { SetCodeView(true); };
         code_mode_.WhenAction = [=] { UpdateCode(); };
         theme_button_.WhenAction = [=] { ToggleTheme(); };
+        help_button_.WhenAction = [=] { PromptOK("UiTabDemo: select a preview type, edit its Inspector or Theme Overrides, then copy the selected control from Generated Code."); };
+        overrides_button_.WhenAction = [=] { SelectStylePage(true); };
         exit_button_.WhenAction = [=] { Close(); };
         properties_.WhenPreview = [=](String, Value) { ApplyProjection(); };
         properties_.WhenCommit = [=](String, Value) { ApplyProjection(); };
@@ -278,42 +308,42 @@ private:
         const UiTabVisual visual = ParseVisual(AsString(Get("visual")));
         UiTab::Style style = UiTheme::ResolveTab(UiRole::Standard, visual);
         style.visual = visual;
-        style.tab_extent = DPI((int)Get("tab_extent"));
-        style.item_spacing = DPI((int)Get("item_spacing"));
-        style.body_gap = DPI((int)Get("body_gap"));
-        style.content_gap = DPI((int)Get("content_gap"));
-        style.min_tab_main = DPI((int)Get("min_tab_main"));
-        style.tab_padding = Rect(DPI((int)Get("padding_x")), DPI((int)Get("padding_y")),
+        if(Changed("tab_extent")) style.tab_extent = DPI((int)Get("tab_extent"));
+        if(Changed("item_spacing")) style.item_spacing = DPI((int)Get("item_spacing"));
+        if(Changed("body_gap")) style.body_gap = DPI((int)Get("body_gap"));
+        if(Changed("content_gap")) style.content_gap = DPI((int)Get("content_gap"));
+        if(Changed("min_tab_main")) style.min_tab_main = DPI((int)Get("min_tab_main"));
+        if(Changed("padding_x") || Changed("padding_y")) style.tab_padding = Rect(DPI((int)Get("padding_x")), DPI((int)Get("padding_y")),
                                  DPI((int)Get("padding_x")), DPI((int)Get("padding_y")));
-        style.icon_size = DPI((int)Get("icon_size"));
-        style.icon_side = ParseSide(AsString(Get("icon_side")));
-        style.indicator_thickness = DPI((int)Get("indicator_thickness"));
-        style.active_frame_width = DPI((int)Get("active_frame_width"));
-        style.open_corner_radius = DPI((int)Get("open_corner_radius"));
-        style.active_frame_color = Color(Get("active_frame_color"));
-        style.expand_tabs = (bool)Get("expand_tabs");
+        if(Changed("icon_size")) style.icon_size = DPI((int)Get("icon_size"));
+        if(Changed("icon_side")) style.icon_side = ParseSide(AsString(Get("icon_side")));
+        if(Changed("indicator_thickness")) style.indicator_thickness = DPI((int)Get("indicator_thickness"));
+        if(Changed("active_frame_width")) style.active_frame_width = DPI((int)Get("active_frame_width"));
+        if(Changed("open_corner_radius")) style.open_corner_radius = DPI((int)Get("open_corner_radius"));
+        if(Changed("active_frame_color")) style.active_frame_color = Color(Get("active_frame_color"));
+        if(Changed("expand_tabs")) style.expand_tabs = (bool)Get("expand_tabs");
         style.fill_tabs = style.expand_tabs;
-        style.active_tab_uses_body_face = (bool)Get("active_uses_body");
+        if(Changed("active_uses_body")) style.active_tab_uses_body_face = (bool)Get("active_uses_body");
 
-        style.metrics.face_enabled = (bool)Get("body_face_enabled");
-        style.metrics.frame_enabled = (bool)Get("body_frame_enabled");
-        style.metrics.radius = DPI((int)Get("body_radius"));
-        style.metrics.frame_width = DPI((int)Get("body_frame_width"));
-        style.tab_metrics.face_enabled = (bool)Get("tab_face_enabled");
-        style.tab_metrics.frame_enabled = (bool)Get("tab_frame_enabled");
-        style.tab_metrics.radius = DPI((int)Get("tab_radius"));
-        style.tab_metrics.frame_width = DPI((int)Get("tab_frame_width"));
-        style.tab_font.Height((int)Get("font_height"));
-        style.tab_font.Bold((bool)Get("font_bold"));
+        if(Changed("body_face_enabled")) style.metrics.face_enabled = (bool)Get("body_face_enabled");
+        if(Changed("body_frame_enabled")) style.metrics.frame_enabled = (bool)Get("body_frame_enabled");
+        if(Changed("body_radius")) style.metrics.radius = DPI((int)Get("body_radius"));
+        if(Changed("body_frame_width")) style.metrics.frame_width = DPI((int)Get("body_frame_width"));
+        if(Changed("tab_face_enabled")) style.tab_metrics.face_enabled = (bool)Get("tab_face_enabled");
+        if(Changed("tab_frame_enabled")) style.tab_metrics.frame_enabled = (bool)Get("tab_frame_enabled");
+        if(Changed("tab_radius")) style.tab_metrics.radius = DPI((int)Get("tab_radius"));
+        if(Changed("tab_frame_width")) style.tab_metrics.frame_width = DPI((int)Get("tab_frame_width"));
+        if(Changed("font_height")) style.tab_font.Height((int)Get("font_height"));
+        if(Changed("font_bold")) style.tab_font.Bold((bool)Get("font_bold"));
 
         for(int i = 0; i < 4; i++) {
-            style.palette.face[i] = UiFill::Solid(Color(Get("body_face")));
-            style.palette.frame[i] = Color(Get("body_frame"));
-            style.palette.ink[i] = Color(Get("body_ink"));
-            style.tab_palette.face[i] = UiFill::Solid(Color(Get("tab_face")));
-            style.tab_palette.frame[i] = Color(Get("tab_frame"));
-            style.tab_palette.ink[i] = Color(Get("tab_ink"));
-            style.tab_palette.icon[i] = Color(Get("tab_icon"));
+            if(Changed("body_face")) style.palette.face[i] = UiFill::Solid(Color(Get("body_face")));
+            if(Changed("body_frame")) style.palette.frame[i] = Color(Get("body_frame"));
+            if(Changed("body_ink")) style.palette.ink[i] = Color(Get("body_ink"));
+            if(Changed("tab_face")) style.tab_palette.face[i] = UiFill::Solid(Color(Get("tab_face")));
+            if(Changed("tab_frame")) style.tab_palette.frame[i] = Color(Get("tab_frame"));
+            if(Changed("tab_ink")) style.tab_palette.ink[i] = Color(Get("tab_ink"));
+            if(Changed("tab_icon")) style.tab_palette.icon[i] = Color(Get("tab_icon"));
         }
         return style;
     }
@@ -348,7 +378,10 @@ private:
     void SetCodeView(bool on)
     {
         code_view_ = on;
-        props_button_.SetChecked(!on);
+        if(on) overrides_view_ = false;
+        UpdatePropertyPage();
+        props_button_.SetChecked(!on && !overrides_view_);
+        overrides_button_.SetChecked(!on && overrides_view_);
         code_button_.SetChecked(on);
         properties_.Show(!on);
         code_mode_.Show(on);
@@ -399,6 +432,57 @@ private:
         out << "tabs.SetCustomStyle(style);\n";
     }
 
+    String AuthoredStyleCode(const String& source) const
+    {
+        String result;
+        for(const String& line : Split(source, '\n', false)) {
+            bool keep = true;
+            if(TrimLeft(line).StartsWith("style.tab_extent")) keep = Changed("tab_extent");
+            if(TrimLeft(line).StartsWith("style.item_spacing")) keep = Changed("item_spacing");
+            if(TrimLeft(line).StartsWith("style.body_gap")) keep = Changed("body_gap");
+            if(TrimLeft(line).StartsWith("style.content_gap")) keep = Changed("content_gap");
+            if(TrimLeft(line).StartsWith("style.min_tab_main")) keep = Changed("min_tab_main");
+            if(TrimLeft(line).StartsWith("style.tab_padding")) keep = Changed("padding_x") || Changed("padding_y");
+            if(TrimLeft(line).StartsWith("style.icon_size")) keep = Changed("icon_size");
+            if(TrimLeft(line).StartsWith("style.icon_side")) keep = Changed("icon_side");
+            if(TrimLeft(line).StartsWith("style.indicator_thickness")) keep = Changed("indicator_thickness");
+            if(TrimLeft(line).StartsWith("style.active_frame_width")) keep = Changed("active_frame_width");
+            if(TrimLeft(line).StartsWith("style.open_corner_radius")) keep = Changed("open_corner_radius");
+            if(TrimLeft(line).StartsWith("style.active_frame_color")) keep = Changed("active_frame_color");
+            if(TrimLeft(line).StartsWith("style.expand_tabs")) keep = Changed("expand_tabs");
+            if(TrimLeft(line).StartsWith("style.active_tab_uses_body_face")) keep = Changed("active_uses_body");
+            if(TrimLeft(line).StartsWith("style.metrics.face_enabled")) keep = Changed("body_face_enabled");
+            if(TrimLeft(line).StartsWith("style.metrics.frame_enabled")) keep = Changed("body_frame_enabled");
+            if(TrimLeft(line).StartsWith("style.metrics.radius")) keep = Changed("body_radius");
+            if(TrimLeft(line).StartsWith("style.metrics.frame_width")) keep = Changed("body_frame_width");
+            if(TrimLeft(line).StartsWith("style.tab_metrics.face_enabled")) keep = Changed("tab_face_enabled");
+            if(TrimLeft(line).StartsWith("style.tab_metrics.frame_enabled")) keep = Changed("tab_frame_enabled");
+            if(TrimLeft(line).StartsWith("style.tab_metrics.radius")) keep = Changed("tab_radius");
+            if(TrimLeft(line).StartsWith("style.tab_metrics.frame_width")) keep = Changed("tab_frame_width");
+            if(TrimLeft(line).StartsWith("style.tab_font.Height")) keep = Changed("font_height");
+            if(TrimLeft(line).StartsWith("style.tab_font.Bold")) keep = Changed("font_bold");
+            if(TrimLeft(line).StartsWith("style.palette.face")) keep = Changed("body_face");
+            if(TrimLeft(line).StartsWith("style.palette.frame")) keep = Changed("body_frame");
+            if(TrimLeft(line).StartsWith("style.palette.ink")) keep = Changed("body_ink");
+            if(TrimLeft(line).StartsWith("style.tab_palette.face")) keep = Changed("tab_face");
+            if(TrimLeft(line).StartsWith("style.tab_palette.frame")) keep = Changed("tab_frame");
+            if(TrimLeft(line).StartsWith("style.tab_palette.ink")) keep = Changed("tab_ink");
+            if(TrimLeft(line).StartsWith("style.tab_palette.icon")) keep = Changed("tab_icon");
+            if(keep) result << line << "\n";
+        }
+        Vector<String> lines = Split(result, '\n', false);
+        bool authored = false;
+        for(const String& line : lines) if(TrimLeft(line).StartsWith("style.")) authored = true;
+        result.Clear();
+        for(int i = 0; i < lines.GetCount(); i++) {
+            String trimmed = TrimLeft(lines[i]);
+            if(trimmed.StartsWith("for(int state") && i + 1 < lines.GetCount() && TrimBoth(lines[i + 1]) == "}") { i++; continue; }
+            if(!authored && (lines[i].Find("::Style style =") >= 0 || lines[i].Find(".SetCustomStyle(style)") >= 0)) continue;
+            result << lines[i] << "\n";
+        }
+        return result;
+    }
+
     void UpdateCode()
     {
         String mode = AsString(code_mode_.GetSelectedData());
@@ -434,6 +518,25 @@ private:
         else
             out << "\n// Usage mode deliberately relies on the active UiTheme.\n";
         out << "\ntabs.WhenAction = [&] { int active = tabs.GetActiveTab(); /* react */ };\n";
+        if(mode == "changes") out = AuthoredStyleCode(out);
+        const String preamble = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
+        if(out.StartsWith(preamble)) {
+            String body = out.Mid(preamble.GetCount());
+            String members, setup;
+            for(const String& line : Split(body, '\n', false)) {
+                String declaration = TrimBoth(line);
+                bool member = declaration.StartsWith("Ui") && declaration.EndsWith(";")
+                           && declaration.Find("::") < 0 && declaration.Find('(') < 0
+                           && declaration.Find('=') < 0 && declaration.Find('.') < 0;
+                if(member) members << "    " << declaration << "\n";
+                else setup << "        " << line << "\n";
+            }
+            members.Replace("    UiTab tabs;\n    UiPanel overview, settings, notes;", "    UiPanel overview, settings, notes;\n    UiTab tabs;");
+            out = preamble + "class ControlExample : public ParentCtrl {\n" + members
+                + "public:\n    ControlExample() {\n" + setup;
+            out << "        Add(tabs.SizePos());\n";
+            out << "    }\n};\n";
+        }
         code_.SetTextUtf8(out);
     }
 
@@ -447,13 +550,83 @@ private:
         ApplyProjection();
     }
 
+    bool IsStyleProperty(const String& id) const
+    {
+        static const char* ids[] = { "active_frame_color", "active_frame_width", "active_uses_body", "body_face", "body_face_enabled", "body_frame", "body_frame_enabled", "body_frame_width", "body_gap", "body_ink", "body_radius", "content_gap", "expand_tabs", "font_bold", "font_height", "icon_side", "icon_size", "indicator_thickness", "item_spacing", "min_tab_main", "open_corner_radius", "padding_x", "padding_y", "tab_extent", "tab_face", "tab_face_enabled", "tab_frame", "tab_frame_enabled", "tab_frame_width", "tab_icon", "tab_ink", "tab_radius" };
+        for(const char* name : ids) if(id == name) return true;
+        return false;
+    }
+
+    void UpdatePropertyPage()
+    {
+        for(const PropertyEditorItem& item : model_.GetItems())
+            model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
+        model_.StructureChanged();
+    }
+
+    void SelectStylePage(bool style)
+    {
+        overrides_view_ = style;
+        SetCodeView(false);
+    }
+
     void ApplyTheme()
     {
-        UiTitleCard::Style hs = UiTheme::ResolveTitleCard(UiRole::Accent);
-        hs.title_line = false;
-        header_.SetCustomStyle(hs);
-        preview_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-        rail_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        theme_button_.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_panel_.SetCustomStyle(surface);
+        rail_panel_.SetCustomStyle(surface);
+
+
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        properties_.SetPaletteMode(mode);
+
+        for(PropertyEditor* editor : { &properties_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_button_, &help_button_, &exit_button_, &props_button_, &overrides_button_, &code_button_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_button_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_button_.SetCustomStyle(exit_style);
         page_a_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
         page_b_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
         page_c_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
@@ -461,29 +634,26 @@ private:
         page_b_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Body));
         page_c_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Body));
         status_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-        props_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Subtle : UiRole::Accent));
-        code_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Accent : UiRole::Subtle));
-        theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
-        exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
-            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        Refresh();
     }
 
 private:
+    bool overrides_view_ = false;
+    Color window_face_ = SColorFace();
+    PropertyEditorFactory factory_;
+    PropertyEditorModel model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
-    UiToolButton theme_button_, exit_button_;
+    UiToolButton theme_button_, help_button_, exit_button_;
     UiPanel preview_panel_, rail_panel_;
     UiTab tab_;
     UiPanel page_a_, page_b_, page_c_;
     UiLabel page_a_label_, page_b_label_, page_c_label_, status_;
 
     UiBoxLayout view_bar_ { UiDirection::H };
-    UiButton props_button_, code_button_;
+    UiToolButton props_button_, overrides_button_, code_button_;
     PropertyEditor properties_;
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
     UiDropdown code_mode_;
     UiMultiEdit code_;
     bool code_view_ = false;
@@ -493,5 +663,8 @@ private:
 
 GUI_APP_MAIN
 {
-    UiTabDemoWindow().Run();
+    UiTabDemoWindow demo;
+    const Vector<String>& args = CommandLine();
+    if(args.GetCount() == 2 && args[0] == "--export-generated") demo.ExportGenerated(args[1]);
+    else demo.Run();
 }

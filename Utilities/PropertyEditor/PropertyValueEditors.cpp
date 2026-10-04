@@ -429,8 +429,14 @@ public:
         slider_.SetStep(step_);
         edit_.Enable(enabled_);
         slider_.Enable(enabled_);
-        toggle_.Show(item.show_slider_toggle && bounded_);
+        toggle_.Show(bounded_ && (item.show_slider_toggle ||
+                     item.kind == PropertyEditorKind::Integer ||
+                     item.kind == PropertyEditorKind::SliderInt));
         toggle_.Enable(enabled_);
+        if(!configured_) {
+            slider_mode_ = item.kind == PropertyEditorKind::SliderInt;
+            configured_ = true;
+        }
         slider_mode_ = slider_mode_ && bounded_;
         UpdateVisible();
     }
@@ -505,6 +511,7 @@ private:
     bool enabled_ = true;
     bool bounded_ = false;
     bool slider_mode_ = false;
+    bool configured_ = false;
     int minimum_ = INT_MIN;
     int maximum_ = INT_MAX;
     int step_ = 1;
@@ -790,8 +797,13 @@ public:
         drop_.WhenSelectData = [=](const Value& v) {
             if(syncing_)
                 return;
-            WhenPreview(v);
-            WhenCommit(v);
+            // The selection Value belongs to the dropdown's model. A host
+            // notification can replace the schema or rebind this editor.
+            const Value selected = v;
+            Event<Value> preview = WhenPreview;
+            Event<Value> commit = WhenCommit;
+            preview(selected);
+            commit(selected);
         };
     }
 
@@ -1456,100 +1468,6 @@ private:
     bool syncing_ = false;
 };
 
-class PropertySliderIntValueEditor : public PropertyValueEditor {
-public:
-    PropertySliderIntValueEditor()
-    {
-        Add(slider_);
-        Add(edit_);
-        slider_.SetCustomStyle(UiTheme::ResolveSlider());
-        slider_.ExpandTrack();
-        slider_.WhenChanging = [=] {
-            if(syncing_)
-                return;
-            syncing_ = true;
-            int value = (int)slider_.GetValue();
-            edit_.SetValue(value);
-            syncing_ = false;
-            WhenPreview(Value(value));
-        };
-        slider_.WhenAction = [=] {
-            if(syncing_)
-                return;
-            int value = (int)slider_.GetValue();
-            edit_.SetValue(value);
-            WhenCommit(Value(value));
-        };
-        edit_.WhenChange = [=] {
-            if(!syncing_)
-                WhenPreview(edit_.GetData());
-        };
-        edit_.WhenCommit = [=] {
-            if(!syncing_)
-                WhenCommit(edit_.GetData());
-        };
-    }
-
-    virtual void Configure(const PropertyEditorItem& item) override
-    {
-        minimum_ = IsNumber(item.minimum) ? (int)item.minimum : 0;
-        maximum_ = IsNumber(item.maximum) ? (int)item.maximum : 100;
-        step_ = IsNumber(item.step) ? max(1, (int)item.step) : 1;
-        if(maximum_ <= minimum_)
-            maximum_ = minimum_ + 1;
-        slider_.SetRange(minimum_, maximum_);
-        slider_.SetStep(step_);
-        slider_.Enable(item.enabled && !item.read_only);
-        edit_.Enable(item.enabled && !item.read_only);
-        edit_.MinMax(minimum_, maximum_);
-        edit_.Step(step_);
-        edit_.SetPlaceholder(item.mixed ? "<mixed>" :
-                             item.inherited ? "<inherited>" : "");
-    }
-
-    virtual void SetEditorValue(const Value& value, bool mixed) override
-    {
-        syncing_ = true;
-        if(mixed || IsNull(value)) {
-            edit_.SetData(String());
-            slider_.SetValue(minimum_);
-        }
-        else {
-            int v = (int)value;
-            edit_.SetValue(v);
-            slider_.SetValue(v);
-        }
-        edit_.SetCommitBaseline(edit_.GetData());
-        syncing_ = false;
-    }
-
-    virtual Value GetEditorValue() const override
-    {
-        return edit_.GetData();
-    }
-
-    virtual void Layout() override
-    {
-        Size sz = GetSize();
-        int edit_cx = min(max(DPI(58), sz.cx / 4), DPI(96));
-        slider_.SetRect(0, 0, max(0, sz.cx - edit_cx - DPI(6)), sz.cy);
-        edit_.SetRect(max(0, sz.cx - edit_cx), 0, edit_cx, sz.cy);
-    }
-
-    virtual void FocusEditor() override
-    {
-        edit_.SetFocus();
-        edit_.SetSelection();
-    }
-
-    UiSlider slider_;
-    PropertyCommitIntEdit edit_;
-    bool syncing_ = false;
-    int minimum_ = 0;
-    int maximum_ = 100;
-    int step_ = 1;
-};
-
 class PropertySliderDoubleValueEditor : public PropertyValueEditor {
 public:
     PropertySliderDoubleValueEditor()
@@ -2044,6 +1962,10 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
     case PropertyEditorKind::Multiline:
         return One<PropertyValueEditor>(new PropertyMultilineValueEditor);
     case PropertyEditorKind::Integer:
+        // Presentation follows authored bounds; the schema stays Integer.
+        if(IsNumber(item.minimum) && IsNumber(item.maximum) &&
+           (int)item.maximum > (int)item.minimum)
+            return One<PropertyValueEditor>(new PropertyNumericIntValueEditor);
         return One<PropertyValueEditor>(new PropertyIntegerValueEditor);
     case PropertyEditorKind::Double:
         return One<PropertyValueEditor>(new PropertyDoubleValueEditor);
@@ -2064,7 +1986,7 @@ One<PropertyValueEditor> PropertyEditorFactory::Create(const PropertyEditorItem&
     case PropertyEditorKind::FilePath:
         return One<PropertyValueEditor>(new PropertyFilePathValueEditor);
     case PropertyEditorKind::SliderInt:
-        return One<PropertyValueEditor>(new PropertySliderIntValueEditor);
+        return One<PropertyValueEditor>(new PropertyNumericIntValueEditor);
     case PropertyEditorKind::SliderDouble:
         return One<PropertyValueEditor>(new PropertySliderDoubleValueEditor);
     case PropertyEditorKind::Vector2:

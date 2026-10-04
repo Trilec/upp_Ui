@@ -1,3 +1,5 @@
+// Native UiChartRing reference: author series and theme overrides through the
+// production PropertyEditor and generate public-API usage C++.
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
@@ -73,7 +75,13 @@ public:
         ConfigureEditors();
         ConnectEvents();
         SelectPage(0);
+        ApplyTheme();
         ApplyProjection();
+    }
+
+    void Paint(Draw& w) override
+    {
+        w.DrawRect(GetSize(), window_face_);
     }
 
     void Layout() override
@@ -383,10 +391,78 @@ private:
         UiThemeContext context = UiTheme::GetContext();
         context.mode = context.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
         UiTheme::Set(context);
+        Ctrl::SwapDarkLight();
+        ApplyTheme();
         ApplyProjection();
     }
 
+    void ApplyTheme()
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        for(UiLabel* label : { &caption_ })
+            label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        Refresh();
+    }
+
 private:
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
     UiToolButton theme_, help_, exit_;
@@ -403,9 +479,8 @@ private:
     UiMultiEdit code_;
     UiToolButton copy_;
 
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_, override_model_;
     String generated_;
+    Color window_face_ = SColorFace();
 };
 
 } // namespace

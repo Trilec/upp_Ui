@@ -1,1130 +1,432 @@
-/*
-    UiTreeDemo
-    ------------
+// UiTree: Inspect a live hierarchy, selection, expansion, drag/drop, rename, columns, and style.
+// Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
 
-    Purpose
-    - Active Ui control demo used as a build smoke test and visual styling reference.
-
-    Demo hygiene header
-    - Keep this package compiling in the active demo sweep.
-    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
-    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
-
-    Changelog
-    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
-*/
 #include <Ui/Ui.h>
-#include "../BuilderDemoSupport.h"
-
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
-
 namespace {
-
-static const char* DEMO_VERSION = "v0.4.0";
-static const int DEMO_RADIUS = 8;
-
-enum DatasetMode {
-    DATASET_SIMPLE = 0,
-    DATASET_BASIC,
-    DATASET_RICH,
-    DATASET_MULTI,
+String QuoteCpp(const String& s) {
+    String out="\""; for(int i=0;i<s.GetCount();i++) {
+        int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
+        else if(c=='\n') out<<"\\n"; else if(c=='\r') out<<"\\r"; else if(c=='\t') out<<"\\t"; else out.Cat(c);
+    } return out<<'"';
+}
+String ColorCpp(Color c) { return IsNull(c) ? String("Null") : Format("Color(%d, %d, %d)",c.GetR(),c.GetG(),c.GetB()); }
+Font DemoSans(int px,bool bold=false) { Font f=SansSerifZ(px); return bold ? f.Bold() : f; }
+struct DemoPalette { bool dark=false; Color paper,ink,segment_face,segment_frame; };
+class PreviewPanel : public UiPanel {
+public: Rect GetCanvasRect() const { return Rect(GetSize()).Deflated(DPI(24)); }
 };
 
-Font DemoMono(int px, bool bold = false)
-{
-    Font f = MonospaceZ(px);
-    if(Font::FindFaceNameIndex("Fira Code") >= 0)
-        f.FaceName("Fira Code");
-    if(bold)
-        f.Bold();
-    return f;
-}
-
-String QuoteCpp(const String& s)
-{
-    String out = "\"";
-    for(int i = 0; i < s.GetCount(); i++) {
-        int c = s[i];
-        switch(c) {
-        case '\\': out << "\\\\"; break;
-        case '\"': out << "\\\""; break;
-        case '\n': out << "\\n"; break;
-        case '\r': out << "\\r"; break;
-        case '\t': out << "\\t"; break;
-        default: out.Cat(c); break;
-        }
-    }
-    out << "\"";
-    return out;
-}
-
-String AlignCode(UiAlign a)
-{
-    if(a == UiAlign::RIGHT) return "RIGHT";
-    if(a == UiAlign::CENTER) return "CENTER";
-    if(a == UiAlign::TOP) return "TOP";
-    if(a == UiAlign::BOTTOM) return "BOTTOM";
-    return "LEFT";
-}
-
-
-
-struct DemoPalette {
-    bool dark = false;
-    Color paper;
-    Color grid;
-    Color code_face;
-    Color code_frame;
-    Color code_ink;
-    Color preview_frame;
+struct TreeConfig {
+    bool root_visible=false; bool multiple=false; bool drag_drop=true; bool internal_mutation=true; bool rename=true;
+    bool connectors=true; bool metadata=true; int glyph=0;
+    int groups=4; int children=6; bool columns=false;
+    int row_height=24; int indent=16; int glyph_size=10; int icon_size=16; int content_gap=6; int item_spacing=0;
+    int h_padding=8; int v_padding=6; int row_radius=4; int branch_hit_extra=10; int metadata_size=8; int metadata_gap=6; int accessory_gap=8;
+    bool show_icons=true; Color ink=Color(30,30,30); Color hot_face=Color(241,245,249); Color selected_face=Color(232,242,255); Color line_color=Color(203,213,225);
 };
-
-DemoPalette ResolveDemoPalette(UiThemeMode mode)
-{
-    DemoPalette p;
-    p.dark = mode == UiThemeMode::Dark;
-    if(p.dark) {
-        p.paper = Color(18, 18, 18);
-        p.grid = Color(42, 42, 42);
-        p.code_face = Color(5, 12, 24);
-        p.code_frame = Color(30, 41, 59);
-        p.code_ink = Color(110, 255, 160);
-        p.preview_frame = Color(77, 92, 116);
-    }
-    else {
-        p.paper = Color(250, 252, 255);
-        p.grid = Color(236, 240, 247);
-        p.code_face = Color(10, 15, 29);
-        p.code_frame = Color(30, 41, 59);
-        p.code_ink = Color(110, 255, 160);
-        p.preview_frame = Color(208, 219, 236);
-    }
-    return p;
-}
-
-void DrawDotGrid(Draw& w, const Rect& r, Color dot, int step, int size)
-{
-    for(int y = r.top; y < r.bottom; y += step)
-        for(int x = r.left; x < r.right; x += step)
-            w.DrawRect(x, y, size, size, dot);
-}
-
-void DrawDashedRect(Draw& w, const Rect& r, Color color, int dash = 5, int gap = 4)
-{
-    for(int x = r.left; x < r.right; x += dash + gap) {
-        int len = min(dash, r.right - x);
-        w.DrawRect(x, r.top, len, 1, color);
-        w.DrawRect(x, r.bottom - 1, len, 1, color);
-    }
-    for(int y = r.top; y < r.bottom; y += dash + gap) {
-        int len = min(dash, r.bottom - y);
-        w.DrawRect(r.left, y, 1, len, color);
-        w.DrawRect(r.right - 1, y, 1, len, color);
-    }
-}
-
-UiPanel::Style MakeCodePanelStyle(const DemoPalette& c)
-{
-    UiPanel::Style s = UiTheme::ResolvePanel(UiPanelRole::Surface);
-    for(int i = 0; i < 4; i++) {
-        s.palette.face[i] = UiFill::Solid(c.code_face);
-        s.palette.frame[i] = c.code_frame;
-        s.palette.ink[i] = c.code_ink;
-    }
-    s.metrics.face_enabled = true;
-    s.metrics.frame_enabled = true;
-    s.metrics.frame_width = DPI(1);
-    s.metrics.radius = DPI(DEMO_RADIUS);
-    s.metrics.focus_enabled = false;
-    s.metrics.content_margin = Rect(DPI(10), DPI(10), DPI(10), DPI(10));
-    return s;
-}
-
-UiLabel::Style MakeCodeLabelStyle(const DemoPalette& c)
-{
-    UiLabel::Style s = UiTheme::ResolveLabel(UiRole::Standard);
-    for(int i = 0; i < 4; i++)
-        s.palette.ink[i] = c.code_ink;
-    s.font = DemoMono(10);
-    return s;
-}
-
-class DemoCodePanel : public UiPanel {
+class Demo : public TopWindow {
 public:
-    typedef DemoCodePanel CLASSNAME;
-
-    DemoCodePanel(int h = DPI(166)) : block_height_(h)
-    {
-        Add(scroll_);
-        scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-        scroll_.Content().Add(code_);
-        code_.NoWantFocus();
+    Demo() {
+        BuildShell("UiTree","Inspect a live hierarchy, selection, expansion, drag/drop, rename, columns, and style.");
+        Preview().Add(tree_); tree_.SetModel(model_);
+        tree_.WhenRename=[=](UiTreeNodeRef,const String&){ UpdateGeneratedCode(); };
+        tree_.WhenAction=[=]{ UpdateGeneratedCode(); };
+        tree_.WhenSelection=[=]{ SyncNode(); };
+        BuildProperties(); ApplyTheme(); ApplyProjection();
     }
 
-    UiLabel& Code() { return code_; }
-    UiScrollPanel& Scroll() { return scroll_; }
-
-    virtual Size GetMinSize() const override
+    void Paint(Draw& w) override { w.DrawRect(GetSize(), window_face_); }
+    void Layout() override
     {
-        return Size(DPI(180), block_height_);
+        Rect r=Rect(GetSize()).Deflated(DPI(12));
+        header_.SetRect(r.left,r.top,r.GetWidth(),DPI(68));
+        int y=r.top+DPI(80), h=max(0,r.bottom-y);
+        int rail=min(DPI(440),max(DPI(340),r.GetWidth()/3));
+        int pw=max(0,r.GetWidth()-rail-DPI(12));
+        preview_.SetRect(r.left,y,pw,h);
+        right_.SetRect(r.left+pw+DPI(12),y,rail,h);
+        tools_.SetRect(DPI(4),DPI(4),max(0,rail-DPI(8)),DPI(36));
+        pages_.SetRect(DPI(4),DPI(44),max(0,rail-DPI(8)),max(0,h-DPI(48)));
+        LayoutPreviewContent();
     }
 
-    virtual void Layout() override
-    {
-        Rect rc = UiStyledInnerRect(GetSize(), GetStyle().metrics, GetStyle().skin);
-        scroll_.SetRect(rc);
-        scroll_.Layout();
-        Rect vp = scroll_.GetViewportRect();
-        code_.SetRect(0, 0, max(0, vp.GetWidth()), max(vp.GetHeight(), code_.GetMinSize().cy));
+    String GetGeneratedCode() const { return BuildUsageCode(); }
+    void ConfigureExample() {
+        for(int i=0;i<override_model_.GetCount();i++) {
+            PropertyEditorItem& item=override_model_[i]; item.override_active=true;
+            if(item.kind==PropertyEditorKind::Color) item.value=Color(70,110,170);
+            else if(item.kind==PropertyEditorKind::Integer) item.value=(int)item.value+1;
+            else if(item.kind==PropertyEditorKind::Boolean) item.value=!(bool)item.value;
+            override_model_.ValueChanged(item.id);
+        }
+        ReadProperties(); ApplyProjection();
     }
 
 private:
-    UiScrollPanel scroll_;
-    UiLabel code_;
-    int block_height_ = 0;
-};
-class DemoModelTree : public UiTree {
-public:
-    typedef DemoModelTree CLASSNAME;
-
-    Event<> WhenStructureChanged;
-
-    virtual void LeftDown(Point p, dword flags) override
+    void BuildShell(const char *title, const char *purpose)
     {
-        Size before = GetContentSize();
-        UiTree::LeftDown(p, flags);
-        if(before != GetContentSize() && WhenStructureChanged)
-            WhenStructureChanged();
+        Title(String(title)+" Demo").Sizeable().Zoomable();
+        SetRect(0,0,DPI(1280),DPI(800));
+        Add(header_); Add(preview_); Add(right_);
+        header_.SetTitle(title).SetSubTitle(purpose).ShowTitleLine(false)
+               .SetContentInset(DPI(8)).SetContentCell(header_actions_);
+        header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        header_actions_.AddSpacer(1).Expand(1);
+        theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16),DPI(16)).Tip("Theme");
+        help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16),DPI(16)).Tip("Help");
+        exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16),DPI(16)).Tip("Close demo");
+        header_actions_.Add(theme_).Fixed(DPI(34));
+        header_actions_.Add(help_).Fixed(DPI(34));
+        header_actions_.Add(exit_).Fixed(DPI(34));
+        theme_.WhenAction=[=] {
+            UiThemeContext ctx=UiTheme::GetContext();
+            ctx.mode=ctx.mode==UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
+            Ctrl::SwapDarkLight(); UiTheme::Set(ctx);
+            theme_.SetIcon(ctx.mode==UiThemeMode::Dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+            ApplyTheme(); ApplyProjection();
+        };
+        help_.WhenAction=[=] { PromptOK(purpose); };
+        exit_.WhenAction=[=] { Close(); };
+        right_.Add(tools_); right_.Add(pages_);
+        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2),0,DPI(2),0)).SetAlignItems(UiCrossAlign::Center);
+        inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Inspector");
+        overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Theme overrides");
+        code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Generated code");
+        tools_.Add(inspector_mode_).Fixed(DPI(38)); tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38)); tools_.AddSpacer(1).Expand(1);
+        pages_.Add(inspector_page_,"inspector"); pages_.Add(overrides_page_,"overrides"); pages_.Add(code_page_,"code");
+        inspector_page_.Add(inspector_.SizePos()); overrides_page_.Add(overrides_.SizePos());
+        code_page_.Add(code_.HSizePos(DPI(6),DPI(6)).VSizePos(DPI(42),DPI(6))); code_.SetReadOnly();
+        code_page_.Add(copy_.RightPos(DPI(8),DPI(32)).TopPos(DPI(6),DPI(30)));
+        copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16),DPI(16)).Tip("Copy C++");
+        copy_.WhenAction=[=] { WriteClipboardText(generated_); };
+        inspector_mode_.WhenAction=[=] { SelectPage(0); };
+        overrides_mode_.WhenAction=[=] { SelectPage(1); };
+        code_mode_.WhenAction=[=] { SelectPage(2); };
+        inspector_.SetFactory(&factory_); overrides_.SetFactory(&factory_);
+        inspector_.SetModel(&inspector_model_); overrides_.SetModel(&override_model_);
+        inspector_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenOverride=[=](String id,bool active) {
+            override_model_.Find(id)->override_active=active; override_model_.ValueChanged(id); ReadProperties(); ApplyProjection();
+        };
+        inspector_.WhenReset=[=](String id) { inspector_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        overrides_.WhenReset=[=](String id) { override_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        SelectPage(0);
     }
-
-    virtual void LeftDouble(Point p, dword flags) override
-    {
-        Size before = GetContentSize();
-        UiTree::LeftDouble(p, flags);
-        if(before != GetContentSize() && WhenStructureChanged)
-            WhenStructureChanged();
+    void SelectPage(int p) {
+        pages_.SetActivePage(p); if(p==2) UpdateGeneratedCode(); inspector_mode_.SetChecked(p==0); overrides_mode_.SetChecked(p==1); code_mode_.SetChecked(p==2);
     }
-
-    virtual bool Key(dword key, int count) override
+    PreviewPanel& Preview() { return preview_; }
+    const DemoPalette& Palette() const { return palette_; }
+    void SetUsageCode(const String& code) { generated_=code; code_.SetData(code); }
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
+    UiTitleCard header_;
+    UiBoxLayout header_actions_{UiDirection::H};
+    UiToolButton theme_,help_,exit_;
+    PreviewPanel preview_;
+    UiPanel right_;
+    UiBoxLayout tools_{UiDirection::H};
+    UiToolButton inspector_mode_,overrides_mode_,code_mode_,copy_;
+    UiStack pages_;
+    UiPanel inspector_page_,overrides_page_,code_page_;
+    PropertyEditor inspector_,overrides_;
+    UiMultiEdit code_;
+    String generated_;
+    DemoPalette palette_;
+    Color window_face_=SColorFace();
+    void ApplyTheme()
     {
-        Size before = GetContentSize();
-        bool out = UiTree::Key(key, count);
-        if(before != GetContentSize() && WhenStructureChanged)
-            WhenStructureChanged();
-        return out;
-    }
-};
-
-class TreePreview : public Ctrl {
-public:
-    typedef TreePreview CLASSNAME;
-
-    TreePreview() { Add(tree_); }
-
-    UiTree& Showcase() { return tree_; }
-    const UiTree& Showcase() const { return tree_; }
-
-    void SetPalette(const DemoPalette& p)
-    {
-        palette_ = p;
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        palette_.dark = dark;
+        palette_.ink = dark ? Color(220,220,220) : Color(30,30,30);
+        palette_.segment_face = panel_face;
+        palette_.segment_frame = dark ? Color(48,48,48) : Color(220,220,220);
+        palette_.paper = window_face_;
+        ApplyDemoTheme();
         Refresh();
     }
+    void BuildProperties() {
+        inspector_model_.AddBoolean("root_visible","Root visible",cfg_.root_visible,"Control").SetDefault(cfg_.root_visible);
+        inspector_model_.AddBoolean("multiple","Multiple",cfg_.multiple,"Control").SetDefault(cfg_.multiple);
+        inspector_model_.AddBoolean("drag_drop","Drag drop",cfg_.drag_drop,"Control").SetDefault(cfg_.drag_drop);
+        inspector_model_.AddBoolean("internal_mutation","Internal mutation",cfg_.internal_mutation,"Control").SetDefault(cfg_.internal_mutation);
+        inspector_model_.AddBoolean("rename","Rename",cfg_.rename,"Control").SetDefault(cfg_.rename);
+        inspector_model_.AddBoolean("connectors","Connectors",cfg_.connectors,"Control").SetDefault(cfg_.connectors);
+        inspector_model_.AddBoolean("metadata","Metadata",cfg_.metadata,"Control").SetDefault(cfg_.metadata);
+        inspector_model_.AddChoice("glyph","Glyph",cfg_.glyph,"Control").AddChoice(0,"Chevron").AddChoice(1,"Thick chevron").AddChoice(2,"Plus/minus").SetDefault(cfg_.glyph);
+        inspector_model_.AddInteger("groups","Groups",cfg_.groups,"Control").SetRange(1,100,1).SetDefault(cfg_.groups);
+        inspector_model_.AddInteger("children","Children",cfg_.children,"Control").SetRange(0,1000,1).SetDefault(cfg_.children);
+        inspector_model_.AddBoolean("columns","Columns",cfg_.columns,"Control").SetDefault(cfg_.columns);
+        override_model_.AddInteger("row_height","Row height",cfg_.row_height,"Appearance").SetRange(18,120,1).SetDefault(cfg_.row_height);
+        override_model_.Find("row_height")->overrideable=true;
+        override_model_.AddInteger("indent","Indent",cfg_.indent,"Appearance").SetRange(0,100,1).SetDefault(cfg_.indent);
+        override_model_.Find("indent")->overrideable=true;
+        override_model_.AddInteger("glyph_size","Glyph size",cfg_.glyph_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.glyph_size);
+        override_model_.Find("glyph_size")->overrideable=true;
+        override_model_.AddInteger("icon_size","Icon size",cfg_.icon_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.icon_size);
+        override_model_.Find("icon_size")->overrideable=true;
+        override_model_.AddInteger("content_gap","Content gap",cfg_.content_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.content_gap);
+        override_model_.Find("content_gap")->overrideable=true;
+        override_model_.AddInteger("item_spacing","Item spacing",cfg_.item_spacing,"Appearance").SetRange(0,60,1).SetDefault(cfg_.item_spacing);
+        override_model_.Find("item_spacing")->overrideable=true;
+        override_model_.AddInteger("h_padding","H padding",cfg_.h_padding,"Appearance").SetRange(0,100,1).SetDefault(cfg_.h_padding);
+        override_model_.Find("h_padding")->overrideable=true;
+        override_model_.AddInteger("v_padding","V padding",cfg_.v_padding,"Appearance").SetRange(0,100,1).SetDefault(cfg_.v_padding);
+        override_model_.Find("v_padding")->overrideable=true;
+        override_model_.AddInteger("row_radius","Row radius",cfg_.row_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.row_radius);
+        override_model_.Find("row_radius")->overrideable=true;
+        override_model_.AddInteger("branch_hit_extra","Branch hit extra",cfg_.branch_hit_extra,"Appearance").SetRange(0,60,1).SetDefault(cfg_.branch_hit_extra);
+        override_model_.Find("branch_hit_extra")->overrideable=true;
+        override_model_.AddInteger("metadata_size","Metadata size",cfg_.metadata_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.metadata_size);
+        override_model_.Find("metadata_size")->overrideable=true;
+        override_model_.AddInteger("metadata_gap","Metadata gap",cfg_.metadata_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.metadata_gap);
+        override_model_.Find("metadata_gap")->overrideable=true;
+        override_model_.AddInteger("accessory_gap","Accessory gap",cfg_.accessory_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.accessory_gap);
+        override_model_.Find("accessory_gap")->overrideable=true;
+        override_model_.AddBoolean("show_icons","Show icons",cfg_.show_icons,"Appearance").SetDefault(cfg_.show_icons);
+        override_model_.Find("show_icons")->overrideable=true;
+        override_model_.AddColor("ink","Ink",cfg_.ink,"Appearance").SetDefault(cfg_.ink);
+        override_model_.Find("ink")->overrideable=true;
+        override_model_.AddColor("hot_face","Hot face",cfg_.hot_face,"Appearance").SetDefault(cfg_.hot_face);
+        override_model_.Find("hot_face")->overrideable=true;
+        override_model_.AddColor("selected_face","Selected face",cfg_.selected_face,"Appearance").SetDefault(cfg_.selected_face);
+        override_model_.Find("selected_face")->overrideable=true;
+        override_model_.AddColor("line_color","Line color",cfg_.line_color,"Appearance").SetDefault(cfg_.line_color);
+        override_model_.Find("line_color")->overrideable=true;
 
-    virtual void Paint(Draw& w) override
-    {
-        Rect r = GetSize();
-        w.DrawRect(r, palette_.paper);
-        Rect body = r.Deflated(DPI(16), DPI(22));
-        DrawDotGrid(w, body, palette_.grid, DPI(14), 2);
-        DrawDashedRect(w, body, palette_.preview_frame);
+        inspector_model_.AddReadOnly("node.id","Selected node","","Data");
+        inspector_model_.AddText("node.text","Text","","Data");
+        inspector_model_.AddText("node.value","Data token","","Data");
+        inspector_model_.AddBoolean("node.enabled","Enabled",true,"Data");
+        inspector_model_.AddBoolean("node.checked","Checked",false,"Data");
+        inspector_model_.AddBoolean("node.check","Show check",false,"Data");
+        inspector_model_.AddBoolean("node.editable","Editable",true,"Data");
+        inspector_.WhenCommit=[=](String id,const Value& value){
+            if(id.StartsWith("node.")) {
+                UiTreeNodeRef node=tree_.GetCursor();
+                if(model_.IsValid(node)) {
+                    UiModelItem item=model_.Get(node);
+                    if(id=="node.text") item.text=AsString(value);
+                    if(id=="node.value") item.data=value;
+                    if(id=="node.enabled") item.enabled=(bool)value;
+                    if(id=="node.checked") item.checked=(bool)value;
+                    if(id=="node.check") item.has_check=(bool)value;
+                    if(id=="node.editable") item.editable=(bool)value;
+                    model_.Set(node,item);
+                }
+                UpdateGeneratedCode();
+            } else { ReadProperties(); ApplyProjection(); }
+        };
+    }
+    void SyncNode() {
+        UiTreeNodeRef node=tree_.GetCursor(); bool valid=model_.IsValid(node);
+        inspector_model_.SetValue("node.id",valid ? AsString(node.id) : String("None"));
+        if(!valid) return;
+        const UiModelItem& item=model_.Get(node);
+        inspector_model_.SetValue("node.text",item.text); inspector_model_.SetValue("node.value",AsString(item.data));
+        inspector_model_.SetValue("node.enabled",item.enabled); inspector_model_.SetValue("node.checked",item.checked);
+        inspector_model_.SetValue("node.check",item.has_check); inspector_model_.SetValue("node.editable",item.editable);
     }
 
-    virtual void Layout() override
-    {
-        Rect body = Rect(GetSize()).Deflated(DPI(28), DPI(34));
-        Size target(min(DPI(500), body.GetWidth()), min(DPI(360), body.GetHeight()));
-        Rect rc = RectC(body.left + (body.GetWidth() - target.cx) / 2,
-                        body.top + (body.GetHeight() - target.cy) / 2,
-                        target.cx, target.cy);
-        tree_.SetRect(rc);
+    void ReadProperties() {
+        TreeConfig defaults;
+        cfg_.root_visible = bool(inspector_model_.Find("root_visible")->value);
+        cfg_.multiple = bool(inspector_model_.Find("multiple")->value);
+        cfg_.drag_drop = bool(inspector_model_.Find("drag_drop")->value);
+        cfg_.internal_mutation = bool(inspector_model_.Find("internal_mutation")->value);
+        cfg_.rename = bool(inspector_model_.Find("rename")->value);
+        cfg_.connectors = bool(inspector_model_.Find("connectors")->value);
+        cfg_.metadata = bool(inspector_model_.Find("metadata")->value);
+        cfg_.glyph = int(inspector_model_.Find("glyph")->value);
+        cfg_.groups = int(inspector_model_.Find("groups")->value);
+        cfg_.children = int(inspector_model_.Find("children")->value);
+        cfg_.columns = bool(inspector_model_.Find("columns")->value);
+        cfg_.row_height = override_model_.Find("row_height")->override_active ? int(override_model_.Find("row_height")->value) : defaults.row_height;
+        cfg_.indent = override_model_.Find("indent")->override_active ? int(override_model_.Find("indent")->value) : defaults.indent;
+        cfg_.glyph_size = override_model_.Find("glyph_size")->override_active ? int(override_model_.Find("glyph_size")->value) : defaults.glyph_size;
+        cfg_.icon_size = override_model_.Find("icon_size")->override_active ? int(override_model_.Find("icon_size")->value) : defaults.icon_size;
+        cfg_.content_gap = override_model_.Find("content_gap")->override_active ? int(override_model_.Find("content_gap")->value) : defaults.content_gap;
+        cfg_.item_spacing = override_model_.Find("item_spacing")->override_active ? int(override_model_.Find("item_spacing")->value) : defaults.item_spacing;
+        cfg_.h_padding = override_model_.Find("h_padding")->override_active ? int(override_model_.Find("h_padding")->value) : defaults.h_padding;
+        cfg_.v_padding = override_model_.Find("v_padding")->override_active ? int(override_model_.Find("v_padding")->value) : defaults.v_padding;
+        cfg_.row_radius = override_model_.Find("row_radius")->override_active ? int(override_model_.Find("row_radius")->value) : defaults.row_radius;
+        cfg_.branch_hit_extra = override_model_.Find("branch_hit_extra")->override_active ? int(override_model_.Find("branch_hit_extra")->value) : defaults.branch_hit_extra;
+        cfg_.metadata_size = override_model_.Find("metadata_size")->override_active ? int(override_model_.Find("metadata_size")->value) : defaults.metadata_size;
+        cfg_.metadata_gap = override_model_.Find("metadata_gap")->override_active ? int(override_model_.Find("metadata_gap")->value) : defaults.metadata_gap;
+        cfg_.accessory_gap = override_model_.Find("accessory_gap")->override_active ? int(override_model_.Find("accessory_gap")->value) : defaults.accessory_gap;
+        cfg_.show_icons = override_model_.Find("show_icons")->override_active ? bool(override_model_.Find("show_icons")->value) : defaults.show_icons;
+        cfg_.ink = override_model_.Find("ink")->override_active ? Color(override_model_.Find("ink")->value) : defaults.ink;
+        cfg_.hot_face = override_model_.Find("hot_face")->override_active ? Color(override_model_.Find("hot_face")->value) : defaults.hot_face;
+        cfg_.selected_face = override_model_.Find("selected_face")->override_active ? Color(override_model_.Find("selected_face")->value) : defaults.selected_face;
+        cfg_.line_color = override_model_.Find("line_color")->override_active ? Color(override_model_.Find("line_color")->value) : defaults.line_color;
     }
 
-private:
-    DemoPalette palette_;
+
+    void BuildModel() {
+        model_.Clear();
+        for(int g=0;g<clamp(cfg_.groups,1,100);g++) {
+            UiModelItem group; group.text=Format("Group %d",g+1); group.icon=ICON_DESIGN_FOLDER_48();
+            UiTreeNodeRef parent=model_.AddChild(model_.Root(),group);
+            for(int c=0;c<clamp(cfg_.children,0,1000);c++) {
+                UiModelItem item; item.text=Format("Item %d.%d",g+1,c+1); item.data=Format("%d/%d",g,c);
+                item.editable=true; item.description="A real UiTreeModel record"; item.icon=ICON_EDITOR_NOTES_48();
+                item.columns.Add(UiModelColumn(Format("Value %d",c+1)));
+                model_.AddChild(parent,item);
+            }
+            tree_.Expand(parent);
+        }
+        previous_groups_=cfg_.groups; previous_children_=cfg_.children;
+    }
+    void ApplyProjection() {
+        if(previous_groups_!=cfg_.groups || previous_children_!=cfg_.children) BuildModel();
+        tree_.ClearCustomStyle(); UiTree::Style s=tree_.GetStyle();
+        { if(override_model_.Find("row_height")->override_active) s.row_height=cfg_.row_height; }
+        { if(override_model_.Find("indent")->override_active) s.indent_px=cfg_.indent; }
+        { if(override_model_.Find("glyph_size")->override_active) s.glyph_size=cfg_.glyph_size; }
+        { if(override_model_.Find("icon_size")->override_active) s.icon_size=cfg_.icon_size; }
+        { if(override_model_.Find("content_gap")->override_active) s.content_gap=cfg_.content_gap; }
+        { if(override_model_.Find("item_spacing")->override_active) s.item_spacing=cfg_.item_spacing; }
+        { if(override_model_.Find("h_padding")->override_active) s.h_padding=cfg_.h_padding; }
+        { if(override_model_.Find("v_padding")->override_active) s.v_padding=cfg_.v_padding; }
+        { if(override_model_.Find("row_radius")->override_active) s.row_radius=cfg_.row_radius; }
+        { if(override_model_.Find("branch_hit_extra")->override_active) s.branch_hit_extra=cfg_.branch_hit_extra; }
+        { if(override_model_.Find("metadata_size")->override_active) s.metadata_size=cfg_.metadata_size; }
+        { if(override_model_.Find("metadata_gap")->override_active) s.metadata_gap=cfg_.metadata_gap; }
+        { if(override_model_.Find("accessory_gap")->override_active) s.accessory_gap=cfg_.accessory_gap; }
+        { if(override_model_.Find("show_icons")->override_active) s.show_icons=cfg_.show_icons; }
+        { if(override_model_.Find("ink")->override_active) s.ink=cfg_.ink; }
+        { if(override_model_.Find("hot_face")->override_active) s.hot_face=cfg_.hot_face; }
+        { if(override_model_.Find("selected_face")->override_active) s.selected_face=cfg_.selected_face; }
+        { if(override_model_.Find("line_color")->override_active) s.line_color=cfg_.line_color; }
+        tree_.SetCustomStyle(s).SetRootVisible(cfg_.root_visible).SetSelectionMode(cfg_.multiple ? UITREESEL_MULTI : UITREESEL_SINGLE)
+          .EnableDragDrop(cfg_.drag_drop).EnableInternalMutation(cfg_.internal_mutation).EnableRenameOnDblClick(cfg_.rename)
+          .ShowConnectorLines(cfg_.connectors).ShowMetadataMarker(cfg_.metadata).SetGlyphStyle((UiTreeGlyphStyle)cfg_.glyph);
+        if(cfg_.columns) { Vector<int> widths; widths.Add(DPI(260)); widths.Add(DPI(160)); tree_.SetColumnWidths(widths); }
+        else tree_.ClearColumnWidths();
+        LayoutPreviewContent(); UpdateGeneratedCode();
+    }
+    void LayoutPreviewContent() { tree_.SetRect(Preview().GetCanvasRect()); }
+    void ApplyDemoTheme() {}
+    void EmitNode(String& code, UiTreeNodeRef node, const String& parent, int& id) const {
+        const UiModelItem& item=model_.Get(node); String var=Format("n%d",id++);
+        code << "UiModelItem " << var << "_item;\n" << var << "_item.text=" << QuoteCpp(item.text) << ";\n";
+        code << var << "_item.data=" << QuoteCpp(AsString(item.data)) << ";\n";
+        if(!item.description.IsEmpty()) code << var << "_item.description=" << QuoteCpp(item.description) << ";\n";
+        if(!IsNull(item.icon)) code << var << "_item.icon=" << (model_.GetChildCount(node) ? "ICON_DESIGN_FOLDER_48()" : "ICON_EDITOR_NOTES_48()") << ";\n";
+
+        for(const auto& column:item.columns) code << var << "_item.columns.Add(UiModelColumn(" << QuoteCpp(column.text) << "));\n";
+
+        if(!item.enabled) code << var << "_item.enabled=false;\n";
+        if(item.has_check) code << var << "_item.has_check=true;\n";
+        if(item.checked) code << var << "_item.checked=true;\n";
+        code << var << "_item.editable=" << (item.editable ? "true" : "false") << ";\n";
+        code << "UiTreeNodeRef " << var << "=model.AddChild(" << parent << "," << var << "_item);\n";
+        for(int i=0;i<model_.GetChildCount(node);i++) EmitNode(code,model_.GetChild(node,i),var,id);
+    }
+    void UpdateGeneratedCode() { if(pages_.GetActivePage()==2) SetUsageCode(BuildUsageCode()); }
+    String BuildUsageCode() const {
+        String code;
+        code << "UiTreeModel model;\nUiTree tree;\n";
+        bool authored=false;
+        if(override_model_.Find("row_height")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.row_height = " << AsString((int)cfg_.row_height) << ";\n"; }
+        if(override_model_.Find("indent")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.indent_px = " << AsString((int)cfg_.indent) << ";\n"; }
+        if(override_model_.Find("glyph_size")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.glyph_size = " << AsString((int)cfg_.glyph_size) << ";\n"; }
+        if(override_model_.Find("icon_size")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.icon_size = " << AsString((int)cfg_.icon_size) << ";\n"; }
+        if(override_model_.Find("content_gap")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.content_gap = " << AsString((int)cfg_.content_gap) << ";\n"; }
+        if(override_model_.Find("item_spacing")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.item_spacing = " << AsString((int)cfg_.item_spacing) << ";\n"; }
+        if(override_model_.Find("h_padding")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.h_padding = " << AsString((int)cfg_.h_padding) << ";\n"; }
+        if(override_model_.Find("v_padding")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.v_padding = " << AsString((int)cfg_.v_padding) << ";\n"; }
+        if(override_model_.Find("row_radius")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.row_radius = " << AsString((int)cfg_.row_radius) << ";\n"; }
+        if(override_model_.Find("branch_hit_extra")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.branch_hit_extra = " << AsString((int)cfg_.branch_hit_extra) << ";\n"; }
+        if(override_model_.Find("metadata_size")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.metadata_size = " << AsString((int)cfg_.metadata_size) << ";\n"; }
+        if(override_model_.Find("metadata_gap")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.metadata_gap = " << AsString((int)cfg_.metadata_gap) << ";\n"; }
+        if(override_model_.Find("accessory_gap")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.accessory_gap = " << AsString((int)cfg_.accessory_gap) << ";\n"; }
+        if(override_model_.Find("show_icons")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.show_icons = " << String(cfg_.show_icons ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("ink")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.ink = " << ColorCpp(cfg_.ink) << ";\n"; }
+        if(override_model_.Find("hot_face")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.hot_face = " << ColorCpp(cfg_.hot_face) << ";\n"; }
+        if(override_model_.Find("selected_face")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.selected_face = " << ColorCpp(cfg_.selected_face) << ";\n"; }
+        if(override_model_.Find("line_color")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.line_color = " << ColorCpp(cfg_.line_color) << ";\n"; }
+        if(authored) code << "tree.SetCustomStyle(style);\n";
+        int id=0;
+        for(int i=0;i<model_.GetChildCount(model_.Root());i++) EmitNode(code,model_.GetChild(model_.Root(),i),"model.Root()",id);
+        code << "tree.SetModel(model);\n";
+
+        code << "tree.SetRootVisible(" << String(cfg_.root_visible ? "true" : "false") << ").SetSelectionMode(" << String(cfg_.multiple ? "true" : "false") << " ? UITREESEL_MULTI : UITREESEL_SINGLE);\n";
+        code << "tree.EnableDragDrop(" << String(cfg_.drag_drop ? "true" : "false") << ").EnableInternalMutation(" << String(cfg_.internal_mutation ? "true" : "false") << ").EnableRenameOnDblClick(" << String(cfg_.rename ? "true" : "false") << ");\n";
+        code << "tree.ShowConnectorLines(" << String(cfg_.connectors ? "true" : "false") << ").ShowMetadataMarker(" << String(cfg_.metadata ? "true" : "false") << ").SetGlyphStyle((UiTreeGlyphStyle)" << AsString((int)cfg_.glyph) << ");\n";
+        if(cfg_.columns) code << "Vector<int> widths; widths.Add(DPI(260)); widths.Add(DPI(160)); tree.SetColumnWidths(widths);\n";
+        return code;
+    }
+
+    TreeConfig cfg_;
+    int previous_groups_=-1,previous_children_=-1;
+    UiTreeModel model_;
     UiTree tree_;
 };
-
-struct EnumOption {
-    const char* label;
-    int value;
-};
-
-const EnumOption kDatasets[] = {
-    { "Simple Items", DATASET_SIMPLE },
-    { "Basic Internal", DATASET_BASIC },
-    { "Rich Internal", DATASET_RICH },
-    { "Multi Internal", DATASET_MULTI },
-};
-
-const EnumOption kGlyphStyles[] = {
-    { "Chevron", (int)UITREEGLYPH_CHEVRON },
-    { "Thick", (int)UITREEGLYPH_THICK_CHEVRON },
-    { "PlusMinus", (int)UITREEGLYPH_PLUSMINUS },
-};
-
 }
-
-class UiTreeDemoWindow : public TopWindow {
-public:
-    typedef UiTreeDemoWindow CLASSNAME;
-
-    UiTreeDemoWindow();
-    virtual void Paint(Draw& w) override;
-    virtual void Layout() override;
-
-private:
-    void BuildShell();
-    void BuildRows();
-    void InitControls();
-    void ApplyTheme(UiThemeMode mode);
-    void ApplyDataset(DatasetMode mode);
-    void RefreshFromConfig();
-    void RefreshState();
-    void RefreshModelTree();
-    void UpdateModelViewport();
-    UiTreeNodeRef ResolveModelTreeNode() const;
-    void AppendInspectorNode(UiTreeNodeRef src, UiTreeNodeRef dst_parent);
-    void AppendUsageNode(UiTreeNodeRef src, const String& parent_var, int& next_id, String& code) const;
-    void SyncEditor();
-    UiTreeNodeRef CurrentNode() const;
-    void SelectNode(UiTreeNodeRef node);
-    UiModelItem BuildEditorItem(const UiModelItem* base = nullptr) const;
-    String IconNameFor(const Image& icon) const;
-    String NodeLabel(UiTreeNodeRef node) const;
-    void InsertNewChild();
-    void InsertNewSibling();
-    void SaveSelectedNode();
-    void DeleteSelectedNode();
-    String BuildUsageCode() const;
-    String DatasetLabel(DatasetMode mode) const;
-
-private:
-    DemoPalette palette_;
-    DatasetMode dataset_ = DATASET_RICH;
-    bool use_drag_ = true;
-    bool rename_on_dblclick_ = true;
-    bool show_icons_ = true;
-    bool show_metadata_ = true;
-    bool show_connector_lines_ = false;
-    bool root_visible_ = false;
-    UiTreeSelectionMode selection_mode_ = UITREESEL_SINGLE;
-    UiTreeGlyphStyle glyph_style_ = UITREEGLYPH_THICK_CHEVRON;
-    int row_height_ = 28;
-    int icon_size_ = 16;
-    int glyph_size_ = 12;
-    int indent_px_ = 18;
-    int radius_ = 8;
-    int margin_x_ = 8;
-    int margin_y_ = 8;
-    int item_spacing_ = 0;
-    int content_gap_ = 6;
-    int metadata_size_ = 8;
-    int metadata_gap_ = 6;
-    Color text_color_;
-    Color glyph_color_;
-    Color line_color_;
-    Color selected_face_;
-    Color selected_frame_;
-
-    UiTreeModel model_;
-    UiTreeModel tree_model_;
-    UiListModel icon_list_model_;
-
-    UiTitleCard header_;
-    UiLabel version_badge_;
-    UiPanel theme_shell_;
-    UiLabel theme_icon_;
-    UiToggle theme_toggle_;
-    UiButton exit_button_;
-    TreePreview preview_;
-    UiScrollPanel inspector_scroll_;
-    UiAccordion inspector_acc_;
-    UiBoxLayout usage_section_ { UiBoxLayout::Direction::V };
-    UiBoxLayout usage_toolbar_ { UiBoxLayout::Direction::H };
-    Ctrl usage_fill_;
-    UiLabel copy_label_;
-    UiButton copy_button_;
-    DemoCodePanel code_panel_;
-
-    UiBoxLayout state_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H };
-    UiBoxLayout state_dataset_row_ { UiBoxLayout::Direction::H };
-    UiBoxLayout state_nodes_row_ { UiBoxLayout::Direction::H };
-    UiBoxLayout state_cursor_row_ { UiBoxLayout::Direction::H };
-    UiBoxLayout state_drag_row_ { UiBoxLayout::Direction::H };
-    UiBoxLayout state_move_row_ { UiBoxLayout::Direction::H };
-    UiLabel state_theme_label_, state_dataset_label_, state_nodes_label_, state_cursor_label_, state_drag_label_, state_move_label_;
-    UiLabel state_theme_value_, state_dataset_value_, state_nodes_value_, state_cursor_value_, state_drag_value_, state_move_value_;
-    UiAccordion model_acc_;
-    int model_section_ = -1;
-    UiScrollPanel model_scroll_;
-    DemoModelTree model_tree_;
-
-    UiBoxLayout data_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout dataset_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel dataset_label_;
-    UiDropdown dataset_drop_;
-    UiBoxLayout item_text_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel item_text_label_;
-    UiLineEdit item_text_edit_;
-    UiBoxLayout item_desc_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel item_desc_label_;
-    UiLineEdit item_desc_edit_;
-    UiBoxLayout item_right_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel item_right_label_;
-    UiLineEdit item_right_edit_;
-    UiBoxLayout item_icon_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel item_icon_label_;
-    UiDropdown item_icon_drop_;
-    UiBoxLayout data_actions_row_ { UiBoxLayout::Direction::H };
-    UiButton new_child_button_, new_sibling_button_, save_item_button_, delete_item_button_;
-
-    UiBoxLayout behavior_box_ { UiBoxLayout::Direction::V };
-    DemoToggleRow use_drag_row_, rename_row_, multi_select_row_, show_icons_row_, show_metadata_row_, connector_lines_row_, root_visible_row_;
-
-    UiBoxLayout layout_box_ { UiBoxLayout::Direction::V };
-    DemoSliderRow row_height_row_, item_spacing_row_, icon_size_row_, glyph_size_row_, indent_row_, radius_row_, margin_x_row_, margin_y_row_, content_gap_row_, metadata_size_row_, metadata_gap_row_;
-    UiBoxLayout glyph_style_row_box_ { UiBoxLayout::Direction::H };
-    UiLabel glyph_style_label_;
-    UiDropdown glyph_style_drop_;
-
-    UiBoxLayout appearance_box_ { UiBoxLayout::Direction::V };
-    DemoColorRow text_color_row_, glyph_color_row_, line_color_row_, selected_face_row_, selected_frame_row_;
-    String last_move_request_;
-};
-
-UiTreeDemoWindow::UiTreeDemoWindow()
-{
-    BackPaint();
-    Title("UiTreeDemo");
-    Sizeable().Zoomable();
-    SetRect(0, 0, DPI(1440), DPI(860));
-
-    UiThemeContext ctx = UiTheme::GetContext();
-    ctx.preset = UiThemePreset::Minimal;
-    ctx.mode = UiThemeMode::Light;
-    UiTheme::Set(ctx);
-
-    BuildShell();
-    BuildRows();
-    InitControls();
-
-    preview_.Showcase().SetModel(model_);
-    preview_.Showcase().WhenSelection = [=] { SyncEditor(); RefreshState(); };
-    preview_.Showcase().WhenMoveRequest = [=](UiTreeMoveRequest& request) {
-        String labels;
-        for(int i = 0; i < request.nodes.GetCount(); i++) {
-            if(i)
-                labels << ", ";
-            labels << NodeLabel(request.nodes[i]);
-        }
-        last_move_request_ = Format("%s -> %s @ %d",
-                                    labels,
-                                    NodeLabel(request.new_parent),
-                                    request.insert_pos);
-        RefreshState();
-    };
-    model_tree_.WhenSelection = [=] {
-        UiTreeNodeRef node = ResolveModelTreeNode();
-        if(model_.IsValid(node))
-            SelectNode(node);
-        else {
-            SyncEditor();
-            RefreshState();
-        }
-    };
-    preview_.Showcase().WhenRename = [=](UiTreeNodeRef, const String&) {
-        SyncEditor();
-        RefreshState();
-        code_panel_.Code().SetText(BuildUsageCode());
-    };
-    model_.WhenChange = [=](const UiModelChange&) {
-        RefreshModelTree();
-        SyncEditor();
-        RefreshState();
-        code_panel_.Code().SetText(BuildUsageCode());
-        preview_.RefreshLayout();
-        preview_.Refresh();
-    };
-
-    theme_toggle_.WhenAction = [=] { ApplyTheme((bool)theme_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
-    exit_button_.WhenAction = [=] { Close(); };
-    copy_button_.WhenAction = [=] { WriteClipboardText(code_panel_.Code().GetText().ToString()); };
-
-    ApplyTheme(UiThemeMode::Light);
-    ApplyDataset(dataset_);
-    RefreshFromConfig();
+GUI_APP_MAIN {
+    Demo demo;
+    const Vector<String>& args=CommandLine();
+    if(args.GetCount()>=2 && args[0]=="--emit-code") { if(args.GetCount()>2) demo.ConfigureExample(); SaveFile(args[1],demo.GetGeneratedCode()); return; }
+    demo.Run();
 }
-void UiTreeDemoWindow::BuildShell()
-{
-    Add(header_);
-    Add(version_badge_);
-    Add(theme_shell_);
-    Add(theme_icon_);
-    Add(theme_toggle_);
-    Add(exit_button_);
-    Add(preview_);
-    Add(inspector_scroll_);
-    inspector_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-    inspector_scroll_.Content().Add(inspector_acc_);
-
-    usage_section_.SetGap(DPI(8)).SetInset(0);
-    usage_toolbar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    usage_section_.Add(usage_toolbar_).Fixed(DPI(36));
-    usage_section_.Add(code_panel_).Fit();
-    usage_toolbar_.Add(usage_fill_).Expand(1);
-    usage_toolbar_.Add(copy_label_).Fixed(DPI(58));
-    usage_toolbar_.Add(copy_button_).Fixed(DPI(22));
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("USAGE", true)).Add(usage_section_.SizePos());
-
-    state_box_.SetGap(DPI(4)).SetInset(0);
-    state_theme_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_dataset_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_nodes_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_cursor_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_drag_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_move_row_.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    state_theme_row_.Add(state_theme_label_).Expand(1); state_theme_row_.Add(state_theme_value_).Fixed(DPI(140));
-    state_dataset_row_.Add(state_dataset_label_).Expand(1); state_dataset_row_.Add(state_dataset_value_).Fixed(DPI(140));
-    state_nodes_row_.Add(state_nodes_label_).Expand(1); state_nodes_row_.Add(state_nodes_value_).Fixed(DPI(140));
-    state_cursor_row_.Add(state_cursor_label_).Expand(1); state_cursor_row_.Add(state_cursor_value_).Fixed(DPI(140));
-    state_drag_row_.Add(state_drag_label_).Expand(1); state_drag_row_.Add(state_drag_value_).Fixed(DPI(140));
-    state_move_row_.Add(state_move_label_).Expand(1); state_move_row_.Add(state_move_value_).Fixed(DPI(140));
-    state_box_.Add(state_theme_row_).Fit();
-    state_box_.Add(state_dataset_row_).Fit();
-    state_box_.Add(state_nodes_row_).Fit();
-    state_box_.Add(state_cursor_row_).Fit();
-    state_box_.Add(state_drag_row_).Fit();
-    state_box_.Add(state_move_row_).Fit();
-    state_box_.Add(model_acc_).Fit();
-    model_section_ = model_acc_.AddSection("MODEL DATA", true);
-    model_acc_.GetSectionContent(model_section_).Add(model_scroll_.SizePos());
-    model_scroll_.SetScrollMode(UIPANELSCROLL_VERTICAL);
-    model_scroll_.Content().Add(model_tree_);
-    model_tree_.SetRootVisible(false);
-    model_tree_.SetSelectionMode(UITREESEL_SINGLE);
-    model_tree_.SetModel(tree_model_);
-    model_tree_.WhenStructureChanged = [=] { UpdateModelViewport(); };
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("STATE", true)).Add(state_box_.SizePos());
-
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("DATA", true)).Add(data_box_.SizePos());
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("BEHAVIOR", true)).Add(behavior_box_.SizePos());
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("LAYOUT", true)).Add(layout_box_.SizePos());
-    inspector_acc_.GetSectionContent(inspector_acc_.AddSection("APPEARANCE", true)).Add(appearance_box_.SizePos());
-
-    header_.SetMedia(ICON_BRAND_NEWLOGO_V5_48()).SetTitle("U++ UiTree Builder").SetSubTitle("Inspect tree styling, model structure, and drag/drop from one shell.");
-    header_.ShowTitleLine(false).ShowCardLine(false).SetSelectable(false).SetShowFocus(false).EnableHover(false);
-    version_badge_.SetText(DEMO_VERSION).NoWantFocus();
-    theme_icon_.SetIcon(ICON_ACTION_LIGHT_MODE_48()).SetIconSize(DPI(20), DPI(20)).NoWantFocus();
-    exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetText("Exit").SetIconSize(DPI(15), DPI(15)).SetIconRenderMode(UiIconRenderMode::MonoTint);
-    copy_label_.SetText("Copy Code").NoWantFocus();
-    copy_button_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(14), DPI(14)).NoWantFocus();
-    code_panel_.Code().SetSelectable(true);
-}
-void UiTreeDemoWindow::BuildRows()
-{
-    auto add_dropdown = [&](UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiDropdown& drop, const char* name) {
-        row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        row_box.Add(label).Fixed(DPI(96));
-        row_box.Add(drop).Expand(1).MinHeight(DPI(24));
-        label.SetText(name).NoWantFocus();
-        target.Add(row_box).Fit();
-    };
-    auto add_edit = [&](UiBoxLayout& target, UiBoxLayout& row_box, UiLabel& label, UiLineEdit& edit, const char* name) {
-        row_box.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        row_box.Add(label).Fixed(DPI(96));
-        row_box.Add(edit).Expand(1).MinHeight(DPI(26));
-        label.SetText(name).NoWantFocus();
-        target.Add(row_box).Fit();
-    };
-    auto add_slider = [&](UiBoxLayout& target, DemoSliderRow& row, const char* name, const char* initial) {
-        row.SetLabel(name).SetValueText(initial).SetValueSelectable(false).SetValueWidth(DPI(80));
-        target.Add(row).Fit();
-    };
-    auto add_toggle = [&](UiBoxLayout& target, DemoToggleRow& row, const char* name) {
-        row.SetLabel(name).ShowValue(false);
-        target.Add(row).Fit();
-    };
-    auto add_color = [&](UiBoxLayout& target, DemoColorRow& row, const char* name) {
-        row.SetLabel(name).SetColorCount(1).ShowValue(false);
-        target.Add(row).Fit();
-    };
-
-    add_dropdown(data_box_, dataset_row_box_, dataset_label_, dataset_drop_, "Dataset");
-    add_edit(data_box_, item_text_row_box_, item_text_label_, item_text_edit_, "Item Text");
-    add_edit(data_box_, item_desc_row_box_, item_desc_label_, item_desc_edit_, "Description");
-    add_edit(data_box_, item_right_row_box_, item_right_label_, item_right_edit_, "Right Text");
-    add_dropdown(data_box_, item_icon_row_box_, item_icon_label_, item_icon_drop_, "Item Icon");
-    data_actions_row_.SetGap(DPI(6)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-    data_actions_row_.Add(new_child_button_).Expand(1).MinHeight(DPI(28));
-    data_actions_row_.Add(new_sibling_button_).Expand(1).MinHeight(DPI(28));
-    data_actions_row_.Add(save_item_button_).Expand(1).MinHeight(DPI(28));
-    data_actions_row_.Add(delete_item_button_).Expand(1).MinHeight(DPI(28));
-    data_box_.Add(data_actions_row_).Fit();
-
-    add_toggle(behavior_box_, use_drag_row_, "Use Drag");
-    add_toggle(behavior_box_, rename_row_, "Rename On DblClick");
-    add_toggle(behavior_box_, multi_select_row_, "Multi Select");
-    add_toggle(behavior_box_, show_icons_row_, "Show Icons");
-    add_toggle(behavior_box_, show_metadata_row_, "Show Metadata");
-    add_toggle(behavior_box_, connector_lines_row_, "Connector Lines");
-    add_toggle(behavior_box_, root_visible_row_, "Root Visible");
-
-    add_slider(layout_box_, row_height_row_, "Row H", "28px");
-    add_slider(layout_box_, icon_size_row_, "Icon Sz", "16px");
-    add_slider(layout_box_, glyph_size_row_, "Glyph Sz", "10px");
-    add_slider(layout_box_, indent_row_, "Indent", "18px");
-    add_slider(layout_box_, radius_row_, "Radius", "4px");
-    add_slider(layout_box_, margin_x_row_, "Margin X", "8px");
-    add_slider(layout_box_, margin_y_row_, "Margin Y", "8px");
-    add_slider(layout_box_, item_spacing_row_, "Item Spacing", "0px");
-    add_slider(layout_box_, content_gap_row_, "Content Gap", "6px");
-    add_slider(layout_box_, metadata_size_row_, "Meta Sz", "8px");
-    add_slider(layout_box_, metadata_gap_row_, "Meta Gap", "6px");
-    add_dropdown(layout_box_, glyph_style_row_box_, glyph_style_label_, glyph_style_drop_, "Glyph");
-
-    add_color(appearance_box_, text_color_row_, "Text");
-    add_color(appearance_box_, glyph_color_row_, "Glyph");
-    add_color(appearance_box_, line_color_row_, "Line");
-    add_color(appearance_box_, selected_face_row_, "Sel Face");
-    add_color(appearance_box_, selected_frame_row_, "Sel Frame");
-}
-void UiTreeDemoWindow::InitControls()
-{
-    icon_list_model_ = UiIconListModel(true);
-
-    dataset_drop_.Model().Clear();
-    for(int i = 0; i < __countof(kDatasets); i++)
-        dataset_drop_.Model().Add(kDatasets[i].label, kDatasets[i].value);
-    glyph_style_drop_.Model().Clear();
-    for(int i = 0; i < __countof(kGlyphStyles); i++)
-        glyph_style_drop_.Model().Add(kGlyphStyles[i].label, kGlyphStyles[i].value);
-
-    UiListModel& icon_model = item_icon_drop_.Model();
-    icon_model.Clear();
-    icon_model.Add(UiModelItem("None", String()));
-    icon_model.AddRange(icon_list_model_.GetAll());
-    item_icon_drop_.Select(0);
-
-    auto bind_slider = [&](DemoSliderRow& row, int& value, int minv, int maxv) {
-        row.Slider().SetRange(minv, maxv).SetStep(1).SetValue(value);
-        row.WhenAction = [&]() {
-            value = (int)row.Slider().GetValue();
-            row.SetValueText(Format("%dpx", value));
-            RefreshFromConfig();
-        };
-    };
-    bind_slider(row_height_row_, row_height_, 22, 52);
-    bind_slider(icon_size_row_, icon_size_, 8, 28);
-    bind_slider(glyph_size_row_, glyph_size_, 6, 20);
-    bind_slider(indent_row_, indent_px_, 10, 32);
-    bind_slider(radius_row_, radius_, 0, 18);
-    bind_slider(margin_x_row_, margin_x_, 0, 24);
-    bind_slider(margin_y_row_, margin_y_, 0, 24);
-    bind_slider(item_spacing_row_, item_spacing_, 0, 16);
-    bind_slider(content_gap_row_, content_gap_, 0, 18);
-    bind_slider(metadata_size_row_, metadata_size_, 4, 18);
-    bind_slider(metadata_gap_row_, metadata_gap_, 0, 18);
-
-    use_drag_row_.Toggle().WhenAction = [=] { use_drag_ = use_drag_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    rename_row_.Toggle().WhenAction = [=] { rename_on_dblclick_ = rename_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    multi_select_row_.Toggle().WhenAction = [=] { selection_mode_ = multi_select_row_.Toggle().IsOn() ? UITREESEL_MULTI : UITREESEL_SINGLE; RefreshFromConfig(); };
-    show_icons_row_.Toggle().WhenAction = [=] { show_icons_ = show_icons_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    show_metadata_row_.Toggle().WhenAction = [=] { show_metadata_ = show_metadata_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    connector_lines_row_.Toggle().WhenAction = [=] { show_connector_lines_ = connector_lines_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    root_visible_row_.Toggle().WhenAction = [=] { root_visible_ = root_visible_row_.Toggle().IsOn(); RefreshFromConfig(); };
-    glyph_style_drop_.WhenSelect = [=](int) { glyph_style_ = (UiTreeGlyphStyle)(int)glyph_style_drop_.GetSelectedData(); RefreshFromConfig(); };
-    dataset_drop_.WhenSelect = [=](int) { dataset_ = (DatasetMode)(int)dataset_drop_.GetSelectedData(); ApplyDataset(dataset_); RefreshFromConfig(); };
-
-    text_color_row_.WhenAction = [=] { text_color_ = text_color_row_.GetColor(0); RefreshFromConfig(); };
-    glyph_color_row_.WhenAction = [=] { glyph_color_ = glyph_color_row_.GetColor(0); RefreshFromConfig(); };
-    line_color_row_.WhenAction = [=] { line_color_ = line_color_row_.GetColor(0); RefreshFromConfig(); };
-    selected_face_row_.WhenAction = [=] { selected_face_ = selected_face_row_.GetColor(0); RefreshFromConfig(); };
-    selected_frame_row_.WhenAction = [=] { selected_frame_ = selected_frame_row_.GetColor(0); RefreshFromConfig(); };
-
-    new_child_button_.SetText("New Child");
-    new_sibling_button_.SetText("New Sibling");
-    save_item_button_.SetText("Save");
-    delete_item_button_.SetText("Delete");
-    new_child_button_.WhenAction = [=] { InsertNewChild(); };
-    new_sibling_button_.WhenAction = [=] { InsertNewSibling(); };
-    save_item_button_.WhenAction = [=] { SaveSelectedNode(); };
-    delete_item_button_.WhenAction = [=] { DeleteSelectedNode(); };
-}
-String UiTreeDemoWindow::DatasetLabel(DatasetMode mode) const
-{
-    switch(mode) {
-    case DATASET_SIMPLE: return "Simple Items";
-    case DATASET_BASIC: return "Basic Internal";
-    case DATASET_RICH: return "Rich Internal";
-    case DATASET_MULTI: return "Multi Internal";
-    }
-    return "Rich Internal";
-}
-
-void UiTreeDemoWindow::ApplyDataset(DatasetMode mode)
-{
-    model_.Clear();
-    UiTreeNodeRef root = model_.Root();
-    switch(mode) {
-    case DATASET_SIMPLE: {
-        UiTreeNodeRef veg = model_.AddChild(root, UiModelItem("Vegetables", "shopping.vegetables"));
-        model_.AddChild(veg, UiModelItem("Broccoli", "shopping.broccoli"));
-        model_.AddChild(veg, UiModelItem("Carrots", "shopping.carrots"));
-        model_.AddChild(veg, UiModelItem("Potatoes", "shopping.potatoes"));
-        UiTreeNodeRef herbs = model_.AddChild(root, UiModelItem("Herbs", "shopping.herbs"));
-        model_.AddChild(herbs, UiModelItem("Parsley", "shopping.parsley"));
-        selection_mode_ = UITREESEL_SINGLE;
-        show_icons_ = false;
-        show_metadata_ = false;
-        show_connector_lines_ = false;
-        break;
-    }
-    case DATASET_BASIC: {
-        UiModelItem design("Design", "workspace.design");
-        design.icon = ICON_CONTENT_CONTENT_COPY_48();
-        design.icon_render_mode = UiIconRenderMode::MonoTint;
-        UiTreeNodeRef design_node = model_.AddChild(root, design);
-        UiModelItem tokens("Tokens", "workspace.tokens"); tokens.right_text = "Core"; model_.AddChild(design_node, tokens);
-        UiModelItem icons("Icon Pass", "workspace.icons"); icons.right_text = "Now"; icons.icon = ICON_ACTION_SEARCH_48(); icons.icon_render_mode = UiIconRenderMode::MonoTint; model_.AddChild(design_node, icons);
-        UiModelItem ops("Operations", "workspace.ops");
-        ops.icon = ICON_NAVIGATION_OUTLINED_APPS_48();
-        ops.icon_render_mode = UiIconRenderMode::MonoTint;
-        UiTreeNodeRef ops_node = model_.AddChild(root, ops);
-        UiModelItem release("Shipping", "workspace.shipping"); release.right_text = "Next"; model_.AddChild(ops_node, release);
-        UiModelItem smoke("Smoke Checks", "workspace.smoke"); smoke.right_text = "Ready"; model_.AddChild(ops_node, smoke);
-        selection_mode_ = UITREESEL_SINGLE;
-        show_icons_ = true;
-        show_metadata_ = false;
-        show_connector_lines_ = false;
-        break;
-    }
-    case DATASET_RICH: {
-        UiModelItem env("Environment", "env"); env.icon = ICON_DESIGN_ADJUST_48(); env.icon_render_mode = UiIconRenderMode::MonoTint; UiTreeNodeRef env_node = model_.AddChild(root, env);
-        UiModelItem staging("Staging", "staging"); staging.description = "Live mutable branch"; staging.right_text = "NEW"; staging.icon = ICON_ACTION_CHECK_CIRCLE_48(); staging.icon_render_mode = UiIconRenderMode::MonoTint; staging.has_metadata = true; staging.metadata_color = Color(37, 99, 235); UiTreeNodeRef staging_node = model_.AddChild(env_node, staging);
-        UiModelItem api("API", "staging.api"); api.right_text = "v2"; api.has_metadata = true; api.metadata_color = Color(37, 99, 235); model_.AddChild(staging_node, api);
-        UiModelItem jobs("Jobs", "staging.jobs"); jobs.right_text = "Queue"; model_.AddChild(staging_node, jobs);
-        UiModelItem prod("Production", "production"); prod.description = "Customer traffic"; prod.right_text = "LIVE"; prod.icon = ICON_DESIGN_CIRCLE_48(); prod.icon_render_mode = UiIconRenderMode::MonoTint; prod.has_metadata = true; prod.metadata_color = Color(22, 163, 74); UiTreeNodeRef prod_node = model_.AddChild(env_node, prod);
-        UiModelItem web("Web", "production.web"); web.right_text = "Green"; model_.AddChild(prod_node, web);
-        UiModelItem worker("Worker", "production.worker"); worker.right_text = "Blue"; model_.AddChild(prod_node, worker);
-        UiModelItem arch("Archive", "archive"); arch.description = "Historical snapshots"; arch.right_text = "RO"; arch.icon = ICON_CONTENT_CONTENT_COPY_48(); arch.icon_render_mode = UiIconRenderMode::MonoTint; model_.AddChild(root, arch);
-        selection_mode_ = UITREESEL_SINGLE;
-        show_icons_ = true;
-        show_metadata_ = true;
-        show_connector_lines_ = true;
-        break;
-    }
-    case DATASET_MULTI: {
-        UiTreeNodeRef channels = model_.AddChild(root, UiModelItem("Channels", "channels"));
-        UiModelItem email("Email", "email"); email.right_text = "Daily"; email.icon = ICON_COMMUNICATION_COMMENT_48(); email.icon_render_mode = UiIconRenderMode::MonoTint; UiTreeNodeRef email_node = model_.AddChild(channels, email);
-        model_.AddChild(email_node, UiModelItem("Digest", "email.digest"));
-        model_.AddChild(email_node, UiModelItem("Alerts", "email.alerts"));
-        UiModelItem push("Push", "push"); push.right_text = "Live"; push.icon = ICON_NAVIGATION_OUTLINED_APPS_48(); push.icon_render_mode = UiIconRenderMode::MonoTint; UiTreeNodeRef push_node = model_.AddChild(channels, push);
-        model_.AddChild(push_node, UiModelItem("iOS", "push.ios"));
-        model_.AddChild(push_node, UiModelItem("Android", "push.android"));
-        UiModelItem slack("Slack", "slack"); slack.right_text = "Team"; slack.icon = ICON_NAVIGATION_OUTLINED_MORE_HORIZ_48(); slack.icon_render_mode = UiIconRenderMode::MonoTint; UiTreeNodeRef slack_node = model_.AddChild(channels, slack);
-        model_.AddChild(slack_node, UiModelItem("Design", "slack.design"));
-        model_.AddChild(slack_node, UiModelItem("Ops", "slack.ops"));
-        selection_mode_ = UITREESEL_MULTI;
-        show_icons_ = true;
-        show_metadata_ = false;
-        show_connector_lines_ = true;
-        break;
-    }
-    }
-    preview_.Showcase().Expand(root, true, true);
-    if(model_.GetChildCount(root) > 0)
-        SelectNode(model_.GetChild(root, 0));
-}
-void UiTreeDemoWindow::ApplyTheme(UiThemeMode mode)
-{
-    UiThemeContext ctx = UiTheme::GetContext();
-    ctx.mode = mode;
-    ctx.preset = UiThemePreset::Minimal;
-    UiTheme::Set(ctx);
-    palette_ = ResolveDemoPalette(mode);
-
-    UiTree::Style base_tree = UiTheme::ResolveTree();
-    text_color_ = base_tree.ink;
-    glyph_color_ = base_tree.glyph_color;
-    line_color_ = base_tree.line_color;
-    selected_face_ = base_tree.selected_face;
-    selected_frame_ = base_tree.selected_frame;
-
-    header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
-    version_badge_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Accent, UiTextSize::H3));
-    theme_shell_.SetCustomStyle(UiTheme::ResolvePanel(UiRole::Standard));
-    theme_icon_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Standard));
-    theme_icon_.SetIcon(mode == UiThemeMode::Dark ? ICON_ACTION_DARK_MODE_48() : ICON_ACTION_LIGHT_MODE_48());
-    theme_toggle_.SetCustomStyle(UiTheme::ResolveToggle());
-    theme_toggle_.SetData(mode == UiThemeMode::Dark);
-    exit_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Alert));
-    copy_label_.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
-    copy_button_.SetCustomStyle(UiTheme::ResolveButton(UiRole::Subtle));
-    code_panel_.SetCustomStyle(MakeCodePanelStyle(palette_));
-    code_panel_.Code().SetCustomStyle(MakeCodeLabelStyle(palette_));
-    preview_.SetPalette(palette_);
-
-    RefreshFromConfig();
-    Refresh();
-    preview_.Refresh();
-    inspector_scroll_.Refresh();
-}
-
-void UiTreeDemoWindow::AppendInspectorNode(UiTreeNodeRef src, UiTreeNodeRef dst_parent)
-{
-    if(!model_.IsValid(src))
-        return;
-    const UiModelItem& it = model_.Get(src);
-    UiModelItem row(it.text, src.id);
-    UiTreeNodeRef out = tree_model_.AddChild(dst_parent, row);
-    UiTreeNodeRef details = tree_model_.AddChild(out, UiModelItem("details"));
-    tree_model_.AddChild(details, UiModelItem("data = " + (it.data.IsVoid() ? String("<void>") : StdFormat(it.data))));
-    tree_model_.AddChild(details, UiModelItem("description = " + (it.description.IsEmpty() ? String("<empty>") : it.description)));
-    tree_model_.AddChild(details, UiModelItem("right_text = " + (it.right_text.IsEmpty() ? String("<empty>") : it.right_text)));
-    tree_model_.AddChild(details, UiModelItem("has_metadata = " + String(it.has_metadata ? "true" : "false")));
-    tree_model_.AddChild(details, UiModelItem("enabled = " + String(it.enabled ? "true" : "false")));
-    for(int i = 0; i < model_.GetChildCount(src); i++)
-        AppendInspectorNode(model_.GetChild(src, i), out);
-}
-
-void UiTreeDemoWindow::RefreshModelTree()
-{
-    tree_model_.Clear();
-    UiTreeNodeRef root = tree_model_.Root();
-    for(int i = 0; i < model_.GetChildCount(model_.Root()); i++)
-        AppendInspectorNode(model_.GetChild(model_.Root(), i), root);
-    model_tree_.Expand(root, true, true);
-    UpdateModelViewport();
-}
-
-void UiTreeDemoWindow::UpdateModelViewport()
-{
-    int viewport_h = min(max(model_tree_.GetContentSize().cy, DPI(120)), DPI(240));
-    model_acc_.SetSectionBodyHeight(model_section_, viewport_h);
-    int width = max(0, model_scroll_.GetViewportRect().GetWidth());
-    model_tree_.SetRect(0, 0, width, max(viewport_h, model_tree_.GetContentSize().cy));
-    model_scroll_.Layout();
-}
-
-UiTreeNodeRef UiTreeDemoWindow::ResolveModelTreeNode() const
-{
-    UiTreeNodeRef cursor = model_tree_.GetCursor();
-    while(tree_model_.IsValid(cursor)) {
-        const UiModelItem& row = tree_model_.Get(cursor);
-        if(row.data.Is<int>())
-            return UiTreeNodeRef{(int)row.data};
-        cursor = tree_model_.GetParent(cursor);
-    }
-    return UiTreeNodeRef();
-}
-
-String UiTreeDemoWindow::IconNameFor(const Image& icon) const
-{
-    if(IsNull(icon))
-        return String();
-    for(int i = 0; i < icon_list_model_.GetCount(); i++) {
-        const UiModelItem& entry = icon_list_model_.Get(i);
-        String name = StdFormat(entry.data);
-        if(!name.IsEmpty() && UiIconFromName(name) == icon)
-            return name;
-    }
-    return String();
-}
-
-String UiTreeDemoWindow::NodeLabel(UiTreeNodeRef node) const
-{
-    if(!model_.IsValid(node))
-        return String("None");
-    return model_.Get(node).text;
-}
-
-UiTreeNodeRef UiTreeDemoWindow::CurrentNode() const
-{
-    UiTreeNodeRef node = preview_.Showcase().GetCursor();
-    if(model_.IsValid(node))
-        return node;
-
-    node = ResolveModelTreeNode();
-    if(model_.IsValid(node))
-        return node;
-
-    UiTreeNodeRef root = model_.Root();
-    if(model_.GetChildCount(root) > 0)
-        return model_.GetChild(root, 0);
-    return UiTreeNodeRef();
-}
-
-void UiTreeDemoWindow::SelectNode(UiTreeNodeRef node)
-{
-    if(!model_.IsValid(node))
-        return;
-    preview_.Showcase().ClearSelection();
-    preview_.Showcase().SetCursor(node);
-    preview_.Showcase().SelectNode(node);
-    preview_.Showcase().ScrollTo(node);
-}
-
-void UiTreeDemoWindow::SyncEditor()
-{
-    UiTreeNodeRef node = CurrentNode();
-    if(!model_.IsValid(node)) {
-        item_text_edit_.SetData(String());
-        item_desc_edit_.SetData(String());
-        item_right_edit_.SetData(String());
-        item_icon_drop_.Select(0);
-        return;
-    }
-    const UiModelItem& it = model_.Get(node);
-    item_text_edit_.SetData(it.text);
-    item_desc_edit_.SetData(it.description);
-    item_right_edit_.SetData(it.right_text);
-    String icon_name = IconNameFor(it.icon);
-    if(icon_name.IsEmpty())
-        item_icon_drop_.Select(0);
-    else
-        item_icon_drop_.SelectByData(icon_name);
-}
-
-UiModelItem UiTreeDemoWindow::BuildEditorItem(const UiModelItem* base) const
-{
-    UiModelItem item = base ? *base : UiModelItem();
-    item.text = item_text_edit_.GetText().ToString();
-    if(item.text.IsEmpty())
-        item.text = "Untitled";
-    item.data = item.text;
-    item.description = item_desc_edit_.GetText().ToString();
-    item.right_text = item_right_edit_.GetText().ToString();
-    String icon_name = StdFormat(item_icon_drop_.GetSelectedData());
-    if(icon_name.IsEmpty())
-        item.icon = Image();
-    else {
-        item.icon = UiIconFromName(icon_name);
-        item.icon_render_mode = UiIconRenderMode::MonoTint;
-    }
-    return item;
-}
-
-void UiTreeDemoWindow::InsertNewChild()
-{
-    UiTreeNodeRef parent = CurrentNode();
-    if(!model_.IsValid(parent))
-        parent = model_.Root();
-    UiTreeNodeRef node = model_.AddChild(parent, BuildEditorItem(nullptr));
-    preview_.Showcase().Expand(parent, true, false);
-    SelectNode(node);
-}
-
-void UiTreeDemoWindow::InsertNewSibling()
-{
-    UiTreeNodeRef cur = CurrentNode();
-    UiTreeNodeRef parent = model_.Root();
-    int pos = model_.GetChildCount(parent);
-    if(model_.IsValid(cur)) {
-        parent = model_.GetParent(cur);
-        if(!model_.IsValid(parent))
-            parent = model_.Root();
-        pos = model_.GetChildIndex(cur) + 1;
-    }
-    UiTreeNodeRef node = model_.InsertChild(parent, pos, BuildEditorItem(nullptr));
-    preview_.Showcase().Expand(parent, true, false);
-    SelectNode(node);
-}
-
-void UiTreeDemoWindow::SaveSelectedNode()
-{
-    UiTreeNodeRef cur = CurrentNode();
-    if(!model_.IsValid(cur))
-        return;
-    model_.Set(cur, BuildEditorItem(&model_.Get(cur)));
-}
-
-void UiTreeDemoWindow::DeleteSelectedNode()
-{
-    UiTreeNodeRef cur = CurrentNode();
-    if(!model_.IsValid(cur) || cur.id == model_.Root().id)
-        return;
-    UiTreeNodeRef parent = model_.GetParent(cur);
-    model_.Remove(cur);
-    if(model_.IsValid(parent) && parent.id != model_.Root().id)
-        SelectNode(parent);
-    else if(model_.GetChildCount(model_.Root()) > 0)
-        SelectNode(model_.GetChild(model_.Root(), 0));
-}
-
-void UiTreeDemoWindow::RefreshState()
-{
-    UiThemeContext ctx = UiTheme::GetContext();
-    state_theme_label_.SetText("Theme");
-    state_dataset_label_.SetText("Dataset");
-    state_nodes_label_.SetText("Nodes");
-    state_cursor_label_.SetText("Cursor");
-    state_drag_label_.SetText("Drag");
-    state_move_label_.SetText("Move request");
-    state_theme_value_.SetText(ctx.mode == UiThemeMode::Dark ? "Dark" : "Light");
-    state_dataset_value_.SetText(DatasetLabel(dataset_));
-    state_nodes_value_.SetText(AsString(max(0, model_.GetNodeCount() - 1)));
-    state_cursor_value_.SetText(NodeLabel(CurrentNode()));
-    state_drag_value_.SetText(use_drag_ ? "On" : "Off");
-    state_move_value_.SetText(last_move_request_.IsEmpty() ? "None" : last_move_request_);
-}
-
-void UiTreeDemoWindow::RefreshFromConfig()
-{
-    UiTree::Style s = UiTheme::ResolveTree();
-    s.metrics.content_margin = Rect(DPI(margin_x_), DPI(margin_y_), DPI(margin_x_), DPI(margin_y_));
-    s.metrics.radius = DPI(radius_);
-    s.row_radius = DPI(radius_);
-    s.row_height = DPI(row_height_);
-    s.icon_size = DPI(icon_size_);
-    s.glyph_size = DPI(glyph_size_);
-    s.indent_px = DPI(indent_px_);
-    s.item_spacing = DPI(item_spacing_);
-    s.content_gap = DPI(content_gap_);
-    s.metadata_size = DPI(metadata_size_);
-    s.metadata_gap = DPI(metadata_gap_);
-    s.show_icons = show_icons_;
-    s.show_connector_lines = show_connector_lines_;
-    s.show_metadata_marker = show_metadata_;
-    s.glyph_style = glyph_style_;
-    s.ink = text_color_;
-    s.glyph_color = glyph_color_;
-    s.line_color = line_color_;
-    s.selected_face = selected_face_;
-    s.selected_frame = selected_frame_;
-    preview_.Showcase().SetCustomStyle(s);
-    preview_.Showcase().SetSelectionMode(selection_mode_);
-    preview_.Showcase().EnableRenameOnDblClick(rename_on_dblclick_);
-    preview_.Showcase().EnableDragDrop(use_drag_);
-    preview_.Showcase().SetRootVisible(root_visible_);
-    preview_.Showcase().Expand(model_.Root(), true, true);
-
-    use_drag_row_.Toggle().SetOn(use_drag_);
-    rename_row_.Toggle().SetOn(rename_on_dblclick_);
-    multi_select_row_.Toggle().SetOn(selection_mode_ == UITREESEL_MULTI);
-    show_icons_row_.Toggle().SetOn(show_icons_);
-    show_metadata_row_.Toggle().SetOn(show_metadata_);
-    connector_lines_row_.Toggle().SetOn(show_connector_lines_);
-    root_visible_row_.Toggle().SetOn(root_visible_);
-    glyph_style_drop_.SelectByData((int)glyph_style_);
-    dataset_drop_.SelectByData((int)dataset_);
-    text_color_row_.SetColor(0, text_color_);
-    glyph_color_row_.SetColor(0, glyph_color_);
-    line_color_row_.SetColor(0, line_color_);
-    selected_face_row_.SetColor(0, selected_face_);
-    selected_frame_row_.SetColor(0, selected_frame_);
-
-    code_panel_.Code().SetText(BuildUsageCode());
-    RefreshModelTree();
-    RefreshState();
-    inspector_acc_.RefreshLayoutDeep();
-    inspector_scroll_.RefreshLayout();
-    preview_.RefreshLayout();
-    preview_.Refresh();
-}
-
-void UiTreeDemoWindow::AppendUsageNode(UiTreeNodeRef src, const String& parent_var, int& next_id, String& code) const
-{
-    const UiModelItem& it = model_.Get(src);
-    String item_var = Format("item%d", next_id);
-    String node_var = Format("n%d", next_id);
-    next_id++;
-    code << "UiModelItem " << item_var << "(" << QuoteCpp(it.text) << ", " << QuoteCpp(it.data.IsVoid() ? String() : StdFormat(it.data)) << ");\n";
-    if(!it.description.IsEmpty()) code << item_var << ".description = " << QuoteCpp(it.description) << ";\n";
-    if(!it.right_text.IsEmpty()) code << item_var << ".right_text = " << QuoteCpp(it.right_text) << ";\n";
-    if(it.has_metadata) code << item_var << ".has_metadata = true;\n";
-    if(!IsNull(it.metadata_color)) code << item_var << ".metadata_color = Color(" << it.metadata_color.GetR() << ", " << it.metadata_color.GetG() << ", " << it.metadata_color.GetB() << ");\n";
-    String icon_name = IconNameFor(it.icon);
-    if(!icon_name.IsEmpty()) {
-        code << item_var << ".icon = UiIconFromName(" << QuoteCpp(icon_name) << ");\n";
-        code << item_var << ".icon_render_mode = UiIconRenderMode::MonoTint;\n";
-    }
-    code << "UiTreeNodeRef " << node_var << " = model.AddChild(" << parent_var << ", " << item_var << ");\n";
-    for(int i = 0; i < model_.GetChildCount(src); i++)
-        AppendUsageNode(model_.GetChild(src, i), node_var, next_id, code);
-}
-
-String UiTreeDemoWindow::BuildUsageCode() const
-{
-    String code;
-    code << "UiTree::Style style = UiTheme::ResolveTree();\n";
-    code << "style.metrics.content_margin = Rect(" << margin_x_ << ", " << margin_y_ << ", " << margin_x_ << ", " << margin_y_ << ");\n";
-    code << "style.metrics.radius = " << radius_ << ";\n";
-    code << "style.row_radius = " << radius_ << ";\n";
-    code << "style.row_height = " << row_height_ << ";\n";
-    code << "style.icon_size = " << icon_size_ << ";\n";
-    code << "style.glyph_size = " << glyph_size_ << ";\n";
-    code << "style.indent_px = " << indent_px_ << ";\n";
-    code << "style.item_spacing = " << item_spacing_ << ";\n";
-    code << "style.content_gap = " << content_gap_ << ";\n";
-    code << "style.metadata_size = " << metadata_size_ << ";\n";
-    code << "style.metadata_gap = " << metadata_gap_ << ";\n";
-    code << "style.show_icons = " << (show_icons_ ? "true" : "false") << ";\n";
-    code << "style.show_metadata_marker = " << (show_metadata_ ? "true" : "false") << ";\n";
-    code << "style.show_connector_lines = " << (show_connector_lines_ ? "true" : "false") << ";\n";
-    code << "style.glyph_style = " << (glyph_style_ == UITREEGLYPH_PLUSMINUS ? "UITREEGLYPH_PLUSMINUS" : glyph_style_ == UITREEGLYPH_THICK_CHEVRON ? "UITREEGLYPH_THICK_CHEVRON" : "UITREEGLYPH_CHEVRON") << ";\n";
-    code << "style.ink = Color(" << text_color_.GetR() << ", " << text_color_.GetG() << ", " << text_color_.GetB() << ");\n";
-    code << "style.glyph_color = Color(" << glyph_color_.GetR() << ", " << glyph_color_.GetG() << ", " << glyph_color_.GetB() << ");\n";
-    code << "style.line_color = Color(" << line_color_.GetR() << ", " << line_color_.GetG() << ", " << line_color_.GetB() << ");\n";
-    code << "style.selected_face = Color(" << selected_face_.GetR() << ", " << selected_face_.GetG() << ", " << selected_face_.GetB() << ");\n";
-    code << "style.selected_frame = Color(" << selected_frame_.GetR() << ", " << selected_frame_.GetG() << ", " << selected_frame_.GetB() << ");\n";
-    code << "\nUiTree tree;\n";
-    code << "tree.SetCustomStyle(style);\n";
-    code << "tree.SetRootVisible(" << (root_visible_ ? "true" : "false") << ");\n";
-    code << "tree.SetSelectionMode(" << (selection_mode_ == UITREESEL_MULTI ? "UITREESEL_MULTI" : "UITREESEL_SINGLE") << ");\n";
-    code << "tree.EnableDragDrop(" << (use_drag_ ? "true" : "false") << ");\n";
-    code << "tree.EnableRenameOnDblClick(" << (rename_on_dblclick_ ? "true" : "false") << ");\n";
-    code << "tree.WhenMoveRequest = [&](UiTreeMoveRequest& request) {\n";
-    code << "    // Validate, reject, handle through a command stack, or leave unhandled for local model mutation.\n";
-    code << "};\n";
-    code << "\nUiTreeModel model;\n";
-    code << "UiTreeNodeRef root = model.Root();\n";
-    int next_id = 0;
-    for(int i = 0; i < model_.GetChildCount(model_.Root()); i++)
-        AppendUsageNode(model_.GetChild(model_.Root(), i), "root", next_id, code);
-    code << "tree.SetModel(model);\n";
-    return code;
-}
-void UiTreeDemoWindow::Paint(Draw& w)
-{
-    w.DrawRect(GetSize(), palette_.paper);
-    int header_h = DPI(78);
-}
-
-void UiTreeDemoWindow::Layout()
-{
-    Rect r = GetSize();
-    int top_h = DPI(78);
-    int split_x = int(r.Width() * 0.60);
-    int body_y = top_h + 1;
-    header_.SetRect(DPI(18), DPI(12), max(0, split_x - DPI(36)), top_h - DPI(18));
-    version_badge_.SetRect(r.right - DPI(348), DPI(16), DPI(78), DPI(34));
-    theme_shell_.SetRect(r.right - DPI(262), DPI(16), DPI(96), DPI(34));
-    theme_icon_.SetRect(theme_shell_.GetRect().left + DPI(8), theme_shell_.GetRect().top + DPI(7), DPI(20), DPI(20));
-    theme_toggle_.SetRect(theme_shell_.GetRect().right - DPI(54), theme_shell_.GetRect().top + DPI(5), DPI(48), DPI(24));
-    exit_button_.SetRect(r.right - DPI(112), DPI(16), DPI(94), DPI(34));
-    preview_.SetRect(0, body_y, split_x, max(0, r.bottom - body_y));
-    inspector_scroll_.SetRect(split_x + DPI(16), body_y + DPI(8), max(0, r.right - split_x - DPI(28)), max(0, r.bottom - body_y - DPI(16)));
-    inspector_scroll_.Layout();
-    Rect viewport = inspector_scroll_.GetViewportRect();
-    inspector_acc_.SetRect(0, 0, max(0, viewport.GetWidth()), max(viewport.GetHeight(), inspector_acc_.GetMinSize().cy));
-}
-
-GUI_APP_MAIN
-{
-    UiTreeDemoWindow().Run();
-}
-
-
-
-

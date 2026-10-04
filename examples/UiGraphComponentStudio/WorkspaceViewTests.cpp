@@ -299,6 +299,40 @@ bool RunWorkspaceViewTests(String& error)
            && ComponentOutcome(&distant).Find("readable") >= 0
            && ComponentOutcome(&full).Find("Text") >= 0,
            "table outcome explains capacity, pixel simplification and readable text separately from LOD mask");
+    // Captured boundary drags exercise the real U++ CancelMode/release contract.
+    // Paint/data-only tests cannot detect release recursively cancelling itself.
+    {
+        NodeWorkspace captured;
+        captured.TopWindow::Open();
+        Ctrl::ProcessEvents();
+        auto begin_drag = [&] {
+            auto geometry = captured.range_.GetGeometry(captured.range_.GetSize());
+            Point boundary = geometry.boundaries[1];
+            captured.range_.LeftDown(boundary, 0);
+            expect(captured.range_.HasCapture(), "studio boundary press obtains native capture");
+            return boundary;
+        };
+        Point point = begin_drag();
+        int before = captured.EffectiveLayout().lod_widths.lod1;
+        captured.range_.MouseMove(point + Point(DPI(12), 0), K_MOUSELEFT);
+        expect(captured.EffectiveLayout().lod_widths.lod1 != before,
+               "captured studio drag updates the authored LOD threshold");
+        captured.range_.LeftUp(point, 0);
+        expect(!captured.range_.HasCapture(), "captured boundary release terminates without CancelMode recursion");
+        begin_drag(); captured.range_.Key(K_ESCAPE, 1);
+        expect(!captured.range_.HasCapture(), "Escape releases a captured studio boundary safely");
+        begin_drag(); captured.range_.Disable();
+        expect(!captured.range_.HasCapture(), "disable releases a captured studio boundary safely");
+        captured.range_.Enable();
+        begin_drag(); captured.range_.Hide();
+        expect(!captured.range_.HasCapture(), "hide releases a captured studio boundary safely");
+        captured.range_.Show();
+        begin_drag(); captured.SyncRange();
+        expect(!captured.range_.HasCapture(), "model resync cancels a captured studio boundary safely");
+        begin_drag(); Ctrl::ReleaseCtrlCapture();
+        expect(!captured.range_.HasCapture(), "framework capture cancellation does not recursively release");
+        captured.TopWindow::Close();
+    }
     LOG("UIGRAPH_WORKSPACE_VIEW_SUMMARY checks=" << checks << " failed=" << failed);
     return failed == 0;
 }

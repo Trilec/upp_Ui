@@ -1,4 +1,5 @@
 uses
+	Utilities/PropertyEditor,
     Core,
     Draw,
     CtrlCore,

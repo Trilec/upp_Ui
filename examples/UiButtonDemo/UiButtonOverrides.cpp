@@ -39,7 +39,7 @@ void UiButtonDemo::BuildOverrideModel()
     static const char *labels[] = { "Normal", "Hot", "Pressed", "Disabled" };
 
     MarkOverride(pe_model_override.AddNumericInt("radius", "Radius", base.metrics.radius,
-                                                 0, 96, 1, "General"));
+                                                 0, 60, 1, "General"));
     MarkOverride(pe_model_override.AddBoolean("transparent", "Transparent", base.transparent,
                                               "General"));
     MarkOverride(pe_model_override.AddBoolean("high_contrast", "High contrast", base.metrics.high_contrast,
@@ -177,14 +177,14 @@ void UiButtonDemo::BuildOverrideModel()
 void UiButtonDemo::UpdateOverrideSummaries()
 {
     VectorMap<String, int> active, total;
-    for(int i = 0; i < pe_model_override.GetCount(); i++) {
-        const PropertyEditorItem& item = pe_model_override[i];
+    for(int i = 0; i < OverrideModel().GetCount(); i++) {
+        const PropertyEditorItem& item = OverrideModel()[i];
         total.GetAdd(item.group, 0)++;
         if(item.override_active)
             active.GetAdd(item.group, 0)++;
     }
     for(int i = 0; i < total.GetCount(); i++)
-        pe_model_override.SetGroupSubtitle(total.GetKey(i),
+        OverrideModel().SetGroupSubtitle(total.GetKey(i),
             Format("%d of %d local", active.Get(total.GetKey(i), 0), total[i]));
 }
 

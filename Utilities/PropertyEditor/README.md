@@ -91,6 +91,12 @@ RegisterPropertyEditorEditors(factory);
 
 `RegisterPropertyEditorV1Editors()` remains available for compatibility with older callers that intentionally want only the original adapter set.
 
+Bounded `Integer` properties automatically offer numeric entry and a slider toggle.
+The slider uses the property's authored minimum, maximum and step; the model kind
+remains `Integer`. `SliderInt` offers the same toggle and initially shows the slider.
+Unbounded integers retain full integer entry without inventing or imposing slider
+bounds. Add an appropriate `SetRange(...)` when the domain has meaningful limits.
+
 ## Minimal usage
 
 ```cpp

@@ -285,28 +285,34 @@ String PropertyEditor::FormatValueSummary(const PropertyEditorItem& item) const
     }
 }
 
+void PropertyEditor::PostPendingStructureRefresh()
+{
+    if(dispatching_editor_callback_ || !structure_refresh_pending_ || structure_refresh_posted_)
+        return;
+    structure_refresh_posted_ = true;
+    Ptr<PropertyEditor> self = this;
+    const uint64 generation = model_binding_generation_;
+    PostCallback([self, generation] {
+        if(!self || self->model_binding_generation_ != generation)
+            return;
+        self->structure_refresh_posted_ = false;
+        if(self->dispatching_editor_callback_ || !self->structure_refresh_pending_)
+            return;
+        self->structure_refresh_pending_ = false;
+        self->selected_display_row_ = -1;
+        self->RebuildRows();
+    });
+}
+
 void PropertyEditor::ModelStructureChanged(PropertyEditorModel *source)
 {
     if(source != model_)
         return;
     if(dispatching_editor_callback_) {
         structure_refresh_pending_ = true;
-        if(!structure_refresh_posted_) {
-            structure_refresh_posted_ = true;
-            Ptr<PropertyEditor> self = this;
-            PostCallback([self] {
-                if(!self)
-                    return;
-                self->structure_refresh_posted_ = false;
-                if(!self->structure_refresh_pending_)
-                    return;
-                self->structure_refresh_pending_ = false;
-                self->selected_display_row_ = -1;
-                self->RebuildRows();
-            });
-        }
         return;
     }
+    structure_refresh_pending_ = false;
     selected_display_row_ = -1;
     RebuildRows();
 }

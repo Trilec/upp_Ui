@@ -2,6 +2,14 @@
 
 Version: **1.1.0**
 
+## 2026-10 - editor callback lifecycle and integer presentation
+
+- protect active and inline editor Preview/Commit across synchronous model structure notifications; defer row rebuilding until the editor callback stack unwinds, including nested event processing;
+- snapshot Choice selection payloads and callbacks, re-find replaced model items, and prevent old editor callbacks from writing into a newly bound model;
+- use the existing numeric/slider editor for bounded Integer properties while preserving their schema kind, range and step; SliderInt starts in slider mode and offers numeric entry;
+- retain unrestricted integer entry for unbounded properties;
+- add actual Choice lifecycle, schema replacement/rebinding and integer presentation regressions in PropertyEditorCallbackLifecycleTest.
+
 ## 2026-08 - v1.1 semantic value adapters
 
 - added complete standard registration through `RegisterPropertyEditorEditors()` while retaining `RegisterPropertyEditorV1Editors()` for compatibility;

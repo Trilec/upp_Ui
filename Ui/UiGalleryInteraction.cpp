@@ -39,6 +39,11 @@ void UiGallery::BeginMarquee(Point p, dword flags)
     marquee_flags_ = flags;
     marquee_open_selection_ = GetSelection();
     marquee_open_anchor_ = anchor_;
+    marquee_open_cursor_ = cursor_;
+    // Own the opening press too, so mouse-up outside the viewport cannot leave
+    // a pending marquee that starts on a subsequent hover.
+    SetCapture();
+    marquee_capture_owned_ = HasCapture();
 }
 
 void UiGallery::AutoScrollMarquee(Point p)
@@ -65,14 +70,15 @@ void UiGallery::UpdateMarquee(Point p, dword)
             return;
         marquee_active_ = true;
         marquee_candidate_ = false;
-        SetCapture();
-        marquee_capture_owned_ = HasCapture();
     }
 
+    Ptr<UiGallery> self = this;
     AutoScrollMarquee(p);
+    if(!self || !marquee_active_)
+        return;
     marquee_current_content_ = ToContentPoint(p);
-    UpdateMarqueeSelection();
     Refresh();
+    UpdateMarqueeSelection();
 }
 
 void UiGallery::UpdateMarqueeSelection()
@@ -131,7 +137,7 @@ void UiGallery::UpdateMarqueeSelection()
     NotifySelectionChange();
 }
 
-void UiGallery::EndMarquee(bool cancel, bool release_capture)
+void UiGallery::EndMarquee(bool cancel, bool release_capture, bool notify)
 {
     bool had_marquee = marquee_candidate_ || marquee_active_;
     if(cancel && had_marquee) {
@@ -140,7 +146,7 @@ void UiGallery::EndMarquee(bool cancel, bool release_capture)
             if(IsSelectableIndex(marquee_open_selection_[i]))
                 selected_.FindAdd(marquee_open_selection_[i]);
         anchor_ = marquee_open_anchor_;
-        cursor_ = selected_.IsEmpty() ? -1 : selected_.Top();
+        cursor_ = IsSelectableIndex(marquee_open_cursor_) ? marquee_open_cursor_ : -1;
     }
 
     marquee_candidate_ = false;
@@ -158,13 +164,16 @@ void UiGallery::EndMarquee(bool cancel, bool release_capture)
 
     if(had_marquee)
         Refresh();
-    if(cancel && had_marquee && WhenSelection)
+    if(notify && cancel && had_marquee && WhenSelection)
         WhenSelection();
 }
 
 void UiGallery::LeftDown(Point p, dword flags)
 {
+    Ptr<UiGallery> self = this;
     SetFocus();
+    if(!self)
+        return;
     SyncModel();
     if(!geometry_valid_)
         UpdateGeometry();
@@ -175,15 +184,20 @@ void UiGallery::LeftDown(Point p, dword flags)
         pressed_ = -1;
         if(index < 0 && selection_mode_ == UIGALLERYSEL_MULTI)
             BeginMarquee(p, flags);
-        else if(index < 0 && !(flags & K_CTRL) && !(flags & K_SHIFT))
-            ClearSelection();
         Refresh();
+        if(index < 0 && selection_mode_ != UIGALLERYSEL_MULTI &&
+           !(flags & K_CTRL) && !(flags & K_SHIFT))
+            ClearSelection();
         return;
     }
 
-    EndMarquee(true);
+    EndMarquee(true, true, false);
     bool shift = (flags & K_SHIFT) != 0;
     bool ctrl = (flags & K_CTRL) != 0;
+    uint64 structure_serial = model_structure_serial_;
+    ScrollTo(index);
+    if(!self || model_structure_serial_ != structure_serial)
+        return;
     if(selection_mode_ == UIGALLERYSEL_MULTI) {
         if(shift)
             SelectRangeTo(index, ctrl);
@@ -195,10 +209,6 @@ void UiGallery::LeftDown(Point p, dword flags)
     else
         SelectSingle(index);
 
-    cursor_ = index;
-    if(!shift)
-        anchor_ = index;
-    ScrollTo(index);
 }
 
 void UiGallery::LeftDrag(Point p, dword flags)
@@ -231,8 +241,11 @@ void UiGallery::LeftDouble(Point p, dword)
 {
     int index = HitTestItem(p);
     if(IsSelectableIndex(index)) {
+        Ptr<UiGallery> self = this;
+        uint64 structure_serial = model_structure_serial_;
         SelectSingle(index);
-        if(WhenAction)
+        if(self && model_structure_serial_ == structure_serial &&
+           cursor_ == index && IsSelected(index) && WhenAction)
             WhenAction();
     }
 }
@@ -304,8 +317,8 @@ bool UiGallery::Key(dword key, int)
     case K_RIGHT: MoveCursor(1); return true;
     case K_UP:    MoveCursorRows(-1); return true;
     case K_DOWN:  MoveCursorRows(1); return true;
-    case K_HOME:  SetCursor(0); return true;
-    case K_END:   SetCursor(model_->GetCount() - 1); return true;
+    case K_HOME: cursor_ = -1; MoveCursor(1); return true;
+    case K_END:  cursor_ = -1; MoveCursor(-1); return true;
     case K_PAGEUP: {
         int visible_rows = max(1, viewport_.GetHeight() / max(1, item_size_.cy + gap_));
         MoveCursorRows(-visible_rows);
@@ -333,13 +346,17 @@ bool UiGallery::Key(dword key, int)
 
 void UiGallery::CancelMode()
 {
-    if(marquee_candidate_ || marquee_active_)
-        EndMarquee(true, false);
+    bool had_marquee = marquee_candidate_ || marquee_active_;
+    if(had_marquee)
+        EndMarquee(true, false, false);
     marquee_capture_owned_ = false;
     pressed_ = -1;
     // Capture teardown owns ReleaseCapture(). Never call it from CancelMode():
     // on Win32 that can recursively re-enter CancelMode before capture clears.
     Ctrl::CancelMode();
+    Refresh();
+    if(had_marquee && WhenSelection)
+        WhenSelection();
 }
 
 void UiGallery::GotFocus()
@@ -349,10 +366,10 @@ void UiGallery::GotFocus()
 
 void UiGallery::LostFocus()
 {
-    if(marquee_candidate_ || marquee_active_)
-        EndMarquee(true);
     pressed_ = -1;
     Refresh();
+    if(marquee_candidate_ || marquee_active_)
+        EndMarquee(true);
 }
 
 bool UiGallery::IsSelectableIndex(int index) const
@@ -484,6 +501,8 @@ void UiGallery::SetData(const Value& value)
             for(int index : resolved)
                 selected_.FindAdd(index);
         }
+        if(selection_mode_ == UIGALLERYSEL_SINGLE && selected_.GetCount() > 1)
+            selected_.Remove(1, selected_.GetCount() - 1);
         Vector<int> selection = GetSelection();
         anchor_ = selection.IsEmpty() ? -1 : selection[0];
         cursor_ = selection.IsEmpty() ? -1 : selection.Top();

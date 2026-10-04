@@ -483,10 +483,11 @@ bool UiRangeSlider::SetValuesInternal(double lower, double upper, bool fire_acti
     lower_ = nl;
     upper_ = nu;
     Refresh();
-    if(fire_changing && WhenChanging)
-        WhenChanging();
-    if(fire_action && WhenAction)
-        WhenAction();
+    Ptr<UiRangeSlider> self = this;
+    auto changing = WhenChanging;
+    auto action = WhenAction;
+    if(fire_changing) changing();
+    if(self && fire_action) action();
     return true;
 }
 
@@ -505,8 +506,11 @@ bool UiRangeSlider::SetBoundsInternal(double lower, double upper, bool fire_acti
     if(lower_ > upper_)
         lower_ = upper_;
     Refresh();
-    if(fire_changing && WhenChanging) WhenChanging();
-    if(fire_action && WhenAction) WhenAction();
+    Ptr<UiRangeSlider> self = this;
+    auto changing = WhenChanging;
+    auto action = WhenAction;
+    if(fire_changing) changing();
+    if(self && fire_action) action();
     return true;
 }
 
@@ -538,10 +542,11 @@ bool UiRangeSlider::SetHandleValueInternal(Handle handle, double value, bool fir
         return false;
     *target = nv;
     Refresh();
-    if(fire_changing && WhenChanging)
-        WhenChanging();
-    if(fire_action && WhenAction)
-        WhenAction();
+    Ptr<UiRangeSlider> self = this;
+    auto changing = WhenChanging;
+    auto action = WhenAction;
+    if(fire_changing) changing();
+    if(self && fire_action) action();
     return true;
 }
 
@@ -687,13 +692,22 @@ void UiRangeSlider::LeftDown(Point p, dword)
     if(!IsEnabled() || !IsShowEnabled())
         return;
 
+    Ptr<UiRangeSlider> self = this;
     SetFocus();
+    if(!self) return;
     active_handle_ = PickHandle(p);
     Rect thumb = GetThumbRect(active_handle_);
     drag_start_lower_ = lower_;
     drag_start_upper_ = upper_;
     drag_start_bound_lower_ = bound_lower_;
     drag_start_bound_upper_ = bound_upper_;
+    Rect track = GetTrackRect();
+    int axis = dir_ == UiDirection::H ? p.x : p.y;
+    dragging_range_ = range_drag_enabled_ && !thumb.Contains(p)
+                     && axis > (dir_ == UiDirection::H ? track.left : track.top) + ValueToPos(lower_)
+                     && axis < (dir_ == UiDirection::H ? track.left : track.top) + ValueToPos(upper_)
+                     && track.Inflated(DPI(4)).Contains(p);
+    drag_start_pos_ = axis;
     dragging_ = true;
     drag_offset_ = thumb.Contains(p)
                  ? (dir_ == UiDirection::H
@@ -702,12 +716,15 @@ void UiRangeSlider::LeftDown(Point p, dword)
                  : 0;
     SetCapture();
 
-    if(!thumb.Contains(p)) {
+    auto begin = WhenBeginEdit;
+    begin();
+    if(!self || !dragging_) return;
+    if(!dragging_range_ && !thumb.Contains(p)) {
         Rect track = GetTrackRect();
         int pos = dir_ == UiDirection::H ? p.x - track.left : p.y - track.top;
         SetHandleValueInternal(active_handle_, PosToValue(pos), false, true);
     }
-    Refresh();
+    if(self) Refresh();
 }
 
 void UiRangeSlider::LeftUp(Point, dword)
@@ -716,6 +733,7 @@ void UiRangeSlider::LeftUp(Point, dword)
         return;
 
     dragging_ = false;
+    dragging_range_ = false;
     if(HasCapture())
         ReleaseCapture();
 
@@ -736,6 +754,19 @@ void UiRangeSlider::MouseMove(Point p, dword)
         return;
 
     Rect track = GetTrackRect();
+    if(dragging_range_) {
+        int axis = dir_ == UiDirection::H ? p.x : p.y;
+        int length = dir_ == UiDirection::H ? track.GetWidth() : track.GetHeight();
+        double delta = double(axis - drag_start_pos_) * (max_ - min_) / max(1, length - 1);
+        if(step_ > 0) delta = std::round(delta / step_) * step_;
+        delta = minmax(delta, bound_lower_ - drag_start_lower_, bound_upper_ - drag_start_upper_);
+        double lower = drag_start_lower_ + delta, upper = drag_start_upper_ + delta;
+        if(lower != lower_ || upper != upper_) {
+            lower_ = lower; upper_ = upper; Refresh();
+            auto notify = WhenChanging; notify();
+        }
+        return;
+    }
     int pos = dir_ == UiDirection::H
             ? p.x - track.left - drag_offset_
             : p.y - track.top - drag_offset_;
@@ -760,6 +791,12 @@ bool UiRangeSlider::Key(dword key, int)
     if(!IsEnabled() || !IsShowEnabled())
         return false;
 
+    if(key == K_ESCAPE && dragging_) {
+        Ptr<UiRangeSlider> self = this;
+        CancelMode();
+        if(self && HasCapture()) ReleaseCapture();
+        return true;
+    }
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
     double value = GetHandleValue(active_handle_);
 
@@ -782,6 +819,28 @@ bool UiRangeSlider::Key(dword key, int)
     }
 
     return false;
+}
+
+void UiRangeSlider::CancelMode()
+{
+    if(!dragging_) return;
+    dragging_ = false; dragging_range_ = false;
+    if(cancel_reverts_) {
+        lower_ = drag_start_lower_; upper_ = drag_start_upper_;
+        bound_lower_ = drag_start_bound_lower_; bound_upper_ = drag_start_bound_upper_;
+    }
+    Refresh();
+    auto notify = WhenCancelEdit; notify();
+}
+void UiRangeSlider::State(int reason)
+{
+    Ptr<UiRangeSlider> self = this;
+    if(dragging_ && (!IsEnabled() || !IsShowEnabled())) {
+        CancelMode();
+        if(!self) return;
+        if(HasCapture()) ReleaseCapture();
+    }
+    Ctrl::State(reason);
 }
 
 }

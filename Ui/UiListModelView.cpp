@@ -148,7 +148,39 @@ void UiList::ClampScroll()
 
 Rect UiList::GetViewportRect() const
 {
-    return UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    Rect viewport = UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    if(GetTotalHeight() > max(0, viewport.GetHeight()))
+        viewport.right = max(viewport.left, viewport.right - max(DPI(12), vscroll_.GetMinSize().cx));
+    return viewport;
+}
+
+void UiList::UpdateScrollBar()
+{
+    Rect base = UiStyledInnerRect(GetSize(), GetEffectiveStyle().metrics, GetEffectiveStyle().skin);
+    int total = GetTotalHeight();
+    updating_scrollbar_ = true;
+    if(total > max(0, base.GetHeight()) && !base.IsEmpty()) {
+        int width = min(base.GetWidth(), max(DPI(12), vscroll_.GetMinSize().cx));
+        vscroll_.Show();
+        vscroll_.SetRect(base.right - width, base.top, width, base.GetHeight());
+        vscroll_.SetRange(0, total, base.GetHeight()).SetPos(scroll_y_);
+    }
+    else {
+        vscroll_.Hide();
+        scroll_y_ = 0;
+    }
+    updating_scrollbar_ = false;
+}
+
+UiList& UiList::SetScrollPos(int y)
+{
+    int next = clamp(y, 0, max(0, GetTotalHeight() - GetViewportRect().GetHeight()));
+    if(next == scroll_y_)
+        return *this;
+    scroll_y_ = next;
+    Layout();
+    Refresh();
+    return *this;
 }
 
 int UiList::GetTotalHeight() const

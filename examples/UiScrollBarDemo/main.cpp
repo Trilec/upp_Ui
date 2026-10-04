@@ -1,751 +1,369 @@
-/*
-    UiScrollBarDemo
-    ------------
-
-    Purpose
-    - Active Ui control demo used as a build smoke test and visual styling reference.
-
-    Demo hygiene header
-    - Keep this package compiling in the active demo sweep.
-    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
-    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
-
-    Changelog
-    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
-*/
-// UiScrollBarDemo.cpp
-// Top row: 4 behavior panels. Bottom: style gallery (sliders + scrollbars).
-
-#include <CtrlCore/CtrlCore.h>
-#include <CtrlLib/CtrlLib.h>
+// UiScrollBar: Edit range, page, orientation, arrows, grips, thin-idle animation, and fading.
+// Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
 
 #include <Ui/Ui.h>
-
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
+namespace {
+String QuoteCpp(const String& s) {
+    String out="\""; for(int i=0;i<s.GetCount();i++) {
+        int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
+        else if(c=='\n') out<<"\\n"; else if(c=='\r') out<<"\\r"; else if(c=='\t') out<<"\\t"; else out.Cat(c);
+    } return out<<'"';
+}
+String ColorCpp(Color c) { return IsNull(c) ? String("Null") : Format("Color(%d, %d, %d)",c.GetR(),c.GetG(),c.GetB()); }
+Font DemoSans(int px,bool bold=false) { Font f=SansSerifZ(px); return bold ? f.Bold() : f; }
+struct DemoPalette { bool dark=false; Color paper,ink,segment_face,segment_frame; };
+class PreviewPanel : public UiPanel {
+public: Rect GetCanvasRect() const { return Rect(GetSize()).Deflated(DPI(24)); }
+};
 
-// -----------------------------------------------------------------------------
-// DemoCanvas - scrollable surface (bounded by virtual size)
-// -----------------------------------------------------------------------------
+struct ScrollBarConfig {
+    int direction=1; int minimum=0; int maximum=1000; int page=200; int position=100;
+    bool arrows=false; int arrows_layout=1; int arrow_cross=1; int thumb_mode=0; int fixed_thumb_len=24; int grip=0;
+    bool auto_hide=false; bool thin_idle=false;
+    int arrow_size=14; int thumb_min_size=20; int thin_px=5; int thick_px=18;
+    bool animate_expand=true; int expand_ms=180; int collapse_ms=1000;
+    bool fade_idle=true; int fade_ms=300; int idle_fade_pct=70;
+    int track_radius=0; int thumb_radius=4; int thumb_inset=0;
+    Color thumb_face=Color(110,110,110); Color track_face=Color(220,220,220); Color grip_color=Color(80,80,80);
+};
+class Demo : public TopWindow {
+public:
+    Demo() {
+        BuildShell("UiScrollBar","Edit range, page, orientation, arrows, grips, thin-idle animation, and fading.");
+        Preview().Add(scrollbar_);
+        scrollbar_.WhenScroll=[=]{ cfg_.position=scrollbar_.GetPos(); inspector_model_.SetValue("position",cfg_.position); SetUsageCode(BuildUsageCode()); };
+        BuildProperties(); ApplyTheme(); ApplyProjection();
+    }
 
-struct DemoCanvas : Ctrl {
-    Point  offset;
-    Size   virtual_size = Size(DPI(1400), DPI(1000));
-    String name;
-
-    void SetOffset(Point p)
+    void Paint(Draw& w) override { w.DrawRect(GetSize(), window_face_); }
+    void Layout() override
     {
-        offset = p;
+        Rect r=Rect(GetSize()).Deflated(DPI(12));
+        header_.SetRect(r.left,r.top,r.GetWidth(),DPI(68));
+        int y=r.top+DPI(80), h=max(0,r.bottom-y);
+        int rail=min(DPI(440),max(DPI(340),r.GetWidth()/3));
+        int pw=max(0,r.GetWidth()-rail-DPI(12));
+        preview_.SetRect(r.left,y,pw,h);
+        right_.SetRect(r.left+pw+DPI(12),y,rail,h);
+        tools_.SetRect(DPI(4),DPI(4),max(0,rail-DPI(8)),DPI(36));
+        pages_.SetRect(DPI(4),DPI(44),max(0,rail-DPI(8)),max(0,h-DPI(48)));
+        LayoutPreviewContent();
+    }
+
+    String GetGeneratedCode() const { return generated_; }
+    void ConfigureExample() {
+        for(int i=0;i<override_model_.GetCount();i++) {
+            PropertyEditorItem& item=override_model_[i]; item.override_active=true;
+            if(item.kind==PropertyEditorKind::Color) item.value=Color(70,110,170);
+            else if(item.kind==PropertyEditorKind::Integer) item.value=(int)item.value+1;
+            else if(item.kind==PropertyEditorKind::Boolean) item.value=!(bool)item.value;
+            override_model_.ValueChanged(item.id);
+        }
+        ReadProperties(); ApplyProjection();
+    }
+
+private:
+    void BuildShell(const char *title, const char *purpose)
+    {
+        Title(String(title)+" Demo").Sizeable().Zoomable();
+        SetRect(0,0,DPI(1280),DPI(800));
+        Add(header_); Add(preview_); Add(right_);
+        header_.SetTitle(title).SetSubTitle(purpose).ShowTitleLine(false)
+               .SetContentInset(DPI(8)).SetContentCell(header_actions_);
+        header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        header_actions_.AddSpacer(1).Expand(1);
+        theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16),DPI(16)).Tip("Theme");
+        help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16),DPI(16)).Tip("Help");
+        exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16),DPI(16)).Tip("Close demo");
+        header_actions_.Add(theme_).Fixed(DPI(34));
+        header_actions_.Add(help_).Fixed(DPI(34));
+        header_actions_.Add(exit_).Fixed(DPI(34));
+        theme_.WhenAction=[=] {
+            UiThemeContext ctx=UiTheme::GetContext();
+            ctx.mode=ctx.mode==UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
+            Ctrl::SwapDarkLight(); UiTheme::Set(ctx);
+            theme_.SetIcon(ctx.mode==UiThemeMode::Dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+            ApplyTheme(); ApplyProjection();
+        };
+        help_.WhenAction=[=] { PromptOK(purpose); };
+        exit_.WhenAction=[=] { Close(); };
+        right_.Add(tools_); right_.Add(pages_);
+        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2),0,DPI(2),0)).SetAlignItems(UiCrossAlign::Center);
+        inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Inspector");
+        overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Theme overrides");
+        code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Generated code");
+        tools_.Add(inspector_mode_).Fixed(DPI(38)); tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38)); tools_.AddSpacer(1).Expand(1);
+        pages_.Add(inspector_page_,"inspector"); pages_.Add(overrides_page_,"overrides"); pages_.Add(code_page_,"code");
+        inspector_page_.Add(inspector_.SizePos()); overrides_page_.Add(overrides_.SizePos());
+        code_page_.Add(code_.HSizePos(DPI(6),DPI(6)).VSizePos(DPI(42),DPI(6))); code_.SetReadOnly();
+        code_page_.Add(copy_.RightPos(DPI(8),DPI(32)).TopPos(DPI(6),DPI(30)));
+        copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16),DPI(16)).Tip("Copy C++");
+        copy_.WhenAction=[=] { WriteClipboardText(generated_); };
+        inspector_mode_.WhenAction=[=] { SelectPage(0); };
+        overrides_mode_.WhenAction=[=] { SelectPage(1); };
+        code_mode_.WhenAction=[=] { SelectPage(2); };
+        inspector_.SetFactory(&factory_); overrides_.SetFactory(&factory_);
+        inspector_.SetModel(&inspector_model_); overrides_.SetModel(&override_model_);
+        inspector_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenOverride=[=](String id,bool active) {
+            override_model_.Find(id)->override_active=active; override_model_.ValueChanged(id); ReadProperties(); ApplyProjection();
+        };
+        inspector_.WhenReset=[=](String id) { inspector_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        overrides_.WhenReset=[=](String id) { override_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        SelectPage(0);
+    }
+    void SelectPage(int p) {
+        pages_.SetActivePage(p); inspector_mode_.SetChecked(p==0); overrides_mode_.SetChecked(p==1); code_mode_.SetChecked(p==2);
+    }
+    PreviewPanel& Preview() { return preview_; }
+    const DemoPalette& Palette() const { return palette_; }
+    void SetUsageCode(const String& code) { generated_=code; code_.SetData(code); }
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
+    UiTitleCard header_;
+    UiBoxLayout header_actions_{UiDirection::H};
+    UiToolButton theme_,help_,exit_;
+    PreviewPanel preview_;
+    UiPanel right_;
+    UiBoxLayout tools_{UiDirection::H};
+    UiToolButton inspector_mode_,overrides_mode_,code_mode_,copy_;
+    UiStack pages_;
+    UiPanel inspector_page_,overrides_page_,code_page_;
+    PropertyEditor inspector_,overrides_;
+    UiMultiEdit code_;
+    String generated_;
+    DemoPalette palette_;
+    Color window_face_=SColorFace();
+    void ApplyTheme()
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        palette_.dark = dark;
+        palette_.ink = dark ? Color(220,220,220) : Color(30,30,30);
+        palette_.segment_face = panel_face;
+        palette_.segment_frame = dark ? Color(48,48,48) : Color(220,220,220);
+        palette_.paper = window_face_;
+        ApplyDemoTheme();
         Refresh();
     }
-
-    void SetVirtualSize(Size sz)
-    {
-        virtual_size = sz;
-        Refresh();
+    void BuildProperties() {
+        inspector_model_.AddChoice("direction","Direction",cfg_.direction,"Control").AddChoice(0,"Horizontal").AddChoice(1,"Vertical").SetDefault(cfg_.direction);
+        inspector_model_.AddInteger("minimum","Minimum",cfg_.minimum,"Control").SetRange(-1000,999,1).SetDefault(cfg_.minimum);
+        inspector_model_.AddInteger("maximum","Maximum",cfg_.maximum,"Control").SetRange(-999,1000,1).SetDefault(cfg_.maximum);
+        inspector_model_.AddInteger("page","Page",cfg_.page,"Control").SetRange(1,1000,1).SetDefault(cfg_.page);
+        inspector_model_.AddInteger("position","Position",cfg_.position,"Control").SetRange(-1000,1000,1).SetDefault(cfg_.position);
+        inspector_model_.AddBoolean("arrows","Arrows",cfg_.arrows,"Control").SetDefault(cfg_.arrows);
+        inspector_model_.AddChoice("arrows_layout","Arrows layout",cfg_.arrows_layout,"Control").AddChoice(0,"None").AddChoice(1,"Split").AddChoice(2,"Start").AddChoice(3,"End").SetDefault(cfg_.arrows_layout);
+        inspector_model_.AddChoice("arrow_cross","Arrow cross",cfg_.arrow_cross,"Control").AddChoice(0,"Fill").AddChoice(1,"Square").SetDefault(cfg_.arrow_cross);
+        inspector_model_.AddChoice("thumb_mode","Thumb mode",cfg_.thumb_mode,"Control").AddChoice(0,"Proportional").AddChoice(1,"Fixed").SetDefault(cfg_.thumb_mode);
+        inspector_model_.AddInteger("fixed_thumb_len","Fixed thumb len",cfg_.fixed_thumb_len,"Control").SetRange(1,300,1).SetDefault(cfg_.fixed_thumb_len);
+        inspector_model_.AddChoice("grip","Grip",cfg_.grip,"Control").AddChoice(0,"None").AddChoice(1,"Lines").AddChoice(2,"Dots").AddChoice(3,"Slot").SetDefault(cfg_.grip);
+        inspector_model_.AddBoolean("auto_hide","Auto hide",cfg_.auto_hide,"Control").SetDefault(cfg_.auto_hide);
+        inspector_model_.AddBoolean("thin_idle","Thin idle",cfg_.thin_idle,"Control").SetDefault(cfg_.thin_idle);
+        override_model_.AddInteger("arrow_size","Arrow size",cfg_.arrow_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.arrow_size);
+        override_model_.Find("arrow_size")->overrideable=true;
+        override_model_.AddInteger("thumb_min_size","Thumb min size",cfg_.thumb_min_size,"Appearance").SetRange(1,300,1).SetDefault(cfg_.thumb_min_size);
+        override_model_.Find("thumb_min_size")->overrideable=true;
+        override_model_.AddInteger("thin_px","Thin px",cfg_.thin_px,"Appearance").SetRange(1,60,1).SetDefault(cfg_.thin_px);
+        override_model_.Find("thin_px")->overrideable=true;
+        override_model_.AddInteger("thick_px","Thick px",cfg_.thick_px,"Appearance").SetRange(1,60,1).SetDefault(cfg_.thick_px);
+        override_model_.Find("thick_px")->overrideable=true;
+        override_model_.AddBoolean("animate_expand","Animate expand",cfg_.animate_expand,"Appearance").SetDefault(cfg_.animate_expand);
+        override_model_.Find("animate_expand")->overrideable=true;
+        override_model_.AddInteger("expand_ms","Expand ms",cfg_.expand_ms,"Appearance").SetRange(0,2000,1).SetDefault(cfg_.expand_ms);
+        override_model_.Find("expand_ms")->overrideable=true;
+        override_model_.AddInteger("collapse_ms","Collapse ms",cfg_.collapse_ms,"Appearance").SetRange(0,2000,1).SetDefault(cfg_.collapse_ms);
+        override_model_.Find("collapse_ms")->overrideable=true;
+        override_model_.AddBoolean("fade_idle","Fade idle",cfg_.fade_idle,"Appearance").SetDefault(cfg_.fade_idle);
+        override_model_.Find("fade_idle")->overrideable=true;
+        override_model_.AddInteger("fade_ms","Fade ms",cfg_.fade_ms,"Appearance").SetRange(0,2000,1).SetDefault(cfg_.fade_ms);
+        override_model_.Find("fade_ms")->overrideable=true;
+        override_model_.AddInteger("idle_fade_pct","Idle fade pct",cfg_.idle_fade_pct,"Appearance").SetRange(0,100,1).SetDefault(cfg_.idle_fade_pct);
+        override_model_.Find("idle_fade_pct")->overrideable=true;
+        override_model_.AddInteger("track_radius","Track radius",cfg_.track_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.track_radius);
+        override_model_.Find("track_radius")->overrideable=true;
+        override_model_.AddInteger("thumb_radius","Thumb radius",cfg_.thumb_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.thumb_radius);
+        override_model_.Find("thumb_radius")->overrideable=true;
+        override_model_.AddInteger("thumb_inset","Thumb inset",cfg_.thumb_inset,"Appearance").SetRange(0,30,1).SetDefault(cfg_.thumb_inset);
+        override_model_.Find("thumb_inset")->overrideable=true;
+        override_model_.AddColor("thumb_face","Thumb face",cfg_.thumb_face,"Appearance").SetDefault(cfg_.thumb_face);
+        override_model_.Find("thumb_face")->overrideable=true;
+        override_model_.AddColor("track_face","Track face",cfg_.track_face,"Appearance").SetDefault(cfg_.track_face);
+        override_model_.Find("track_face")->overrideable=true;
+        override_model_.AddColor("grip_color","Grip color",cfg_.grip_color,"Appearance").SetDefault(cfg_.grip_color);
+        override_model_.Find("grip_color")->overrideable=true;
+    }
+    void ReadProperties() {
+        ScrollBarConfig defaults;
+        cfg_.direction = int(inspector_model_.Find("direction")->value);
+        cfg_.minimum = int(inspector_model_.Find("minimum")->value);
+        cfg_.maximum = int(inspector_model_.Find("maximum")->value);
+        cfg_.page = int(inspector_model_.Find("page")->value);
+        cfg_.position = int(inspector_model_.Find("position")->value);
+        cfg_.arrows = bool(inspector_model_.Find("arrows")->value);
+        cfg_.arrows_layout = int(inspector_model_.Find("arrows_layout")->value);
+        cfg_.arrow_cross = int(inspector_model_.Find("arrow_cross")->value);
+        cfg_.thumb_mode = int(inspector_model_.Find("thumb_mode")->value);
+        cfg_.fixed_thumb_len = int(inspector_model_.Find("fixed_thumb_len")->value);
+        cfg_.grip = int(inspector_model_.Find("grip")->value);
+        cfg_.auto_hide = bool(inspector_model_.Find("auto_hide")->value);
+        cfg_.thin_idle = bool(inspector_model_.Find("thin_idle")->value);
+        cfg_.arrow_size = override_model_.Find("arrow_size")->override_active ? int(override_model_.Find("arrow_size")->value) : defaults.arrow_size;
+        cfg_.thumb_min_size = override_model_.Find("thumb_min_size")->override_active ? int(override_model_.Find("thumb_min_size")->value) : defaults.thumb_min_size;
+        cfg_.thin_px = override_model_.Find("thin_px")->override_active ? int(override_model_.Find("thin_px")->value) : defaults.thin_px;
+        cfg_.thick_px = override_model_.Find("thick_px")->override_active ? int(override_model_.Find("thick_px")->value) : defaults.thick_px;
+        cfg_.animate_expand = override_model_.Find("animate_expand")->override_active ? bool(override_model_.Find("animate_expand")->value) : defaults.animate_expand;
+        cfg_.expand_ms = override_model_.Find("expand_ms")->override_active ? int(override_model_.Find("expand_ms")->value) : defaults.expand_ms;
+        cfg_.collapse_ms = override_model_.Find("collapse_ms")->override_active ? int(override_model_.Find("collapse_ms")->value) : defaults.collapse_ms;
+        cfg_.fade_idle = override_model_.Find("fade_idle")->override_active ? bool(override_model_.Find("fade_idle")->value) : defaults.fade_idle;
+        cfg_.fade_ms = override_model_.Find("fade_ms")->override_active ? int(override_model_.Find("fade_ms")->value) : defaults.fade_ms;
+        cfg_.idle_fade_pct = override_model_.Find("idle_fade_pct")->override_active ? int(override_model_.Find("idle_fade_pct")->value) : defaults.idle_fade_pct;
+        cfg_.track_radius = override_model_.Find("track_radius")->override_active ? int(override_model_.Find("track_radius")->value) : defaults.track_radius;
+        cfg_.thumb_radius = override_model_.Find("thumb_radius")->override_active ? int(override_model_.Find("thumb_radius")->value) : defaults.thumb_radius;
+        cfg_.thumb_inset = override_model_.Find("thumb_inset")->override_active ? int(override_model_.Find("thumb_inset")->value) : defaults.thumb_inset;
+        cfg_.thumb_face = override_model_.Find("thumb_face")->override_active ? Color(override_model_.Find("thumb_face")->value) : defaults.thumb_face;
+        cfg_.track_face = override_model_.Find("track_face")->override_active ? Color(override_model_.Find("track_face")->value) : defaults.track_face;
+        cfg_.grip_color = override_model_.Find("grip_color")->override_active ? Color(override_model_.Find("grip_color")->value) : defaults.grip_color;
     }
 
-    Size GetVirtualSize() const { return virtual_size; }
 
-    virtual void Paint(Draw& w) override
-    {
-        Rect r = GetSize();
-        w.DrawRect(r, SColorPaper());
-
-        const int cell = DPI(90);
-
-        Rect vis(offset.x, offset.y, offset.x + r.GetWidth(), offset.y + r.GetHeight());
-        Rect virt(0, 0, virtual_size.cx, virtual_size.cy);
-        vis &= virt;
-        if(vis.IsEmpty())
-            return;
-
-        int x0 = (vis.left / cell) * cell;
-        int y0 = (vis.top  / cell) * cell;
-        int x1 = min(virtual_size.cx, vis.right + cell);
-        int y1 = min(virtual_size.cy, vis.bottom + cell);
-
-        Color line = Blend(SColorText(), SColorPaper(), 220);
-        Font  f = SansSerifZ(10);
-
-        for(int y = y0; y < y1; y += cell) {
-            for(int x = x0; x < x1; x += cell) {
-                int px = x - offset.x;
-                int py = y - offset.y;
-                Rect cr(px, py, px + cell, py + cell);
-                if(!cr.Intersects(r))
-                    continue;
-
-                w.DrawRect(cr, Blend(SColorFace(), SColorPaper(), 230));
-                w.DrawRect(cr.left, cr.top, cr.GetWidth(), 1, line);
-                w.DrawRect(cr.left, cr.bottom - 1, cr.GetWidth(), 1, line);
-                w.DrawRect(cr.left, cr.top, 1, cr.GetHeight(), line);
-                w.DrawRect(cr.right - 1, cr.top, 1, cr.GetHeight(), line);
-
-                String t = Format("%s %d,%d", name, x / cell, y / cell);
-                w.DrawText(cr.left + DPI(8), cr.top + DPI(6), t, f, SColorText());
-            }
+    void ApplyProjection() {
+        cfg_.maximum=max(cfg_.minimum+1,cfg_.maximum);
+        cfg_.page=clamp(cfg_.page,1,cfg_.maximum-cfg_.minimum);
+        inspector_model_.Find("page")->SetRange(1,cfg_.maximum-cfg_.minimum,1);
+        inspector_model_.Find("position")->SetRange(cfg_.minimum,cfg_.maximum-cfg_.page,1);
+        inspector_model_.SetValue("maximum",cfg_.maximum);
+        inspector_model_.SetValue("page",cfg_.page);
+        scrollbar_.ClearCustomStyle();
+        UiScrollBar::Style s=scrollbar_.GetStyle();
+        { if(override_model_.Find("arrow_size")->override_active) s.arrow_size=cfg_.arrow_size; }
+        { if(override_model_.Find("thumb_min_size")->override_active) s.thumb_min_size=cfg_.thumb_min_size; }
+        { if(override_model_.Find("thin_px")->override_active) s.thin_px=cfg_.thin_px; }
+        { if(override_model_.Find("thick_px")->override_active) s.thick_px=cfg_.thick_px; }
+        { if(override_model_.Find("animate_expand")->override_active) s.animate_expand=cfg_.animate_expand; }
+        { if(override_model_.Find("expand_ms")->override_active) s.expand_ms=cfg_.expand_ms; }
+        { if(override_model_.Find("collapse_ms")->override_active) s.collapse_ms=cfg_.collapse_ms; }
+        { if(override_model_.Find("fade_idle")->override_active) s.fade_idle=cfg_.fade_idle; }
+        { if(override_model_.Find("fade_ms")->override_active) s.fade_ms=cfg_.fade_ms; }
+        { if(override_model_.Find("idle_fade_pct")->override_active) s.idle_fade_pct=cfg_.idle_fade_pct; }
+        { if(override_model_.Find("track_radius")->override_active) s.track_metrics.radius=cfg_.track_radius; }
+        { if(override_model_.Find("thumb_radius")->override_active) s.thumb_metrics.radius=cfg_.thumb_radius; }
+        { if(override_model_.Find("thumb_inset")->override_active) s.thumb_inset=Rect(cfg_.thumb_inset,cfg_.thumb_inset,cfg_.thumb_inset,cfg_.thumb_inset); }
+        for(int i=0;i<4;i++) {
+            { if(override_model_.Find("thumb_face")->override_active) s.thumb_palette.face[i]=UiFill::Solid(cfg_.thumb_face); }
+            { if(override_model_.Find("track_face")->override_active) s.track_palette.face[i]=UiFill::Solid(cfg_.track_face); }
         }
+        { if(override_model_.Find("grip_color")->override_active) s.grip_color=cfg_.grip_color; }
+        scrollbar_.SetCustomStyle(s).SetDirection(cfg_.direction ? UiDirection::V : UiDirection::H)
+          .SetRange(cfg_.minimum,cfg_.maximum,cfg_.page).SetPos(cfg_.position)
+          .ShowArrows(cfg_.arrows).SetArrowsLayout((UiScrollArrowsLayout)cfg_.arrows_layout)
+          .SetArrowCross((UiScrollArrowCross)cfg_.arrow_cross).SetThumbLenMode((UiScrollThumbLenMode)cfg_.thumb_mode)
+          .SetFixedThumbLen(cfg_.fixed_thumb_len).SetGrip((UiScrollGrip)cfg_.grip)
+          .EnableAutoHide(cfg_.auto_hide).EnableThinIdle(cfg_.thin_idle);
+        cfg_.position=scrollbar_.GetPos(); inspector_model_.SetValue("position",cfg_.position);
+        SetUsageCode(BuildUsageCode()); LayoutPreviewContent();
     }
+    void LayoutPreviewContent() {
+        Rect r=Preview().GetCanvasRect();
+        if(cfg_.direction) scrollbar_.SetRect(r.left+r.GetWidth()/2-DPI(14),r.top,DPI(28),r.GetHeight());
+        else scrollbar_.SetRect(r.left,r.top+r.GetHeight()/2-DPI(14),r.GetWidth(),DPI(28));
+    }
+    void ApplyDemoTheme() {}
+    String BuildUsageCode() const {
+        String code;
+        code << "UiScrollBar scrollbar;\n";
+        bool authored=false;
+        if(override_model_.Find("arrow_size")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.arrow_size = " << AsString((int)cfg_.arrow_size) << ";\n"; }
+        if(override_model_.Find("thumb_min_size")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.thumb_min_size = " << AsString((int)cfg_.thumb_min_size) << ";\n"; }
+        if(override_model_.Find("thin_px")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.thin_px = " << AsString((int)cfg_.thin_px) << ";\n"; }
+        if(override_model_.Find("thick_px")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.thick_px = " << AsString((int)cfg_.thick_px) << ";\n"; }
+        if(override_model_.Find("animate_expand")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.animate_expand = " << String(cfg_.animate_expand ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("expand_ms")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.expand_ms = " << AsString((int)cfg_.expand_ms) << ";\n"; }
+        if(override_model_.Find("collapse_ms")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.collapse_ms = " << AsString((int)cfg_.collapse_ms) << ";\n"; }
+        if(override_model_.Find("fade_idle")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.fade_idle = " << String(cfg_.fade_idle ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("fade_ms")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.fade_ms = " << AsString((int)cfg_.fade_ms) << ";\n"; }
+        if(override_model_.Find("idle_fade_pct")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.idle_fade_pct = " << AsString((int)cfg_.idle_fade_pct) << ";\n"; }
+        if(override_model_.Find("track_radius")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.track_metrics.radius = " << AsString((int)cfg_.track_radius) << ";\n"; }
+        if(override_model_.Find("thumb_radius")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.thumb_metrics.radius = " << AsString((int)cfg_.thumb_radius) << ";\n"; }
+        if(override_model_.Find("thumb_inset")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.thumb_inset = Rect(" << AsString((int)cfg_.thumb_inset) << "," << AsString((int)cfg_.thumb_inset) << "," << AsString((int)cfg_.thumb_inset) << "," << AsString((int)cfg_.thumb_inset) << ");\n"; }
+        if(override_model_.Find("thumb_face")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.thumb_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.thumb_face) << ");\n"; }
+        if(override_model_.Find("track_face")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.track_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.track_face) << ");\n"; }
+        if(override_model_.Find("grip_color")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.grip_color = " << ColorCpp(cfg_.grip_color) << ";\n"; }
+        if(authored) code << "scrollbar.SetCustomStyle(style);\n";
+        code << "scrollbar.SetDirection(" << AsString((int)cfg_.direction) << " ? UiDirection::V : UiDirection::H);\n";
+        code << "scrollbar.SetRange(" << AsString((int)cfg_.minimum) << "," << AsString((int)cfg_.maximum) << "," << AsString((int)cfg_.page) << ").SetPos(" << AsString((int)cfg_.position) << ");\n";
+        code << "scrollbar.ShowArrows(" << String(cfg_.arrows ? "true" : "false") << ").SetArrowsLayout((UiScrollArrowsLayout)" << AsString((int)cfg_.arrows_layout) << ").SetArrowCross((UiScrollArrowCross)" << AsString((int)cfg_.arrow_cross) << ");\n";
+        code << "scrollbar.SetThumbLenMode((UiScrollThumbLenMode)" << AsString((int)cfg_.thumb_mode) << ").SetFixedThumbLen(" << AsString((int)cfg_.fixed_thumb_len) << ").SetGrip((UiScrollGrip)" << AsString((int)cfg_.grip) << ");\n";
+        code << "scrollbar.EnableAutoHide(" << String(cfg_.auto_hide ? "true" : "false") << ").EnableThinIdle(" << String(cfg_.thin_idle ? "true" : "false") << ");\n";
+        return code;
+    }
+
+    ScrollBarConfig cfg_;
+    UiScrollBar scrollbar_;
 };
-
-// -----------------------------------------------------------------------------
-// Panel - one canvas + one V/H scrollbar pair
-// -----------------------------------------------------------------------------
-
-struct Panel : ParentCtrl {
-    UiLabel     title;
-    DemoCanvas  canvas;
-    UiScrollBar sb_v { UiDirection::V };
-    UiScrollBar sb_h { UiDirection::H };
-
-    Panel()
-    {
-        Add(title);
-        Add(canvas);
-        Add(sb_v);
-        Add(sb_h);
-
-        title.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        title.SetInkColor(SColorDisabled());
-
-        sb_v.WhenScroll = [=] { SyncCanvas(); };
-        sb_h.WhenScroll = [=] { SyncCanvas(); };
-    }
-
-    void SetTitle(const String& t) { title.SetText(t); }
-    void SetName(const String& n)  { canvas.name = n; }
-    void SetVirtual(Size sz)       { canvas.SetVirtualSize(sz); RefreshLayout(); }
-
-    UiScrollBar& V() { return sb_v; }
-    UiScrollBar& H() { return sb_h; }
-
-    void SyncCanvas()
-    {
-        canvas.SetOffset(Point(sb_h.GetPos(), sb_v.GetPos()));
-    }
-
-    virtual void Layout() override
-    {
-        Rect r = GetSize();
-        int pad = DPI(10);
-        int head_h = DPI(22);
-
-        title.SetRect(r.left + pad, r.top + pad, r.GetWidth() - 2 * pad, head_h);
-
-        Rect view = r;
-        view.Deflate(pad, pad);
-        view.top += head_h + DPI(6);
-
-        // Auto-hide needs to affect geometry, so decide visibility first.
-        Size total = canvas.GetVirtualSize();
-        bool need_v = total.cy > view.GetHeight();
-        bool need_h = total.cx > view.GetWidth();
-
-        for(int pass = 0; pass < 2; pass++) {
-            if(sb_v.GetStyle().auto_hide)
-                sb_v.Show(need_v);
-            if(sb_h.GetStyle().auto_hide)
-                sb_h.Show(need_h);
-
-            int sbw = sb_v.IsShown() ? max(DPI(14), sb_v.GetMinSize().cx) : 0;
-            int sbh = sb_h.IsShown() ? max(DPI(14), sb_h.GetMinSize().cy) : 0;
-
-            Rect canvas_rect = view;
-            canvas_rect.right  -= sbw;
-            canvas_rect.bottom -= sbh;
-
-            need_v = total.cy > canvas_rect.GetHeight();
-            need_h = total.cx > canvas_rect.GetWidth();
-        }
-
-        int sbw = sb_v.IsShown() ? max(DPI(14), sb_v.GetMinSize().cx) : 0;
-        int sbh = sb_h.IsShown() ? max(DPI(14), sb_h.GetMinSize().cy) : 0;
-
-        Rect canvas_rect = view;
-        canvas_rect.right  -= sbw;
-        canvas_rect.bottom -= sbh;
-
-        canvas.SetRect(canvas_rect);
-        sb_v.SetRect(canvas_rect.right, canvas_rect.top, sbw, canvas_rect.GetHeight());
-        sb_h.SetRect(canvas_rect.left, canvas_rect.bottom, canvas_rect.GetWidth(), sbh);
-
-        int page_x = max(1, canvas_rect.GetWidth());
-        int page_y = max(1, canvas_rect.GetHeight());
-
-        sb_h.SetRange(0, total.cx, page_x);
-        sb_v.SetRange(0, total.cy, page_y);
-
-        SyncCanvas();
-    }
-};
-
-// -----------------------------------------------------------------------------
-// GalleryStrip - vertical bar silhouettes
-// -----------------------------------------------------------------------------
-
-struct GalleryStrip : ParentCtrl {
-    UiLabel title_sliders;
-    UiLabel title_scrollbars;
-
-    static const int NSL = 7;
-    static const int NSB = 10;
-
-    UiScrollBar sl[NSL];
-    UiScrollBar sb[NSB];
-    UiLabel     sl_cap[NSL];
-    UiLabel     sb_cap[NSB];
-
-    GalleryStrip()
-    {
-        Add(title_sliders);
-        Add(title_scrollbars);
-        title_sliders.SetText("Sliders (fixed thumb)").SetInkColor(SColorDisabled());
-        title_scrollbars.SetText("Scrollbars (proportional thumb)").SetInkColor(SColorDisabled());
-
-        for(int i = 0; i < NSL; i++) {
-            sl[i].SetDirection(UiDirection::V);
-            Add(sl[i]);
-            Add(sl_cap[i]);
-            sl_cap[i].SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-            sl_cap[i].SetInkColor(SColorDisabled());
-        }
-
-        for(int i = 0; i < NSB; i++) {
-            sb[i].SetDirection(UiDirection::V);
-            Add(sb[i]);
-            Add(sb_cap[i]);
-            sb_cap[i].SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-            sb_cap[i].SetInkColor(SColorDisabled());
-        }
-
-        Setup();
-    }
-
-    void Setup()
-    {
-        // --- Sliders --------------------------------------------------------
-        for(int i = 0; i < NSL; i++) {
-            UiScrollBar::Style s = sl[i].GetStyle();
-            s.show_arrows = false;
-            s.auto_hide = false;
-            s.thin_idle = false;
-            s.fade_idle = false;
-            s.thumb_len_mode = UITHUMB_FIXED;
-            s.fixed_thumb_len_px = DPI(18);
-            s.arrow_cross = UIARROWCROSS_SQUARE;
-
-            // Thin line track + bigger thumb
-            s.thick_px = DPI(18);
-            s.track_paint_px_idle = DPI(3);
-            s.track_paint_px_hot  = DPI(3);
-            s.thumb_paint_px_idle = DPI(14);
-            s.thumb_paint_px_hot  = DPI(16);
-
-            // Slight inset to feel centered
-            s.track_metrics.content_margin = Rect(0, 0, 0, 0);
-
-            sl[i].SetCustomStyle(s);
-            sl[i].SetRange(0, 100, 0);
-            sl[i].SetPos(35 + i * 8);
-        }
-
-        sl_cap[0].SetText("dot");
-        sl[0].SetGrip(UIGRIP_DOTS);
-
-        sl_cap[1].SetText("lines");
-        sl[1].SetGrip(UIGRIP_LINES);
-
-        sl_cap[2].SetText("slot sq");
-        {
-            sl[2].SetGrip(UIGRIP_SLOT);
-            UiScrollBar::Style s = sl[2].GetStyle();
-            s.thumb_metrics.radius = 0;
-            s.thumb_metrics.frame_enabled = false;
-            s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            sl[2].SetCustomStyle(s);
-        }
-
-        sl_cap[3].SetText("slot pill");
-        {
-            UiScrollBar::Style s = sl[3].GetStyle();
-            s.thumb_metrics.radius = DPI(10);
-            s.thumb_metrics.frame_enabled = false;
-            s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 130));
-            s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 165));
-            sl[3].SetCustomStyle(s);
-        }
-
-        sl_cap[4].SetText("ring");
-        {
-            UiScrollBar::Style s = sl[4].GetStyle();
-            s.thumb_paint_px_idle = DPI(16);
-            s.fixed_thumb_len_px  = DPI(16);
-            s.thumb_metrics.radius = DPI(20);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st] = UiFill::None();
-                s.thumb_palette.frame[st] = Blend(SColorText(), SColorPaper(), 160);
-            }
-            s.thumb_metrics.face_enabled = false;
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width = DPI(2);
-            sl[4].SetCustomStyle(s);
-        }
-
-        sl_cap[5].SetText("image");
-        {
-            UiScrollBar::Style s = sl[5].GetStyle();
-            s.grip = UIGRIP_IMAGE;
-            s.grip_image = CtrlImg::MenuCheck0();
-
-            // Pill thumb with subtle frame.
-            s.thumb_metrics.radius = DPI(20);
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width = DPI(1);
-
-            // Give the icon some contrast.
-            s.fixed_thumb_len_px = DPI(22);
-            s.thumb_paint_px_idle = DPI(16);
-            s.thumb_paint_px_hot  = DPI(16);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st]  = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 35));
-                s.thumb_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 55);
-            }
-            sl[5].SetCustomStyle(s);
-        }
-
-        sl_cap[6].SetText("big");
-        {
-            UiScrollBar::Style s = sl[6].GetStyle();
-            s.fixed_thumb_len_px = DPI(30);
-            s.thumb_paint_px_idle = DPI(18);
-            s.thumb_paint_px_hot  = DPI(18);
-            s.thumb_metrics.radius = DPI(20);
-            // Thick line (10px)
-            s.track_paint_px_idle  = DPI(10);
-            s.track_paint_px_hot   = DPI(10);
-            s.track_metrics.radius = DPI(10);
-
-            // Windows blue line.
-            Color b = Color(0, 120, 212);
-            for(int st = 0; st < 4; st++)
-                s.track_palette.face[st] = UiFill::Solid(Blend(SColorPaper(), b, 90));
-            s.track_metrics.frame_enabled = false;
-
-            sl[6].SetCustomStyle(s);
-            sl[6].SetPos(70);
-        }
-
-        // --- Scrollbars -----------------------------------------------------
-        for(int i = 0; i < NSB; i++) {
-            UiScrollBar::Style s = sb[i].GetStyle();
-            s.auto_hide = false;
-            s.thin_idle = false;
-            s.fade_idle = false;
-            s.thumb_len_mode = UITHUMB_PROPORTIONAL;
-            s.thick_px = DPI(18);
-            s.track_paint_px_idle = DPI(18);
-            s.track_paint_px_hot  = DPI(18);
-            s.thumb_paint_px_idle = DPI(18);
-            s.thumb_paint_px_hot  = DPI(18);
-            s.arrow_cross = UIARROWCROSS_SQUARE;
-            sb[i].SetCustomStyle(s);
-            sb[i].SetRange(0, DPI(900), DPI(220));
-            sb[i].SetPos(DPI(140));
-        }
-
-        sb_cap[0].SetText("classic");
-        {
-            UiScrollBar::Style s = sb[0].GetStyle();
-            s.show_arrows = true;
-            s.arrows_layout = UIARROWS_SPLIT;
-            s.arrow_cross = UIARROWCROSS_SQUARE;
-            s.arrow_size = DPI(18);
-
-            // Classic: do NOT expand the frame/track, only the thumb.
-            s.thin_idle = false;
-            s.fade_idle = false;
-            s.track_paint_px_idle = s.thick_px;
-            s.track_paint_px_hot  = s.thick_px;
-            s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
-            s.thumb_paint_px_hot  = s.thick_px;
-            s.thumb_metrics.radius = DPI(50);
-
-            // Arrow buttons match the track thickness and are pill/circle-like.
-            s.arrow_metrics.radius = DPI(50);
-            sb[0].SetCustomStyle(s);
-        }
-
-        sb_cap[1].SetText("group end");
-        {
-            UiScrollBar::Style s = sb[1].GetStyle();
-            s.show_arrows = true;
-            s.arrows_layout = UIARROWS_GROUP_END;
-            sb[1].SetCustomStyle(s);
-        }
-
-        sb_cap[2].SetText("thin&exp");
-        {
-            UiScrollBar::Style s = sb[2].GetStyle();
-            s.show_arrows = false;
-            s.thin_idle = true;
-            s.thin_px = DPI(5);
-            s.thick_px = DPI(18);
-            s.fade_idle = true;
-            s.idle_fade_pct = 25;
-            s.collapse_ms = 1000;
-            s.track_metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            s.thumb_metrics.radius = DPI(20);
-            s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 185));
-            s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 205));
-            sb[2].SetCustomStyle(s);
-        }
-
-        sb_cap[3].SetText("gradient");
-        {
-            UiScrollBar::Style s = sb[3].GetStyle();
-            s.show_arrows = true;
-            s.paint_track_under_arrows = true;
-            s.arrows_layout = UIARROWS_SPLIT;
-            s.arrow_cross = UIARROWCROSS_SQUARE;
-            for(int st = 0; st < 4; st++) {
-                s.arrow_palette.face[st] = UiFill::None();
-                s.arrow_palette.frame[st] = Null;
-            }
-            s.arrow_metrics.face_enabled = false;
-            s.arrow_metrics.frame_enabled = false;
-
-            // Gradient thumb
-            Image tile = MakeQuadGradientTile(32,
-                                              Blend(SColorPaper(), SColorHighlight(), 70),
-                                              Blend(SColorPaper(), SColorHighlight(), 120),
-                                              Blend(SColorPaper(), SColorShadow(), 30),
-                                              Blend(SColorPaper(), SColorShadow(), 60),
-                                              2);
-            UiFill grad = UiFill::ImageFill(tile);
-            s.thumb_palette.face[ST_NORMAL] = grad;
-            s.thumb_palette.face[ST_HOT]    = grad;
-            s.thumb_palette.face[ST_PRESSED]= grad;
-            s.thumb_metrics.radius = DPI(10);
-            s.thumb_metrics.frame_enabled = false;
-
-            sb[3].SetCustomStyle(s);
-        }
-
-        sb_cap[4].SetText("dark" );
-        {
-            UiScrollBar::Style s = sb[4].GetStyle();
-            Color dark = Blend(SColorText(), SColorPaper(), 80);
-            for(int st = 0; st < 4; st++) {
-                s.track_palette.face[st] = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 20));
-                s.thumb_palette.face[st] = UiFill::Solid(dark);
-                s.thumb_palette.ink[st] = White();
-            }
-            s.thumb_metrics.radius = DPI(10);
-            sb[4].SetCustomStyle(s);
-            sb[4].SetGrip(UIGRIP_LINES);
-        }
-
-        sb_cap[5].SetText("min" );
-        {
-            UiScrollBar::Style s = sb[5].GetStyle();
-            s.thumb_min_size = DPI(60);
-            // Windows blue thumb
-            Color b0 = Color(0, 120, 212);
-            Color b1 = Color(0, 90, 170);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st]  = UiFill::Solid(b0);
-                s.thumb_palette.frame[st] = b1;
-                s.thumb_palette.ink[st]   = White();
-            }
-            // Pill-like
-            s.thumb_metrics.radius = DPI(50);
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width = DPI(1);
-            // Reduce thumb painted thickness by 4px
-            s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
-            s.thumb_paint_px_hot  = max(DPI(1), s.thick_px - DPI(4));
-            sb[5].SetCustomStyle(s);
-        }
-
-        sb_cap[6].SetText("no frame");
-        {
-            UiScrollBar::Style s = sb[6].GetStyle();
-            s.track_metrics.frame_enabled = false;
-            // Darker light-blue thumb with darker frame
-            Color f0 = Blend(SColorHighlight(), SColorPaper(), 140);
-            Color f1 = Blend(SColorHighlight(), SColorShadow(), 120);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st]  = UiFill::Solid(f0);
-                s.thumb_palette.frame[st] = f1;
-            }
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width = DPI(1);
-            s.thumb_metrics.radius = DPI(10);
-            s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
-            s.thumb_paint_px_hot  = max(DPI(1), s.thick_px - DPI(4));
-            sb[6].SetCustomStyle(s);
-        }
-
-        sb_cap[7].SetText("slot" );
-        sb[7].SetGrip(UIGRIP_SLOT);
-
-        sb_cap[8].SetText("dots" );
-        sb[8].SetGrip(UIGRIP_DOTS);
-
-        sb_cap[9].SetText("image" );
-        {
-            sb[9].SetGrip(UIGRIP_IMAGE);
-            UiScrollBar::Style s = sb[9].GetStyle();
-            s.grip = UIGRIP_IMAGE;
-            s.grip_image = CtrlImg::MenuCheck0();
-            s.grip_color = Blend(SColorText(), SColorPaper(), 120);
-
-            // Inset + pill frame for nicer silhouette.
-            s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            s.thumb_metrics.radius = DPI(50);
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width = DPI(1);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st]  = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 55));
-                s.thumb_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 90);
-            }
-            sb[9].SetCustomStyle(s);
-        }
-    }
-
-    virtual void Layout() override
-    {
-        Rect r = GetSize();
-        int pad = DPI(10);
-        r.Deflate(pad, pad);
-
-        int head_h = DPI(20);
-        int cap_h  = DPI(18);
-        int bar_h  = r.GetHeight() - head_h - cap_h - DPI(8);
-
-        int x = r.left;
-        int w = DPI(40);
-        int gap = DPI(10);
-
-        title_sliders.SetRect(x, r.top, w * NSL + gap * (NSL - 1), head_h);
-        int y0 = r.top + head_h + DPI(4);
-        for(int i = 0; i < NSL; i++) {
-            sl[i].SetRect(x, y0, w, bar_h);
-            sl_cap[i].SetRect(x, y0 + bar_h + DPI(2), w, cap_h);
-            x += w + gap;
-        }
-
-        x += DPI(18);
-
-        title_scrollbars.SetRect(x, r.top, w * NSB + gap * (NSB - 1), head_h);
-        for(int i = 0; i < NSB; i++) {
-            sb[i].SetRect(x, y0, w, bar_h);
-            sb_cap[i].SetRect(x, y0 + bar_h + DPI(2), w, cap_h);
-            x += w + gap;
-        }
-    }
-};
-
-// -----------------------------------------------------------------------------
-// Window
-// -----------------------------------------------------------------------------
-
-struct UiScrollBarDemoWindow : TopWindow {
-    Panel p1, p2, p3, p4;
-    GalleryStrip gallery;
-
-    Option big_content;
-    Label  note;
-
-    UiScrollBarDemoWindow()
-    {
-        Title("UiScrollBar Demo");
-        Sizeable().Zoomable();
-        SetRect(0, 0, DPI(1380), DPI(860));
-
-        Add(p1);
-        Add(p2);
-        Add(p3);
-        Add(p4);
-        Add(gallery);
-        Add(big_content);
-        Add(note);
-
-        big_content.SetLabel("Auto-hide panel: big content");
-        big_content = false;
-        big_content.WhenAction = [=] { ApplyAutoHideContent(); };
-
-        note.SetLabel("Hover reserved space to expand. Leave to collapse after delay.");
-
-        // P1: Classic split arrows, always visible, square arrows.
-        p1.SetName("P1");
-        p1.SetTitle("Classic: split arrows (square)");
-        {
-            UiScrollBar::Style s = p1.V().GetStyle();
-            s.show_arrows = true;
-            s.arrows_layout = UIARROWS_SPLIT;
-            // Classic: circular arrow buttons, no track expansion; only thumb expands.
-            s.arrow_cross = UIARROWCROSS_SQUARE;
-            s.arrow_size = DPI(18);
-
-            s.auto_hide = false;
-            s.thin_idle = false;
-            s.fade_idle = false;
-
-            // Fixed trough, medium thumb; thumb expands on hover.
-            s.thick_px = DPI(18); // reserved thickness
-            s.track_paint_px_idle = s.thick_px;
-            s.track_paint_px_hot  = s.thick_px;
-            s.thumb_paint_px_idle = DPI(10);
-            s.thumb_paint_px_hot  = DPI(16);
-
-            // Make the trough visible.
-            s.track_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 18));
-            s.track_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 22));
-            s.track_palette.face[ST_PRESSED]= UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 26));
-            s.track_palette.face[ST_DISABLED]= UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 12));
-            for(int st = 0; st < 4; st++)
-                s.track_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 55);
-            s.track_metrics.frame_enabled = true;
-            s.track_metrics.frame_width = DPI(1);
-            s.track_metrics.radius = DPI(50);
-
-            // Pill thumb.
-            s.thumb_metrics.radius = DPI(50);
-            s.thumb_metrics.frame_enabled = true;
-            s.thumb_metrics.frame_width   = DPI(1);
-            for(int st = 0; st < 4; st++) {
-                s.thumb_palette.face[st]  = UiFill::Solid(Blend(SColorPaper(), SColorShadow(), 35));
-                s.thumb_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 70);
-            }
-
-            // Circular arrow buttons.
-            s.arrow_metrics.radius = DPI(50);
-            s.arrow_metrics.frame_enabled = true;
-            s.arrow_metrics.frame_width = DPI(1);
-            for(int st = 0; st < 4; st++) {
-                s.arrow_palette.face[st]  = UiFill::None();
-                s.arrow_palette.frame[st] = Blend(SColorPaper(), SColorShadow(), 80);
-                s.arrow_palette.ink[st]   = Blend(SColorText(), SColorPaper(), 80);
-            }
-
-            p1.V().SetCustomStyle(s);
-
-            // Horizontal uses the same look.
-            UiScrollBar::Style sh = s;
-            p1.H().SetCustomStyle(sh);
-        }
-
-        // P2: Grouped arrows at end, hover expand.
-        p2.SetName("P2");
-        p2.SetTitle("Grouped arrows + hover expand");
-        {
-            UiScrollBar::Style sv = p2.V().GetStyle();
-            sv.show_arrows = true;
-            sv.arrows_layout = UIARROWS_GROUP_END;
-            sv.thin_idle = true;
-            sv.thin_px = DPI(5);
-            sv.thick_px = DPI(18);
-            sv.idle_fade_pct = 25;
-            sv.collapse_ms = 1000;
-            p2.V().SetCustomStyle(sv);
-
-            UiScrollBar::Style sh = p2.H().GetStyle();
-            sh.show_arrows = true;
-            sh.arrows_layout = UIARROWS_GROUP_START;
-            sh.thin_idle = true;
-            sh.thin_px = DPI(5);
-            sh.thick_px = DPI(18);
-            sh.idle_fade_pct = 25;
-            sh.collapse_ms = 1000;
-            p2.H().SetCustomStyle(sh);
-        }
-
-        // P3: No arrows, thin idle + expand. Make thumb darker/pill-ish.
-        p3.SetName("P3");
-        p3.SetTitle("Thin idle + expand (no arrows)");
-        {
-            UiScrollBar::Style s = p3.V().GetStyle();
-            s.show_arrows = false;
-            s.thin_idle = true;
-            s.thin_px = DPI(5);
-            s.thick_px = DPI(18);
-            s.idle_fade_pct = 20;
-            s.collapse_ms = 1000;
-            s.track_metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
-            s.thumb_metrics.radius = DPI(20);
-            s.track_metrics.radius = DPI(20);
-            s.thumb_inset = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
-            s.thumb_palette.face[ST_NORMAL] = UiFill::Solid(Blend(SColorText(), SColorPaper(), 175));
-            s.thumb_palette.face[ST_HOT]    = UiFill::Solid(Blend(SColorText(), SColorPaper(), 195));
-            p3.V().SetCustomStyle(s);
-            p3.H().SetCustomStyle(s);
-        }
-
-        // P4: Auto-hide.
-        p4.SetName("P4");
-        p4.SetTitle("Auto-hide (fully hidden unless needed)");
-        {
-            UiScrollBar::Style s = p4.V().GetStyle();
-            s.show_arrows = false;
-            s.auto_hide = true;
-            s.thin_idle = true;
-            s.thin_px = DPI(5);
-            s.thick_px = DPI(18);
-            s.idle_fade_pct = 30;
-            s.collapse_ms = 1000;
-            p4.V().SetCustomStyle(s);
-            p4.H().SetCustomStyle(s);
-        }
-
-        p1.SetVirtual(Size(DPI(1400), DPI(1000)));
-        p2.SetVirtual(Size(DPI(1400), DPI(1000)));
-        p3.SetVirtual(Size(DPI(1400), DPI(1000)));
-        ApplyAutoHideContent();
-    }
-
-    void ApplyAutoHideContent()
-    {
-        if((bool)big_content)
-            p4.SetVirtual(Size(DPI(1400), DPI(1000)));
-        else
-            p4.SetVirtual(Size(DPI(360), DPI(270)));
-    }
-
-    virtual void Layout() override
-    {
-        Rect r = GetSize();
-        int pad = DPI(12);
-
-        big_content.SetRect(pad, pad, DPI(240), DPI(20));
-        note.SetRect(pad + DPI(260), pad, r.GetWidth() - (pad + DPI(272)), DPI(20));
-
-        Rect area = r;
-        area.Deflate(pad, pad);
-        area.top += DPI(30);
-
-        int top_h = DPI(360);
-        Rect top = area;
-        top.bottom = top.top + top_h;
-
-        Rect bottom = area;
-        bottom.top = top.bottom + DPI(10);
-
-        int gap = DPI(10);
-        int w = (top.GetWidth() - 3 * gap) / 4;
-
-        p1.SetRect(top.left + 0 * (w + gap), top.top, w, top.GetHeight());
-        p2.SetRect(top.left + 1 * (w + gap), top.top, w, top.GetHeight());
-        p3.SetRect(top.left + 2 * (w + gap), top.top, w, top.GetHeight());
-        p4.SetRect(top.left + 3 * (w + gap), top.top, w, top.GetHeight());
-
-        gallery.SetRect(bottom);
-    }
-};
-
-GUI_APP_MAIN
-{
-    UiScrollBarDemoWindow().Run();
+}
+GUI_APP_MAIN {
+    Demo demo;
+    const Vector<String>& args=CommandLine();
+    if(args.GetCount()>=2 && args[0]=="--emit-code") { if(args.GetCount()>2) demo.ConfigureExample(); SaveFile(args[1],demo.GetGeneratedCode()); return; }
+    demo.Run();
 }

@@ -920,6 +920,16 @@ inline Image ICON_DESIGN_UPLOAD_48()
     return UiIconsImg::ICON_DESIGN_UPLOAD_48();
 }
 
+Image ICON_MEDIA_FIRST_48();
+Image ICON_MEDIA_STEP_BACK_48();
+Image ICON_MEDIA_REVERSE_48();
+Image ICON_MEDIA_PAUSE_48();
+Image ICON_MEDIA_PLAY_48();
+Image ICON_MEDIA_STEP_FORWARD_48();
+Image ICON_MEDIA_LAST_48();
+Image ICON_SAMPLE_POINT_48();
+Image ICON_SAMPLE_AREA_48();
+
 inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
 {
     static const Vector<UiIconCatalogEntry> catalog = [] {
@@ -1080,6 +1090,15 @@ inline const Vector<UiIconCatalogEntry>& UiIconCatalog()
         out.Add(UiIconCatalogEntry("ICON_DESIGN_UPLOAD_48", &ICON_DESIGN_UPLOAD_48));
 
         out.Add(UiIconCatalogEntry("ICON_BRAND_NEWLOGO_V5_48", &ICON_BRAND_NEWLOGO_V5_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_FIRST_48", &ICON_MEDIA_FIRST_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_STEP_BACK_48", &ICON_MEDIA_STEP_BACK_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_REVERSE_48", &ICON_MEDIA_REVERSE_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_PAUSE_48", &ICON_MEDIA_PAUSE_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_PLAY_48", &ICON_MEDIA_PLAY_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_STEP_FORWARD_48", &ICON_MEDIA_STEP_FORWARD_48));
+        out.Add(UiIconCatalogEntry("ICON_MEDIA_LAST_48", &ICON_MEDIA_LAST_48));
+        out.Add(UiIconCatalogEntry("ICON_SAMPLE_POINT_48", &ICON_SAMPLE_POINT_48));
+        out.Add(UiIconCatalogEntry("ICON_SAMPLE_AREA_48", &ICON_SAMPLE_AREA_48));
         return out;
     }();
     return catalog;

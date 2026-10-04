@@ -43,9 +43,25 @@ public:
 
     UiButtonDemo();
     void Layout() override;
+    void Paint(Draw& draw) override;
+    void ExportGenerated(const String& directory);
+    bool TestSelectors(const String& output);
+    void RenderFamilies(const String& directory);
 
 private:
+    Color window_face_ = SColorFace();
     void BuildHeader();
+    void BuildSplitModels();
+    void BuildToolModels();
+    void ApplySplitProjection();
+    void ApplyToolProjection();
+    void GenerateSplitCode();
+    void GenerateToolCode();
+    void SelectKind(int kind);
+    PropertyEditorModel& InspectorModel();
+    PropertyEditorModel& OverrideModel();
+    const PropertyEditorModel& InspectorModel() const;
+    const PropertyEditorModel& OverrideModel() const;
     void BuildPreview();
     void BuildRightRail();
     void BuildInspectorModel();
@@ -55,7 +71,6 @@ private:
 
     void ApplyProjection();
     void ApplyTheme();
-    void ConfigureModeButton(UiToolButton& button);
     void UpdateOverrideSummaries();
     void UpdateGeneratedCode();
     void UpdateStatus();
@@ -71,12 +86,21 @@ private:
     Value OverrideValue(const String& id) const;
     bool OverrideActive(const String& id) const;
 
+    PropertyEditorFactory pe_factory;
+    PropertyEditorModel pe_model_inspector;
+    PropertyEditorModel pe_model_override;
+    PropertyEditorModel split_inspector,split_overrides,tool_inspector,tool_overrides;
     UiTitleCard tc_header;
     UiBoxLayout box_header_actions { UiDirection::H };
     UiToolButton btn_theme, btn_help, btn_exit;
 
     UiPanel pnl_preview;
     UiButton btn_preview;
+    UiSplitButton split_preview;
+    UiToolButton tool_preview;
+    UiButton select_button,select_split,select_tool;
+    UiBoxLayout selector {UiDirection::H};
+    int selected_kind=0;
     UiLabel lbl_preview_caption, lbl_status;
 
     UiPanel pnl_right_rail;
@@ -88,9 +112,6 @@ private:
     UiMultiEdit edit_generated_code;
     UiToolButton btn_copy_code;
 
-    PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_inspector;
-    PropertyEditorModel pe_model_override;
     String str_generated_code;
     int activation_count = 0;
 };

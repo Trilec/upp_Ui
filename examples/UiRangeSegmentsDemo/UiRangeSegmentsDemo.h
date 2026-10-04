@@ -13,8 +13,11 @@ public:
 
     UiRangeSegmentsDemo();
     void Layout() override;
+    void Paint(Draw& draw) override;
+    void ExportGenerated(const String& directory);
 
 private:
+    Color window_face_ = SColorFace();
     void BuildHeader();
     void BuildPreview();
     void BuildRightRail();
@@ -42,6 +45,11 @@ private:
     bool OverrideActive(const String& id) const;
 
 private:
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_;
+    PropertyEditorModel override_model_;
+    PropertyEditorModel data_model_;
+
     UiTitleCard header_;
     UiBoxLayout header_actions_;
     UiToolButton theme_;
@@ -68,11 +76,6 @@ private:
     PropertyEditor data_;
     UiMultiEdit code_;
     UiToolButton copy_;
-
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_;
-    PropertyEditorModel override_model_;
-    PropertyEditorModel data_model_;
 
     String generated_;
     int data_segment_count_ = 0;

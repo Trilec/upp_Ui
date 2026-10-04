@@ -1,0 +1,16 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	plugin/png,
+	plugin/jpg,
+	Ui;
+
+file
+	UiDocReviewPanel.h,
+	main.cpp;
+
+mainconfig
+	"" = "GUI";
+

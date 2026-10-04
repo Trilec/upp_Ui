@@ -43,17 +43,35 @@ void UiGallery::Paint(Draw& w)
         w.DrawRect(marquee, style.marquee_fill);
 
     if(!range.IsEmpty()) {
-        for(int i = range.first; i <= range.last; i++) {
-            Rect rect = GetItemRect(i);
-            if(rect.right <= viewport_.left || rect.left >= viewport_.right ||
-               rect.bottom <= viewport_.top || rect.top >= viewport_.bottom)
-                continue;
-            const UiItemRender *render = FindPreparedItemRender(i);
-            if(render)
-                render->Paint(w, GetItemRenderState(i));
-            if(IsSelected(i))
-                DrawGalleryFrame(w, rect, style.selection_frame, style.selection_frame_width);
-            last_paint_item_count_++;
+        // Uniform geometry also bounds damage queries: hover/selection damage
+        // should not walk every tile in a large viewport.
+        Rect damage = w.GetPaintRect() & viewport_;
+        int row_extent = max(1, item_size_.cy + gap_);
+        int col_extent = max(1, item_size_.cx + gap_);
+        int first_row = max(range.first / columns_,
+                            max(0, damage.top - viewport_.top + scroll_y_ - inset_.top) / row_extent);
+        int last_row = min(range.last / columns_,
+                           max(0, damage.bottom - 1 - viewport_.top + scroll_y_ - inset_.top) / row_extent);
+        int first_col = max(0, max(0, damage.left - viewport_.left - inset_.left) / col_extent);
+        int last_col = min(columns_ - 1,
+                           max(0, damage.right - 1 - viewport_.left - inset_.left) / col_extent);
+        for(int row = first_row; !damage.IsEmpty() && row <= last_row; row++) {
+            for(int col = first_col; col <= last_col; col++) {
+                int i = row * columns_ + col;
+                if(!range.Contains(i))
+                    continue;
+                Rect rect = GetItemRect(i);
+                if(rect.right <= viewport_.left || rect.left >= viewport_.right ||
+                   rect.bottom <= viewport_.top || rect.top >= viewport_.bottom ||
+                   !w.IsPainting(rect))
+                    continue;
+                const UiItemRender *render = FindPreparedItemRender(i);
+                if(render)
+                    render->Paint(w, GetItemRenderState(i));
+                if(IsSelected(i))
+                    DrawGalleryFrame(w, rect, style.selection_frame, style.selection_frame_width);
+                last_paint_item_count_++;
+            }
         }
     }
 

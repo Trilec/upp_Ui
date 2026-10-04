@@ -4,7 +4,8 @@ uses
     CtrlCore,
     CtrlLib,
     Ui,
-    Ui/UiOsFileDialog;
+    Ui/UiOsFileDialog,
+    Utilities/PropertyEditor;
 
 file
     main.cpp;

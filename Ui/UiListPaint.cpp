@@ -183,7 +183,7 @@ void UiList::Paint(Draw& w)
         ExcludeListRoundedCorners(w, vp, ResolveListViewportRadius(GetSize(), vp, style));
         for(int i = visible.first; i <= visible.last; i++) {
             Rect row = GetRowRect(i);
-            if(row.bottom <= vp.top || row.top >= vp.bottom)
+            if(row.bottom <= vp.top || row.top >= vp.bottom || !w.IsPainting(row))
                 continue;
             PaintRow(w, i, row);
             last_paint_item_count_++;
@@ -207,6 +207,8 @@ void UiList::Paint(Draw& w)
 void UiList::Layout()
 {
     SyncModel();
+    ClampScroll();
+    UpdateScrollBar();
 
     if(editing_ && editing_index_ >= 0 && model_ && editing_index_ < model_->GetCount()) {
         Rect row = GetRowRect(editing_index_);

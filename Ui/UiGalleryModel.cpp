@@ -23,8 +23,17 @@ void UiGallery::BindModel(UiListModel& model)
 void UiGallery::HandleModelChange(const UiModelChange& change)
 {
     if(UiIsSequentialStructuralChange(change)) {
-        if(marquee_candidate_ || marquee_active_)
-            EndMarquee(true);
+        model_structure_serial_++;
+        if(marquee_candidate_ || marquee_active_) {
+            // The notification arrives after the edit. Restore old identities
+            // before remapping, without validating them against new indices.
+            selected_.Clear();
+            for(int index : marquee_open_selection_)
+                selected_.FindAdd(index);
+            cursor_ = marquee_open_cursor_;
+            anchor_ = marquee_open_anchor_;
+            EndMarquee(false, true, false);
+        }
         UiRemapSequentialSelection(selected_, change);
         cursor_ = UiRemapSequentialIndex(cursor_, change);
         anchor_ = UiRemapSequentialIndex(anchor_, change);
@@ -33,7 +42,10 @@ void UiGallery::HandleModelChange(const UiModelChange& change)
     }
 
     model_revision_ = -1;
-    SyncModel();
+    if(change.kind == UI_MODEL_UPDATE)
+        SyncModel(change.a, change.a + max(1, change.b) - 1);
+    else
+        SyncModel();
 
     if(change.kind == UI_MODEL_UPDATE && geometry_valid_) {
         int start = max(0, change.a);
@@ -56,7 +68,7 @@ void UiGallery::HandleModelChange(const UiModelChange& change)
     InvalidateGeometry();
 }
 
-void UiGallery::SyncModel()
+void UiGallery::SyncModel(int first, int last)
 {
     if(!model_)
         return;
@@ -66,11 +78,21 @@ void UiGallery::SyncModel()
     model_revision_ = revision;
 
     int count = model_->GetCount();
-    for(int i = selected_.GetCount() - 1; i >= 0; i--) {
-        int index = selected_[i];
-        if(index < 0 || index >= count || !IsSelectableIndex(index))
-            selected_.Remove(i);
+    if(first >= 0 && last >= first) {
+        // Presentation edits must not scan Select All's entire selection.
+        for(int index = first; index <= min(last, count - 1); index++)
+            if(!IsSelectableIndex(index)) {
+                int slot = selected_.Find(index);
+                if(slot >= 0)
+                    selected_.Remove(slot);
+            }
     }
+    else
+        for(int i = selected_.GetCount() - 1; i >= 0; i--) {
+            int index = selected_[i];
+            if(index < 0 || index >= count || !IsSelectableIndex(index))
+                selected_.Remove(i);
+        }
     if(cursor_ >= count || (cursor_ >= 0 && !IsSelectableIndex(cursor_)))
         cursor_ = -1;
     if(anchor_ >= count || (anchor_ >= 0 && !IsSelectableIndex(anchor_)))

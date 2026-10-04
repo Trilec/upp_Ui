@@ -116,6 +116,8 @@ void UiButtonDemo::BuildInspectorModel()
 
 void UiButtonDemo::ApplyProjection()
 {
+    if(selected_kind==1) { ApplySplitProjection(); return; }
+    if(selected_kind==2) { ApplyToolProjection(); return; }
     UiButton::Style style = UiTheme::ResolveButton();
 
     for(int i = 0; i < 4; i++) {

@@ -1,3 +1,4 @@
+// Self-contained UiEditDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
@@ -38,6 +39,7 @@ String CppString(const String& value)
         if(c == '\\') out << "\\\\";
         else if(c == '"') out << "\\\"";
         else if(c == '\n') out << "\\n";
+        else if(c == '\r') out << "\\r";
         else if(c == '\t') out << "\\t";
         else out.Cat(c);
     }
@@ -100,8 +102,10 @@ struct EditConfig {
     String mask_validator = "Date";
     String mask_formatter = "None";
     bool mask_show_error = true;
+    bool mask_flash = true;
 
     bool multi_accept_tabs = true;
+    bool multi_left_icon = false, multi_clear_action = false;
 };
 
 class UiEditDemoWindow : public TopWindow {
@@ -135,8 +139,10 @@ public:
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
         theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark theme");
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
         header_actions_.Add(theme_button_).Fixed(DPI(34));
+        help_button_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Demo help");
+        header_actions_.Add(help_button_).Fixed(DPI(34));
         header_actions_.Add(exit_button_).Fixed(DPI(34));
 
         preview_panel_.Add(selector_);
@@ -170,10 +176,14 @@ public:
         rail_panel_.Add(code_mode_);
         rail_panel_.Add(code_);
         view_bar_.SetGap(DPI(5)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        props_button_.SetText("Properties").SetCheckable().SetChecked(true);
-        code_button_.SetText("Code").SetCheckable();
-        view_bar_.Add(props_button_).Expand(1);
-        view_bar_.Add(code_button_).Expand(1);
+        props_button_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().SetChecked(true);
+        code_button_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(props_button_).Fixed(DPI(38));
+        props_button_.Tip("Inspector"); code_button_.Tip("Generated code"); overrides_button_.Tip("Theme Overrides");
+        overrides_button_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(overrides_button_).Fixed(DPI(38));
+        view_bar_.Add(code_button_).Fixed(DPI(38));
+        view_bar_.AddSpacer(1).Expand(1);
 
         code_mode_.UseInternalModel().Clear()
                   .Add("Usage", "usage")
@@ -197,6 +207,8 @@ public:
         SetCodeView(false);
     }
 
+    void Paint(Draw& draw) override { draw.DrawRect(GetSize(), window_face_); }
+
     virtual void Layout() override
     {
         Rect client = GetSize();
@@ -212,17 +224,14 @@ public:
         Rect pr = preview_panel_.GetSize();
         const int inset = DPI(24);
         selector_.SetRect(inset, DPI(18), max(0, pr.GetWidth() - inset * 2), DPI(34));
-        const int label_h = DPI(24), edit_h = DPI(36), gap_y = DPI(14);
-        int y = DPI(78);
+        const int label_h = DPI(24), edit_h = DPI(36);
+        int y = selected_==EDIT_MULTI ? DPI(78) : max(DPI(78),pr.GetHeight()/2-DPI(40));
         const int edit_w = max(DPI(200), pr.GetWidth() - inset * 2);
-
-        line_label_.SetRect(inset, y, edit_w, label_h); y += label_h;
-        line_.SetRect(inset, y, edit_w, edit_h); y += edit_h + gap_y;
-        password_label_.SetRect(inset, y, edit_w, label_h); y += label_h;
-        password_.SetRect(inset, y, edit_w, edit_h); y += edit_h + gap_y;
-        mask_label_.SetRect(inset, y, edit_w, label_h); y += label_h;
-        mask_.SetRect(inset, y, edit_w, edit_h); y += edit_h + gap_y;
-        multi_label_.SetRect(inset, y, edit_w, label_h); y += label_h;
+        for(UiLabel* label:{&line_label_,&password_label_,&mask_label_,&multi_label_})
+            label->SetRect(inset,y,edit_w,label_h);
+        y += label_h;
+        UiBaseEdit* edits[]={&line_,&password_,&mask_};
+        for(UiBaseEdit* edit:edits) edit->SetRect(inset,y,edit_w,edit_h);
         const int multi_h = max(DPI(120), pr.GetHeight() - y - DPI(70));
         multi_.SetRect(inset, y, edit_w, multi_h);
         status_.SetRect(inset, max(0, pr.bottom - DPI(42)), edit_w, DPI(26));
@@ -233,6 +242,106 @@ public:
         properties_.SetRect(DPI(8), content_y, max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - content_y - DPI(8)));
         code_mode_.SetRect(DPI(8), content_y, max(0, rr.GetWidth() - DPI(16)), DPI(32));
         code_.SetRect(DPI(8), content_y + DPI(40), max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - content_y - DPI(48)));
+    }
+
+    bool TestSelectors(const String& output)
+    {
+        String failures;
+        int checks=0;
+        auto check=[&](bool ok,const char* name) { ++checks; if(!ok) failures << name << "\n"; };
+        UiButton* buttons[]={&line_select_,&password_select_,&mask_select_,&multi_select_};
+        const char* types[]={"UiLineEdit edit;","UiPasswordEdit edit;","UiMaskEdit edit;","UiMultiEdit edit;"};
+        String text[EDIT_COUNT];
+        for(int i=0;i<EDIT_COUNT;i++) text[i]=cfg_[i].text;
+        for(int theme=0;theme<2;theme++) {
+            if(theme) ToggleTheme();
+            for(int repeat=0;repeat<8;repeat++) for(int type=0;type<EDIT_COUNT;type++) {
+                buttons[type]->SetFocus();
+                check(buttons[type]->Key(K_SPACE,1),"Native selector keyboard action");
+                for(int pump=0;pump<4;pump++) ProcessEvents();
+                check(selected_==type,"Selected concrete edit");
+                check(line_.IsShown()==(type==EDIT_LINE) && password_.IsShown()==(type==EDIT_PASSWORD)
+                   && mask_.IsShown()==(type==EDIT_MASK) && multi_.IsShown()==(type==EDIT_MULTI),"Exactly one edit preview visible");
+                check(cfg_[type].text==text[type],"Configuration retained across selection");
+                check(code_.GetTextUtf8().Find(types[type])>=0,"Generated code owns selected concrete edit");
+                ImageDraw image(GetSize()); DrawCtrl(image);
+            }
+        }
+        SaveFile(output,Format("%d checks\n",checks)+(failures.IsEmpty()?"PASS\n":failures));
+        return failures.IsEmpty();
+    }
+
+    void ExportGenerated(const String& directory)
+    {
+        RealizeDirectory(directory);
+        SelectSample(EDIT_LINE);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_LINE_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_LINE_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_LINE_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
+        if(selected_ == EDIT_MASK) model_.SetValue("mask_prompt", "'", false);
+        PullConfig(selected_); ApplySample(selected_);
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_LINE_authored.cpp"), code_.GetTextUtf8());
+        }
+        SelectSample(EDIT_PASSWORD);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_PASSWORD_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_PASSWORD_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_PASSWORD_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
+        if(selected_ == EDIT_MASK) model_.SetValue("mask_prompt", "'", false);
+        PullConfig(selected_); ApplySample(selected_);
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_PASSWORD_authored.cpp"), code_.GetTextUtf8());
+        }
+        SelectSample(EDIT_MASK);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MASK_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MASK_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MASK_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
+        if(selected_ == EDIT_MASK) model_.SetValue("mask_prompt", "'", false);
+        PullConfig(selected_); ApplySample(selected_);
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MASK_authored.cpp"), code_.GetTextUtf8());
+        }
+        SelectSample(EDIT_MULTI);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MULTI_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MULTI_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MULTI_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
+        if(selected_ == EDIT_MASK) model_.SetValue("mask_prompt", "'", false);
+        PullConfig(selected_); ApplySample(selected_);
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MULTI_authored.cpp"), code_.GetTextUtf8());
+        }
     }
 
 private:
@@ -322,9 +431,12 @@ private:
                 .AddChoice("None", "None").AddChoice("Uppercase", "Uppercase")
                 .AddChoice("Lowercase", "Lowercase").AddChoice("TitleCase", "Title case")
                 .AddChoice("Username", "Username").AddChoice("SafeAlnum", "Safe alnum"));
+            Resettable(model_.AddBoolean("mask_flash", "Flash validation on commit", cfg.mask_flash, "Mask"));
             Resettable(model_.AddBoolean("mask_show_error", "Show invalid state", cfg.mask_show_error, "Mask"));
         }
         else if(sample == EDIT_MULTI) {
+            Resettable(model_.AddBoolean("multi_left_icon", "Leading icon", cfg.multi_left_icon, "Side controls"));
+            Resettable(model_.AddBoolean("multi_clear_action", "Clear action", cfg.multi_clear_action, "Side controls"));
             Resettable(model_.AddBoolean("multi_accept_tabs", "Accept tabs", cfg.multi_accept_tabs, "Whitespace"));
             Resettable(model_.AddNumericInt("tab_size", "Tab size", cfg.tab_size, 1, 12, 1, "Whitespace"));
             Resettable(model_.AddBoolean("show_tabs", "Show tabs", cfg.show_tabs, "Whitespace"));
@@ -337,6 +449,29 @@ private:
         model_.SetGroupSubtitle("Editing", "caret and selection");
         if(sample == EDIT_MULTI)
             model_.SetGroupSubtitle("Whitespace", "multi-line whitespace rendering");
+        const EditConfig defaults;
+        if(PropertyEditorItem* item = model_.Find("block_caret")) item->default_value = defaults.block_caret;
+        if(PropertyEditorItem* item = model_.Find("caret")) item->default_value = defaults.caret;
+        if(PropertyEditorItem* item = model_.Find("caret_width")) item->default_value = defaults.caret_width;
+        if(PropertyEditorItem* item = model_.Find("face")) item->default_value = defaults.face;
+        if(PropertyEditorItem* item = model_.Find("font_height")) item->default_value = defaults.font_height;
+        if(PropertyEditorItem* item = model_.Find("frame")) item->default_value = defaults.frame;
+        if(PropertyEditorItem* item = model_.Find("frame_width")) item->default_value = defaults.frame_width;
+        if(PropertyEditorItem* item = model_.Find("ink")) item->default_value = defaults.ink;
+        if(PropertyEditorItem* item = model_.Find("margin_x")) item->default_value = defaults.margin_x;
+        if(PropertyEditorItem* item = model_.Find("margin_y")) item->default_value = defaults.margin_y;
+        if(PropertyEditorItem* item = model_.Find("placeholder_ink")) item->default_value = defaults.placeholder_ink;
+        if(PropertyEditorItem* item = model_.Find("radius")) item->default_value = defaults.radius;
+        if(PropertyEditorItem* item = model_.Find("selection_face")) item->default_value = defaults.selection_face;
+        if(PropertyEditorItem* item = model_.Find("selection_ink")) item->default_value = defaults.selection_ink;
+        if(PropertyEditorItem* item = model_.Find("show_line_endings")) item->default_value = defaults.show_line_endings;
+        if(PropertyEditorItem* item = model_.Find("show_spaces")) item->default_value = defaults.show_spaces;
+        if(PropertyEditorItem* item = model_.Find("show_tabs")) item->default_value = defaults.show_tabs;
+        if(PropertyEditorItem* item = model_.Find("tab_size")) item->default_value = defaults.tab_size;
+        if(PropertyEditorItem* item = model_.Find("text_align")) item->default_value = defaults.text_align;
+        if(PropertyEditorItem* item = model_.Find("underline")) item->default_value = defaults.underline;
+        if(PropertyEditorItem* item = model_.Find("underline_enabled")) item->default_value = defaults.underline_enabled;
+        if(PropertyEditorItem* item = model_.Find("underline_width")) item->default_value = defaults.underline_width;
         model_.StructureChanged();
         properties_.RefreshModel();
     }
@@ -379,9 +514,12 @@ private:
             cfg.mask_prompt = AsString(Get("mask_prompt"));
             cfg.mask_validator = AsString(Get("mask_validator"));
             cfg.mask_formatter = AsString(Get("mask_formatter"));
+            cfg.mask_flash = (bool)Get("mask_flash");
             cfg.mask_show_error = (bool)Get("mask_show_error");
         }
         else if(sample == EDIT_MULTI) {
+            cfg.multi_left_icon = (bool)Get("multi_left_icon");
+            cfg.multi_clear_action = (bool)Get("multi_clear_action");
             cfg.multi_accept_tabs = (bool)Get("multi_accept_tabs");
             cfg.tab_size = (int)Get("tab_size");
             cfg.show_tabs = (bool)Get("show_tabs");
@@ -392,32 +530,33 @@ private:
 
     UiBaseEdit::Style MakeStyle(const EditConfig& cfg) const
     {
+        const EditConfig defaults;
         UiBaseEdit::Style style = UiTheme::ResolveEdit(UiRole::Standard);
         for(int i = 0; i < 4; i++) {
-            style.palette.face[i] = UiFill::Solid(cfg.face);
-            style.palette.frame[i] = cfg.frame;
-            style.palette.ink[i] = cfg.ink;
-            style.underline[i] = cfg.underline;
+            if(cfg.face != defaults.face) style.palette.face[i] = UiFill::Solid(cfg.face);
+            if(cfg.frame != defaults.frame) style.palette.frame[i] = cfg.frame;
+            if(cfg.ink != defaults.ink) style.palette.ink[i] = cfg.ink;
+            if(cfg.underline != defaults.underline) style.underline[i] = cfg.underline;
         }
         style.metrics.face_enabled = true;
-        style.metrics.frame_enabled = cfg.frame_width > 0;
-        style.metrics.frame_width = DPI(cfg.frame_width);
-        style.metrics.radius = DPI(cfg.radius);
-        style.metrics.content_margin = Rect(DPI(cfg.margin_x), DPI(cfg.margin_y), DPI(cfg.margin_x), DPI(cfg.margin_y));
-        style.font.Height(cfg.font_height);
-        style.text_align = ParseTextAlign(cfg.text_align);
-        style.placeholder_ink = cfg.placeholder_ink;
-        style.caret_color = cfg.caret;
-        style.caret_width = DPI(cfg.caret_width);
-        style.block_caret = cfg.block_caret;
-        style.selection_color = cfg.selection_face;
-        style.selection_ink = cfg.selection_ink;
-        style.underline_enabled = cfg.underline_enabled;
-        style.underline_width = DPI(cfg.underline_width);
-        style.tab_size = cfg.tab_size;
-        style.show_tabs = cfg.show_tabs;
-        style.show_spaces = cfg.show_spaces;
-        style.show_line_endings = cfg.show_line_endings;
+        if(cfg.frame_width != defaults.frame_width) style.metrics.frame_enabled = cfg.frame_width > 0;
+        if(cfg.frame_width != defaults.frame_width) style.metrics.frame_width = DPI(cfg.frame_width);
+        if(cfg.radius != defaults.radius) style.metrics.radius = DPI(cfg.radius);
+        if(cfg.margin_x != defaults.margin_x || cfg.margin_y != defaults.margin_y) style.metrics.content_margin = Rect(DPI(cfg.margin_x), DPI(cfg.margin_y), DPI(cfg.margin_x), DPI(cfg.margin_y));
+        if(cfg.font_height != defaults.font_height) style.font.Height(cfg.font_height);
+        if(cfg.text_align != defaults.text_align) style.text_align = ParseTextAlign(cfg.text_align);
+        if(cfg.placeholder_ink != defaults.placeholder_ink) style.placeholder_ink = cfg.placeholder_ink;
+        if(cfg.caret != defaults.caret) style.caret_color = cfg.caret;
+        if(cfg.caret_width != defaults.caret_width) style.caret_width = DPI(cfg.caret_width);
+        if(cfg.block_caret != defaults.block_caret) style.block_caret = cfg.block_caret;
+        if(cfg.selection_face != defaults.selection_face) style.selection_color = cfg.selection_face;
+        if(cfg.selection_ink != defaults.selection_ink) style.selection_ink = cfg.selection_ink;
+        if(cfg.underline_enabled != defaults.underline_enabled) style.underline_enabled = cfg.underline_enabled;
+        if(cfg.underline_width != defaults.underline_width) style.underline_width = DPI(cfg.underline_width);
+        if(cfg.tab_size != defaults.tab_size) style.tab_size = cfg.tab_size;
+        if(cfg.show_tabs != defaults.show_tabs) style.show_tabs = cfg.show_tabs;
+        if(cfg.show_spaces != defaults.show_spaces) style.show_spaces = cfg.show_spaces;
+        if(cfg.show_line_endings != defaults.show_line_endings) style.show_line_endings = cfg.show_line_endings;
         return style;
     }
 
@@ -472,6 +611,12 @@ private:
         case EDIT_MULTI:
             ApplyCommon(multi_, cfg);
             multi_.SetAcceptsTabs(cfg.multi_accept_tabs);
+            multi_icon_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(16), DPI(16));
+            multi_clear_.SetIcon(ICON_DESIGN_DELETE_48()).SetIconSize(DPI(16), DPI(16));
+            if(multi_.GetSideId(multi_icon_) < 0) multi_.AddToSide(multi_icon_, UiAlign::LEFT, Size(DPI(24), DPI(24))).Overlay(false);
+            if(multi_.GetSideId(multi_clear_) < 0) multi_.AddToSide(multi_clear_, UiAlign::RIGHT, Size(DPI(24), DPI(24))).Overlay(false);
+            multi_.GetSideHandle(multi_icon_).Visible(cfg.multi_left_icon);
+            multi_.GetSideHandle(multi_clear_).Visible(cfg.multi_clear_action);
             if(multi_.GetTextUtf8() != cfg.text)
                 multi_.SetTextUtf8(cfg.text);
             break;
@@ -496,14 +641,20 @@ private:
     void SelectSample(EditSample sample)
     {
         selected_ = sample;
+        line_.Show(sample==EDIT_LINE); line_label_.Show(sample==EDIT_LINE);
+        password_.Show(sample==EDIT_PASSWORD); password_label_.Show(sample==EDIT_PASSWORD);
+        mask_.Show(sample==EDIT_MASK); mask_label_.Show(sample==EDIT_MASK);
+        multi_.Show(sample==EDIT_MULTI); multi_label_.Show(sample==EDIT_MULTI);
         line_select_.SetChecked(sample == EDIT_LINE);
         password_select_.SetChecked(sample == EDIT_PASSWORD);
         mask_select_.SetChecked(sample == EDIT_MASK);
         multi_select_.SetChecked(sample == EDIT_MULTI);
         BuildModel(sample);
+        UpdatePropertyPage();
         ApplyTheme();
         UpdateStatus();
         UpdateCode();
+        RefreshLayout();
     }
 
     void Connect()
@@ -512,12 +663,21 @@ private:
         password_select_.WhenAction = [=] { SelectSample(EDIT_PASSWORD); };
         mask_select_.WhenAction = [=] { SelectSample(EDIT_MASK); };
         multi_select_.WhenAction = [=] { SelectSample(EDIT_MULTI); };
-        props_button_.WhenAction = [=] { SetCodeView(false); };
+        props_button_.WhenAction = [=] { SelectStylePage(false); };
         code_button_.WhenAction = [=] { SetCodeView(true); };
         code_mode_.WhenAction = [=] { UpdateCode(); };
         theme_button_.WhenAction = [=] { ToggleTheme(); };
+        help_button_.WhenAction = [=] { PromptOK("UiEditDemo: select a preview type, edit its Inspector or Theme Overrides, then copy the selected control from Generated Code."); };
+        overrides_button_.WhenAction = [=] { SelectStylePage(true); };
         exit_button_.WhenAction = [=] { Close(); };
 
+        multi_clear_.WhenAction = [=] { multi_.SetTextUtf8(""); CaptureText(EDIT_MULTI, multi_); };
+        mask_.WhenAction = [=] {
+            const bool valid = mask_.IsValid();
+            mask_.ShowError(!valid);
+            if(cfg_[EDIT_MASK].mask_flash) { if(valid) mask_.FlashSuccess(); else mask_.FlashError(); }
+            UpdateStatus();
+        };
         properties_.WhenPreview = [=](String, Value) {
             PullConfig(selected_);
             ApplySample(selected_);
@@ -575,7 +735,10 @@ private:
     void SetCodeView(bool on)
     {
         code_view_ = on;
-        props_button_.SetChecked(!on);
+        if(on) overrides_view_ = false;
+        UpdatePropertyPage();
+        props_button_.SetChecked(!on && !overrides_view_);
+        overrides_button_.SetChecked(!on && overrides_view_);
         code_button_.SetChecked(on);
         properties_.Show(!on);
         code_mode_.Show(on);
@@ -623,7 +786,7 @@ private:
                 << "style.show_spaces = " << CppBool(cfg.show_spaces) << ";\n"
                 << "style.show_line_endings = " << CppBool(cfg.show_line_endings) << ";\n";
         }
-        if(explicit_style) {
+        {
             out << "for(int state = 0; state < 4; ++state) {\n"
                 << "    style.palette.face[state] = UiFill::Solid(" << CppColor(cfg.face) << ");\n"
                 << "    style.palette.frame[state] = " << CppColor(cfg.frame) << ";\n"
@@ -645,7 +808,7 @@ private:
         }
         else if(selected_ == EDIT_MASK) {
             char prompt = cfg.mask_prompt.IsEmpty() ? '_' : cfg.mask_prompt[0];
-            out << "edit.SetMask(" << CppString(cfg.mask) << ", '" << prompt << "');\n";
+            out << "edit.SetMask(" << CppString(cfg.mask) << ", " << (int)(byte)prompt << ");\n";
             if(cfg.mask_validator == "Date") out << "edit.SetValidator(UiMaskEdit::DateValidator());\n";
             else if(cfg.mask_validator == "Time") out << "edit.SetValidator(UiMaskEdit::TimeValidator());\n";
             else if(cfg.mask_validator == "NonEmpty") out << "edit.SetValidator(UiMaskEdit::NonEmptyValidator());\n";
@@ -659,7 +822,53 @@ private:
                 out << "edit.ShowError(!edit.IsValid());\n";
         }
         else if(selected_ == EDIT_MULTI)
+        {
             out << "edit.SetAcceptsTabs(" << CppBool(cfg.multi_accept_tabs) << ");\n";
+            if(cfg.multi_left_icon) out << "UiToolButton icon;\nicon.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(16), DPI(16));\nedit.AddToSide(icon, UiAlign::LEFT, Size(DPI(24), DPI(24))).Overlay(false);\n";
+            if(cfg.multi_clear_action) out << "UiToolButton clear;\nclear.SetIcon(ICON_DESIGN_DELETE_48()).SetIconSize(DPI(16), DPI(16));\nedit.AddToSide(clear, UiAlign::RIGHT, Size(DPI(24), DPI(24))).Overlay(false);\nclear.WhenAction = [&] { edit.SetTextUtf8(\"\"); };\n";
+        }
+    }
+
+    String AuthoredStyleCode(const String& source) const
+    {
+        String result;
+        for(const String& line : Split(source, '\n', false)) {
+            bool keep = true;
+            if(TrimLeft(line).StartsWith("style.palette.face")) keep = cfg_[selected_].face != EditConfig().face;
+            if(TrimLeft(line).StartsWith("style.palette.frame")) keep = cfg_[selected_].frame != EditConfig().frame;
+            if(TrimLeft(line).StartsWith("style.palette.ink")) keep = cfg_[selected_].ink != EditConfig().ink;
+            if(TrimLeft(line).StartsWith("style.underline")) keep = cfg_[selected_].underline != EditConfig().underline;
+            if(TrimLeft(line).StartsWith("style.metrics.frame_enabled")) keep = cfg_[selected_].frame_width != EditConfig().frame_width;
+            if(TrimLeft(line).StartsWith("style.metrics.frame_width")) keep = cfg_[selected_].frame_width != EditConfig().frame_width;
+            if(TrimLeft(line).StartsWith("style.metrics.radius")) keep = cfg_[selected_].radius != EditConfig().radius;
+            if(TrimLeft(line).StartsWith("style.metrics.content_margin")) keep = cfg_[selected_].margin_x != EditConfig().margin_x || cfg_[selected_].margin_y != EditConfig().margin_y;
+            if(TrimLeft(line).StartsWith("style.font.Height")) keep = cfg_[selected_].font_height != EditConfig().font_height;
+            if(TrimLeft(line).StartsWith("style.text_align")) keep = cfg_[selected_].text_align != EditConfig().text_align;
+            if(TrimLeft(line).StartsWith("style.placeholder_ink")) keep = cfg_[selected_].placeholder_ink != EditConfig().placeholder_ink;
+            if(TrimLeft(line).StartsWith("style.caret_color")) keep = cfg_[selected_].caret != EditConfig().caret;
+            if(TrimLeft(line).StartsWith("style.caret_width")) keep = cfg_[selected_].caret_width != EditConfig().caret_width;
+            if(TrimLeft(line).StartsWith("style.block_caret")) keep = cfg_[selected_].block_caret != EditConfig().block_caret;
+            if(TrimLeft(line).StartsWith("style.selection_color")) keep = cfg_[selected_].selection_face != EditConfig().selection_face;
+            if(TrimLeft(line).StartsWith("style.selection_ink")) keep = cfg_[selected_].selection_ink != EditConfig().selection_ink;
+            if(TrimLeft(line).StartsWith("style.underline_enabled")) keep = cfg_[selected_].underline_enabled != EditConfig().underline_enabled;
+            if(TrimLeft(line).StartsWith("style.underline_width")) keep = cfg_[selected_].underline_width != EditConfig().underline_width;
+            if(TrimLeft(line).StartsWith("style.tab_size")) keep = cfg_[selected_].tab_size != EditConfig().tab_size;
+            if(TrimLeft(line).StartsWith("style.show_tabs")) keep = cfg_[selected_].show_tabs != EditConfig().show_tabs;
+            if(TrimLeft(line).StartsWith("style.show_spaces")) keep = cfg_[selected_].show_spaces != EditConfig().show_spaces;
+            if(TrimLeft(line).StartsWith("style.show_line_endings")) keep = cfg_[selected_].show_line_endings != EditConfig().show_line_endings;
+            if(keep) result << line << "\n";
+        }
+        Vector<String> lines = Split(result, '\n', false);
+        bool authored = false;
+        for(const String& line : lines) if(TrimLeft(line).StartsWith("style.")) authored = true;
+        result.Clear();
+        for(int i = 0; i < lines.GetCount(); i++) {
+            String trimmed = TrimLeft(lines[i]);
+            if(trimmed.StartsWith("for(int state") && i + 1 < lines.GetCount() && TrimBoth(lines[i + 1]) == "}") { i++; continue; }
+            if(!authored && (lines[i].Find("::Style style =") >= 0 || lines[i].Find(".SetCustomStyle(style)") >= 0)) continue;
+            result << lines[i] << "\n";
+        }
+        return result;
     }
 
     void UpdateCode()
@@ -691,9 +900,33 @@ private:
             out << "\n// Usage mode deliberately relies on UiTheme for visual styling.\n";
 
         if(selected_ == EDIT_MASK)
-            out << "\nedit.WhenChange = [&] { bool valid = edit.IsValid(); /* update validation UI */ };\n";
+        {
+            out << "\nedit.WhenChange = [&] { edit.ShowError(!edit.IsValid()); };\n";
+            if(cfg.mask_flash) out << "edit.WhenAction = [&] { if(edit.IsValid()) edit.FlashSuccess(); else edit.FlashError(); };\n";
+        }
         else
             out << "\nedit.WhenChange = [&] { String text = edit.GetTextUtf8(); /* react */ };\n";
+        if(mode == "changes") out = AuthoredStyleCode(out);
+        const String preamble = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
+        if(out.StartsWith(preamble)) {
+            String body = out.Mid(preamble.GetCount());
+            String members, setup;
+            for(const String& line : Split(body, '\n', false)) {
+                String declaration = TrimBoth(line);
+                bool member = declaration.StartsWith("Ui") && declaration.EndsWith(";")
+                           && declaration.Find("::") < 0 && declaration.Find('(') < 0
+                           && declaration.Find('=') < 0 && declaration.Find('.') < 0;
+                if(member) members << "    " << declaration << "\n";
+                else setup << "        " << line << "\n";
+            }
+            // Borrowed side controls outlive the edit that hosts them.
+            members.Replace("    " + type + " edit;\n", "");
+            members << "    " << type << " edit;\n";
+            out = preamble + "class ControlExample : public ParentCtrl {\n" + members
+                + "public:\n    ControlExample() {\n" + setup;
+            out << "        Add(edit.SizePos());\n";
+            out << "    }\n};\n";
+        }
         code_.SetTextUtf8(out);
     }
 
@@ -707,37 +940,106 @@ private:
         ApplyAllSamples();
     }
 
+    bool IsStyleProperty(const String& id) const
+    {
+        static const char* ids[] = { "block_caret", "caret", "caret_width", "face", "font_height", "frame", "frame_width", "ink", "margin_x", "margin_y", "placeholder_ink", "radius", "selection_face", "selection_ink", "show_line_endings", "show_spaces", "show_tabs", "tab_size", "text_align", "underline", "underline_enabled", "underline_width" };
+        for(const char* name : ids) if(id == name) return true;
+        return false;
+    }
+
+    void UpdatePropertyPage()
+    {
+        for(const PropertyEditorItem& item : model_.GetItems())
+            model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
+        model_.StructureChanged();
+    }
+
+    void SelectStylePage(bool style)
+    {
+        overrides_view_ = style;
+        SetCodeView(false);
+    }
+
     void ApplyTheme()
     {
-        UiTitleCard::Style hs = UiTheme::ResolveTitleCard(UiRole::Accent);
-        hs.title_line = false;
-        header_.SetCustomStyle(hs);
-        preview_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-        rail_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        theme_button_.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_panel_.SetCustomStyle(surface);
+        rail_panel_.SetCustomStyle(surface);
+
+
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        properties_.SetPaletteMode(mode);
+
+        for(PropertyEditor* editor : { &properties_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_button_, &help_button_, &exit_button_, &props_button_, &overrides_button_, &code_button_, &multi_icon_, &multi_clear_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_button_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_button_.SetCustomStyle(exit_style);
         line_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         password_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         mask_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         multi_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         status_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
         UiButton *selectors[] = { &line_select_, &password_select_, &mask_select_, &multi_select_ };
         for(int i = 0; i < EDIT_COUNT; i++)
             selectors[i]->SetCustomStyle(UiTheme::ResolveButton(i == selected_ ? UiRole::Accent : UiRole::Subtle));
-        props_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Subtle : UiRole::Accent));
-        code_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Accent : UiRole::Subtle));
-        theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
-        exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
-        code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
-            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        Refresh();
     }
 
 private:
+    bool overrides_view_ = false;
+    Color window_face_ = SColorFace();
     EditConfig cfg_[EDIT_COUNT];
     EditSample selected_ = EDIT_LINE;
 
+    PropertyEditorFactory factory_;
+    PropertyEditorModel model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
-    UiToolButton theme_button_, exit_button_;
+    UiToolButton theme_button_, help_button_, exit_button_;
     UiPanel preview_panel_, rail_panel_;
     UiBoxLayout selector_ { UiDirection::H };
     UiButton line_select_, password_select_, mask_select_, multi_select_;
@@ -745,13 +1047,12 @@ private:
     UiLineEdit line_;
     UiPasswordEdit password_;
     UiMaskEdit mask_;
+    UiToolButton multi_icon_, multi_clear_;
     UiMultiEdit multi_;
 
     UiBoxLayout view_bar_ { UiDirection::H };
-    UiButton props_button_, code_button_;
+    UiToolButton props_button_, overrides_button_, code_button_;
     PropertyEditor properties_;
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
     UiDropdown code_mode_;
     UiMultiEdit code_;
     bool code_view_ = false;
@@ -761,5 +1062,12 @@ private:
 
 GUI_APP_MAIN
 {
-    UiEditDemoWindow().Run();
+    UiEditDemoWindow demo;
+    const Vector<String>& args = CommandLine();
+    if(args.GetCount() == 2 && args[0] == "--export-generated") demo.ExportGenerated(args[1]);
+    else if(args.GetCount()==2 && args[0]=="--selector-test") {
+        demo.Open(); Ctrl::ProcessEvents();
+        bool passed=demo.TestSelectors(args[1]); demo.Close(); SetExitCode(passed?0:1);
+    }
+    else demo.Run();
 }

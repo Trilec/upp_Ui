@@ -1,4 +1,5 @@
 #include "UiGraphDemo.h"
+#include "GraphImages.brc"
 
 namespace Upp {
 namespace {
@@ -97,14 +98,13 @@ UiGraphNode GraphDemoReferenceNode(const String& title,
     return node;
 }
 
-String GraphDemoImagePath(const String& name)
-{
-    return NormalizePath(AppendFileName(GetFileFolder(__FILE__), "../../tests/Images/" + name));
-}
-
 Image GraphDemoLoadImage(const String& name)
 {
-    return StreamRaster::LoadFileAny(GraphDemoImagePath(name));
+    if(name == "Elephant.png") return StreamRaster::LoadStringAny(String(graph_elephant, graph_elephant_length));
+    if(name == "FilmNoir.png") return StreamRaster::LoadStringAny(String(graph_film_noir, graph_film_noir_length));
+    if(name == "sifi.png") return StreamRaster::LoadStringAny(String(graph_scifi, graph_scifi_length));
+    if(name == "Castle.png") return StreamRaster::LoadStringAny(String(graph_castle, graph_castle_length));
+    return Image();
 }
 
 Rect GraphDemoAspectFit(const Image& image, Rect area)
@@ -451,7 +451,7 @@ void UiGraphDemo::EnsureScaleGraph()
     // benchmark. One row-neighbour connector per node is enough to prove the
     // retained scene without drawing a second vertical edge and arrow from every
     // interior node. The heavier 19,800-edge topology remains covered separately
-    // by UiNodeGraphScaleTest.
+    // by UiGraphScaleTests/Scale.cpp.
     if(scale_model_.GetNodeCount() == 10000 && scale_model_.GetEdgeCount() == 9900)
         return;
 

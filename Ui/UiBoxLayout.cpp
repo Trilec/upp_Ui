@@ -454,6 +454,35 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
     }
 
     int gap_total = max(0, visible_count - 1) * main_gap;
+    // Expand is a viewport allocation, not Fit to an arbitrarily large natural
+    // content height (e.g. a model-backed List). Share a deficit between flexible
+    // items down to their explicit minimum before distributing positive space.
+    int deficit = max(0, main_sum + gap_total - inner_h);
+    int64 shrink_room = 0;
+    for(int i = 0; i < items.GetCount(); i++)
+        if(items[i].cl.visible && !items[i].is_break && items[i].expandingWeight > 0)
+            shrink_room += max(0, base_h[i] - items[i].minw);
+    if(deficit > 0 && shrink_room > 0) {
+        int consumed = 0;
+        for(int i = 0; i < items.GetCount(); i++) {
+            const Item& it = items[i];
+            if(!it.cl.visible || it.is_break || it.expandingWeight <= 0)
+                continue;
+            int room = max(0, base_h[i] - it.minw);
+            int cut = (int)min<int64>(room, (int64)deficit * room / shrink_room);
+            base_h[i] -= cut;
+            consumed += cut;
+        }
+        for(int i = items.GetCount() - 1; i >= 0 && consumed < deficit; i--) {
+            const Item& it = items[i];
+            if(!it.cl.visible || it.is_break || it.expandingWeight <= 0)
+                continue;
+            int cut = min(max(0, base_h[i] - it.minw), deficit - consumed);
+            base_h[i] -= cut;
+            consumed += cut;
+        }
+        main_sum -= consumed;
+    }
     int extra = max(0, inner_h - (main_sum + gap_total));
 
     Vector<int> grow;

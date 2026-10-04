@@ -1,7 +1,8 @@
 # 04 — Demo Guide
 
 A demo is executable documentation for a control, not another application
-framework. `examples/UiLabelDemo` is the canonical shell/reference. Full demos
+framework. `examples/UiMediaCardDemo` and `examples/UiCollectionDemo` are the
+accepted shell references. Full demos
 use real Ui controls and the production PropertyEditor, remain self-contained,
 and generate useful C++ that uses the public control API.
 
@@ -12,6 +13,16 @@ exit and layout setup is preferable to hiding the example behind another layer.
 Share production controls, styles, drawing and PropertyEditor adapters; do not
 invent a convenience abstraction merely to remove harmless shell duplication.
 Demos never depend on UiDesigner or another demo executable.
+
+Every control has one designated maintained demo, or shares a documented family
+demo that actually covers its concrete type. The release inventory is the
+authority for that mapping. A toolbar using a control is not automatically a
+feature demonstration of that control. Specialized authoring, benchmarks and
+platform integration examples are explicit exceptions, not competing canonical
+builders. Each demo keeps an explanatory source header and declares its direct
+U++/Ui dependencies; production PropertyEditor and codecs are valid dependencies.
+Generated usage C++ depends only on the public control/library APIs and declared
+host resources, never on another demo or shell helper.
 
 A substantial demo normally has a class header, implementation, tiny main.cpp and
 .upp. Separate Inspector/Overrides/Code implementation only when that improves
@@ -28,6 +39,10 @@ Light/Dark, Help and Exit actions compact, correctly labeled/tipped and consiste
 with UiLabelDemo. Each action has its own appropriate icon; verify actual tint,
 contrast, sizing and selection rather than merely checking that SetIcon is called.
 
+Keep the title/purpose at the left and exactly three adjacent actions at the top
+right, in Theme / Help / Exit order. Use 16 DPI-scaled pixel action icons in compact
+34-pixel buttons. Help explains the demo and Exit closes it normally.
+
 Provide a generous live preview of the actual control. Size/layout, content,
 interaction and state must be inspectable; do not shrink it to fit more properties.
 An ordinary demo is not a selectable mini-Designer canvas.
@@ -38,6 +53,30 @@ state, not a hover/focus trick. Hidden pages must not be re-shown by a flow-layo
 pass or reserve blank space. Resizing, page changes and theme changes keep the
 chosen page and editor state usable. Ordinary controls do not show an empty Data
 page. A Data page is appropriate for real model/domain collections.
+
+Page actions form a compact, left-aligned icon strip above the PropertyEditor:
+Inspector / Theme Overrides / optional Data / Generated Code, in that order.
+Use 17 DPI-scaled pixel icons in 38-pixel buttons, meaningful tooltips and persistent
+checked feedback. Put flexible space after the strip, rather than stretching each
+button across the rail. UiMediaCardDemo demonstrates this layout alongside the
+UiLabelDemo reference; the same shell conventions apply to all canonical demos.
+
+Preview and right rail are matching opaque rounded panels (8 DPI-scaled pixels),
+slightly darker than the window: RGB 245/245/245 in Light, 18/18/18 in Dark.
+The rail contains both its action strip and editor. Inner pages are transparent;
+the PropertyEditor has no separate square outer frame. Page and header actions
+have no pill face, frame or underline: grey at rest, white on Dark hover, blue
+when selected. Exit stays red. Resolve these styles again on each theme change.
+
+Keep one current executable per maintained demo in `bin/windows-x64`. Intermediate objects,
+build logs, tests and generated-code acceptance output belong in `build`.
+Run `python examples/build_demos.py --umk <path-to-umk.exe>` to build the current
+inventory and promote successful executables. `--list` shows targets;
+`--package UiGraphDemo` selects a package. The assembly includes this checkout's
+examples/library, the sibling animation/state-machine libraries and U++ uppsrc.
+Use `--upp-root` when the installed tool is not beside uppsrc. The generated build
+report in `build/demos` records each package's outcome; compilation remains
+separate from native visual and generated-code acceptance.
 
 ## Inspector and PropertyEditor
 
@@ -70,6 +109,18 @@ Minimal Standard/Subtle/Accent/Alert in Light/Dark is the common visual baseline
 Preserve family-specific roles and data colors. Apply the complete shell/panel/
 PropertyEditor palette when switching modes, following the reference's U++ theme
 bridge; changing only the preview is not a complete demo theme change.
+
+Synchronize the U++ native palette as well as UiTheme (the reference uses
+Ctrl::SwapDarkLight on an actual mode transition). Explicitly apply the matching
+PropertyEditorPaletteMode to every editor, including hidden pages. Resolve any
+custom header/panel/label/button styles again; stale custom snapshots do not
+inherit a newly selected mode. Check the exposed window background, header icon
+contrast and filter/editor surfaces in Light / Dark / Light.
+
+Paint the exposed window area with the resolved shell surface, including behind
+the title and header actions. A dark preview inside a native grey window leaves
+the header disconnected; switching the native palette alone does not establish
+the intended shell background. Keep nested inspector surfaces deliberate.
 
 Inactive style rows inherit the current theme; active rows apply only the local
 recipe the control supports. Explicit None is not the same as inheritance. Reset
@@ -111,13 +162,30 @@ paint hooks. Reset/inheritance, special text and each family type also matter.
 
 Combine controls only when they share a genuine production/style/teaching foundation.
 The existing UiEditDemo covers Line/Password/Mask/Multi-line; UiIntFloatDemo is the
-numeric companion. Slider/RangeSlider can share their existing family demonstration.
+numeric companion. UiSliderDemo covers Slider, RangeSlider and both slider editors;
+UiButtonDemo covers Button, SplitButton and ToolButton.
+Its adjacent selectors retain separate inspector and override models for each type,
+show one live preview, and generate only that concrete control. The standalone
+UiSplitButtonDemo and UiToolButtonDemo packages are retired.
 Do not create a third edit-family demo or put every widget into an enormous switch.
 
 When changing a family type, show only applicable properties, preserve/restore its
 own authored state deliberately and generate that type's actual C++. Common shell
 code stays explicit within the package. Grouping should make reading easier, not
 hide each control behind a generic adapter class.
+
+Use compact adjacent selector buttons above the preview for a family. Selecting
+one shows that concrete control alone and routes its inspector, overrides and code
+to the same selected configuration. Collection may offer an explicit Compare
+option, but its default is a single selected view. A control-type dropdown in the
+inspector is not the default family navigation.
+
+Bounded integer properties offer the number/slider toggle and use their real
+minimum, maximum and step. Counts such as 1–10 keep that range; do not substitute
+an arbitrary 0–1000. Demo preview widths/heights generally stop at 1000 and corner
+radii at 60. Font sizes, frame widths, gaps and durations each need appropriate
+units and bounds. Unbounded application data must not acquire a fabricated slider
+domain or be silently clamped merely to enable that presentation.
 
 Old demos are removed only after the replacement retains their useful examples,
 public behavior, generated-code options and a working compile/run path. File age,

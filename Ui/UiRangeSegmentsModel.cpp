@@ -26,7 +26,7 @@ UiRangeSegments& UiRangeSegments::SetRange(double mn, double mx)
         Swap(mx, mn);
     if(min_ == mn && max_ == mx)
         return *this;
-    CancelMode();
+    CancelDrag();
     min_ = mn;
     max_ = mx;
     NormalizeSegments();
@@ -49,7 +49,7 @@ UiRangeSegments& UiRangeSegments::SetMinimumSegmentSpan(double span)
     span = max(0.0, span);
     if(min_segment_span_ == span)
         return *this;
-    CancelMode();
+    CancelDrag();
     min_segment_span_ = span;
     NormalizeSegments();
     Refresh();
@@ -137,7 +137,7 @@ void UiRangeSegments::NormalizeSegments()
 
 UiRangeSegments& UiRangeSegments::SetSegments(const Vector<UiRangeSegment>& segments)
 {
-    CancelMode();
+    CancelDrag();
     segments_ = clone(segments);
     NormalizeSegments();
     selected_segment_ = segments_.IsEmpty() ? -1 : clamp(selected_segment_, -1, segments_.GetCount() - 1);
@@ -149,7 +149,7 @@ UiRangeSegments& UiRangeSegments::SetSegments(const Vector<UiRangeSegment>& segm
 
 UiRangeSegments& UiRangeSegments::SetSegmentCount(int count)
 {
-    CancelMode();
+    CancelDrag();
     count = max(0, count);
     segments_.Clear();
     if(count > 0) {
@@ -166,7 +166,7 @@ UiRangeSegments& UiRangeSegments::SetSegmentCount(int count)
 
 UiRangeSegments& UiRangeSegments::ClearSegments()
 {
-    CancelMode();
+    CancelDrag();
     segments_.Clear();
     selected_segment_ = active_boundary_ = hot_segment_ = hot_boundary_ = -1;
     RefreshLayout();
@@ -178,7 +178,7 @@ UiRangeSegments& UiRangeSegments::SetSegment(int index, const UiRangeSegment& se
 {
     if(index < 0 || index >= segments_.GetCount())
         return *this;
-    CancelMode();
+    CancelDrag();
     segments_[index] = segment;
     segments_[index].span = max(0.0, segments_[index].span);
     NormalizeSegments();
@@ -192,7 +192,7 @@ UiRangeSegments& UiRangeSegments::SplitSegment(int index, double ratio, const St
         return *this;
     if(!IsRangeScalar(ratio))
         return *this;
-    CancelMode();
+    CancelDrag();
     ratio = ClampRangeModelValue(ratio, 0.01, 0.99);
     UiRangeSegment& left = segments_[index];
     double old_span = left.span;
@@ -220,7 +220,7 @@ UiRangeSegments& UiRangeSegments::RemoveSegment(int index)
     if(n == 1)
         return ClearSegments();
 
-    CancelMode();
+    CancelDrag();
     double removed = segments_[index].span;
     if(index > 0)
         segments_[index - 1].span += removed;
@@ -284,7 +284,7 @@ UiRangeSegments& UiRangeSegments::SetBoundaryValues(const Vector<double>& values
     for(double value : values)
         if(!IsRangeScalar(value))
             return *this;
-    CancelMode();
+    CancelDrag();
     const int required_segments = values.GetCount() + 1;
     if(required_segments <= 0)
         return *this;

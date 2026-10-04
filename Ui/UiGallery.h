@@ -109,6 +109,7 @@ public:
     int GetOverscanRows() const { return overscan_rows_; }
 
     // Semantic tile zoom. SetItemSize establishes the 1.0 base size.
+    // Null/non-finite zoom inputs and unrepresentable tile sizes are ignored.
     UiGallery& SetZoom(double zoom, Point anchor = Point(-1, -1));
     UiGallery& ZoomBy(double factor, Point anchor = Point(-1, -1));
     UiGallery& SetZoomRange(double minimum, double maximum, double step = 1.12);
@@ -119,6 +120,7 @@ public:
     UiGallery& SetSelectionMode(UiGallerySelectionMode mode);
     UiGallerySelectionMode GetSelectionMode() const { return selection_mode_; }
     UiGallery& ClearSelection();
+    // In multi mode additive=true toggles the item; false replaces selection.
     UiGallery& Select(int index, bool additive = false);
     UiGallery& SelectAll();
     bool IsSelected(int index) const;
@@ -162,6 +164,11 @@ public:
     virtual void SetData(const Value& v) override;
     virtual Value GetData() const override;
 
+    // Selection setters notify synchronously. WhenVisibleRange covers overscan
+    // and is the host's lazy asset seam; publish prepared data with Model().Touch.
+    // Callbacks may switch models or destroy the view. External models outlive
+    // their active binding. Multi-mode GetData returns stable item.data tokens
+    // (indices when data is Null); single-mode array SetData uses the first match.
     Event<> WhenSelection;
     Event<> WhenAction;
     Event<double> WhenZoom;
@@ -179,7 +186,7 @@ private:
 
     void BindModel(UiListModel& model);
     void HandleModelChange(const UiModelChange& change);
-    void SyncModel();
+    void SyncModel(int first = -1, int last = -1);
     void InvalidateGeometry();
     void UpdateGeometry();
     void UpdateVisibleRangeNotification();
@@ -209,7 +216,7 @@ private:
     void UpdateMarquee(Point p, dword flags);
     void UpdateMarqueeSelection();
     void AutoScrollMarquee(Point p);
-    void EndMarquee(bool cancel, bool release_capture = true);
+    void EndMarquee(bool cancel, bool release_capture = true, bool notify = true);
     Rect GetMarqueeContentRect() const;
     Point ToContentPoint(Point p) const;
 
@@ -226,6 +233,7 @@ private:
     UiListModel* model_ = nullptr;
     UiModelObserverSet<UiListModel> bound_models_;
     mutable int model_revision_ = -1;
+    uint64 model_structure_serial_ = 0;
 
     One<UiItemRender> item_render_;
     Array<ItemRenderSlot> item_render_pool_;
@@ -268,6 +276,7 @@ private:
     Point marquee_current_content_ = Point(0, 0);
     Vector<int> marquee_open_selection_;
     int marquee_open_anchor_ = -1;
+    int marquee_open_cursor_ = -1;
     dword marquee_flags_ = 0;
     int marquee_threshold_ = DPI(4);
 

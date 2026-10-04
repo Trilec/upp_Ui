@@ -105,7 +105,7 @@ void UiRangeSegments::MouseWheel(Point, int zdelta, dword)
 bool UiRangeSegments::Key(dword key, int)
 {
     if(key == K_ESCAPE && dragging_) {
-        CancelMode();
+        CancelDrag();
         return true;
     }
     if(!IsEnabled() || !IsShowEnabled() || active_boundary_ < 0 || active_boundary_ >= GetBoundaryCount())
@@ -132,7 +132,13 @@ void UiRangeSegments::CancelMode()
     drag_offset_ = 0;
     if(dirty)
         Refresh();
-    // Clear state before releasing capture: the framework may re-enter CancelMode.
+    // U++ calls CancelMode before clearing capture in ReleaseCtrlCapture.
+    // This framework hook must only clear transient state, never release capture.
+}
+
+void UiRangeSegments::CancelDrag()
+{
+    CancelMode();
     if(HasCapture())
         ReleaseCapture();
 }
@@ -141,7 +147,7 @@ void UiRangeSegments::State(int reason)
 {
     Ctrl::State(reason);
     if(reason == CLOSE || !IsShown() || !IsShowEnabled())
-        CancelMode();
+        CancelDrag();
 }
 
 Image UiRangeSegments::CursorImage(Point p, dword)

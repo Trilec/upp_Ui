@@ -99,6 +99,8 @@
 #include <Ui/UiChartRing.h>
 #include <Ui/UiSlider.h>
 #include <Ui/UiRangeSlider.h>
+#include <Ui/UiColorProbe.h>
+#include <Ui/UiPlaybackBar.h>
 #include <Ui/UiRangeSegments.h>
 #include <Ui/UiRangeSliderEdit.h>
 #include <Ui/UiMatrixSelector.h>

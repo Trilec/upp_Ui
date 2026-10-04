@@ -12,6 +12,8 @@ UiSliderEdit::UiSliderEdit()
 
     slider_.WhenChanging = [this] { SyncFromSlider_(); if(WhenChanging) WhenChanging(); };
     slider_.WhenAction   = [this] { SyncFromSlider_(); if(WhenAction) WhenAction(); };
+    slider_.WhenBeginEdit = [this] { auto notify = WhenBeginEdit; notify(); };
+    slider_.WhenCancelEdit = [this] { SyncFromSlider_(); auto notify = WhenCancelEdit; notify(); };
     field_.WhenAction    = [this] { SyncFromField_(); if(WhenAction) WhenAction(); };
 }
 

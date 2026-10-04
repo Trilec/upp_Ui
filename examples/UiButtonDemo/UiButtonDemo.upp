@@ -12,6 +12,7 @@ file
 	UiButtonProperties.cpp,
 	UiButtonOverrides.cpp,
 	UiButtonCode.cpp,
+	UiButtonFamily.cpp,
 	main.cpp;
 
 mainconfig

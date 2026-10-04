@@ -32,6 +32,12 @@ UiRangeSliderEdit::UiRangeSliderEdit()
             WhenAction();
     };
 
+    slider_.WhenBeginEdit = [this] { auto notify = WhenBeginEdit; notify(); };
+    slider_.WhenCancelEdit = [this] {
+        field_dirty_ = false;
+        SyncFieldsFromSlider_();
+        auto notify = WhenCancelEdit; notify();
+    };
     lower_field_.WhenChange = [this] {
         if(!syncing_)
             SyncSliderFromFields_(false);

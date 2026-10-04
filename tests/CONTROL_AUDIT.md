@@ -255,3 +255,555 @@ contract and UMK instructions, added missing recent contracts, and linked the sk
 All 50 catalogue controls match the inventory. No tests, examples or historical evidence
 were deleted merely because their names looked old. No production-code defects listed
 above were repaired by this audit, and no commit or publication was performed.
+
+## Gallery reuse audit — 4 October 2026
+
+Scope: all six UiGallery implementation/header files, shared UiItemRender and
+UiListModel seams, Gallery demo and the focused binding/mutation/scale suites.
+Reviewed on `b86e598` plus the uncommitted changes from this audit; U++ 18468,
+CLANGx64, Windows. This section supersedes the earlier Gallery row only; it does
+not certify other controls or close the Graph development gates.
+
+The architecture is appropriate for reuse: one active semantic model, owned
+renderer prototypes, visible/overscan-only lightweight renderers, arithmetic
+uniform geometry, preparation outside Paint, host-owned lazy assets and no item
+Ctrl population. Model switches do not copy datasets. Explicit external-model
+lifetime and GUI-thread notification contracts remain part of the public API.
+
+Repairs implemented:
+
+- Release surplus renderers and their image handles on viewport/range shrink and
+  empty models. Cyclic slots retain overlapping data; a one-row scroll rebinds
+  only the entering row when the prepared range size is unchanged.
+- Reconcile UI_MODEL_UPDATE selection over its changed range rather than scanning
+  all selected records on every local presentation edit. Uniform geometry stays
+  intact; prepared data invalidation remains bounded to the renderer pool.
+- Map dirty paint bounds directly to grid row/column candidates and respect
+  Draw::IsPainting, so a tile-sized damage region paints one tile.
+- Complete state/refresh work before user callbacks. Guard continuation with a
+  destruction-aware Ctrl observer and a structural serial. Model replacement,
+  structural edits and destruction cancel pending input; lazy Touch notifications
+  can update assets during scrolling without suppressing cursor selection.
+- Capture the opening background press; cancel marquee without recursive capture
+  teardown. Escape restores the original cursor as well as selection. Structural
+  edits restore old indices before remapping them into the edited model.
+- Enforce single-selection when binding ValueArray tokens; Home/End skip disabled
+  items/group headers. Reject Null/non-finite zoom and unrepresentable tile sizes.
+- Fix the demo's member declaration order so its borrowed model outlives views.
+  Share the same Gallery regression implementation between the standalone and
+  consolidated targets, eliminating the duplicate corrective test body.
+
+Validation on the final edited sources:
+
+| Check | Result |
+| --- | --- |
+| UiModelViewTests Debug, non-BLITZ | 5 suites / 0 failed; includes 100,000-item Gallery reachability and bounded renderer/paint tests |
+| Gallery regressions, Debug non-BLITZ and Release BLITZ | 29 checks / 0 failed in each configuration |
+| UiModelTests Debug, non-BLITZ | 3 suites / 0 failed; data models 7,535 checks, binding 55, mutation 31 |
+| UiGalleryDemo Debug BLITZ | Build passes |
+| git diff --check | Pass |
+
+Build/test logs and executable artifacts are under `build/GalleryAudit_*` in this
+checkout. Source-only hygiene does not establish native visual acceptance. The
+Computer Use demo launch timed out waiting for app approval, and re-observation
+confirmed no demo window opened; no visual/physical interaction PASS is claimed.
+
+Remaining finish gates: inspect Light/Dark/Light, resize, focus/disabled states,
+Ctrl/Shift marquee, mouse-up outside the viewport and Escape while held at
+representative DPI. UiGalleryDemo remains a List/Gallery shared-model showcase;
+it does not yet provide the full Inspector/Theme Overrides/Data/Code experience
+or generated-code acceptance required by the demo guide. The Designer catalogue
+is outside this checkout, so Designer authoring/export is not certified here.
+
+Scale limits are explicit: uniform tiles, 32-bit pixel extent saturation at
+INT_MAX, GUI-thread mutations, and models that outlive binding. Explicit Select
+All/token resolution/structural changes may be O(N); marquee selection work grows
+with the intersected selection. No unlimited-coordinate, zero-risk or completed
+Graph claim follows from this Gallery audit. The control is suitable for reuse
+within these documented contracts; overall finish status remains pending the
+native/demo gates above.
+
+## Collection designer and shared presentation audit — 4 October 2026
+
+This follow-up replaces the separate UiListDemo/UiGalleryDemo packages with
+`examples/UiCollectionDemo`. Both previews bind the same production UiListModel;
+Inspector, Style, Data and Code use PropertyEditor and a projection of the active
+record. The projection is not another collection model. The catalogue and release
+inventory now point both controls to this example. Historical evidence above is
+retained as evidence of the earlier state.
+
+The old comparison exposed a reusable layout defect: vertical Expand used the
+collection's full natural height and did not shrink a deficit. That made the
+viewport, renderer population and wheel distance much larger than the visible
+window. UiBoxLayout now shrinks expanding children to explicit minimums before
+distributing spare space. List gains a production scrollbar, releases surplus
+renderers, retains overlapping records with cyclic slots and respects paint
+damage. Fit/Fixed allocation is preserved. Native header icons are explicitly
+16 DPI-scaled pixels and page icons 17, matching UiLabelDemo.
+
+Validation:
+
+- UiModelViewTests: five suites pass, including the new 100,000-record Expand
+  viewport regression and existing List/Gallery scale tests.
+- UiStackMeasureTest and UiTabMeasureTest: 11 checks each, zero failures, Debug
+  non-BLITZ.
+- UiCollectionDemo Debug BLITZ builds; native acceptance: 12 checks, zero failures.
+- Five generated standalone sources (default, configured, overrides, Gallery,
+  List) compile unchanged, including quoted Data text. Generated configuration
+  deliberately leaves dataset size and image loading to the host.
+- Repeated synthetic wheel preparation: 100 iterations, about 5.1 ms List and
+  3.5 ms Gallery total, pools 17/27 in the acceptance viewport. This excludes
+  painting and physical input latency; it is not a frame-rate claim.
+- The corrected executable was opened on the visible desktop and its icon sizes
+  inspected; native List wheel input advanced the bounded viewport. Dark-theme
+  inspection exposed a light window background behind pale header buttons. The
+  demo now paints its resolved theme surface and tints title media; the polished
+  build passes the same 12 acceptance checks. Final physical Dark-theme recheck
+  yielded to active user interaction. Logs/artifacts: `build/CollectionAcceptance*`,
+  `build/Collection_*Measure*`, `build/UiCollectionDemo*`.
+
+### Can Graph, Gallery and List share node families?
+
+Yes, at the presentation layer. They do not currently have one unified family
+authority. No Graph schema or evaluator was changed by this audit.
+
+| Existing seam | What it already provides | Boundary to resolve |
+| --- | --- | --- |
+| UiItemRender and UiMakeItemRenderData | List/Gallery share model-to-render data, cloneable lightweight prototypes and viewport pools | No Graph family/template adapter exists |
+| UiMediaCardRender | List/Gallery can use the same media card; live UiMediaCard and its renderer share preparation/painting | Graph's Media family uses its separate component evaluator |
+| UiGraphNodeTemplate and slot rules | Validated bounded recipes, stable component IDs, data-key bindings, component styles and multiple families | Names/types and evaluator input depend on Graph nodes/styles |
+| UiGraphNodeComponent preparation | Text, icons, images, progress, fields, tags and actions become prepared output outside Paint | Preparation takes UiGraphNode/UiGraphNodeStyle; Graph owns region allocation and painting |
+| UiGraphNodePresentation | Retained output drives rendering and authoring picking | Shape-safe bands, port reservations, camera zoom and LOD are Graph-specific |
+
+Evidence: `Ui/UiItemRender.h`, `Ui/UiListRender.cpp`,
+`Ui/UiGalleryRender.cpp`, `Ui/UiMediaCard.h/.cpp`,
+`Ui/UiGraph/UiGraphNodeComponent.h/.cpp`, `Ui/UiGraph/UiNodeGraph.h`,
+and the production template/presentation contracts in guides 08 and 09.
+Graph Media and MediaCard also implement image fit separately; the shared
+UiMediaFit utility is used by MediaCard, but not this Graph component path.
+Changing this requires parity checks for cropping, alignment and rounding.
+
+Recommended extraction, in dependency order:
+
+1. Extract a view-independent, bounded presentation recipe, component data
+   resolver and prepared paint output from the existing Graph evaluator. Keep
+   existing public Graph templates through a compatibility adapter. Avoid copying
+   its region allocator into a second renderer implementation.
+2. Retain Graph's shape/port allocation, camera, LOD, topology and selection.
+   Provide ordinary rectangular allocation for collection rows/tiles; family
+   intent is shared, while the allocated footprint differs with available space.
+3. Adapt UiModelItem/UiItemRenderData at preparation time into the same resolver.
+   Do not populate a parallel UiGraphModel or convert all N records. Arbitrary
+   typed fields remain in the existing Value data payload with explicit bindings.
+4. Put default families and their styling in one registry/recipe authority used
+   by all adapters. Extension authors provide shared recipes or bounded painted
+   components; per-record heavyweight Ctrl instances are not the default path.
+   Map selection/focus/disabled states explicitly and reserve List chrome lanes.
+5. Add a UiItemRender implementation backed by the shared evaluator, then
+   consolidate MediaCard only where its richer tag/action contracts are preserved.
+   Action identity/hit routing must remain view-owned and destruction-safe.
+
+Required acceptance before replacing the current engines: Graph rendering and
+picking parity at every LOD/shape; Media Contain/Cover parity; Light/Dark and
+selected/disabled/focus states; custom family registration and missing/invalid
+field behavior; generated-code compatibility; collection dirty paint and pool
+shrink; one-row overlap retention; local model Touch; 100,000-record bounded
+preparation; no image decode/font fitting/data callbacks during Paint; interrupted
+actions and model replacement/destruction. Template/theme changes invalidate only
+affected prepared state. Prepared resources remain viewport-bounded and image
+loading stays host-owned.
+
+The architecture makes this feasible, but performance equivalence has not been
+measured for a Graph-backed collection renderer because none exists yet. This is
+an extraction proposal, not a certification of unified nodes or a 100%-finished
+Graph. The remaining native Gallery capture/DPI matrix from the earlier section
+and a full List callback audit are still open.
+
+### Shared node foundation: detailed follow-up
+
+This source audit refines the extraction proposal above. The target is one
+content contract and one design/evaluator/drawing authority, not permanent
+translation between independently maintained Graph and collection node systems.
+Compatibility forwarding is a migration detail. No production API, serialization
+or rendering implementation is changed by this follow-up.
+
+**Base class versus shared values.** A lightweight rendering interface already
+exists: UiItemRender explicitly names later Graph node content as an intended
+consumer. Reuse/evolve that interface rather than introduce a second renderer
+hierarchy. Common semantic content and authored designs should be plain value
+types, separate from transient prepared geometry. Graph can contain/reference
+common content and add graph identity, position, ports and connections. List and
+Gallery add sequence identity and their own placement/interaction. Composition
+is the recommended default for these records; deriving a Graph control from a
+Gallery/List control would couple unrelated lifetimes and interaction. A simple
+non-virtual data base could also work, but alone would not unify drawing, binding,
+serialization or notifications. Preserve U++ relocation/copy contracts explicitly.
+
+Confirmed differences that a common contract must resolve:
+
+| Concern | Current source behavior | Proposed single authority |
+| --- | --- | --- |
+| Main text | UiModelItem.text maps to UiItemRenderData.title; Graph stores title directly | One content title, with old spelling retained only for compatibility |
+| Subtitle | Render data and Graph have it; UiModelItem does not | Common optional subtitle, without inventing a second payload key |
+| Media | Collection data has image; named Graph Image components require a literal or data-key Image | Common image/icon fields and explicit custom-field binding precedence |
+| Arbitrary fields | Both use Value data; Graph named binding expects ValueMap | Retain opaque host data; validate ValueMap only for a component that requests named fields |
+| Styling | Graph has its own role enum/style plus slot styles; collections use UiRole/UiItemRenderStyle | Common presentation roles, component styling and family recipe; Graph-only port styles remain extra |
+| Identity | Graph refs, collection keys and action values have different meanings | Content identity separate from view/topology identity and action identity |
+| Designs | Graph registered templates are held per UiNodeGraph; Workspace owns a Family with Base/shape overrides | One explicitly owned, shareable family/design catalogue used by the hosts and authoring tools |
+| Interaction | UiItemRenderHit has an action Value; Graph Actions currently paint string chips | Shared component/subitem hit IDs and action tokens; each view owns dispatch/capture |
+
+Important limits from the source: UiGraphNodeComponentKind is a closed enum.
+Users can register new compositions of existing components, but arbitrary new
+component kinds are not currently a plug-in registration API. Graph Actions
+currently accept arrays of strings and prepare boxes/text; UiGraphNodeComponentItem
+has no action token. WhenNodeAction is a node double-click event, not per-chip
+action routing. Therefore custom components and actionable chips need an explicit
+extension/interaction contract before promising them across views.
+
+**One record in several views.** A common struct alone removes vocabulary drift,
+but placing copies of it into two independently edited models would still diverge.
+For simultaneous Graph/List/Gallery editing, retain one host-owned authoritative
+content record and let topology/sequence entries refer to it by stable identity.
+Content revisions notify each bound view; each prepares only its affected visible
+records. This can be an access path into the host's existing model, rather than a
+mandatory new datastore. Prepared snapshots may retain String/Value/Image handles,
+as the existing renderer does, but those are disposable rendering state, not
+another editable content model. Value sharing alone must not be treated as a
+mutable shared-record/notification mechanism. Define removal, model replacement
+and borrowed-reference lifetime before implementing this access path.
+
+**Shared design does not mean fixed pixel bounds.** The same family should retain
+component identities, bindings, order, alignment and styling. A 300-pixel Graph
+node and a 100-pixel Gallery tile may legitimately wrap/hide content according to
+that same recipe. A narrow List row need not acquire a separately authored List
+family. The host supplies allocated bounds, exclusions and scale/detail policy.
+Shared content-region allocation then prepares identical drawing/picking output
+for equivalent inputs. Graph supplies shape-safe regions and port exclusions;
+List supplies its chrome reservations; Gallery usually supplies a rectangle.
+Silhouette math should use existing Ui shape/geometry primitives where practical,
+while preserving Graph's dense-scene paths and Micro budgets.
+
+Concrete implementation slices, with checkpoints:
+
+1. Establish the common content/style/state contract by evolving the current
+   render data vocabulary. Preserve legacy Graph field access and its explicit
+   stream order; do not serialize a new base blindly. Test old Graph model load,
+   missing fields and image/custom-key precedence. This is where any migration
+   field forwarding belongs.
+2. Extract the existing named component resolver, prepared types and painter
+   from Graph-specific inputs. Let Graph and a UiItemRender implementation call
+   those same functions. Keep Graph legacy callbacks and Micro behavior working.
+   Verify Media and Identity families in both hosts with identical input/bounds.
+3. Extract content region allocation from BuildNodePresentation, with host-owned
+   shape/port/chrome constraints as inputs. Promote the current template
+   validation and registration/prepared-resource logic into the shared design
+   catalogue. Move Workspace Base/shape inheritance and generated code to that
+   authority instead of duplicating a Gallery design editor.
+4. Bind both hosts to the same authoritative content access path and revisions.
+   Demonstrate an edit made through Gallery updating Graph and List without
+   copying datasets or refreshing every record. Exercise replacement/removal and
+   callback destruction. Selection and camera/scroll remain independent.
+5. Add registered painted component extensions only after the built-in path has
+   parity. Require bounded preparation, stable hits and no Ctrl per record.
+   Consolidate Basic/Image/MediaCard code incrementally; preserve MediaCard tag
+   semantics and live-control behavior before retiring duplicate implementation.
+
+Main footprint opportunities are GraphNodeComponent resolution/painting,
+BuildNodePresentation content allocation, shared family authoring/validation,
+Basic/Image/MediaCard text/media layout and separate media-fit calculations.
+Topology, spatial queries, ports, scrolling and selection remain useful distinct
+code. Moving files/names alone saves no implementation; quantify removed duplicate
+logic only after parity permits deleting the old paths. Do not promise a line
+count or speedup from this source audit.
+
+Later consumers are already evidenced by SetItemRender/SetCellRender APIs in
+UiTree, UiTable and UiDropdown. They can opt into the shared renderer without
+having to turn ordinary cells or menu rows into rich nodes. Live MediaCard is
+another natural consumer of the common prepare/paint functions. The shared core
+must not depend on UiNodeGraph, UiGraphWorkspace or PropertyEditor; authoring sits
+above it. Keep preparation bounded by visible records and recipe component limits,
+cache immutable recipe resources once, and avoid a virtual call/lookup per painted
+primitive. Final performance acceptance must measure Graph and collections,
+including cold media preparation, warm pan/scroll and local content/design edits.
+
+Additional reviewed sources: UiDataModels.h; UiItemRender.cpp/Data.cpp;
+UiGraphModel.h/.cpp; UiGraphNodeTemplate.h; UiNodeGraphTemplates.cpp;
+UiNodeGraphPresentation.inc; UiGraphNodeComponentPaint.cpp;
+UiNodeGraphInteraction.cpp; UiMediaFit.h; UiGraphWorkspace.h; UiTree.h,
+UiTable.h and UiDropdown.h. This follow-up is source/design evidence only; no
+shared-engine executable exists yet and no new runtime PASS is claimed.
+
+## Initial demo estate and test/artifact scan — 4 October 2026
+
+User-authorized direction: redesign the maintained demos around the corrected
+MediaCard shell, combine genuine control families, preserve public feature/style
+coverage and generate clean standalone usage code. This is active migration work,
+not an acceptance claim for the entire estate. Explicit repeated shell code is
+acceptable; no new mandatory DemoBase/framework is planned.
+
+Source inventory started with 50 controls and 31 mapped packages. UiTag and
+UiMediaCard were present in the catalogue but missing from the machine inventory;
+they are now included, giving 52 controls and 33 mapped packages. All mapped
+headers exist. UiFontSelectorDemo is a font utility, not a public UiFontSelector
+control; it must not create a fictitious control row. The untracked media-control
+work underway elsewhere in this checkout is preserved and needs its own final
+inventory reconciliation.
+
+| Canonical package group | Source findings and disposition |
+| --- | --- |
+| UiLabelDemo, UiButtonDemo, UiRangeSegmentsDemo | Closest existing explicit PropertyEditor shells. Retain behavior; align exposed backdrop and verify page feedback/native matrix during redesign. |
+| UiMediaCardDemo, UiTagDemo, UiCollectionDemo, UiProgressRingDemo, UiChartRingDemo | Shell/theme cleanup implemented. MediaCard and Tag lacked native palette bridge and PropertyEditor palette updates; both Rings had the same omission. Apply custom styles from the current theme, paint the continuous window surface, use compact left-aligned page icons and visible selected feedback. Five Debug BLITZ builds pass. MediaCard inspected in native Light and Dark; other final native matrices remain open. |
+| UiCheckBoxDemo, UiRadioButtonDemo, UiToggleDemo, UiEditDemo, UiSliderDemo, UiTabDemo, UiDropdownDemo | Production PropertyEditor exists, but header lacks Help and rail uses expanded Properties/Code buttons. Preserve Usage/Current changes/Full explicit generation modes while adding canonical pages. Existing authored styles must be audited for unconditional light-color snapshots before claiming reset/theme inheritance. |
+| UiAccordionDemo, UiBreadcrumbsDemo, UiColorPickerDemo, UiIntFloatDemo, UiMatrixSelectorDemo, UiMenuDemo, UiScrollBarDemo, UiScrollPanelDemo, UiSplitterDemo, UiTableDemo, UiTitleCardDemo, UiTreeDemo | Depend on BuilderDemoSupport and/or DemoPropertyRows. Re-author explicit self-contained shells and production PropertyEditor; preserve model editing, popup, layout and generated-code capabilities before removing helpers. |
+| UiPanelDemo | Bespoke builder and property rows. Keep Panel/GroupPanel teaching coverage; migrate shell/editor and generated projection. |
+| UiDateTimeDemo, UiProgressBarDemo, UiSplitButtonDemo | Need dedicated canonical editor/code/page review and redesign; existing snippets/showcases do not establish complete API coverage. |
+| UiGraphDemo | Specialist topology/model demo remains canonical; preserve authoring, diagnostics and generation behavior while aligning shell. Existing source loads image samples from tests/Images; move demo asset ownership out of test-fixture paths during self-containment work. |
+| UiDocDemo | Specialist document interaction harness. Retain unique editing coverage; add a canonical design/code shell without erasing document behavior. |
+
+Ten inventory rows lack mapped examples: UiSliderEdit, UiRangeSliderEdit,
+UiColorMatrix, UiDirectContentHost, UiStack, UiAbsoluteLayout, UiGridLayout,
+UiBoxLayout, UiBezierCurveEditor and UiBezierCurveField. Layout/nonvisual helpers
+may share an explicit composition example rather than receive artificial empty
+style panels. Using a control in a shell is not proof its features are showcased.
+UiToolButton's current UiLabelDemo mapping also needs actual feature coverage
+review; toolbar presence alone does not qualify.
+
+Consolidation decisions/checkpoints:
+
+- List/Gallery: one UiCollectionDemo replaces separate packages; removal and
+  catalogue/inventory routing already implemented, including generated-code gates.
+- Line/Password/Mask/MultiEdit: UiEditDemo is the family authority. The four old
+  separate packages remain retirement candidates until matching their useful
+  examples/generation with the redesigned family demo. Do not blindly delete them.
+- Slider/RangeSlider: keep one family demo; assess adding SliderEdit/RangeSliderEdit
+  there so all four concrete public types have meaningful configuration and code.
+- Panel/GroupPanel and Splitter/QuadSplitter already share family examples; retain
+  their concrete-type coverage. A layout composition family can cover Box/Grid/
+  Absolute/Stack and document DirectContentHost where appropriate.
+- MatrixSelector/ColorMatrix and Bezier editor/field are candidate families to
+  review at their actual API/style seams. ChartRing's series semantics, topology
+  authoring and document editing are not generic collection/demo duplicates.
+- UiGraphComponentStudio and UiGraphHierarchyDemo are specialist authoring/
+  topology examples; UiRenderBenchmarkDemo is benchmark evidence. UiThemeDemo,
+  UiFontSelectorDemo and UiOsFileDialogDemo are theme/font/platform utilities.
+  UiLabelGeneratedSmoke is generated-code infrastructure. Preserve or explicitly
+  relocate these rather than presenting them as competing canonical builders.
+- UiGraphDesignMatrix contains only a retirement README, no executable package;
+  its former implementation is in Git history. Empty List/Gallery directories
+  after source deletion are not active demos.
+
+Test source comparison covered nine aggregate packages and their 49 suite sources.
+After normalizing whitespace and the console entry-point/exit wrapper, 38
+standalone bodies match aggregate bodies. This supports sharing implementation,
+not throwing away regression coverage. Gallery already uses one shared suite;
+the updated ModelViewPerformance standalone differs from the aggregate and must
+be reconciled before retirement.
+
+| Aggregate | Matching standalone implementation candidates |
+| --- | --- |
+| UiControlTests | UiButtonInteractionContractTest; UiChartRingRunTests; UiColorMatrixRunTests; UiDateTimeRunTests; UiGroupPanelRunTests; UiMatrixSelectorRunTests; UiProgressBarRunTests; UiProgressRingRunTests; UiRangeSliderEditRunTests; UiRangeSliderRunTests; UiSliderRunTests; UiStackMeasureTest; UiTabMeasureTest |
+| UiDrawingTests | UiGeometryContractTest; UiShapePathTest |
+| UiThemeTests | UiThemeSurfaceRegressionTest |
+| UiModelTests | UiDataModelsTest; UiModelBindingContractTest; UiModelMutationContractTest |
+| UiModelViewTests | UiDropdownMenuRenderTest; UiListStyleContractTest; UiTreeScaleTest |
+| UiGraphModelTests | UiGraphHierarchyTest |
+| UiGraphViewTests | UiNodeGraphCanonicalShapeTest; UiNodeGraphDragDamageTest; UiNodeGraphHierarchyViewTest; UiNodeGraphInteractionStateTest; UiNodeGraphLiveViewTest; UiNodeGraphRouteEditTest; UiNodeGraphSelectionModifierTest |
+| UiGraphRenderTests | UiNodeGraphDetailLodTest; UiNodeGraphOverviewLodTest; UiNodeGraphPatternedPaintTest; UiNodeGraphRenderLodTest |
+| UiGraphScaleTests | UiNodeGraphModelSwitchProfileTest; UiNodeGraphPanProfileTest; UiNodeGraphPerformanceTest; UiNodeGraphScaleTest |
+
+There are 78 tracked test/probe/smoke .upp targets. Other suites include unique
+PropertyEditor transactions/adapters, MediaCard/Tag, Doc models/geometry/input,
+Menu/Dropdown interaction, shape/theme contracts and native/platform behavior.
+Their purpose and runner references must be reviewed before consolidation.
+Focused targets may remain tiny entry points linking aggregate suite sources;
+having one implementation is more important than minimizing useful launch names.
+
+Artifact findings: no tracked .log/.exe/.pdb/.obj files. .gitignore already excludes
+build output, logs, caches and local scripts. At inspection, build held about
+15.56 GB (14.49 GiB), including executable/acceptance evidence and generated smoke
+sources. It is disposable output, but running demos and in-progress evidence must
+be accounted for before scoped deletion. No blanket deletion was performed by
+this audit. tests/Images contains real Graph fixture/demo references, not merely
+unreferenced screenshots. Root Snapshot_*.jpg and icon.png are documentation/
+project assets, distinct from output logs.
+
+Acceptance for every replacement: declared direct dependencies; meaningful source
+header and subtitle; Theme/Help/Exit order; selected left-aligned Inspector/
+Overrides/optional Data/Code icons; bounds-safe live preview; Light/Dark/Light and
+hidden-page palettes; all consumed style states/features and reset/inheritance;
+same semantic model for Data; actual unchanged default/changed/override generated
+C++ compiled for every concrete family type; normal close and idle behavior.
+Source token scans locate candidates only: they cannot certify style completeness
+or generated-code accuracy. This initial scan is superseded by the implementation
+checkpoint below; the complete native interaction matrix remains open.
+
+## Demo implementation checkpoint — 4 October 2026
+
+The accepted MediaCard/Collection shell now guides the maintained builders:
+matching rounded preview and inspector containers, slightly tinted Light/Dark
+surfaces, transparent inner pages, icon-only left-aligned page actions, and
+adjacent Theme/Help/red Exit at the top right. Each demo owns its shell directly;
+shared demo helper dependencies have been removed. Compilation is recorded
+separately from full native acceptance.
+
+The release inventory maps 55 controls to 37 canonical demos and retains five
+specialist examples: document authoring, graph components, graph hierarchy,
+theme comparison and font selection. New meaningful coverage includes slider
+editors, layout families, Bezier field/editor, ColorMatrix, ToolButton and native
+file dialogs. GroupPanel and QuadSplitter have actual selected concrete branches.
+ColorProbe and PlaybackBar share UiMediaControlsDemo, while generating only the
+selected control's reusable usage. RangeSlider is available in UiSliderDemo via
+its preview selector, alongside SliderEdit and RangeSliderEdit. Button, SplitButton
+and ToolButton share UiButtonDemo with selected concrete-type generation.
+
+Ten obsolete packages are retired: List/Gallery singles, the four separate
+edit variants, SliderEdit, SplitButton and ToolButton singles, and the
+RenderBenchmark demo explicitly removed by the user.
+Document authoring remains UiDocEditorDemo because its file/ribbon/review workflow
+is distinct from the focused UiDoc control builder. Regression suites and image
+fixtures are preserved. The Utilities checkpoint below records the completed
+retirement of duplicate standalone packages and their preserved aggregate coverage.
+
+`examples/build_demos.py` builds only the maintained inventory, keeps objects,
+logs and staged outputs in `build/demos`, and promotes successful executables to
+`bin/windows-x64`. It does not erase that folder. The user moved earlier finished
+executables to this platform directory during the cleanup. The former approximately
+15.56 GB build output was cleaned before the fresh builds.
+
+Generated examples use public APIs, concrete selected types and explicit lifetime
+order. The modern form and media builders emit reusable ParentCtrl examples with
+owned members and visible placement, rather than GUI entry points that configure
+objects and immediately exit. Layout exports omit unused children. Actual exports
+are compiled unchanged inside independent harnesses; runtime checks verify model
+binding, initialization, layout and selected concrete types where applicable.
+Graph offers a concise usage recipe and a separate authored-topology export;
+connections use the model-returned node references, escaped strings are preserved,
+and custom style exports include font traits and shadow parameters. Graph demo
+images are embedded package assets, independent of test fixture paths.
+
+RangeSegments implementation hygiene: geometry/hit testing lives in
+`UiRangeSegmentsGeometry.cpp`; all drawing, palette resolution and raster caching
+live in `UiRangeSegmentsPaint.cpp`. The former PaintParts/PaintView fragments were
+consolidated without changing the control API or rendering/cache policy. This is
+source organization, not a claimed performance improvement.
+
+Earlier build checkpoint: all 45 then-maintained packages built successfully with CLANGx64
+Release/BLITZ and were promoted to `bin/windows-x64`; `build/demos/build_report.json`
+contains each result. All 55 inventory mappings resolve to existing headers and
+maintained package manifests. No published executable predates its demo sources.
+
+Earlier generated-code evidence covered 122 recipes before the final family
+consolidations: 53 forms/media, 28
+container/numeric, 27 specialist/layout and 14 Graph/font/dialog/Collection.
+Every recipe compiled unchanged inside its acceptance harness. Constructor,
+model, layout and teardown checks passed where applicable; the four native-dialog
+functions were compiled without opening modal OS dialogs. Evidence resides in
+`build/agents/forms`, `build/agents/containers`, `build/agents/special` and
+`build/RootGenerated`. MediaControls passes 48 regression checks; Collection
+passes 12 acceptance checks, and GraphComponentStudio's view checks exit zero.
+RangeSegments Debug/non-BLITZ and Release/BLITZ regressions each report 60 checks
+and zero failures. The captured-drag studio regressions described below exercise
+the newly fixed cancellation paths.
+
+Native offscreen MediaControls Light/Dark/code renders were inspected. A full
+per-demo live Light/Dark/Light, resizing, keyboard/focus, disabled/selected and
+DPI sweep remains open: Computer Use approval timed out during this session.
+Native file-dialog modal interaction has not been exercised by generated-code
+compilation. These build results do not certify every library control as finished
+or eliminate all possible integration defects.
+
+## Utilities consolidation checkpoint — 4 October 2026
+
+The user authorized removal of obsolete and duplicated Utilities test packages.
+Current source comparison confirmed all 38 candidates in the table above still
+match their aggregate implementations after normalizing only whitespace outside
+string/character literals, the console entry point and the exit wrapper. Each
+retained source is present in its aggregate manifest and its suite is invoked by
+the aggregate driver. The 38 standalone directories and their 76 copied source/
+manifest files were removed, totaling 339,335 bytes. No retained aggregate source
+file changed; SHA256 checks before and after retirement confirm that.
+
+The nine authoritative packages built with CLANGx64 Release/BLITZ and all 48
+no-argument suites passed with zero failures. UiGraphScaleTests --components also
+passed its opt-in suite (76 checks, zero failures), exercising the 49th retained
+suite implementation. Profile timings are measurement data, not a performance
+acceptance claim. Build/runtime logs, literal-preserving comparison metadata and
+retained-source hashes are in build/agents/special; finished test executables
+remain there rather than in the demo bin folder.
+
+The machine inventory records every retired package's replacement, retained
+source and suite entry in retired_test_packages. Current behavior-test routes and
+audit source links point to retained packages/files. Utilities/README.md lists the
+maintained aggregate entry points and the purpose of remaining support tools.
+There are 46 Utilities package manifests after this cleanup.
+
+Focused RangeSegments, shared-source Gallery, PropertyEditor callback lifecycle,
+working-range/numeric, Doc, platform and other unique tests remain. Different
+ModelViewPerformance, theme-structure, styled-cache and graph-presentation bodies
+were not discarded based on a filename resemblance. PropertyEditor and its
+headless core are production dependencies. Their two capability demos, headless
+probe, icon authoring/export pipeline and rendering benchmark have distinct
+current purposes and remain; no obsolete non-test tool was proved safe to retire.
+
+Slider family consolidation also replaces UiSliderEditDemo with UiSliderDemo:
+four compact buttons select Slider, RangeSlider, SliderEdit or RangeSliderEdit,
+with exactly one preview and selected concrete-type generation. The old package
+was removed and both catalogue/inventory routes updated. All four family-selector
+checks (Slider, Panel/GroupPanel, Bezier and layouts) passed. Twelve actual slider
+default/authored/override exports compiled unchanged against CtrlLib and Ui, and
+the twelve unchanged generated control bodies passed construction/teardown in a
+separate harness. These checks do not replace a complete live theme/DPI review.
+
+
+## Final reported defect fixes and family policy — 4 October 2026
+
+The user's studio crash was a real stack overflow (Windows exception c00000fd):
+RangeSegments released capture inside CancelMode, while U++ invokes CancelMode
+before clearing capture. CancelMode now only clears transient state; explicit
+CancelDrag releases capture for Escape, disable/hide/close and model-reset paths.
+The real studio view regression obtains native capture and exercises drag updates,
+release, Escape, disable, hide, model resync and framework capture cancellation.
+It exits successfully. Geometry/measurement and drawing now have two clear source
+files; the source split itself does not claim a rendering speedup.
+
+The user's MediaControls access violation (c0000005) exposed synchronous editor
+reconstruction during Choice preview/commit. PropertyEditor now guards the whole
+model and host callback dispatch, copies borrowed payloads, checks binding/lifetime
+and defers structural rebuilding until callbacks unwind, including nested native
+event pumps. Bounded Integer and SliderInt reuse the numeric number/slider editor
+while preserving their schema kind, minimum, maximum and step. Unbounded integer
+values retain their full domain. The focused lifecycle/numeric gate and four
+existing PropertyEditor suites pass 511 checks in total with zero failures.
+
+All multi-control builders use compact top selector buttons and one active preview:
+Button/SplitButton/ToolButton, Slider/RangeSlider/SliderEdit/RangeSliderEdit,
+Line/Password/Mask/MultiEdit, Probe/Playback/HDR, Int/Float, Panel/GroupPanel,
+Splitter/QuadSplitter, Bezier Field/Editor and layouts. Collection defaults to List
+and retains explicit List/Gallery/Compare buttons. Its single-view exported recipes
+now declare and configure only the selected view. Native repeated selector checks
+pass for Media (576), Edit (320), Button including popup cycles (340), and the
+other family builders. These are application-driven native checks, not physical
+keyboard/mouse or DPI certification.
+
+The document authoring demo's ribbon and review children, including hidden pages,
+now refresh their Light/Dark semantic palettes. Twelve native snapshots cover
+three ribbons, two review pages and both themes; representative images were
+inspected. Numeric demo properties have meaningful authored bounds: preview
+width/height generally at most 1000, radii at most 60, small counts retain their
+small domains, and live indices/pages follow the actual model ranges.
+
+Final shipment verification: all 42 maintained demos (37 canonical builders and
+five specialist workflows) build successfully. `bin/windows-x64` contains exactly
+those 42 executables, with ten superseded demo packages absent. All 55 control
+catalogue mappings resolve to existing headers and maintained package manifests.
+The final fresh generated-code gate passes 126 recipes: 50 forms, 28 containers,
+33 specialist/slider and 15 Graph/font/native-dialog/Collection recipes, with
+zero compile or initialization/teardown failures. Actual emitted source is used;
+native file-dialog execution remains an interactive workflow.
+
+The nine aggregate test runners pass 48 default suites, plus GraphScale's
+76 component checks. All 38 retired standalone test routes retain their coverage
+in existing aggregate source files. The shipped Studio, Slider, Panel, Bezier,
+Layout, IntFloat and Splitter native acceptance commands exit successfully after
+the final full build. Build reports, logs, generated sources and test executables
+remain under `build`; finished demo executables alone belong in `bin/windows-x64`.

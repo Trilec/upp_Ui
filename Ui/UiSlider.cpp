@@ -375,10 +375,11 @@ void UiSlider::SetValueInternal(double v, bool fire_action, bool fire_changing)
 
     value_ = nv;
     Refresh();
-    if(fire_changing && WhenChanging)
-        WhenChanging();
-    if(fire_action && WhenAction)
-        WhenAction();
+    Ptr<UiSlider> self = this;
+    auto changing = WhenChanging;
+    auto action = WhenAction;
+    if(fire_changing) changing();
+    if(self && fire_action) action();
 }
 
 void UiSlider::Paint(Draw& w)
@@ -535,28 +536,22 @@ void UiSlider::Paint(Draw& w)
 
 void UiSlider::LeftDown(Point p, dword)
 {
-    if(!IsEnabled() || !IsShowEnabled())
-        return;
-
+    if(!IsEnabled() || !IsShowEnabled()) return;
+    Ptr<UiSlider> self = this;
     SetFocus();
-    Rect th = GetThumbRect();
-    if(th.Contains(p)) {
-        dragging_ = true;
-        drag_start_value_ = value_;
-        drag_offset_ = dir_ == UiDirection::H ? (p.x - th.CenterPoint().x) : (p.y - th.CenterPoint().y);
-        SetCapture();
-        Refresh();
-        return;
-    }
-
-    Rect tr = GetTrackRect();
-    int pos = dir_ == UiDirection::H ? (p.x - tr.left) : (p.y - tr.top);
-    dragging_ = true;
-    drag_start_value_ = value_;
-    drag_offset_ = 0;
+    if(!self) return;
+    Rect thumb = GetThumbRect();
+    bool hit = thumb.Contains(p);
+    dragging_ = true; drag_start_value_ = value_;
+    drag_offset_ = hit ? (dir_ == UiDirection::H ? p.x - thumb.CenterPoint().x : p.y - thumb.CenterPoint().y) : 0;
     SetCapture();
-    SetValueInternal(PosToValue(pos), false, true);
-    Refresh();
+    auto begin = WhenBeginEdit; begin();
+    if(!self || !dragging_) return;
+    if(!hit) {
+        Rect track = GetTrackRect();
+        SetValueInternal(PosToValue(dir_ == UiDirection::H ? p.x - track.left : p.y - track.top), false, true);
+    }
+    if(self) Refresh();
 }
 
 void UiSlider::LeftUp(Point, dword)
@@ -600,6 +595,12 @@ bool UiSlider::Key(dword key, int)
     if(!IsEnabled() || !IsShowEnabled())
         return false;
 
+    if(key == K_ESCAPE && dragging_) {
+        Ptr<UiSlider> self = this;
+        CancelMode();
+        if(self && HasCapture()) ReleaseCapture();
+        return true;
+    }
     double d = step_ > 0 ? step_ : (max_ - min_) / 50.0;
 
     if(dir_ == UiDirection::H) {
@@ -615,6 +616,24 @@ bool UiSlider::Key(dword key, int)
     if(key == K_END)  { SetValueInternal(max_, true, true); return true; }
 
     return false;
+}
+
+void UiSlider::CancelMode()
+{
+    if(!dragging_) return;
+    dragging_ = false;
+    if(cancel_reverts_) value_ = drag_start_value_;
+    Refresh(); auto notify = WhenCancelEdit; notify();
+}
+void UiSlider::State(int reason)
+{
+    Ptr<UiSlider> self = this;
+    if(dragging_ && (!IsEnabled() || !IsShowEnabled())) {
+        CancelMode();
+        if(!self) return;
+        if(HasCapture()) ReleaseCapture();
+    }
+    Ctrl::State(reason);
 }
 
 }

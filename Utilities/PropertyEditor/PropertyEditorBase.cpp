@@ -135,13 +135,16 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
     if(model_ == model)
         return;
 
-    ClearInlineEditors();
-    DeactivateEditor();
+    if(!dispatching_editor_callback_) {
+        ClearInlineEditors();
+        DeactivateEditor();
+    }
     EndTransaction();
     model_ = model;
     ++model_binding_generation_;
     color_drop_display_row_ = -1;
     structure_refresh_pending_ = false;
+    structure_refresh_posted_ = false;
     property_expanded_.Clear();
     selected_display_row_ = -1;
     hover_display_row_ = -1;
@@ -164,7 +167,7 @@ void PropertyEditor::SetModel(PropertyEditorModel *model)
         };
     }
 
-    RebuildRows();
+    ModelStructureChanged(model_);
 }
 
 void PropertyEditor::SetFactory(PropertyEditorFactory *factory)

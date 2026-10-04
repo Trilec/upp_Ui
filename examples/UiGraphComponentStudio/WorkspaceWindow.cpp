@@ -54,7 +54,7 @@ NodeWorkspace::NodeWorkspace()
     factory_.RegisterPicker("workspace-image", [this](Value& v, Ctrl* owner) { return PickImage(v, owner); });
     factory_.RegisterThumbnailProvider("workspace-image", [](const Value& v) { return v.Is<Image>() ? (Image)v : Image(); });
     BuildShell(); Connect();
-    ready_ = true; ApplyDocument(); RebuildInspector(); Layout();
+    ready_ = true; ApplyDocument(); RebuildInspector(); ApplyShellTheme(); Layout();
 }
 NodeWorkspace::~NodeWorkspace()
 {
@@ -64,15 +64,22 @@ void NodeWorkspace::BuildShell()
 {
     Add(root_.SizePos());
     root_.SetInset(DPI(8)).SetGap(DPI(6)).SetAlignItems(UiCrossAlign::Stretch);
-    root_.Add(header_).Fixed(DPI(48)); root_.Add(body_).Expand(1); root_.Add(status_).Fixed(DPI(22));
+    root_.Add(header_).Fixed(DPI(72)); root_.Add(file_tools_).Fixed(DPI(30)); root_.Add(body_).Expand(1); root_.Add(status_).Fixed(DPI(22));
     header_.SetGap(DPI(5)).SetAlignItems(UiCrossAlign::Center);
-    CompactLabel(heading_, "UiGraph / Node Design Workspace", true); header_.Add(heading_).Fixed(DPI(290));
-    CompactLabel(current_, "Media"); header_.Add(current_).Expand(1);
-    UiButton* actions[] = { &new_, &clone_, &open_, &save_, &save_as_, &undo_button_, &theme_ };
-    const char* titles[] = { "New", "Clone", "Open JSON", "Save", "Save As", "Undo", "Theme" };
-    for(int i = 0; i < 7; i++) { actions[i]->SetText(titles[i]); header_.Add(*actions[i]).Fixed(DPI(i == 2 ? 86 : 65)); }
+    title_.SetTitle("UiGraph Node Design Workspace").SetSubTitle("Author reusable node templates, geometry, style and C++ across detail levels").ShowTitleLine(false);
+    header_.Add(title_).Expand(1);
+    theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).Tip("Light / Dark");
+    help_.SetIcon(ICON_DESIGN_HELP_48()).Tip("Workspace help");
+    exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).Tip("Close workspace");
+    for(UiToolButton* b : { &theme_, &help_, &exit_ }) { b->SetIconSize(DPI(16),DPI(16)); header_.Add(*b).Fixed(DPI(34)); }
+    UiButton* actions[] = { &new_, &clone_, &open_, &save_, &save_as_, &undo_button_ };
+    const char* titles[] = { "New", "Clone", "Open JSON", "Save", "Save As", "Undo" };
+    file_tools_.SetGap(DPI(5));
+    for(int i=0;i<6;i++) { actions[i]->SetText(titles[i]); file_tools_.Add(*actions[i]).Fixed(DPI(i==2?86:65)); }
+    CompactLabel(current_, "Media"); file_tools_.Add(current_).Expand(1);
     body_.SetGap(DPI(8)).SetAlignItems(UiCrossAlign::Stretch);
-    body_.Add(left_).Fixed(DPI(210)); body_.Add(center_split_).Expand(1); body_.Add(rail_).Fixed(DPI(350));
+    preview_surface_.Add(center_split_.SizePos()); rail_surface_.Add(rail_.SizePos());
+    body_.Add(left_).Fixed(DPI(210)); body_.Add(preview_surface_).Expand(1); body_.Add(rail_surface_).Fixed(DPI(350));
     left_.SetGap(DPI(5)).SetInset(DPI(5)).SetAlignItems(UiCrossAlign::Stretch);
     CompactLabel(family_label_, "TEMPLATE FAMILY", true); left_.Add(family_label_).Fixed(DPI(22));
     for(int i = 1; i <= 7; i++) family_.Add(UiGraphNodeTemplateName((UiGraphNodeTemplateKind)i), i);
@@ -148,19 +155,8 @@ void NodeWorkspace::BuildShell()
     Image icons[] = { ICON_DESIGN_TUNE_48(), ICON_DESIGN_WIDGETS_48(), ICON_DESIGN_FORMAT_PAINT_48(), ICON_DESIGN_CODE_BLOCKS_48() };
     const char* modes[] = { "Inspector", "Template / Layout", "Style overrides", "Generated C++" };
     for(int i = 0; i < 4; i++) {
-        mode_[i].SetIcon(icons[i]).SetIconSize(DPI(18), DPI(18)).SetCheckable().Tip(modes[i]);
-        // Checked is the persistent selected-page state, not mouse focus. Give
-        // it a distinct face/frame/icon even under the Minimal toolbar theme.
-        auto selected_style = mode_[i].GetStyle();
-        selected_style.transparent = false;
-        selected_style.palette.face[ST_PRESSED] = UiFill::Solid(Color(223, 238, 250));
-        selected_style.palette.frame[ST_PRESSED] = Color(80, 155, 202);
-        selected_style.palette.icon[ST_PRESSED] = Color(10, 115, 200);
-        selected_style.metrics.frame_enabled = true;
-        selected_style.metrics.frame_width = DPI(1);
-        selected_style.press_offset = Point(0, 0);
-        mode_[i].SetCustomStyle(selected_style);
-        tools_.Add(mode_[i]).Fixed(DPI(36));
+        mode_[i].SetIcon(icons[i]).SetIconSize(DPI(17), DPI(17)).SetCheckable().Tip(modes[i]);
+        tools_.Add(mode_[i]).Fixed(DPI(38));
     }
     remove_.SetText("Remove"); tools_.AddSpacer(1).Expand(1); tools_.Add(remove_).Fixed(DPI(66));
     // UiBoxLayout deliberately shows its participating children during Layout.
@@ -186,10 +182,13 @@ void NodeWorkspace::Connect()
     theme_.WhenAction = [this] {
         FinishProperty(); auto c = UiTheme::GetContext(); c.mode = c.mode == UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
         UiTheme::Set(c);
+        Ctrl::SwapDarkLight();
         for(auto& button : shape_buttons_) CompactChooserButton(button);
         for(auto& button : palette_) CompactChooserButton(button);
-        ApplyDocument(); RebuildInspector(); Refresh();
+        ApplyDocument(); RebuildInspector(); ApplyShellTheme(); Refresh();
     };
+    help_.WhenAction=[this] { PromptOK("Node design workspace&Choose a family and shape. Drag components into Header, Body or Footer; edit selected components in the inspector. Layout and Style pages author reusable overrides. Generated C++ uses production UiGraph APIs. Save/Open persist the workspace document; Undo restores prior authored changes."); };
+    exit_.WhenAction=[this] { Close(); };
     family_.WhenSelect = [this](int i) { if(!building_ && i >= 0) NewFamily(i + 1); };
     for(int i = 0; i < 9; i++) shape_buttons_[i].WhenAction = [this, i] {
         FinishProperty(); document_.revision++; document_.edit_base = i == 8;
@@ -249,8 +248,39 @@ void NodeWorkspace::Connect()
 }
 void NodeWorkspace::Paint(Draw& w)
 {
-    bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
-    w.DrawRect(GetSize(), dark ? Color(24, 31, 40) : Color(238, 242, 246));
+    w.DrawRect(GetSize(), UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color);
+}
+void NodeWorkspace::ApplyShellTheme()
+{
+    const bool dark=UiTheme::GetContext().mode==UiThemeMode::Dark;
+    const Color face=dark?Color(18,18,18):Color(245,245,245);
+    auto panel=UiTheme::ResolvePanel(UiPanelRole::Surface);
+    panel.transparent=false; panel.metrics.radius=DPI(8);
+    panel.metrics.face_enabled=panel.metrics.frame_enabled=true;
+    panel.metrics.frame_width=DPI(1); panel.metrics.shadow.enabled=false;
+    for(int i=0;i<4;i++) { panel.palette.face[i]=UiFill::Solid(face); panel.palette.frame[i]=dark?Color(48,48,48):Color(220,220,220); }
+    rail_surface_.SetCustomStyle(panel); preview_surface_.SetCustomStyle(panel);
+    rail_.SetInset(DPI(6));
+    title_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+    inspector_.SetPaletteMode(dark?PropertyEditorPaletteMode::Dark:PropertyEditorPaletteMode::Light);
+    auto editor=inspector_.GetStyle(); editor.show_frame=false; editor.background=face; inspector_.SetStyle(editor);
+    auto action=UiTheme::ResolveToolButton(UiRole::Standard);
+    action.transparent=true; action.underline=false;
+    action.metrics.face_enabled=action.metrics.frame_enabled=action.metrics.focus_enabled=false;
+    action.metrics.shadow.enabled=false;
+    for(int i=0;i<4;i++) { action.palette.face[i]=UiFill::None(); action.palette.frame[i]=Null; }
+    action.palette.icon[ST_NORMAL]=dark?Color(180,180,180):Color(110,110,110);
+    action.palette.icon[ST_HOT]=dark?White():Color(32,32,32);
+    action.palette.icon[ST_PRESSED]=Color(0,120,212);
+    for(UiToolButton* b : { &theme_, &help_, &exit_, &mode_[0], &mode_[1], &mode_[2], &mode_[3] }) b->SetCustomStyle(action);
+    action.palette.icon[ST_NORMAL]=Color(200,60,60); action.palette.icon[ST_HOT]=Color(240,85,85); action.palette.icon[ST_PRESSED]=Color(180,45,45); exit_.SetCustomStyle(action);
+    theme_.SetIcon(dark?ICON_ACTION_LIGHT_MODE_48():ICON_ACTION_DARK_MODE_48());
+    for(UiLabel* label : { &current_, &status_, &family_label_, &shape_label_, &scope_label_, &palette_label_, &preview_label_, &region_label_, &overlay_label_, &table_label_, &selection_label_, &preview_data_label_ }) {
+        auto old=label->GetStyle(); auto next=UiTheme::ResolveLabel(UiRole::Standard); next.font=old.font; label->SetCustomStyle(next);
+    }
+    auto graph_style=preview_.GetStyle();
+    for(int i=0;i<4;i++) graph_style.canvas_palette.face[i]=UiFill::Solid(face);
+    preview_.SetCustomStyle(graph_style);
 }
 void NodeWorkspace::Layout()
 {

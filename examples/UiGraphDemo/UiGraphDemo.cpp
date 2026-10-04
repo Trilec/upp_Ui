@@ -235,17 +235,7 @@ String GraphDemoPresetClass(const String& value)
 
 String GraphDemoCppString(const String& value)
 {
-    String out = "\"";
-    for(int i = 0; i < value.GetCount(); i++) {
-        int c = value[i];
-        if(c == '\\') out << "\\\\";
-        else if(c == '"') out << "\\\"";
-        else if(c == '\n') out << "\\n";
-        else if(c == '\r') out << "\\r";
-        else if(c == '\t') out << "\\t";
-        else out.Cat(c);
-    }
-    return out << '"';
+    return AsCString(value);
 }
 
 String GraphDemoShapeCode(UiGraphNodeShape shape)
@@ -311,6 +301,7 @@ UiGraphDemo::UiGraphDemo()
     BuildStyleEditorModel();
     ConfigureEditors();
     ConnectEvents();
+    ApplyTheme();
 
     graph_.SetEditable(true)
           .EnableInternalMutation(true)
@@ -367,11 +358,9 @@ void UiGraphDemo::BuildHeader()
     btn_theme.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle Light/Dark theme");
     btn_exit.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
 
-    box_header_actions.Add(btn_reference).Fixed(DPI(88));
-    box_header_actions.Add(btn_scale).Fixed(DPI(88));
-    box_header_actions.Add(btn_fit).Fixed(DPI(54));
-    box_header_actions.Add(btn_one_to_one).Fixed(DPI(54));
+    btn_help.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Graph usage and authoring help");
     box_header_actions.Add(btn_theme).Fixed(DPI(34));
+    box_header_actions.Add(btn_help).Fixed(DPI(34));
     box_header_actions.Add(btn_exit).Fixed(DPI(34));
 }
 
@@ -379,6 +368,8 @@ void UiGraphDemo::BuildPreview()
 {
     Add(pnl_preview);
     pnl_preview.Add(graph_);
+    for(UiButton* button : { &btn_reference, &btn_scale, &btn_fit, &btn_one_to_one })
+        pnl_preview.Add(*button);
     pnl_preview.Add(lbl_status);
     lbl_status.SetAlign(UiAlign::LEFT, UiAlign::CENTER);
 }
@@ -414,6 +405,9 @@ void UiGraphDemo::BuildRightRail()
     btn_copy_code.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy generated C++");
     btn_save_code.SetIcon(ICON_DESIGN_FOLDER_48()).SetIconSize(DPI(16), DPI(16)).Tip("Save generated C++");
     edit_generated_code.SetReadOnly();
+    pnl_code_page.Add(code_recipe_.LeftPos(DPI(6), DPI(220)).TopPos(DPI(6), DPI(30)));
+    code_recipe_.Add("Control usage", 0).Add("Authored topology", 1).Select(0);
+    code_recipe_.Tip("Concise control setup or the authored model snapshot");
 
     btn_diag_enable.SetText("Live profiling").SetCheckable();
     btn_diag_reset.SetText("Reset peaks");
@@ -503,9 +497,9 @@ void UiGraphDemo::BuildNodeEditorModel()
         return minmax(value, lo - span, hi + span);
     };
 
-    pe_model_node.AddNumericDouble("width", "Width", 64.0, 24.0, 2000.0, 1.0, "Layout").SetUnit("world");
-    pe_model_node.AddNumericDouble("height", "Height", 44.0, 24.0, 2000.0, 1.0, "Layout").SetUnit("world");
-    pe_model_node.AddNumericDouble("corner_radius", "Corner radius", 8.0, 0.0, 128.0, 1.0, "Layout").SetUnit("world");
+    pe_model_node.AddNumericDouble("width", "Width", 64.0, 24.0, 1000.0, 1.0, "Layout").SetUnit("world");
+    pe_model_node.AddNumericDouble("height", "Height", 44.0, 24.0, 1000.0, 1.0, "Layout").SetUnit("world");
+    pe_model_node.AddNumericDouble("corner_radius", "Corner radius", 8.0, 0.0, 60.0, 1.0, "Layout").SetUnit("world");
 
     pe_model_node.AddBoolean("enabled", "Enabled", true, "Behaviour");
     pe_model_node.AddBoolean("visible", "Visible", true, "Behaviour");
@@ -652,6 +646,9 @@ void UiGraphDemo::ConnectEvents()
         UpdateStatus();
     };
     btn_theme.WhenAction = [=] { ToggleTheme(); };
+    btn_help.WhenAction = [=] {
+        PromptOK("UiNodeGraph&Select a node or connector to inspect it. The paintbrush edits the selected node style. Drag ports to connect nodes; Ctrl+Z undoes authored edits. Use Reference or 10k scale to switch models, Fit to frame the graph, and 1:1 for authored size. Code exports public UiNodeGraph setup; media and embedded controls remain host-owned. Diagnostics are opt-in.");
+    };
     btn_exit.WhenAction = [=] { Close(); };
 
     btn_inspector_mode.WhenAction = [=] { SelectPage(0); };
@@ -660,6 +657,7 @@ void UiGraphDemo::ConnectEvents()
     btn_diagnostics_mode.WhenAction = [=] { SelectPage(3); };
     btn_copy_code.WhenAction = [=] { EnsureGeneratedCode(); WriteClipboardText((String)edit_generated_code.GetData()); };
     btn_save_code.WhenAction = [=] { SaveGeneratedCode(); };
+    code_recipe_.WhenSelect = [=](int) { generated_code_dirty_ = true; EnsureGeneratedCode(); };
     btn_diag_enable.WhenAction = [=] { SetDiagnosticsEnabled(btn_diag_enable.IsChecked()); };
     btn_diag_reset.WhenAction = [=] { ResetDiagnostics(); };
 
@@ -1169,10 +1167,7 @@ void UiGraphDemo::ToggleTheme()
     Ctrl::SwapDarkLight();
     scale_resolved_style_cache_.Clear();
     graph_.OnStyleChanged();
-    pe_inspector.SetPaletteMode(context.mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark
-                                                                   : PropertyEditorPaletteMode::Light);
-    pe_style.SetPaletteMode(context.mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark
-                                                               : PropertyEditorPaletteMode::Light);
+    ApplyTheme();
     SyncStyleEditor();
     UpdateStatus();
     RefreshDiagnostics();
@@ -1194,6 +1189,86 @@ void UiGraphDemo::UpdateStatus()
                               graph_.GetZoom(), graph_undo_.GetCount(), graph_redo_.GetCount(), selection));
 }
 
+void UiGraphDemo::Paint(Draw& w)
+{
+    w.DrawRect(GetSize(), window_face_);
+}
+
+void UiGraphDemo::ApplyTheme()
+{
+    const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+    window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+    const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+    tc_header.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+    UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+    surface.transparent = false;
+    surface.metrics.face_enabled = surface.metrics.frame_enabled = true;
+    surface.metrics.frame_width = DPI(1);
+    surface.metrics.radius = DPI(8);
+    surface.metrics.shadow.enabled = surface.metrics.focus_enabled = false;
+    for(int state = 0; state < 4; state++) {
+        surface.palette.face[state] = UiFill::Solid(panel_face);
+        surface.palette.frame[state] = dark ? Color(48,48,48) : Color(220,220,220);
+    }
+    for(UiPanel* panel : { &pnl_preview, &pnl_right_rail, &pnl_authoring })
+        panel->SetCustomStyle(surface);
+    surface.transparent = true;
+    surface.metrics.face_enabled = surface.metrics.frame_enabled = false;
+    for(UiPanel* page : { &pnl_inspector_page, &pnl_style_page, &pnl_code_page, &pnl_diagnostics_page })
+        page->SetCustomStyle(surface);
+    for(PropertyEditor* editor : { &pe_inspector, &pe_style }) {
+        editor->SetPaletteMode(dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        PropertyEditorStyle style = editor->GetStyle();
+        style.show_frame = false;
+        style.background = panel_face;
+        style.show_group_summaries = true;
+        editor->SetStyle(style);
+    }
+    for(UiToolButton* button : { &btn_theme, &btn_help, &btn_exit, &btn_inspector_mode,
+                               &btn_style_mode, &btn_code_mode, &btn_diagnostics_mode,
+                               &btn_copy_code, &btn_save_code, &btn_author_undo, &btn_author_redo }) {
+        UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+        style.transparent = true;
+        style.metrics.face_enabled = style.metrics.frame_enabled = style.metrics.focus_enabled = false;
+        style.metrics.shadow.enabled = false;
+        style.underline = false;
+        for(int state = 0; state < 4; state++) {
+            style.palette.face[state] = UiFill::None();
+            style.palette.frame[state] = Null;
+        }
+        Color neutral = dark ? Color(180,180,180) : Color(110,110,110);
+        style.palette.icon[ST_NORMAL] = neutral;
+        style.palette.icon[ST_HOT] = dark ? White() : Color(32,32,32);
+        style.palette.icon[ST_PRESSED] = Color(0,120,212);
+        style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+        button->SetCustomStyle(style);
+    }
+    UiToolButton::Style exit_style = btn_exit.GetStyle();
+    exit_style.palette.icon[ST_NORMAL] = Color(200,60,60);
+    exit_style.palette.icon[ST_HOT] = Color(240,85,85);
+    exit_style.palette.icon[ST_PRESSED] = Color(180,45,45);
+    btn_exit.SetCustomStyle(exit_style);
+    btn_theme.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+    for(UiLabel* label : { &lbl_status, &lbl_author_history, &lbl_author_nodes, &lbl_author_edges,
+                          &lbl_diag_paint, &lbl_diag_geometry, &lbl_diag_edges, &lbl_diag_nodes, &lbl_diag_switch })
+        label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+    Refresh();
+}
+
+String UiGraphDemo::GenerateUsageCode(bool topology, bool authored)
+{
+    if(authored) {
+        ApplyNodeProperty("title", String("Authored \"node\"\\path\nnext line"));
+        ApplyStyleProperty("font_title", 18);
+        ApplyStyleProperty("frame_width", 3);
+        ApplyStyleProperty("shadow_enabled", true);
+    }
+    code_recipe_.Select(topology ? 1 : 0);
+    generated_code_dirty_ = true;
+    EnsureGeneratedCode();
+    return AsString(edit_generated_code.GetData());
+}
+
 void UiGraphDemo::MarkGeneratedCodeDirty()
 {
     if(!scale_mode_)
@@ -1211,6 +1286,38 @@ void UiGraphDemo::UpdateGeneratedCode()
     if(scale_mode_)
         return;
 
+    if((int)code_recipe_.GetSelectedData() == 0) {
+        edit_generated_code.SetData(
+            "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n"
+            "// The control owns its default model; bind a host UiGraphModel with SetModel.\n"
+            "void BuildGraph(UiNodeGraph& graph)\n{\n"
+            "    graph.SetEditable(true).SetAutoFitOnFirstPaint(true);\n"
+            "    UiGraphNode source;\n"
+            "    source.title = \"Source\";\n"
+            "    source.position = Pointf(20, 40);\n"
+            "    UiGraphPort output;\n"
+            "    output.id = \"out\";\n"
+            "    output.direction = UiGraphPortDirection::Output;\n"
+            "    output.side = UiGraphPortSide::Right;\n"
+            "    source.ports.Add(output);\n"
+            "    UiGraphNodeRef from = graph.Model().AddNode(source);\n\n"
+            "    UiGraphNode target;\n"
+            "    target.title = \"Result\";\n"
+            "    target.position = Pointf(320, 40);\n"
+            "    UiGraphPort input;\n"
+            "    input.id = \"in\";\n"
+            "    input.direction = UiGraphPortDirection::Input;\n"
+            "    input.side = UiGraphPortSide::Left;\n"
+            "    target.ports.Add(input);\n"
+            "    UiGraphNodeRef to = graph.Model().AddNode(target);\n\n"
+            "    UiGraphEdge connection;\n"
+            "    connection.source = UiGraphPortRef{from, \"out\"};\n"
+            "    connection.target = UiGraphPortRef{to, \"in\"};\n"
+            "    graph.Model().AddEdge(connection);\n}\n");
+        generated_code_dirty_ = false;
+        return;
+    }
+
     const UiGraphModel& model = graph_.Model();
     Vector<UiGraphNodeRef> node_refs;
     Vector<UiGraphEdgeRef> edge_refs;
@@ -1226,8 +1333,11 @@ void UiGraphDemo::UpdateGeneratedCode()
     }
 
     String out;
-    out << "// UiNodeGraph reference design handoff: " << node_refs.GetCount() << " node(s), "
-        << edge_refs.GetCount() << " connector(s).\n";
+    out << "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n"
+        << "// Populate one UiNodeGraph through its public model API.\n"
+        << "// Images, embedded controls and application callbacks are host-owned.\n"
+        << "void BuildGraph(UiNodeGraph& graph)\n{\n"
+        << "graph.BeginBatchUpdate();\n";
 
     for(UiGraphNodeRef ref : node_refs) {
         const UiGraphNode* node = model.FindNode(ref);
@@ -1246,14 +1356,17 @@ void UiGraphDemo::UpdateGeneratedCode()
         out << variable << ".shape = " << GraphDemoShapeCode(node->shape) << ";\n";
         out << variable << ".role = " << GraphDemoRoleCode(node->role) << ";\n";
         out << variable << ".corner_radius = " << node->corner_radius << ";\n";
-        out << variable << ".z_order = " << node->z_order << ";\n";
-        out << variable << ".enabled = " << (node->enabled ? "true" : "false") << ";\n";
-        out << variable << ".visible = " << (node->visible ? "true" : "false") << ";\n";
-        out << variable << ".selectable = " << (node->selectable ? "true" : "false") << ";\n";
-        out << variable << ".movable = " << (node->movable ? "true" : "false") << ";\n";
-        out << variable << ".collapsed = " << (node->collapsed ? "true" : "false") << ";\n";
-        if(!node->style_class.IsEmpty())
+        if(node->z_order) out << variable << ".z_order = " << node->z_order << ";\n";
+        if(!node->enabled) out << variable << ".enabled = false;\n";
+        if(!node->visible) out << variable << ".visible = false;\n";
+        if(!node->selectable) out << variable << ".selectable = false;\n";
+        if(!node->movable) out << variable << ".movable = false;\n";
+        if(node->collapsed) out << variable << ".collapsed = true;\n";
+        if(node->style_class.StartsWith("custom:"))
             out << variable << ".style_class = " << GraphDemoCppString(node->style_class) << ";\n";
+        else if(!node->style_class.IsEmpty())
+            out << "// Optional host style preset: " << GraphDemoCppString(node->style_class)
+                << ". The stock role theme is inherited here.\n";
         String tag = GraphDemoNodeTag(*node);
         if(!tag.IsEmpty()) {
             out << "ValueMap data_" << suffix << ";\n"
@@ -1297,6 +1410,8 @@ void UiGraphDemo::UpdateGeneratedCode()
                 out << sv << ".port_label_ink[" << si << "] = " << GraphDemoColorCode(style.port_label_ink[si]) << ";\n";
             }
             out << sv << ".metrics.frame_enabled = " << (style.metrics.frame_enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.face_enabled = " << (style.metrics.face_enabled ? "true" : "false") << ";\n";
+            out << sv << ".metrics.radius = " << style.metrics.radius << ";\n";
             out << sv << ".metrics.frame_width = " << style.metrics.frame_width << ";\n";
             out << sv << ".metrics.content_margin = Rect(" << style.metrics.content_margin.left << ", "
                 << style.metrics.content_margin.top << ", " << style.metrics.content_margin.right << ", "
@@ -1309,6 +1424,16 @@ void UiGraphDemo::UpdateGeneratedCode()
             out << sv << ".description_font.Height(" << style.description_font.GetHeight() << ");\n";
             out << sv << ".port_font.FaceName(" << GraphDemoCppString(style.port_font.GetFaceName()) << ");\n";
             out << sv << ".port_font.Height(" << style.port_font.GetHeight() << ");\n";
+            const Font* fonts[] = { &style.title_font, &style.subtitle_font, &style.description_font, &style.port_font };
+            const char* names[] = { "title_font", "subtitle_font", "description_font", "port_font" };
+            for(int f=0;f<4;f++) {
+                const Font& font=*fonts[f];
+                out << sv << "." << names[f] << ".Width(" << font.GetWidth()
+                    << ").Bold(" << (font.IsBold()?"true":"false")
+                    << ").Italic(" << (font.IsItalic()?"true":"false")
+                    << ").Underline(" << (font.IsUnderline()?"true":"false")
+                    << ").Strikeout(" << (font.IsStrikeout()?"true":"false") << ");\n";
+            }
             out << sv << ".metrics.focus_enabled = " << (style.metrics.focus_enabled ? "true" : "false") << ";\n";
             out << sv << ".metrics.focus_margin = " << style.metrics.focus_margin << ";\n";
             out << sv << ".metrics.focus_alpha = " << style.metrics.focus_alpha << ";\n";
@@ -1320,6 +1445,10 @@ void UiGraphDemo::UpdateGeneratedCode()
             out << sv << ".metrics.shadow.alpha = " << style.metrics.shadow.alpha << ";\n";
             out << sv << ".metrics.shadow.color = " << GraphDemoColorCode(style.metrics.shadow.color) << ";\n";
             out << sv << ".metrics.shadow.inset = " << (style.metrics.shadow.inset ? "true" : "false") << ";\n";
+            out << sv << ".metrics.shadow.mode = " << (style.metrics.shadow.mode == SHADOW_HARD ? "SHADOW_HARD" : "SHADOW_CURVE") << ";\n";
+            out << sv << ".metrics.shadow.curve = ShadowCurve{" << Format("%.17g",style.metrics.shadow.curve.x1) << ", "
+                << Format("%.17g",style.metrics.shadow.curve.y1) << ", " << Format("%.17g",style.metrics.shadow.curve.x2)
+                << ", " << Format("%.17g",style.metrics.shadow.curve.y2) << "};\n";
             out << sv << ".metrics.highlight.enabled = " << (style.metrics.highlight.enabled ? "true" : "false") << ";\n";
             out << sv << ".metrics.highlight.thickness = " << style.metrics.highlight.thickness << ";\n";
             out << sv << ".metrics.highlight.alpha = " << style.metrics.highlight.alpha << ";\n";
@@ -1327,6 +1456,11 @@ void UiGraphDemo::UpdateGeneratedCode()
             out << sv << ".port_radius = " << style.port_radius << ";\n";
             out << sv << ".port_hit_radius = " << style.port_hit_radius << ";\n";
             out << sv << ".port_spacing = " << style.port_spacing << ";\n";
+            out << sv << ".header_height = " << style.header_height << ";\n";
+            out << sv << ".title_subtitle_gap = " << style.title_subtitle_gap << ";\n";
+            out << sv << ".subtitle_description_gap = " << style.subtitle_description_gap << ";\n";
+            out << sv << ".show_header_band = " << (style.show_header_band ? "true" : "false") << ";\n";
+            out << sv << ".show_description = " << (style.show_description ? "true" : "false") << ";\n";
             out << sv << ".show_port_labels = " << (style.show_port_labels ? "true" : "false") << ";\n";
             out << sv << ".show_port_type = " << (style.show_port_type ? "true" : "false") << ";\n";
             out << "graph.SetNodeStyleClass(" << GraphDemoCppString(node->style_class) << ", " << sv << ");\n";
@@ -1340,9 +1474,9 @@ void UiGraphDemo::UpdateGeneratedCode()
         String suffix = AsString((int64)edge->ref.id);
         String variable = "edge_" + suffix;
         out << "\n// Connector " << edge->ref.id << "\nUiGraphEdge " << variable << ";\n";
-        out << variable << ".source = UiGraphPortRef{UiGraphNodeRef{" << edge->source.node.id << "}, "
+        out << variable << ".source = UiGraphPortRef{node_ref_" << edge->source.node.id << ", "
             << GraphDemoCppString(edge->source.port_id) << "};\n";
-        out << variable << ".target = UiGraphPortRef{UiGraphNodeRef{" << edge->target.node.id << "}, "
+        out << variable << ".target = UiGraphPortRef{node_ref_" << edge->target.node.id << ", "
             << GraphDemoCppString(edge->target.port_id) << "};\n";
         if(!edge->title.IsEmpty()) out << variable << ".title = " << GraphDemoCppString(edge->title) << ";\n";
         out << variable << ".route = UiGraphRouteStyle::" << GraphDemoRouteName(edge->route) << ";\n";
@@ -1357,7 +1491,18 @@ void UiGraphDemo::UpdateGeneratedCode()
         out << "UiGraphEdgeRef edge_ref_" << suffix << " = graph.Model().AddEdge(" << variable << ");\n";
     }
 
-    edit_generated_code.SetData(out);
+    out << "graph.EndBatchUpdate();\n"
+        << "graph.SetEditable(true).SetAutoFitOnFirstPaint(true);\n}\n";
+    // Keep the exported function readable without changing authored values.
+    String formatted;
+    bool in_body = false;
+    for(const String& line : Split(out, '\n', false)) {
+        if(in_body && line != "}" && !line.IsEmpty())
+            formatted << "    ";
+        formatted << line << "\n";
+        if(line == "{") in_body = true;
+    }
+    edit_generated_code.SetData(formatted);
     generated_code_dirty_ = false;
 }
 
@@ -1396,7 +1541,13 @@ void UiGraphDemo::Layout()
     LayoutAuthoringPanel();
 
     Size pr = pnl_preview.GetSize();
-    graph_.SetRect(DPI(2), DPI(2), max(0, pr.cx - DPI(4)), max(0, pr.cy - DPI(34)));
+    int action_x = DPI(8);
+    for(UiButton* button : { &btn_reference, &btn_scale, &btn_fit, &btn_one_to_one }) {
+        int width = button == &btn_reference || button == &btn_scale ? DPI(88) : DPI(54);
+        button->SetRect(action_x, DPI(6), width, DPI(30));
+        action_x += width + DPI(5);
+    }
+    graph_.SetRect(DPI(6), DPI(42), max(0, pr.cx - DPI(12)), max(0, pr.cy - DPI(76)));
     lbl_status.SetRect(DPI(10), max(0, pr.cy - DPI(30)), max(0, pr.cx - DPI(20)), DPI(24));
 
     Size rr = pnl_right_rail.GetSize();

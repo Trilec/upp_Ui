@@ -39,6 +39,7 @@
 #include <Ui/UiDataModels.h>
 #include <Ui/UiItemRender.h>
 #include <Ui/UiModelView.h>
+#include <Ui/UiScrollBar.h>
 
 namespace Upp {
 
@@ -195,6 +196,8 @@ public:
 
     void ScrollTo(int index);
     void ScrollToSelection();
+    UiList& SetScrollPos(int y);
+    int GetScrollPos() const { return scroll_y_; }
 
     UiVisibleRange GetVisibleRange(int overscan_rows = 0) const;
     int GetLastPaintItemCount() const { return last_paint_item_count_; }
@@ -234,6 +237,7 @@ private:
     void HandleModelChange(const UiModelChange& change);
     void SyncModel();
     void ClampScroll();
+    void UpdateScrollBar();
     Rect GetViewportRect() const;
     int GetTotalHeight() const;
     Rect GetRowRect(int row) const;
@@ -308,6 +312,8 @@ private:
     int hot_drag_ = -1;
     int pressed_drag_ = -1;
     int scroll_y_ = 0;
+    UiScrollBar vscroll_ { UiDirection::V };
+    bool updating_scrollbar_ = false;
 
     bool drag_reorder_enabled_ = false;
     bool internal_mutation_enabled_ = true;

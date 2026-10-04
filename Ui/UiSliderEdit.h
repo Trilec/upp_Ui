@@ -69,6 +69,8 @@ public:
 
     Event<> WhenAction;
     Event<> WhenChanging;
+    Event<> WhenBeginEdit;
+    Event<> WhenCancelEdit;
 
     virtual void Layout() override;
     virtual Size GetMinSize() const override;

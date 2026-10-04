@@ -1,10 +1,11 @@
 #include "UiButtonDemo.h"
+#include <plugin/png/png.h>
 
 namespace Upp {
 
 UiButtonDemo::UiButtonDemo()
 {
-    Title("UiButton Demo");
+    Title("Button family designer");
     Sizeable().Zoomable();
     SetRect(0, 0, DPI(1220), DPI(780));
 
@@ -24,6 +25,8 @@ UiButtonDemo::UiButtonDemo()
     BuildRightRail();
     BuildInspectorModel();
     BuildOverrideModel();
+    BuildSplitModels();
+    BuildToolModels();
     ConfigureEditors();
     ConnectEvents();
     ApplyTheme();
@@ -34,8 +37,8 @@ UiButtonDemo::UiButtonDemo()
 void UiButtonDemo::BuildHeader()
 {
     Add(tc_header);
-    tc_header.SetTitle("UiButton")
-             .SetSubTitle("Live PropertyEditor, canonical theme overrides and copyable C++")
+    tc_header.SetTitle("Buttons")
+             .SetSubTitle("Choose Button, Split button or Tool button; inspect its features and generate reusable C++")
              .SetMedia(ICON_DESIGN_WIDGETS_48())
              .SetMediaSide(UiAlign::LEFT)
              .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
@@ -62,7 +65,13 @@ void UiButtonDemo::BuildHeader()
 void UiButtonDemo::BuildPreview()
 {
     Add(pnl_preview);
-    pnl_preview.Add(btn_preview);
+    pnl_preview.Add(selector);
+    pnl_preview.Add(btn_preview); pnl_preview.Add(split_preview); pnl_preview.Add(tool_preview);
+    selector.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+    select_button.SetText("Button").SetCheckable(); select_split.SetText("Split button").SetCheckable(); select_tool.SetText("Tool button").SetCheckable();
+    selector.Add(select_button).Fixed(DPI(84)); selector.Add(select_split).Fixed(DPI(110)); selector.Add(select_tool).Fixed(DPI(110));
+    select_button.WhenAction=[=]{SelectKind(0);}; select_split.WhenAction=[=]{SelectKind(1);}; select_tool.WhenAction=[=]{SelectKind(2);};
+    split_preview.Hide(); tool_preview.Hide(); select_button.SetChecked();
     pnl_preview.Add(lbl_preview_caption);
     pnl_preview.Add(lbl_status);
 
@@ -132,8 +141,10 @@ void UiButtonDemo::ConnectEvents()
 
     btn_theme.WhenAction = [=] { ToggleTheme(); };
     btn_help.WhenAction = [=] {
-        PromptOK("UiButton Demo&&"
-                 "Inspector authors the real UiButton public API. "
+        PromptOK("Button family designer&&"
+                 "Select Button, Split button or Tool button above the preview. "
+                 "Each choice retains its inspector values and local overrides. "
+                 "Inspector authors that concrete control's public API. "
                  "Theme Overrides activate individual local style fields. "
                  "The Code page is regenerated from exactly the same state.");
     };
@@ -145,10 +156,13 @@ void UiButtonDemo::ConnectEvents()
     pe_inspector.WhenCommit = changed;
     pe_overrides.WhenPreview = changed;
     pe_overrides.WhenCommit = changed;
-    pe_inspector.WhenReset = [=](String id) { ResetProperty(pe_model_inspector, id); };
-    pe_overrides.WhenReset = [=](String id) { ResetProperty(pe_model_override, id); };
+    pe_inspector.WhenReset = [=](String id) { ResetProperty(InspectorModel(), id); };
+    pe_overrides.WhenReset = [=](String id) { ResetProperty(OverrideModel(), id); };
     pe_overrides.WhenOverride = [=](String id, bool active) { SetOverrideActive(id, active); };
 
+    split_preview.WhenAction=[=] { activation_count++; UpdateStatus(); };
+    split_preview.WhenSelect=[=](int,const Value& data) { lbl_status.SetText("Selected menu choice: "+AsString(data)); };
+    tool_preview.WhenAction=[=] { activation_count++; tool_inspector.SetValue("checked",tool_preview.IsChecked(),false); pe_inspector.RefreshValue("checked"); UpdateGeneratedCode(); UpdateStatus(); };
     btn_preview.WhenAction = [=] {
         activation_count++;
         if((bool)InspectorValue("checkable")) {
@@ -162,19 +176,19 @@ void UiButtonDemo::ConnectEvents()
 
 Value UiButtonDemo::InspectorValue(const String& id) const
 {
-    const PropertyEditorItem *item = pe_model_inspector.Find(id);
+    const PropertyEditorItem *item = InspectorModel().Find(id);
     return item ? item->value : Value();
 }
 
 Value UiButtonDemo::OverrideValue(const String& id) const
 {
-    const PropertyEditorItem *item = pe_model_override.Find(id);
+    const PropertyEditorItem *item = OverrideModel().Find(id);
     return item ? item->value : Value();
 }
 
 bool UiButtonDemo::OverrideActive(const String& id) const
 {
-    const PropertyEditorItem *item = pe_model_override.Find(id);
+    const PropertyEditorItem *item = OverrideModel().Find(id);
     return item && item->override_active;
 }
 
@@ -183,7 +197,7 @@ void UiButtonDemo::UpdateStatus()
     lbl_status.SetText(Format("Actions: %d  |  checkable: %s  |  checked: %s",
                               activation_count,
                               (bool)InspectorValue("checkable") ? "yes" : "no",
-                              btn_preview.IsChecked() ? "yes" : "no"));
+                              (selected_kind==2 ? tool_preview.IsChecked() : selected_kind==1 ? split_preview.IsChecked() : btn_preview.IsChecked()) ? "yes" : "no"));
 }
 
 void UiButtonDemo::ResetProperty(PropertyEditorModel& model, const String& id)
@@ -197,11 +211,11 @@ void UiButtonDemo::ResetProperty(PropertyEditorModel& model, const String& id)
 
 void UiButtonDemo::SetOverrideActive(const String& id, bool active)
 {
-    PropertyEditorItem *item = pe_model_override.Find(id);
+    PropertyEditorItem *item = OverrideModel().Find(id);
     if(!item)
         return;
     item->override_active = active;
-    pe_model_override.StructureChanged();
+    OverrideModel().StructureChanged();
     UpdateOverrideSummaries();
     pe_overrides.RefreshModel();
     ApplyProjection();
@@ -245,57 +259,80 @@ void UiButtonDemo::ToggleTheme()
 }
 
 void UiButtonDemo::ApplyTheme()
-{
-    UiTitleCard::Style header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
-    header_style.title_line = false;
-    header_style.card_line = true;
-    header_style.card_line_style = SOLID;
-    header_style.card_line_thickness = DPI(1);
-    header_style.card_line_gap = 0;
-    header_style.card_line_color_enabled = true;
-    header_style.card_line_color = Color(0, 120, 212);
-    header_style.media_tint_mono = true;
-    tc_header.SetCustomStyle(header_style);
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        btn_theme.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        tc_header.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        pnl_preview.SetCustomStyle(surface);
+        pnl_right_rail.SetCustomStyle(surface);
+        for(UiButton* button:{&select_button,&select_split,&select_tool}) {
+            auto style=UiTheme::ResolveButton(UiRole::Standard);
+            style.transparent=true; style.metrics.face_enabled=style.metrics.frame_enabled=false;
+            style.metrics.focus_enabled=false; style.metrics.shadow.enabled=false;
+            style.palette.ink[ST_NORMAL]=dark?Color(180,180,180):Color(110,110,110);
+            style.palette.ink[ST_HOT]=dark?White():Color(32,32,32);
+            style.palette.ink[ST_PRESSED]=Color(0,120,212);
+            button->SetCustomStyle(style);
+        }
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &pnl_inspector_page, &pnl_overrides_page, &pnl_code_page })
+            panel->SetCustomStyle(page_style);
+        for(UiLabel* label : { &lbl_preview_caption, &lbl_status })
+            label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        pe_inspector.SetPaletteMode(mode);
+        pe_overrides.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &pe_inspector, &pe_overrides }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &btn_theme, &btn_help, &btn_exit, &btn_inspector_mode, &btn_overrides_mode, &btn_code_mode, &btn_copy_code }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = btn_exit.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        btn_exit.SetCustomStyle(exit_style);
+        Refresh();
+    }
 
-    pnl_preview.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-    pnl_right_rail.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_inspector_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_overrides_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_code_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
 
-    lbl_preview_caption.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-    lbl_status.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-    btn_exit.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
-
-    ConfigureModeButton(btn_inspector_mode);
-    ConfigureModeButton(btn_overrides_mode);
-    ConfigureModeButton(btn_code_mode);
-
-    PropertyEditorPaletteMode mode =
-        UiTheme::GetContext().mode == UiThemeMode::Dark ?
-            PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
-    pe_inspector.SetPaletteMode(mode);
-    pe_overrides.SetPaletteMode(mode);
-}
-
-void UiButtonDemo::ConfigureModeButton(UiToolButton& button)
-{
-    UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
-    Color accent = Color(0, 120, 212);
-    Color selected_face = UiTheme::GetContext().mode == UiThemeMode::Dark ?
-                          Color(27, 62, 89) : Color(225, 240, 252);
-    Color hot_face = UiTheme::GetContext().mode == UiThemeMode::Dark ?
-                     Color(38, 48, 58) : Color(239, 246, 252);
-
-    style.palette.face[ST_HOT] = UiFill::Solid(hot_face);
-    style.palette.face[ST_PRESSED] = UiFill::Solid(selected_face);
-    style.palette.ink[ST_PRESSED] = accent;
-    style.palette.icon[ST_PRESSED] = accent;
-    style.underline = true;
-    style.underline_width = DPI(2);
-    style.underline_offset = DPI(0);
-    button.SetCustomStyle(style);
-}
 
 void UiButtonDemo::Layout()
 {
@@ -315,11 +352,13 @@ void UiButtonDemo::Layout()
     pnl_right_rail.SetRect(pad + preview_w + gap, top, right_w, body_h);
 
     Rect pr = pnl_preview.GetSize();
-    int width = min((int)InspectorValue("preview_width"), max(0, pr.GetWidth() - DPI(48)));
-    int height = min((int)InspectorValue("preview_height"), max(0, pr.GetHeight() - DPI(150)));
+    selector.SetRect(DPI(12),DPI(10),max(0,pr.GetWidth()-DPI(24)),DPI(34));
+    int width = min((int)InspectorValue(selected_kind==0 ? "preview_width" : "width"), max(0, pr.GetWidth() - DPI(48)));
+    int height = min((int)InspectorValue(selected_kind==0 ? "preview_height" : "height"), max(0, pr.GetHeight() - DPI(150)));
     int available_h = max(0, pr.GetHeight() - DPI(120));
     int center_y = max(DPI(24), (available_h - height) / 2 + DPI(24));
-    btn_preview.SetRect(max(0, (pr.GetWidth() - width) / 2), center_y, width, height);
+    Rect rect(max(0,(pr.GetWidth()-width)/2),center_y,max(0,(pr.GetWidth()-width)/2)+width,center_y+height);
+    btn_preview.SetRect(rect); split_preview.SetRect(rect); tool_preview.SetRect(rect);
     lbl_preview_caption.SetRect(DPI(18), max(0, pr.bottom - DPI(82)),
                                 max(0, pr.GetWidth() - DPI(36)), DPI(26));
     lbl_status.SetRect(DPI(18), max(0, pr.bottom - DPI(52)),
@@ -333,3 +372,89 @@ void UiButtonDemo::Layout()
 }
 
 } // namespace Upp
+
+namespace Upp {
+PropertyEditorModel& UiButtonDemo::InspectorModel() {
+    return selected_kind==1 ? split_inspector : selected_kind==2 ? tool_inspector : pe_model_inspector;
+}
+PropertyEditorModel& UiButtonDemo::OverrideModel() {
+    return selected_kind==1 ? split_overrides : selected_kind==2 ? tool_overrides : pe_model_override;
+}
+const PropertyEditorModel& UiButtonDemo::InspectorModel() const {
+    return selected_kind==1 ? split_inspector : selected_kind==2 ? tool_inspector : pe_model_inspector;
+}
+const PropertyEditorModel& UiButtonDemo::OverrideModel() const {
+    return selected_kind==1 ? split_overrides : selected_kind==2 ? tool_overrides : pe_model_override;
+}
+void UiButtonDemo::SelectKind(int kind) {
+    selected_kind=clamp(kind,0,2);
+    if(selected_kind!=1) split_preview.ClosePopup();
+    btn_preview.Show(selected_kind==0); split_preview.Show(selected_kind==1); tool_preview.Show(selected_kind==2);
+    select_button.SetChecked(selected_kind==0); select_split.SetChecked(selected_kind==1); select_tool.SetChecked(selected_kind==2);
+    pe_inspector.SetModel(&InspectorModel()); pe_overrides.SetModel(&OverrideModel());
+    lbl_preview_caption.SetText(selected_kind==0 ? "UiButton: text, icons, interaction and sizing" : selected_kind==1 ? "UiSplitButton: primary action and related popup choices" : "UiToolButton: compact commands and persistent checked state");
+    ApplyProjection(); UpdateStatus(); RefreshLayout();
+}
+void UiButtonDemo::Paint(Draw& draw) { draw.DrawRect(GetSize(), window_face_); }
+}
+
+namespace Upp {
+void UiButtonDemo::ExportGenerated(const String& directory)
+{
+    RealizeDirectory(directory);
+    const char* names[]={"Button","SplitButton","ToolButton"};
+    for(int kind=0;kind<3;kind++) {
+        SelectKind(kind); UpdateGeneratedCode();
+        SaveFile(AppendFileName(directory,String("UiButtonDemo_")+names[kind]+"_default.cpp"),str_generated_code);
+        InspectorModel().SetValue("text",String("Quoted \"command\"\t\r\nC:\\media"),false);
+        auto& model=OverrideModel();
+        const char* id=kind==0?"radius":"metrics.radius";
+        if(auto* item=model.Find(id)) { item->override_active=true; model.SetValue(id,17,false); }
+        if(kind==2) tool_inspector.SetValue("checked",true,false);
+        ApplyProjection(); UpdateGeneratedCode();
+        SaveFile(AppendFileName(directory,String("UiButtonDemo_")+names[kind]+"_authored.cpp"),str_generated_code);
+    }
+}
+bool UiButtonDemo::TestSelectors(const String& output)
+{
+    String failures;
+    int checks=0;
+    auto check=[&](bool ok,const char* name) { ++checks; if(!ok) failures << name << "\n"; };
+    UiButton* buttons[]={&select_button,&select_split,&select_tool};
+    const char* concrete[]={"UiButton button;","UiSplitButton control;","UiToolButton control;"};
+    const char* text[]={"Primary command","Related commands","Compact command"};
+    for(int kind=0;kind<3;kind++) { SelectKind(kind); InspectorModel().SetValue("text",text[kind],false); }
+    for(int theme=0;theme<2;theme++) {
+        if(theme) ToggleTheme();
+        for(int repeat=0;repeat<10;repeat++) for(int kind=0;kind<3;kind++) {
+            SelectPage(repeat%3); buttons[kind]->SetFocus();
+            check(buttons[kind]->Key(K_SPACE,1),"Native adjacent selector action");
+            ProcessEvents();
+            check(selected_kind==kind,"Selected concrete kind");
+            check(btn_preview.IsShown()==(kind==0) && split_preview.IsShown()==(kind==1) && tool_preview.IsShown()==(kind==2),"Exactly one visible preview");
+            check(AsString(InspectorValue("text"))==text[kind],"Each concrete kind retains its model");
+            check(str_generated_code.Find(concrete[kind])>=0 && str_generated_code.Find("class ButtonExample : public ParentCtrl")>=0,"Generated code owns selected concrete type");
+            if(kind==1) {
+                split_preview.OpenPopup(); ProcessEvents();
+                check(split_preview.IsPopupOpen(),"Split popup opens with owned menu rows");
+                split_preview.Key(K_ESCAPE,1); ProcessEvents();
+                check(!split_preview.IsPopupOpen(),"Split popup closes without losing model");
+            }
+            ImageDraw image(GetSize()); DrawCtrl(image);
+        }
+    }
+    SaveFile(output,Format("%d checks\n",checks)+(failures.IsEmpty()?"PASS\n":failures));
+    return failures.IsEmpty();
+}
+void UiButtonDemo::RenderFamilies(const String& directory)
+{
+    RealizeDirectory(directory);
+    for(int theme=0;theme<2;theme++) {
+        if(theme) ToggleTheme();
+        for(int kind=0;kind<3;kind++) {
+            SelectKind(kind); ProcessEvents(); ImageDraw image(GetSize()); DrawCtrl(image);
+            PNGEncoder().SaveFile(AppendFileName(directory,Format("button-%s-%d.png",theme?"dark":"light",kind)),image);
+        }
+    }
+}
+}

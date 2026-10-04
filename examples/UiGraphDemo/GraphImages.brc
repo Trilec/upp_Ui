@@ -1,0 +1,4 @@
+BINARY(graph_elephant, "images/Elephant.png")
+BINARY(graph_film_noir, "images/FilmNoir.png")
+BINARY(graph_scifi, "images/sifi.png")
+BINARY(graph_castle, "images/Castle.png")

@@ -1,24 +1,22 @@
-/*
-    UiTitleCardDemo
-    ------------
+// UiTitleCard: Design titles, subtitles, copy, media placement, lines, and optional content cells.
+// Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
 
-    Purpose
-    - Active Ui control demo used as a build smoke test and visual styling reference.
-
-    Demo hygiene header
-    - Keep this package compiling in the active demo sweep.
-    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
-    - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
-
-    Changelog
-    - 2026-05: active demo sweep verified; header added during demo cleanup pass.
-*/
-#include "../BuilderDemoSupport.h"
-
+#include <Ui/Ui.h>
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
-using namespace BuilderDemoSupport;
-
 namespace {
+String QuoteCpp(const String& s) {
+    String out="\""; for(int i=0;i<s.GetCount();i++) {
+        int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
+        else if(c=='\n') out<<"\\n"; else if(c=='\r') out<<"\\r"; else if(c=='\t') out<<"\\t"; else out.Cat(c);
+    } return out<<'"';
+}
+String ColorCpp(Color c) { return IsNull(c) ? String("Null") : Format("Color(%d, %d, %d)",c.GetR(),c.GetG(),c.GetB()); }
+Font DemoSans(int px,bool bold=false) { Font f=SansSerifZ(px); return bold ? f.Bold() : f; }
+struct DemoPalette { bool dark=false; Color paper,ink,segment_face,segment_frame; };
+class PreviewPanel : public UiPanel {
+public: Rect GetCanvasRect() const { return Rect(GetSize()).Deflated(DPI(24)); }
+};
 
 struct TitleCardConfig {
     String title = "Release Notes";
@@ -37,14 +35,11 @@ struct TitleCardConfig {
     bool hover = false;
     bool selectable = false;
 };
-
-class UiTitleCardBuilder : public BuilderWindowBase {
+class Demo : public TopWindow {
 public:
-    typedef UiTitleCardBuilder CLASSNAME;
+    Demo() {
+        BuildShell("UiTitleCard","Design titles, subtitles, copy, media placement, lines, and optional content cells.");
 
-    UiTitleCardBuilder()
-        : BuilderWindowBase("UiTitleCardDemo", "U++ UiTitleCard Builder", "Inspect header card media placement, title lines, and title/copy layout from one shell.")
-    {
         Preview().Add(card_);
         Preview().Add(mirror_card_);
 
@@ -62,70 +57,227 @@ public:
 
         card_.SetContentCell(card_cell_);
         mirror_card_.SetContentCell(mirror_cell_);
-
-        AddStateRow(StateBox(), state_theme_row_, state_theme_label_, state_theme_value_, "Theme");
-        AddStateRow(StateBox(), state_title_row_, state_title_label_, state_title_value_, "Title");
-        AddStateRow(StateBox(), state_side_row_, state_side_label_, state_side_value_, "Media Side");
-        AddStateRow(StateBox(), state_title_line_row_, state_title_line_label_, state_title_line_value_, "Title Line");
-
-        AddEditRow(PropsBox(), title_row_box_, title_label_, title_edit_, "Title");
-        AddEditRow(PropsBox(), subtitle_row_box_, subtitle_label_, subtitle_edit_, "Subtitle");
-        AddEditRow(PropsBox(), copy_row_box_, copy_label2_, copy_edit_, "Copy");
-        AddDropdownRow(PropsBox(), side_row_box_, side_label_, side_drop_, "Media Side");
-        AddSliderRow(PropsBox(), share_row_, "Media %", "28%");
-        AddSliderRow(PropsBox(), size_row_, "Media Sz", "28px");
-        AddSliderRow(PropsBox(), radius_row_, "Radius", "8px");
-        AddToggleRow(PropsBox(), title_line_row_, "Title Line");
-        AddDropdownRow(PropsBox(), title_line_length_box_, title_line_length_label_, title_line_length_drop_, "Title Length");
-        AddSliderRow(PropsBox(), title_line_thickness_row_, "Title Thick", "1px");
-        AddToggleRow(PropsBox(), card_line_row_, "Card Line");
-        AddDropdownRow(PropsBox(), card_line_length_box_, card_line_length_label_, card_line_length_drop_, "Card Length");
-        AddSliderRow(PropsBox(), card_line_thickness_row_, "Card Thick", "1px");
-        AddToggleRow(PropsBox(), hover_row_, "Hover");
-        AddToggleRow(PropsBox(), selectable_row_, "Selectable");
-
-        const EnumOption sides[] = { { "Left", (int)UiAlign::LEFT }, { "Right", (int)UiAlign::RIGHT }, { "Top", (int)UiAlign::TOP }, { "Bottom", (int)UiAlign::BOTTOM } };
-        PopulateDropdown(side_drop_, sides, 4);
-        const EnumOption spans[] = { { "None", (int)NONE }, { "Small", (int)SMALL }, { "Medium", (int)MEDIUM }, { "Large", (int)LARGE } };
-        PopulateDropdown(title_line_length_drop_, spans, 4);
-        PopulateDropdown(card_line_length_drop_, spans, 4);
-
-        title_edit_.SetData(cfg_.title);
-        subtitle_edit_.SetData(cfg_.subtitle);
-        copy_edit_.SetData(cfg_.copy);
-        share_row_.Slider().SetRange(20, 60).SetStep(1).SetValue(cfg_.media_share);
-        size_row_.Slider().SetRange(DPI(18), DPI(48)).SetStep(1).SetValue(cfg_.media_size);
-        radius_row_.Slider().SetRange(0, DPI(18)).SetStep(1).SetValue(cfg_.radius);
-        title_line_thickness_row_.Slider().SetRange(1, 6).SetStep(1).SetValue(cfg_.title_line_thickness);
-        card_line_thickness_row_.Slider().SetRange(1, 6).SetStep(1).SetValue(cfg_.card_line_thickness);
-
-        title_edit_.WhenChange = [=] { cfg_.title = title_edit_.GetData().ToString(); RefreshFromConfig(); };
-        subtitle_edit_.WhenChange = [=] { cfg_.subtitle = subtitle_edit_.GetData().ToString(); RefreshFromConfig(); };
-        copy_edit_.WhenChange = [=] { cfg_.copy = copy_edit_.GetData().ToString(); RefreshFromConfig(); };
-        side_drop_.WhenSelect = [=](int) { cfg_.media_side = (UiAlign)(int)side_drop_.GetSelectedData(); RefreshFromConfig(); };
-        share_row_.WhenAction = [=] { cfg_.media_share = (int)share_row_.Slider().GetValue(); RefreshFromConfig(); };
-        size_row_.WhenAction = [=] { cfg_.media_size = (int)size_row_.Slider().GetValue(); RefreshFromConfig(); };
-        radius_row_.WhenAction = [=] { cfg_.radius = (int)radius_row_.Slider().GetValue(); RefreshFromConfig(); };
-        title_line_row_.Toggle().WhenAction = [=] { cfg_.title_line = title_line_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        title_line_length_drop_.WhenSelect = [=](int) { cfg_.title_line_length = (UiSpan)(int)title_line_length_drop_.GetSelectedData(); RefreshFromConfig(); };
-        title_line_thickness_row_.WhenAction = [=] { cfg_.title_line_thickness = (int)title_line_thickness_row_.Slider().GetValue(); RefreshFromConfig(); };
-        card_line_row_.Toggle().WhenAction = [=] { cfg_.card_line = card_line_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        card_line_length_drop_.WhenSelect = [=](int) { cfg_.card_line_length = (UiSpan)(int)card_line_length_drop_.GetSelectedData(); RefreshFromConfig(); };
-        card_line_thickness_row_.WhenAction = [=] { cfg_.card_line_thickness = (int)card_line_thickness_row_.Slider().GetValue(); RefreshFromConfig(); };
-        hover_row_.Toggle().WhenAction = [=] { cfg_.hover = hover_row_.Toggle().IsOn(); RefreshFromConfig(); };
-        selectable_row_.Toggle().WhenAction = [=] { cfg_.selectable = selectable_row_.Toggle().IsOn(); RefreshFromConfig(); };
-
-        FinishInit();
-        RefreshFromConfig();
+        BuildProperties(); ApplyTheme(); ApplyProjection();
     }
 
-protected:
-    virtual void ApplyDemoTheme() override
+    void Paint(Draw& w) override { w.DrawRect(GetSize(), window_face_); }
+    void Layout() override
     {
-        RefreshFromConfig();
+        Rect r=Rect(GetSize()).Deflated(DPI(12));
+        header_.SetRect(r.left,r.top,r.GetWidth(),DPI(68));
+        int y=r.top+DPI(80), h=max(0,r.bottom-y);
+        int rail=min(DPI(440),max(DPI(340),r.GetWidth()/3));
+        int pw=max(0,r.GetWidth()-rail-DPI(12));
+        preview_.SetRect(r.left,y,pw,h);
+        right_.SetRect(r.left+pw+DPI(12),y,rail,h);
+        tools_.SetRect(DPI(4),DPI(4),max(0,rail-DPI(8)),DPI(36));
+        pages_.SetRect(DPI(4),DPI(44),max(0,rail-DPI(8)),max(0,h-DPI(48)));
+        LayoutPreviewContent();
     }
 
-    virtual void LayoutPreviewContent() override
+    String GetGeneratedCode() const { return generated_; }
+    void ConfigureExample() {
+        inspector_model_.SetValue("content.cell",true);
+        for(int i=0;i<override_model_.GetCount();i++) {
+            PropertyEditorItem& item=override_model_[i]; item.override_active=true;
+            if(item.kind==PropertyEditorKind::Color) item.value=Color(70,110,170);
+            else if(item.kind==PropertyEditorKind::Integer) item.value=(int)item.value+1;
+            else if(item.kind==PropertyEditorKind::Boolean) item.value=!(bool)item.value;
+            override_model_.ValueChanged(item.id);
+        }
+        ReadProperties(); ApplyProjection();
+    }
+
+private:
+    void BuildShell(const char *title, const char *purpose)
+    {
+        Title(String(title)+" Demo").Sizeable().Zoomable();
+        SetRect(0,0,DPI(1280),DPI(800));
+        Add(header_); Add(preview_); Add(right_);
+        header_.SetTitle(title).SetSubTitle(purpose).ShowTitleLine(false)
+               .SetContentInset(DPI(8)).SetContentCell(header_actions_);
+        header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        header_actions_.AddSpacer(1).Expand(1);
+        theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16),DPI(16)).Tip("Theme");
+        help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16),DPI(16)).Tip("Help");
+        exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16),DPI(16)).Tip("Close demo");
+        header_actions_.Add(theme_).Fixed(DPI(34));
+        header_actions_.Add(help_).Fixed(DPI(34));
+        header_actions_.Add(exit_).Fixed(DPI(34));
+        theme_.WhenAction=[=] {
+            UiThemeContext ctx=UiTheme::GetContext();
+            ctx.mode=ctx.mode==UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
+            Ctrl::SwapDarkLight(); UiTheme::Set(ctx);
+            theme_.SetIcon(ctx.mode==UiThemeMode::Dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+            ApplyTheme(); ApplyProjection();
+        };
+        help_.WhenAction=[=] { PromptOK(purpose); };
+        exit_.WhenAction=[=] { Close(); };
+        right_.Add(tools_); right_.Add(pages_);
+        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2),0,DPI(2),0)).SetAlignItems(UiCrossAlign::Center);
+        inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Inspector");
+        overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Theme overrides");
+        code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Generated code");
+        tools_.Add(inspector_mode_).Fixed(DPI(38)); tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38)); tools_.AddSpacer(1).Expand(1);
+        pages_.Add(inspector_page_,"inspector"); pages_.Add(overrides_page_,"overrides"); pages_.Add(code_page_,"code");
+        inspector_page_.Add(inspector_.SizePos()); overrides_page_.Add(overrides_.SizePos());
+        code_page_.Add(code_.HSizePos(DPI(6),DPI(6)).VSizePos(DPI(42),DPI(6))); code_.SetReadOnly();
+        code_page_.Add(copy_.RightPos(DPI(8),DPI(32)).TopPos(DPI(6),DPI(30)));
+        copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16),DPI(16)).Tip("Copy C++");
+        copy_.WhenAction=[=] { WriteClipboardText(generated_); };
+        inspector_mode_.WhenAction=[=] { SelectPage(0); };
+        overrides_mode_.WhenAction=[=] { SelectPage(1); };
+        code_mode_.WhenAction=[=] { SelectPage(2); };
+        inspector_.SetFactory(&factory_); overrides_.SetFactory(&factory_);
+        inspector_.SetModel(&inspector_model_); overrides_.SetModel(&override_model_);
+        inspector_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenOverride=[=](String id,bool active) {
+            override_model_.Find(id)->override_active=active; override_model_.ValueChanged(id); ReadProperties(); ApplyProjection();
+        };
+        inspector_.WhenReset=[=](String id) { inspector_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        overrides_.WhenReset=[=](String id) { override_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        SelectPage(0);
+    }
+    void SelectPage(int p) {
+        pages_.SetActivePage(p); inspector_mode_.SetChecked(p==0); overrides_mode_.SetChecked(p==1); code_mode_.SetChecked(p==2);
+    }
+    PreviewPanel& Preview() { return preview_; }
+    const DemoPalette& Palette() const { return palette_; }
+    void SetUsageCode(const String& code) { generated_=code; code_.SetData(code); }
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
+    UiTitleCard header_;
+    UiBoxLayout header_actions_{UiDirection::H};
+    UiToolButton theme_,help_,exit_;
+    PreviewPanel preview_;
+    UiPanel right_;
+    UiBoxLayout tools_{UiDirection::H};
+    UiToolButton inspector_mode_,overrides_mode_,code_mode_,copy_;
+    UiStack pages_;
+    UiPanel inspector_page_,overrides_page_,code_page_;
+    PropertyEditor inspector_,overrides_;
+    UiMultiEdit code_;
+    String generated_;
+    DemoPalette palette_;
+    Color window_face_=SColorFace();
+    void ApplyTheme()
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        palette_.dark = dark;
+        palette_.ink = dark ? Color(220,220,220) : Color(30,30,30);
+        palette_.segment_face = panel_face;
+        palette_.segment_frame = dark ? Color(48,48,48) : Color(220,220,220);
+        palette_.paper = window_face_;
+        ApplyDemoTheme();
+        Refresh();
+    }
+    void BuildProperties() {
+        inspector_model_.AddBoolean("content.cell","Content cell",false,"Content");
+        inspector_model_.AddText("title","Title",cfg_.title,"Control").SetDefault(cfg_.title);
+        inspector_model_.AddText("subtitle","Subtitle",cfg_.subtitle,"Control").SetDefault(cfg_.subtitle);
+        inspector_model_.AddText("copy","Copy",cfg_.copy,"Control").SetDefault(cfg_.copy);
+        inspector_model_.AddChoice("media_side","Media side",(int)cfg_.media_side,"Control").AddChoice((int)UiAlign::LEFT,"Left").AddChoice((int)UiAlign::CENTER,"Center").AddChoice((int)UiAlign::RIGHT,"Right").AddChoice((int)UiAlign::TOP,"Top").AddChoice((int)UiAlign::BOTTOM,"Bottom").SetDefault((int)cfg_.media_side);
+        inspector_model_.AddInteger("media_share","Media share",cfg_.media_share,"Control").SetRange(0,100,1).SetDefault(cfg_.media_share);
+        inspector_model_.AddInteger("media_size","Media size",cfg_.media_size,"Control").SetRange(0,300,1).SetDefault(cfg_.media_size);
+        override_model_.AddInteger("radius","Radius",cfg_.radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.radius);
+        override_model_.Find("radius")->overrideable=true;
+        override_model_.AddBoolean("title_line","Title line",cfg_.title_line,"Appearance").SetDefault(cfg_.title_line);
+        override_model_.Find("title_line")->overrideable=true;
+        override_model_.AddChoice("title_line_length","Title line length",(int)cfg_.title_line_length,"Appearance").AddChoice((int)NONE,"None").AddChoice((int)SMALL,"Small").AddChoice((int)MEDIUM,"Medium").AddChoice((int)LARGE,"Large").SetDefault((int)cfg_.title_line_length);
+        override_model_.Find("title_line_length")->overrideable=true;
+        override_model_.AddInteger("title_line_thickness","Title line thickness",cfg_.title_line_thickness,"Appearance").SetRange(0,12,1).SetDefault(cfg_.title_line_thickness);
+        override_model_.Find("title_line_thickness")->overrideable=true;
+        override_model_.AddBoolean("card_line","Card line",cfg_.card_line,"Appearance").SetDefault(cfg_.card_line);
+        override_model_.Find("card_line")->overrideable=true;
+        override_model_.AddChoice("card_line_length","Card line length",(int)cfg_.card_line_length,"Appearance").AddChoice((int)NONE,"None").AddChoice((int)SMALL,"Small").AddChoice((int)MEDIUM,"Medium").AddChoice((int)LARGE,"Large").SetDefault((int)cfg_.card_line_length);
+        override_model_.Find("card_line_length")->overrideable=true;
+        override_model_.AddInteger("card_line_thickness","Card line thickness",cfg_.card_line_thickness,"Appearance").SetRange(0,12,1).SetDefault(cfg_.card_line_thickness);
+        override_model_.Find("card_line_thickness")->overrideable=true;
+        inspector_model_.AddBoolean("hover","Hover",cfg_.hover,"Control").SetDefault(cfg_.hover);
+        inspector_model_.AddBoolean("selectable","Selectable",cfg_.selectable,"Control").SetDefault(cfg_.selectable);
+    }
+    void ReadProperties() {
+        TitleCardConfig defaults;
+        cfg_.title = AsString(inspector_model_.Find("title")->value);
+        cfg_.subtitle = AsString(inspector_model_.Find("subtitle")->value);
+        cfg_.copy = AsString(inspector_model_.Find("copy")->value);
+        cfg_.media_side = (UiAlign)(int)inspector_model_.Find("media_side")->value;
+        cfg_.media_share = int(inspector_model_.Find("media_share")->value);
+        cfg_.media_size = int(inspector_model_.Find("media_size")->value);
+        cfg_.radius = override_model_.Find("radius")->override_active ? int(override_model_.Find("radius")->value) : defaults.radius;
+        cfg_.title_line = override_model_.Find("title_line")->override_active ? bool(override_model_.Find("title_line")->value) : defaults.title_line;
+        cfg_.title_line_length = override_model_.Find("title_line_length")->override_active ? (UiSpan)(int)override_model_.Find("title_line_length")->value : defaults.title_line_length;
+        cfg_.title_line_thickness = override_model_.Find("title_line_thickness")->override_active ? int(override_model_.Find("title_line_thickness")->value) : defaults.title_line_thickness;
+        cfg_.card_line = override_model_.Find("card_line")->override_active ? bool(override_model_.Find("card_line")->value) : defaults.card_line;
+        cfg_.card_line_length = override_model_.Find("card_line_length")->override_active ? (UiSpan)(int)override_model_.Find("card_line_length")->value : defaults.card_line_length;
+        cfg_.card_line_thickness = override_model_.Find("card_line_thickness")->override_active ? int(override_model_.Find("card_line_thickness")->value) : defaults.card_line_thickness;
+        cfg_.hover = bool(inspector_model_.Find("hover")->value);
+        cfg_.selectable = bool(inspector_model_.Find("selectable")->value);
+    }
+
+    void ApplyDemoTheme()
+    {
+        ApplyProjection();
+    }
+    void LayoutPreviewContent()
     {
         Rect canvas = Preview().GetCanvasRect();
         int w = min(DPI(480), canvas.GetWidth() - DPI(30));
@@ -135,18 +287,6 @@ protected:
         card_.SetRect(x, y, w, h);
         mirror_card_.SetRect(x, y + h + DPI(16), w, h);
     }
-
-private:
-    struct EnumOption { const char* label; int value; };
-
-    void PopulateDropdown(UiDropdown& drop, const EnumOption* opts, int count)
-    {
-        drop.UseInternalModel();
-        drop.Clear();
-        for(int i = 0; i < count; i++)
-            drop.Add(opts[i].label, opts[i].value);
-    }
-
     String SideLabel() const
     {
         if(cfg_.media_side == UiAlign::RIGHT) return "Right";
@@ -154,7 +294,6 @@ private:
         if(cfg_.media_side == UiAlign::BOTTOM) return "Bottom";
         return "Left";
     }
-
     String SpanLabel(UiSpan span) const
     {
         switch(span) {
@@ -165,7 +304,6 @@ private:
         default: return "Large";
         }
     }
-
     String SpanCode(UiSpan span) const
     {
         switch(span) {
@@ -176,25 +314,18 @@ private:
         default: return "LARGE";
         }
     }
-
-    void RefreshFromConfig()
+    void ApplyProjection()
     {
+        if((bool)inspector_model_.Find("content.cell")->value) { card_.SetContentCell(card_cell_); mirror_card_.SetContentCell(mirror_cell_); }
+        else { card_.ClearContentCell(); mirror_card_.ClearContentCell(); }
         UiTitleCard::Style style = UiTheme::ResolveTitleCard();
-        style.metrics.radius = cfg_.radius;
-        style.metrics.frame_enabled = true;
-        style.metrics.face_enabled = true;
-        style.metrics.frame_width = DPI(1);
-        for(int i = 0; i < 4; i++) {
-            style.palette.face[i] = UiFill::Solid(Palette().segment_face);
-            style.palette.frame[i] = Palette().segment_frame;
-            style.palette.ink[i] = Palette().ink;
-        }
-        style.title_line = cfg_.title_line;
-        style.title_line_length = cfg_.title_line_length;
-        style.title_line_thickness = cfg_.title_line_thickness;
-        style.card_line = cfg_.card_line;
-        style.card_line_length = cfg_.card_line_length;
-        style.card_line_thickness = cfg_.card_line_thickness;
+        { if(override_model_.Find("radius")->override_active) style.metrics.radius = cfg_.radius; }
+        { if(override_model_.Find("title_line")->override_active) style.title_line = cfg_.title_line; }
+        { if(override_model_.Find("title_line_length")->override_active) style.title_line_length = cfg_.title_line_length; }
+        { if(override_model_.Find("title_line_thickness")->override_active) style.title_line_thickness = cfg_.title_line_thickness; }
+        { if(override_model_.Find("card_line")->override_active) style.card_line = cfg_.card_line; }
+        { if(override_model_.Find("card_line_length")->override_active) style.card_line_length = cfg_.card_line_length; }
+        { if(override_model_.Find("card_line_thickness")->override_active) style.card_line_thickness = cfg_.card_line_thickness; }
         style.hover_enabled = cfg_.hover;
 
         card_.SetCustomStyle(style)
@@ -225,87 +356,39 @@ private:
         mirror_card_.SetCardLineSide(UiAlign::LEFT);
         mirror_card_.SetContentCellGap(DPI(8));
 
-        side_drop_.SelectByData((int)cfg_.media_side);
-        share_row_.Slider().SetValue(cfg_.media_share);
-        size_row_.Slider().SetValue(cfg_.media_size);
-        radius_row_.Slider().SetValue(cfg_.radius);
-        title_line_row_.Toggle().SetOn(cfg_.title_line);
-        title_line_length_drop_.SelectByData((int)cfg_.title_line_length);
-        title_line_thickness_row_.Slider().SetValue(cfg_.title_line_thickness);
-        card_line_row_.Toggle().SetOn(cfg_.card_line);
-        card_line_length_drop_.SelectByData((int)cfg_.card_line_length);
-        card_line_thickness_row_.Slider().SetValue(cfg_.card_line_thickness);
-        hover_row_.Toggle().SetOn(cfg_.hover);
-        selectable_row_.Toggle().SetOn(cfg_.selectable);
-        share_row_.SetValueText(AsString(cfg_.media_share) + "%");
-        size_row_.SetValueText(AsString(cfg_.media_size) + "px");
-        radius_row_.SetValueText(AsString(cfg_.radius) + "px");
-        title_line_thickness_row_.SetValueText(AsString(cfg_.title_line_thickness) + "px");
-        card_line_thickness_row_.SetValueText(AsString(cfg_.card_line_thickness) + "px");
 
-        state_theme_value_.SetText(Palette().dark ? "Dark" : "Light");
-        state_title_value_.SetText(cfg_.title);
-        state_side_value_.SetText(SideLabel());
-        state_title_line_value_.SetText(cfg_.title_line ? SpanLabel(cfg_.title_line_length) : "Hidden");
 
         SetUsageCode(BuildUsageCode());
         Preview().Refresh();
     }
-
-    String BuildUsageCode() const
-    {
+    String BuildUsageCode() const {
         String code;
-        code << "UiBoxLayout card_cell(UiDirection::H);\n";
-        code << "card_cell.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);\n";
-        code << "card_cell.Add(card_primary).Fit();\n";
-        code << "card_cell.Add(card_secondary).Fit();\n";
         code << "UiTitleCard card;\n";
-        code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n";
-        code << "style.metrics.radius = " << cfg_.radius << ";\n";
-        code << "style.title_line = " << (cfg_.title_line ? "true" : "false") << ";\n";
-        code << "style.title_line_length = " << SpanCode(cfg_.title_line_length) << ";\n";
-        code << "style.title_line_thickness = " << cfg_.title_line_thickness << ";\n";
-        code << "style.card_line = " << (cfg_.card_line ? "true" : "false") << ";\n";
-        code << "style.card_line_length = " << SpanCode(cfg_.card_line_length) << ";\n";
-        code << "style.card_line_thickness = " << cfg_.card_line_thickness << ";\n";
-        code << "card.SetCustomStyle(style)\n";
-        code << "    .SetTitle(" << QuoteCpp(cfg_.title) << ")\n";
-        code << "    .SetSubTitle(" << QuoteCpp(cfg_.subtitle) << ")\n";
-        code << "    .SetCopyText(" << QuoteCpp(cfg_.copy) << ")\n";
-        code << "    .SetMedia(ICON_EDITOR_NOTES_48(), Size(" << cfg_.media_size << ", " << cfg_.media_size << "))\n";
-        code << "    .SetMediaSide(UiAlign::" << (cfg_.media_side == UiAlign::RIGHT ? "RIGHT" : cfg_.media_side == UiAlign::TOP ? "TOP" : cfg_.media_side == UiAlign::BOTTOM ? "BOTTOM" : "LEFT") << ")\n";
-        code << "    .SetMediaSharePercent(" << cfg_.media_share << ")\n";
-        code << "    .SetContentCell(card_cell);\n";
+        bool authored=false;
+        if(override_model_.Find("radius")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.metrics.radius = " << AsString((int)cfg_.radius) << ";\n"; }
+        if(override_model_.Find("title_line")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.title_line = " << String(cfg_.title_line ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("title_line_length")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.title_line_length = " << String("(UiSpan)") << AsString((int)cfg_.title_line_length) << ";\n"; }
+        if(override_model_.Find("title_line_thickness")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.title_line_thickness = " << AsString((int)cfg_.title_line_thickness) << ";\n"; }
+        if(override_model_.Find("card_line")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line = " << String(cfg_.card_line ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("card_line_length")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line_length = " << String("(UiSpan)") << AsString((int)cfg_.card_line_length) << ";\n"; }
+        if(override_model_.Find("card_line_thickness")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line_thickness = " << AsString((int)cfg_.card_line_thickness) << ";\n"; }
+        if(authored) code << "card.SetCustomStyle(style);\n";        code << "card.SetTitle(" << QuoteCpp(cfg_.title) << ").SetSubTitle(" << QuoteCpp(cfg_.subtitle) << ").SetCopyText(" << QuoteCpp(cfg_.copy) << ");\n";
+        code << "card.SetMedia(ICON_EDITOR_NOTES_48(),Size(" << AsString((int)cfg_.media_size) << "," << AsString((int)cfg_.media_size) << ")).SetMediaSide((UiAlign)" << AsString((int)cfg_.media_side) << ").SetMediaSharePercent(" << AsString((int)cfg_.media_share) << ");\n";
+        code << "card.EnableHover(" << String(cfg_.hover ? "true" : "false") << ").SetSelectable(" << String(cfg_.selectable ? "true" : "false") << ");\n";
+        code << "card.SetTextAlign(UiAlign::LEFT,UiAlign::CENTER).SetCardLineSide(UiAlign::RIGHT).SetContentCellGap(DPI(8));\n";
+        if((bool)inspector_model_.Find("content.cell")->value) code << "UiButton primary,secondary;\nprimary.SetText(\"Primary\"); secondary.SetText(\"Secondary\");\nUiBoxLayout content(UiDirection::H);\ncontent.SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);\ncontent.Add(primary).Fit(); content.Add(secondary).Fit();\ncard.SetContentCell(content);\n";
+
         return code;
     }
-
     TitleCardConfig cfg_;
-    UiTitleCard card_;
-    UiTitleCard mirror_card_;
-    UiBoxLayout card_cell_ { UiBoxLayout::Direction::H };
-    UiBoxLayout mirror_cell_ { UiBoxLayout::Direction::H };
-    UiButton card_cell_primary_;
-    UiButton card_cell_secondary_;
-    UiButton mirror_cell_primary_;
-    UiButton mirror_cell_secondary_;
-
-    UiBoxLayout state_theme_row_ { UiBoxLayout::Direction::H }, state_title_row_ { UiBoxLayout::Direction::H }, state_side_row_ { UiBoxLayout::Direction::H }, state_title_line_row_ { UiBoxLayout::Direction::H };
-    UiLabel state_theme_label_, state_theme_value_, state_title_label_, state_title_value_, state_side_label_, state_side_value_, state_title_line_label_, state_title_line_value_;
-
-    UiBoxLayout title_row_box_ { UiBoxLayout::Direction::H }, subtitle_row_box_ { UiBoxLayout::Direction::H }, copy_row_box_ { UiBoxLayout::Direction::H }, side_row_box_ { UiBoxLayout::Direction::H };
-    UiBoxLayout title_line_length_box_ { UiBoxLayout::Direction::H }, card_line_length_box_ { UiBoxLayout::Direction::H };
-    UiLabel title_label_, subtitle_label_, copy_label2_, side_label_, title_line_length_label_, card_line_length_label_;
-    UiLineEdit title_edit_, subtitle_edit_, copy_edit_;
-    UiDropdown side_drop_, title_line_length_drop_, card_line_length_drop_;
-    DemoSliderRow share_row_, size_row_, radius_row_, title_line_thickness_row_, card_line_thickness_row_;
-    DemoToggleRow title_line_row_, card_line_row_, hover_row_, selectable_row_;
+    UiTitleCard card_,mirror_card_;
+    UiBoxLayout card_cell_{UiDirection::H},mirror_cell_{UiDirection::H};
+    UiButton card_cell_primary_,card_cell_secondary_,mirror_cell_primary_,mirror_cell_secondary_;
 };
-
 }
-
-GUI_APP_MAIN
-{
-    UiTitleCardBuilder demo;
+GUI_APP_MAIN {
+    Demo demo;
+    const Vector<String>& args=CommandLine();
+    if(args.GetCount()>=2 && args[0]=="--emit-code") { if(args.GetCount()>2) demo.ConfigureExample(); SaveFile(args[1],demo.GetGeneratedCode()); return; }
     demo.Run();
 }
-

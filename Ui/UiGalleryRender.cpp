@@ -60,10 +60,14 @@ void UiGallery::PrepareItemRenders()
 
     UiVisibleRange range = GetVisibleRange(true);
     prepared_render_range_ = range;
-    if(!model_ || range.IsEmpty())
+    int needed = model_ ? range.GetCount() : 0;
+    // A past large viewport must not retain renderers (and image handles) after
+    // resizing, zooming in, or clearing the model.
+    if(item_render_pool_.GetCount() > needed)
+        item_render_pool_.SetCount(needed);
+    if(needed == 0)
         return;
 
-    int needed = range.GetCount();
     while(item_render_pool_.GetCount() < needed) {
         ItemRenderSlot& slot = item_render_pool_.Add();
         slot.render = item_render_->Clone();
@@ -71,7 +75,9 @@ void UiGallery::PrepareItemRenders()
 
     for(int slot_index = 0; slot_index < needed; slot_index++) {
         int index = range.first + slot_index;
-        ItemRenderSlot& slot = item_render_pool_[slot_index];
+        // Stable cyclic assignment preserves overlapping item data when the
+        // viewport advances a row, rather than rebinding every visible slot.
+        ItemRenderSlot& slot = item_render_pool_[index % needed];
         if(slot.index != index) {
             slot.render->SetData(UiMakeItemRenderData(model_->Get(index)));
             slot.index = index;
@@ -80,15 +86,13 @@ void UiGallery::PrepareItemRenders()
             last_render_layout_count_++;
     }
 
-    for(int i = needed; i < item_render_pool_.GetCount(); i++)
-        item_render_pool_[i].index = -1;
 }
 
 UiItemRender* UiGallery::FindPreparedItemRender(int index)
 {
     if(prepared_render_range_.IsEmpty() || !prepared_render_range_.Contains(index))
         return nullptr;
-    int slot_index = index - prepared_render_range_.first;
+    int slot_index = index % prepared_render_range_.GetCount();
     if(slot_index < 0 || slot_index >= item_render_pool_.GetCount())
         return nullptr;
     ItemRenderSlot& slot = item_render_pool_[slot_index];

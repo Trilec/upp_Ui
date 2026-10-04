@@ -78,6 +78,8 @@ String IconModeCode(const String& value)
 
 void UiButtonDemo::UpdateGeneratedCode()
 {
+    if(selected_kind==1) { GenerateSplitCode(); return; }
+    if(selected_kind==2) { GenerateToolCode(); return; }
     String out;
     out << "#include <Ui/Ui.h>\n\n"
         << "using namespace Upp;\n\n"
@@ -234,6 +236,14 @@ void UiButtonDemo::UpdateGeneratedCode()
         << ", DPI(" << (int)InspectorValue("underline_width")
         << "), DPI(" << (int)InspectorValue("underline_offset") << "));\n";
 
+    out << "button.WhenAction = [=] { bool checked = button.IsChecked(); /* host handles action */ };\n";
+
+    const String preamble = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
+    String body = out.Mid(preamble.GetCount());
+    out = preamble + "class ButtonExample : public ParentCtrl {\npublic:\n    UiButton button;\n    ButtonExample()\n    {\n        Add(button.SizePos());\n";
+    for(const String& line : Split(body, '\n', false))
+        if(line != "UiButton button;") out << "        " << line << "\n";
+    out << "    }\n};\n";
     str_generated_code = out;
     edit_generated_code.SetData(str_generated_code);
 }

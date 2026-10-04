@@ -51,8 +51,11 @@ public:
 
     UiLabelDemo();
     void Layout() override;
+    void Paint(Draw& draw) override;
+    void ExportGenerated(const String& directory);
 
 private:
+    Color window_face_ = SColorFace();
     void BuildHeader();
     void BuildPreview();
     void BuildRightRail();
@@ -62,7 +65,6 @@ private:
     void ConnectEvents();
     void ApplyProjection();
     void ApplyTheme();
-    void ConfigureModeButton(UiToolButton& button);
     void UpdateOverrideSummaries();
     void UpdateGeneratedCode();
     void SelectPage(int page);
@@ -76,6 +78,9 @@ private:
     Value OverrideValue(const String& id) const;
     bool OverrideActive(const String& id) const;
 
+    PropertyEditorFactory pe_factory;
+    PropertyEditorModel pe_model_inspector;
+    UiLabelOverrideModel pe_model_override;
     UiTitleCard tc_header;
     UiBoxLayout box_header_actions { UiDirection::H };
     UiToolButton btn_theme, btn_help, btn_exit;
@@ -92,9 +97,6 @@ private:
     UiMultiEdit edit_generated_code;
     UiToolButton btn_copy_code;
 
-    PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_inspector;
-    UiLabelOverrideModel pe_model_override;
     String str_generated_code;
 };
 

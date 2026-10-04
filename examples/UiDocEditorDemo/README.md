@@ -1,0 +1,1 @@
+Specialized rich document authoring application. Retains ribbon commands, file open/save, rich formatting, tables, images, annotations and review workflows. UiDocDemo is the focused canonical control builder.

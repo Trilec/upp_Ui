@@ -1,44 +1,23 @@
-/*
-    UiAccordionDemo -- canonical Header/*, Body/* and Section ownership reference.
-*/
-#include <CtrlLib/CtrlLib.h>
+// UiAccordion: Edit header, body, section, animation, and reorder behaviour.
+// Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
+
 #include <Ui/Ui.h>
-#include "../BuilderDemoSupport.h"
-
+#include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
-using namespace BuilderDemoSupport;
-
 namespace {
+String QuoteCpp(const String& s) {
+    String out="\""; for(int i=0;i<s.GetCount();i++) {
+        int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
+        else if(c=='\n') out<<"\\n"; else if(c=='\r') out<<"\\r"; else if(c=='\t') out<<"\\t"; else out.Cat(c);
+    } return out<<'"';
+}
+String ColorCpp(Color c) { return IsNull(c) ? String("Null") : Format("Color(%d, %d, %d)",c.GetR(),c.GetG(),c.GetB()); }
+Font DemoSans(int px,bool bold=false) { Font f=SansSerifZ(px); return bold ? f.Bold() : f; }
+struct DemoPalette { bool dark=false; Color paper,ink,segment_face,segment_frame; };
+class PreviewPanel : public UiPanel {
+public: Rect GetCanvasRect() const { return Rect(GetSize()).Deflated(DPI(24)); }
+};
 
-class UiAccordionDemoWindow : public BuilderWindowBase {
-public:
-    typedef UiAccordionDemoWindow CLASSNAME;
-
-    UiAccordionDemoWindow()
-        : BuilderWindowBase("UiAccordion Demo", "UiAccordion",
-                            "Outer chrome with distinct Header/*, Body/* and Section style domains")
-    {
-        Preview().Add(accordion_);
-        BuildPreviewSections();
-        BuildSections();
-        BuildRows();
-        Connect();
-        FinishInit();
-    }
-
-protected:
-    void LayoutPreviewContent() override
-    {
-        Rect rc = Preview().GetCanvasRect().Deflated(DPI(24), DPI(20));
-        accordion_.SetRect(rc);
-    }
-
-    void ApplyDemoTheme() override
-    {
-        ApplyConfig();
-    }
-
-private:
     struct Config {
         bool face_enabled = false;
         Color face = White();
@@ -101,43 +80,346 @@ private:
         bool animation = true;
         int anim_open_ms = 120;
         int anim_close_ms = 0;
-    } cfg_;
+    };
+class Demo : public TopWindow {
+public:
+    Demo() {
+        BuildShell("UiAccordion","Edit header, body, section, animation, and reorder behaviour.");
+        Preview().Add(accordion_); BuildPreviewSections();
+        BuildProperties(); ApplyTheme(); ApplyProjection();
+    }
 
-    UiAccordion accordion_;
-    UiLabel body_a_, body_b_, body_c_;
+    void Paint(Draw& w) override { w.DrawRect(GetSize(), window_face_); }
+    void Layout() override
+    {
+        Rect r=Rect(GetSize()).Deflated(DPI(12));
+        header_.SetRect(r.left,r.top,r.GetWidth(),DPI(68));
+        int y=r.top+DPI(80), h=max(0,r.bottom-y);
+        int rail=min(DPI(440),max(DPI(340),r.GetWidth()/3));
+        int pw=max(0,r.GetWidth()-rail-DPI(12));
+        preview_.SetRect(r.left,y,pw,h);
+        right_.SetRect(r.left+pw+DPI(12),y,rail,h);
+        tools_.SetRect(DPI(4),DPI(4),max(0,rail-DPI(8)),DPI(36));
+        pages_.SetRect(DPI(4),DPI(44),max(0,rail-DPI(8)),max(0,h-DPI(48)));
+        LayoutPreviewContent();
+    }
 
-    UiBoxLayout face_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout frame_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout ink_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout margin_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout shadow_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout highlight_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout layout_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout section_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout header_face_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout header_frame_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout header_ink_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout header_type_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout header_margin_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout chevron_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout drag_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout body_face_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout body_frame_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout body_margin_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout body_line_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout behaviour_box_ { UiBoxLayout::Direction::V };
-    UiBoxLayout animation_box_ { UiBoxLayout::Direction::V };
+    String GetGeneratedCode() const { return generated_; }
+    void ConfigureExample() {
+        for(int i=0;i<override_model_.GetCount();i++) {
+            PropertyEditorItem& item=override_model_[i]; item.override_active=true;
+            if(item.kind==PropertyEditorKind::Color) item.value=Color(70,110,170);
+            else if(item.kind==PropertyEditorKind::Integer) item.value=(int)item.value+1;
+            else if(item.kind==PropertyEditorKind::Boolean) item.value=!(bool)item.value;
+            override_model_.ValueChanged(item.id);
+        }
+        ReadProperties(); ApplyProjection();
+    }
 
-    DemoToggleRow face_enabled_row_, frame_enabled_row_, shadow_row_, highlight_row_, unified_row_;
-    DemoToggleRow header_face_enabled_row_, header_frame_enabled_row_, chevron_row_, drag_reorder_row_, drag_row_;
-    DemoToggleRow body_transparent_row_, body_face_enabled_row_, body_frame_enabled_row_, single_row_, enforce_row_, animation_row_;
-    DemoSliderRow frame_width_row_, margin_x_row_, margin_y_row_, header_height_row_, spacing_row_, header_body_gap_row_, body_min_height_row_;
-    DemoSliderRow unified_radius_row_, unified_frame_width_row_, header_frame_width_row_, header_font_row_, header_radius_row_, header_margin_x_row_, header_margin_y_row_;
-    DemoSliderRow chevron_size_row_, chevron_gap_row_, drag_size_row_, drag_gap_row_, body_frame_width_row_, body_radius_row_, body_margin_x_row_, body_margin_y_row_;
-    DemoSliderRow body_line_thickness_row_, anim_open_row_, anim_close_row_;
-    DemoColorRow face_row_, frame_row_, ink_row_, header_face_row_, header_frame_row_, header_ink_row_, body_face_row_, body_frame_row_, body_line_color_row_;
-    DemoDropdownRow chevron_side_row_, drag_side_row_, body_line_extent_row_, body_line_style_row_;
+private:
+    void BuildShell(const char *title, const char *purpose)
+    {
+        Title(String(title)+" Demo").Sizeable().Zoomable();
+        SetRect(0,0,DPI(1280),DPI(800));
+        Add(header_); Add(preview_); Add(right_);
+        header_.SetTitle(title).SetSubTitle(purpose).ShowTitleLine(false)
+               .SetContentInset(DPI(8)).SetContentCell(header_actions_);
+        header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+        header_actions_.AddSpacer(1).Expand(1);
+        theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16),DPI(16)).Tip("Theme");
+        help_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16),DPI(16)).Tip("Help");
+        exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16),DPI(16)).Tip("Close demo");
+        header_actions_.Add(theme_).Fixed(DPI(34));
+        header_actions_.Add(help_).Fixed(DPI(34));
+        header_actions_.Add(exit_).Fixed(DPI(34));
+        theme_.WhenAction=[=] {
+            UiThemeContext ctx=UiTheme::GetContext();
+            ctx.mode=ctx.mode==UiThemeMode::Dark ? UiThemeMode::Light : UiThemeMode::Dark;
+            Ctrl::SwapDarkLight(); UiTheme::Set(ctx);
+            theme_.SetIcon(ctx.mode==UiThemeMode::Dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+            ApplyTheme(); ApplyProjection();
+        };
+        help_.WhenAction=[=] { PromptOK(purpose); };
+        exit_.WhenAction=[=] { Close(); };
+        right_.Add(tools_); right_.Add(pages_);
+        tools_.SetGap(DPI(4)).SetInset(Rect(DPI(2),0,DPI(2),0)).SetAlignItems(UiCrossAlign::Center);
+        inspector_mode_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Inspector");
+        overrides_mode_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Theme overrides");
+        code_mode_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17),DPI(17)).SetCheckable().Tip("Generated code");
+        tools_.Add(inspector_mode_).Fixed(DPI(38)); tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38)); tools_.AddSpacer(1).Expand(1);
+        pages_.Add(inspector_page_,"inspector"); pages_.Add(overrides_page_,"overrides"); pages_.Add(code_page_,"code");
+        inspector_page_.Add(inspector_.SizePos()); overrides_page_.Add(overrides_.SizePos());
+        code_page_.Add(code_.HSizePos(DPI(6),DPI(6)).VSizePos(DPI(42),DPI(6))); code_.SetReadOnly();
+        code_page_.Add(copy_.RightPos(DPI(8),DPI(32)).TopPos(DPI(6),DPI(30)));
+        copy_.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16),DPI(16)).Tip("Copy C++");
+        copy_.WhenAction=[=] { WriteClipboardText(generated_); };
+        inspector_mode_.WhenAction=[=] { SelectPage(0); };
+        overrides_mode_.WhenAction=[=] { SelectPage(1); };
+        code_mode_.WhenAction=[=] { SelectPage(2); };
+        inspector_.SetFactory(&factory_); overrides_.SetFactory(&factory_);
+        inspector_.SetModel(&inspector_model_); overrides_.SetModel(&override_model_);
+        inspector_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenCommit=[=](String,const Value&) { ReadProperties(); ApplyProjection(); };
+        overrides_.WhenOverride=[=](String id,bool active) {
+            override_model_.Find(id)->override_active=active; override_model_.ValueChanged(id); ReadProperties(); ApplyProjection();
+        };
+        inspector_.WhenReset=[=](String id) { inspector_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        overrides_.WhenReset=[=](String id) { override_model_.Reset(id); ReadProperties(); ApplyProjection(); };
+        SelectPage(0);
+    }
+    void SelectPage(int p) {
+        pages_.SetActivePage(p); inspector_mode_.SetChecked(p==0); overrides_mode_.SetChecked(p==1); code_mode_.SetChecked(p==2);
+    }
+    PreviewPanel& Preview() { return preview_; }
+    const DemoPalette& Palette() const { return palette_; }
+    void SetUsageCode(const String& code) { generated_=code; code_.SetData(code); }
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
+    UiTitleCard header_;
+    UiBoxLayout header_actions_{UiDirection::H};
+    UiToolButton theme_,help_,exit_;
+    PreviewPanel preview_;
+    UiPanel right_;
+    UiBoxLayout tools_{UiDirection::H};
+    UiToolButton inspector_mode_,overrides_mode_,code_mode_,copy_;
+    UiStack pages_;
+    UiPanel inspector_page_,overrides_page_,code_page_;
+    PropertyEditor inspector_,overrides_;
+    UiMultiEdit code_;
+    String generated_;
+    DemoPalette palette_;
+    Color window_face_=SColorFace();
+    void ApplyTheme()
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        palette_.dark = dark;
+        palette_.ink = dark ? Color(220,220,220) : Color(30,30,30);
+        palette_.segment_face = panel_face;
+        palette_.segment_frame = dark ? Color(48,48,48) : Color(220,220,220);
+        palette_.paper = window_face_;
+        ApplyDemoTheme();
+        Refresh();
+    }
+    void BuildProperties() {
+        override_model_.AddBoolean("face_enabled","Face enabled",cfg_.face_enabled,"Appearance").SetDefault(cfg_.face_enabled);
+        override_model_.Find("face_enabled")->overrideable=true;
+        override_model_.AddColor("face","Face",cfg_.face,"Appearance").SetDefault(cfg_.face);
+        override_model_.Find("face")->overrideable=true;
+        override_model_.AddBoolean("frame_enabled","Frame enabled",cfg_.frame_enabled,"Appearance").SetDefault(cfg_.frame_enabled);
+        override_model_.Find("frame_enabled")->overrideable=true;
+        override_model_.AddInteger("frame_width","Frame width",cfg_.frame_width,"Appearance").SetRange(0,12,1).SetDefault(cfg_.frame_width);
+        override_model_.Find("frame_width")->overrideable=true;
+        override_model_.AddColor("frame","Frame",cfg_.frame,"Appearance").SetDefault(cfg_.frame);
+        override_model_.Find("frame")->overrideable=true;
+        override_model_.AddColor("ink","Ink",cfg_.ink,"Appearance").SetDefault(cfg_.ink);
+        override_model_.Find("ink")->overrideable=true;
+        override_model_.AddInteger("margin_x","Margin x",cfg_.margin_x,"Appearance").SetRange(0,100,1).SetDefault(cfg_.margin_x);
+        override_model_.Find("margin_x")->overrideable=true;
+        override_model_.AddInteger("margin_y","Margin y",cfg_.margin_y,"Appearance").SetRange(0,100,1).SetDefault(cfg_.margin_y);
+        override_model_.Find("margin_y")->overrideable=true;
+        override_model_.AddBoolean("shadow","Shadow",cfg_.shadow,"Appearance").SetDefault(cfg_.shadow);
+        override_model_.Find("shadow")->overrideable=true;
+        override_model_.AddBoolean("highlight","Highlight",cfg_.highlight,"Appearance").SetDefault(cfg_.highlight);
+        override_model_.Find("highlight")->overrideable=true;
+        override_model_.AddInteger("header_height","Header height",cfg_.header_height,"Appearance").SetRange(16,120,1).SetDefault(cfg_.header_height);
+        override_model_.Find("header_height")->overrideable=true;
+        override_model_.AddInteger("item_spacing","Item spacing",cfg_.item_spacing,"Appearance").SetRange(0,60,1).SetDefault(cfg_.item_spacing);
+        override_model_.Find("item_spacing")->overrideable=true;
+        override_model_.AddInteger("header_body_gap","Header body gap",cfg_.header_body_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.header_body_gap);
+        override_model_.Find("header_body_gap")->overrideable=true;
+        override_model_.AddInteger("body_min_height","Body min height",cfg_.body_min_height,"Appearance").SetRange(0,1000,1).SetDefault(cfg_.body_min_height);
+        override_model_.Find("body_min_height")->overrideable=true;
+        override_model_.AddBoolean("unified_frame","Unified frame",cfg_.unified_frame,"Appearance").SetDefault(cfg_.unified_frame);
+        override_model_.Find("unified_frame")->overrideable=true;
+        override_model_.AddInteger("unified_radius","Unified radius",cfg_.unified_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.unified_radius);
+        override_model_.Find("unified_radius")->overrideable=true;
+        override_model_.AddInteger("unified_frame_width","Unified frame width",cfg_.unified_frame_width,"Appearance").SetRange(0,12,1).SetDefault(cfg_.unified_frame_width);
+        override_model_.Find("unified_frame_width")->overrideable=true;
+        override_model_.AddBoolean("header_face_enabled","Header face enabled",cfg_.header_face_enabled,"Appearance").SetDefault(cfg_.header_face_enabled);
+        override_model_.Find("header_face_enabled")->overrideable=true;
+        override_model_.AddColor("header_face","Header face",cfg_.header_face,"Appearance").SetDefault(cfg_.header_face);
+        override_model_.Find("header_face")->overrideable=true;
+        override_model_.AddBoolean("header_frame_enabled","Header frame enabled",cfg_.header_frame_enabled,"Appearance").SetDefault(cfg_.header_frame_enabled);
+        override_model_.Find("header_frame_enabled")->overrideable=true;
+        override_model_.AddInteger("header_frame_width","Header frame width",cfg_.header_frame_width,"Appearance").SetRange(0,12,1).SetDefault(cfg_.header_frame_width);
+        override_model_.Find("header_frame_width")->overrideable=true;
+        override_model_.AddColor("header_frame","Header frame",cfg_.header_frame,"Appearance").SetDefault(cfg_.header_frame);
+        override_model_.Find("header_frame")->overrideable=true;
+        override_model_.AddColor("header_ink","Header ink",cfg_.header_ink,"Appearance").SetDefault(cfg_.header_ink);
+        override_model_.Find("header_ink")->overrideable=true;
+        override_model_.AddInteger("header_font_height","Header font height",cfg_.header_font_height,"Appearance").SetRange(6,60,1).SetDefault(cfg_.header_font_height);
+        override_model_.Find("header_font_height")->overrideable=true;
+        override_model_.AddInteger("header_radius","Header radius",cfg_.header_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.header_radius);
+        override_model_.Find("header_radius")->overrideable=true;
+        override_model_.AddInteger("header_margin_x","Header margin x",cfg_.header_margin_x,"Appearance").SetRange(0,100,1).SetDefault(cfg_.header_margin_x);
+        override_model_.Find("header_margin_x")->overrideable=true;
+        override_model_.AddInteger("header_margin_y","Header margin y",cfg_.header_margin_y,"Appearance").SetRange(0,100,1).SetDefault(cfg_.header_margin_y);
+        override_model_.Find("header_margin_y")->overrideable=true;
+        inspector_model_.AddBoolean("show_chevron","Show chevron",cfg_.show_chevron,"Control").SetDefault(cfg_.show_chevron);
+        inspector_model_.AddChoice("chevron_side","Chevron side",(int)cfg_.chevron_side,"Control").AddChoice((int)UiAlign::LEFT,"Left").AddChoice((int)UiAlign::CENTER,"Center").AddChoice((int)UiAlign::RIGHT,"Right").AddChoice((int)UiAlign::TOP,"Top").AddChoice((int)UiAlign::BOTTOM,"Bottom").SetDefault((int)cfg_.chevron_side);
+        override_model_.AddInteger("chevron_size","Chevron size",cfg_.chevron_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.chevron_size);
+        override_model_.Find("chevron_size")->overrideable=true;
+        override_model_.AddInteger("chevron_gap","Chevron gap",cfg_.chevron_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.chevron_gap);
+        override_model_.Find("chevron_gap")->overrideable=true;
+        inspector_model_.AddBoolean("drag_reorder","Drag reorder",cfg_.drag_reorder,"Control").SetDefault(cfg_.drag_reorder);
+        inspector_model_.AddBoolean("show_drag","Show drag",cfg_.show_drag,"Control").SetDefault(cfg_.show_drag);
+        inspector_model_.AddChoice("drag_side","Drag side",(int)cfg_.drag_side,"Control").AddChoice((int)UiAlign::LEFT,"Left").AddChoice((int)UiAlign::CENTER,"Center").AddChoice((int)UiAlign::RIGHT,"Right").AddChoice((int)UiAlign::TOP,"Top").AddChoice((int)UiAlign::BOTTOM,"Bottom").SetDefault((int)cfg_.drag_side);
+        override_model_.AddInteger("drag_size","Drag size",cfg_.drag_size,"Appearance").SetRange(0,96,1).SetDefault(cfg_.drag_size);
+        override_model_.Find("drag_size")->overrideable=true;
+        override_model_.AddInteger("drag_gap","Drag gap",cfg_.drag_gap,"Appearance").SetRange(0,60,1).SetDefault(cfg_.drag_gap);
+        override_model_.Find("drag_gap")->overrideable=true;
+        override_model_.AddBoolean("body_transparent","Body transparent",cfg_.body_transparent,"Appearance").SetDefault(cfg_.body_transparent);
+        override_model_.Find("body_transparent")->overrideable=true;
+        override_model_.AddBoolean("body_face_enabled","Body face enabled",cfg_.body_face_enabled,"Appearance").SetDefault(cfg_.body_face_enabled);
+        override_model_.Find("body_face_enabled")->overrideable=true;
+        override_model_.AddColor("body_face","Body face",cfg_.body_face,"Appearance").SetDefault(cfg_.body_face);
+        override_model_.Find("body_face")->overrideable=true;
+        override_model_.AddBoolean("body_frame_enabled","Body frame enabled",cfg_.body_frame_enabled,"Appearance").SetDefault(cfg_.body_frame_enabled);
+        override_model_.Find("body_frame_enabled")->overrideable=true;
+        override_model_.AddInteger("body_frame_width","Body frame width",cfg_.body_frame_width,"Appearance").SetRange(0,12,1).SetDefault(cfg_.body_frame_width);
+        override_model_.Find("body_frame_width")->overrideable=true;
+        override_model_.AddColor("body_frame","Body frame",cfg_.body_frame,"Appearance").SetDefault(cfg_.body_frame);
+        override_model_.Find("body_frame")->overrideable=true;
+        override_model_.AddInteger("body_radius","Body radius",cfg_.body_radius,"Appearance").SetRange(0,60,1).SetDefault(cfg_.body_radius);
+        override_model_.Find("body_radius")->overrideable=true;
+        override_model_.AddInteger("body_margin_x","Body margin x",cfg_.body_margin_x,"Appearance").SetRange(0,100,1).SetDefault(cfg_.body_margin_x);
+        override_model_.Find("body_margin_x")->overrideable=true;
+        override_model_.AddInteger("body_margin_y","Body margin y",cfg_.body_margin_y,"Appearance").SetRange(0,100,1).SetDefault(cfg_.body_margin_y);
+        override_model_.Find("body_margin_y")->overrideable=true;
+        override_model_.AddChoice("body_line_extent","Body line extent",(int)cfg_.body_line_extent,"Appearance").AddChoice((int)NONE,"None").AddChoice((int)SMALL,"Small").AddChoice((int)MEDIUM,"Medium").AddChoice((int)LARGE,"Large").SetDefault((int)cfg_.body_line_extent);
+        override_model_.Find("body_line_extent")->overrideable=true;
+        override_model_.AddChoice("body_line_style","Body line style",(int)cfg_.body_line_style,"Appearance").AddChoice((int)SOLID,"Solid").AddChoice((int)DASHED,"Dashed").SetDefault((int)cfg_.body_line_style);
+        override_model_.Find("body_line_style")->overrideable=true;
+        override_model_.AddInteger("body_line_thickness","Body line thickness",cfg_.body_line_thickness,"Appearance").SetRange(0,12,1).SetDefault(cfg_.body_line_thickness);
+        override_model_.Find("body_line_thickness")->overrideable=true;
+        override_model_.AddColor("body_line_color","Body line color",cfg_.body_line_color,"Appearance").SetDefault(cfg_.body_line_color);
+        override_model_.Find("body_line_color")->overrideable=true;
+        inspector_model_.AddBoolean("single_open","Single open",cfg_.single_open,"Control").SetDefault(cfg_.single_open);
+        inspector_model_.AddBoolean("enforce_one","Enforce one",cfg_.enforce_one,"Control").SetDefault(cfg_.enforce_one);
+        inspector_model_.AddBoolean("animation","Animation",cfg_.animation,"Control").SetDefault(cfg_.animation);
+        inspector_model_.AddInteger("anim_open_ms","Anim open ms",cfg_.anim_open_ms,"Control").SetRange(0,2000,1).SetDefault(cfg_.anim_open_ms);
+        inspector_model_.AddInteger("anim_close_ms","Anim close ms",cfg_.anim_close_ms,"Control").SetRange(0,2000,1).SetDefault(cfg_.anim_close_ms);
+    }
+    void ReadProperties() {
+        Config defaults;
+        cfg_.face_enabled = override_model_.Find("face_enabled")->override_active ? bool(override_model_.Find("face_enabled")->value) : defaults.face_enabled;
+        cfg_.face = override_model_.Find("face")->override_active ? Color(override_model_.Find("face")->value) : defaults.face;
+        cfg_.frame_enabled = override_model_.Find("frame_enabled")->override_active ? bool(override_model_.Find("frame_enabled")->value) : defaults.frame_enabled;
+        cfg_.frame_width = override_model_.Find("frame_width")->override_active ? int(override_model_.Find("frame_width")->value) : defaults.frame_width;
+        cfg_.frame = override_model_.Find("frame")->override_active ? Color(override_model_.Find("frame")->value) : defaults.frame;
+        cfg_.ink = override_model_.Find("ink")->override_active ? Color(override_model_.Find("ink")->value) : defaults.ink;
+        cfg_.margin_x = override_model_.Find("margin_x")->override_active ? int(override_model_.Find("margin_x")->value) : defaults.margin_x;
+        cfg_.margin_y = override_model_.Find("margin_y")->override_active ? int(override_model_.Find("margin_y")->value) : defaults.margin_y;
+        cfg_.shadow = override_model_.Find("shadow")->override_active ? bool(override_model_.Find("shadow")->value) : defaults.shadow;
+        cfg_.highlight = override_model_.Find("highlight")->override_active ? bool(override_model_.Find("highlight")->value) : defaults.highlight;
+        cfg_.header_height = override_model_.Find("header_height")->override_active ? int(override_model_.Find("header_height")->value) : defaults.header_height;
+        cfg_.item_spacing = override_model_.Find("item_spacing")->override_active ? int(override_model_.Find("item_spacing")->value) : defaults.item_spacing;
+        cfg_.header_body_gap = override_model_.Find("header_body_gap")->override_active ? int(override_model_.Find("header_body_gap")->value) : defaults.header_body_gap;
+        cfg_.body_min_height = override_model_.Find("body_min_height")->override_active ? int(override_model_.Find("body_min_height")->value) : defaults.body_min_height;
+        cfg_.unified_frame = override_model_.Find("unified_frame")->override_active ? bool(override_model_.Find("unified_frame")->value) : defaults.unified_frame;
+        cfg_.unified_radius = override_model_.Find("unified_radius")->override_active ? int(override_model_.Find("unified_radius")->value) : defaults.unified_radius;
+        cfg_.unified_frame_width = override_model_.Find("unified_frame_width")->override_active ? int(override_model_.Find("unified_frame_width")->value) : defaults.unified_frame_width;
+        cfg_.header_face_enabled = override_model_.Find("header_face_enabled")->override_active ? bool(override_model_.Find("header_face_enabled")->value) : defaults.header_face_enabled;
+        cfg_.header_face = override_model_.Find("header_face")->override_active ? Color(override_model_.Find("header_face")->value) : defaults.header_face;
+        cfg_.header_frame_enabled = override_model_.Find("header_frame_enabled")->override_active ? bool(override_model_.Find("header_frame_enabled")->value) : defaults.header_frame_enabled;
+        cfg_.header_frame_width = override_model_.Find("header_frame_width")->override_active ? int(override_model_.Find("header_frame_width")->value) : defaults.header_frame_width;
+        cfg_.header_frame = override_model_.Find("header_frame")->override_active ? Color(override_model_.Find("header_frame")->value) : defaults.header_frame;
+        cfg_.header_ink = override_model_.Find("header_ink")->override_active ? Color(override_model_.Find("header_ink")->value) : defaults.header_ink;
+        cfg_.header_font_height = override_model_.Find("header_font_height")->override_active ? int(override_model_.Find("header_font_height")->value) : defaults.header_font_height;
+        cfg_.header_radius = override_model_.Find("header_radius")->override_active ? int(override_model_.Find("header_radius")->value) : defaults.header_radius;
+        cfg_.header_margin_x = override_model_.Find("header_margin_x")->override_active ? int(override_model_.Find("header_margin_x")->value) : defaults.header_margin_x;
+        cfg_.header_margin_y = override_model_.Find("header_margin_y")->override_active ? int(override_model_.Find("header_margin_y")->value) : defaults.header_margin_y;
+        cfg_.show_chevron = bool(inspector_model_.Find("show_chevron")->value);
+        cfg_.chevron_side = (UiAlign)(int)inspector_model_.Find("chevron_side")->value;
+        cfg_.chevron_size = override_model_.Find("chevron_size")->override_active ? int(override_model_.Find("chevron_size")->value) : defaults.chevron_size;
+        cfg_.chevron_gap = override_model_.Find("chevron_gap")->override_active ? int(override_model_.Find("chevron_gap")->value) : defaults.chevron_gap;
+        cfg_.drag_reorder = bool(inspector_model_.Find("drag_reorder")->value);
+        cfg_.show_drag = bool(inspector_model_.Find("show_drag")->value);
+        cfg_.drag_side = (UiAlign)(int)inspector_model_.Find("drag_side")->value;
+        cfg_.drag_size = override_model_.Find("drag_size")->override_active ? int(override_model_.Find("drag_size")->value) : defaults.drag_size;
+        cfg_.drag_gap = override_model_.Find("drag_gap")->override_active ? int(override_model_.Find("drag_gap")->value) : defaults.drag_gap;
+        cfg_.body_transparent = override_model_.Find("body_transparent")->override_active ? bool(override_model_.Find("body_transparent")->value) : defaults.body_transparent;
+        cfg_.body_face_enabled = override_model_.Find("body_face_enabled")->override_active ? bool(override_model_.Find("body_face_enabled")->value) : defaults.body_face_enabled;
+        cfg_.body_face = override_model_.Find("body_face")->override_active ? Color(override_model_.Find("body_face")->value) : defaults.body_face;
+        cfg_.body_frame_enabled = override_model_.Find("body_frame_enabled")->override_active ? bool(override_model_.Find("body_frame_enabled")->value) : defaults.body_frame_enabled;
+        cfg_.body_frame_width = override_model_.Find("body_frame_width")->override_active ? int(override_model_.Find("body_frame_width")->value) : defaults.body_frame_width;
+        cfg_.body_frame = override_model_.Find("body_frame")->override_active ? Color(override_model_.Find("body_frame")->value) : defaults.body_frame;
+        cfg_.body_radius = override_model_.Find("body_radius")->override_active ? int(override_model_.Find("body_radius")->value) : defaults.body_radius;
+        cfg_.body_margin_x = override_model_.Find("body_margin_x")->override_active ? int(override_model_.Find("body_margin_x")->value) : defaults.body_margin_x;
+        cfg_.body_margin_y = override_model_.Find("body_margin_y")->override_active ? int(override_model_.Find("body_margin_y")->value) : defaults.body_margin_y;
+        cfg_.body_line_extent = override_model_.Find("body_line_extent")->override_active ? (UiSpan)(int)override_model_.Find("body_line_extent")->value : defaults.body_line_extent;
+        cfg_.body_line_style = override_model_.Find("body_line_style")->override_active ? (UiLineStyle)(int)override_model_.Find("body_line_style")->value : defaults.body_line_style;
+        cfg_.body_line_thickness = override_model_.Find("body_line_thickness")->override_active ? int(override_model_.Find("body_line_thickness")->value) : defaults.body_line_thickness;
+        cfg_.body_line_color = override_model_.Find("body_line_color")->override_active ? Color(override_model_.Find("body_line_color")->value) : defaults.body_line_color;
+        cfg_.single_open = bool(inspector_model_.Find("single_open")->value);
+        cfg_.enforce_one = bool(inspector_model_.Find("enforce_one")->value);
+        cfg_.animation = bool(inspector_model_.Find("animation")->value);
+        cfg_.anim_open_ms = int(inspector_model_.Find("anim_open_ms")->value);
+        cfg_.anim_close_ms = int(inspector_model_.Find("anim_close_ms")->value);
+    }
 
+    void LayoutPreviewContent()
+    {
+        Rect rc = Preview().GetCanvasRect().Deflated(DPI(24), DPI(20));
+        accordion_.SetRect(rc);
+    }
     void BuildPreviewSections()
     {
         body_a_.SetText("Outer Accordion chrome is separate from section Header and Body styles.");
@@ -154,177 +436,60 @@ private:
         accordion_.SetSectionBodyHeight(b, DPI(64));
         accordion_.SetSectionBodyHeight(c, DPI(64));
     }
-
-    void AddSection(const char *name, UiBoxLayout& box)
+    void ApplyProjection()
     {
-        box.SetGap(DPI(5)).SetInset(0);
-        int q = InspectorAccordion().AddSection(name, false);
-        InspectorAccordion().GetSectionContent(q).Add(box.SizePos());
-    }
-
-    static void AddColor(UiBoxLayout& box, DemoColorRow& row, const char *label)
-    {
-        row.SetLabel(label).SetColorCount(1).SetValueSelectable(false);
-        box.Add(row).Fit();
-    }
-
-    static void AddChoice(UiBoxLayout& box, DemoDropdownRow& row, const char *label)
-    {
-        row.SetLabel(label);
-        box.Add(row).Fit();
-    }
-
-    void BuildSections()
-    {
-        AddSection("FACE", face_box_);
-        AddSection("FRAME", frame_box_);
-        AddSection("INK", ink_box_);
-        AddSection("CONTENT MARGIN", margin_box_);
-        AddSection("SHADOW", shadow_box_);
-        AddSection("HIGHLIGHT", highlight_box_);
-        AddSection("LAYOUT", layout_box_);
-        AddSection("SECTION", section_box_);
-        AddSection("HEADER/FACE", header_face_box_);
-        AddSection("HEADER/FRAME", header_frame_box_);
-        AddSection("HEADER/INK", header_ink_box_);
-        AddSection("HEADER/TYPOGRAPHY", header_type_box_);
-        AddSection("HEADER/CONTENT MARGIN", header_margin_box_);
-        AddSection("HEADER/CHEVRON", chevron_box_);
-        AddSection("HEADER/DRAG", drag_box_);
-        AddSection("BODY/FACE", body_face_box_);
-        AddSection("BODY/FRAME", body_frame_box_);
-        AddSection("BODY/CONTENT MARGIN", body_margin_box_);
-        AddSection("BODY/LINE", body_line_box_);
-        AddSection("BEHAVIOUR", behaviour_box_);
-        AddSection("ANIMATION", animation_box_);
-    }
-
-    void BuildRows()
-    {
-        AddToggleRow(face_box_, face_enabled_row_, "Enabled"); AddColor(face_box_, face_row_, "Normal");
-        AddToggleRow(frame_box_, frame_enabled_row_, "Enabled"); AddSliderRow(frame_box_, frame_width_row_, "Width", "0 px"); frame_width_row_.Slider().SetRange(0, 8).SetStep(1); AddColor(frame_box_, frame_row_, "Normal");
-        AddColor(ink_box_, ink_row_, "Normal");
-        AddSliderRow(margin_box_, margin_x_row_, "Horizontal", "0 px"); margin_x_row_.Slider().SetRange(0, 32).SetStep(1); AddSliderRow(margin_box_, margin_y_row_, "Vertical", "0 px"); margin_y_row_.Slider().SetRange(0, 24).SetStep(1);
-        AddToggleRow(shadow_box_, shadow_row_, "Enabled"); AddToggleRow(highlight_box_, highlight_row_, "Enabled");
-
-        AddSliderRow(layout_box_, header_height_row_, "Header height", "34 px"); header_height_row_.Slider().SetRange(22, 72).SetStep(1);
-        AddSliderRow(layout_box_, spacing_row_, "Item spacing", "6 px"); spacing_row_.Slider().SetRange(0, 24).SetStep(1);
-        AddSliderRow(layout_box_, header_body_gap_row_, "Header/body gap", "4 px"); header_body_gap_row_.Slider().SetRange(0, 24).SetStep(1);
-        AddSliderRow(layout_box_, body_min_height_row_, "Body min height", "72 px"); body_min_height_row_.Slider().SetRange(20, 240).SetStep(1);
-
-        AddToggleRow(section_box_, unified_row_, "Unified frame");
-        AddSliderRow(section_box_, unified_radius_row_, "Radius", "7 px"); unified_radius_row_.Slider().SetRange(0, 32).SetStep(1);
-        AddSliderRow(section_box_, unified_frame_width_row_, "Frame width", "1 px"); unified_frame_width_row_.Slider().SetRange(0, 8).SetStep(1);
-
-        AddToggleRow(header_face_box_, header_face_enabled_row_, "Enabled"); AddColor(header_face_box_, header_face_row_, "Normal");
-        AddToggleRow(header_frame_box_, header_frame_enabled_row_, "Enabled"); AddSliderRow(header_frame_box_, header_frame_width_row_, "Width", "1 px"); header_frame_width_row_.Slider().SetRange(0, 8).SetStep(1); AddSliderRow(header_frame_box_, header_radius_row_, "Radius", "6 px"); header_radius_row_.Slider().SetRange(0, 32).SetStep(1); AddColor(header_frame_box_, header_frame_row_, "Normal");
-        AddColor(header_ink_box_, header_ink_row_, "Title");
-        AddSliderRow(header_type_box_, header_font_row_, "Title font height", "11 px"); header_font_row_.Slider().SetRange(8, 28).SetStep(1);
-        AddSliderRow(header_margin_box_, header_margin_x_row_, "Horizontal", "10 px"); header_margin_x_row_.Slider().SetRange(0, 32).SetStep(1); AddSliderRow(header_margin_box_, header_margin_y_row_, "Vertical", "6 px"); header_margin_y_row_.Slider().SetRange(0, 24).SetStep(1);
-
-        AddToggleRow(chevron_box_, chevron_row_, "Show"); AddChoice(chevron_box_, chevron_side_row_, "Side"); chevron_side_row_.Add("Left", 0).Add("Right", 1); AddSliderRow(chevron_box_, chevron_size_row_, "Size", "12 px"); chevron_size_row_.Slider().SetRange(6, 32).SetStep(1); AddSliderRow(chevron_box_, chevron_gap_row_, "Gap", "8 px"); chevron_gap_row_.Slider().SetRange(0, 24).SetStep(1);
-        AddToggleRow(drag_box_, drag_reorder_row_, "Enable reorder"); AddToggleRow(drag_box_, drag_row_, "Show handle"); AddChoice(drag_box_, drag_side_row_, "Side"); drag_side_row_.Add("Left", 0).Add("Right", 1); AddSliderRow(drag_box_, drag_size_row_, "Size", "14 px"); drag_size_row_.Slider().SetRange(8, 32).SetStep(1); AddSliderRow(drag_box_, drag_gap_row_, "Gap", "8 px"); drag_gap_row_.Slider().SetRange(0, 24).SetStep(1);
-
-        AddToggleRow(body_face_box_, body_transparent_row_, "Transparent"); AddToggleRow(body_face_box_, body_face_enabled_row_, "Face enabled"); AddColor(body_face_box_, body_face_row_, "Normal");
-        AddToggleRow(body_frame_box_, body_frame_enabled_row_, "Enabled"); AddSliderRow(body_frame_box_, body_frame_width_row_, "Width", "0 px"); body_frame_width_row_.Slider().SetRange(0, 8).SetStep(1); AddSliderRow(body_frame_box_, body_radius_row_, "Radius", "0 px"); body_radius_row_.Slider().SetRange(0, 32).SetStep(1); AddColor(body_frame_box_, body_frame_row_, "Normal");
-        AddSliderRow(body_margin_box_, body_margin_x_row_, "Horizontal", "10 px"); body_margin_x_row_.Slider().SetRange(0, 32).SetStep(1); AddSliderRow(body_margin_box_, body_margin_y_row_, "Vertical", "8 px"); body_margin_y_row_.Slider().SetRange(0, 24).SetStep(1);
-        AddChoice(body_line_box_, body_line_extent_row_, "Extent"); body_line_extent_row_.Add("None", 0).Add("Small", 1).Add("Medium", 2).Add("Large", 3);
-        AddChoice(body_line_box_, body_line_style_row_, "Style"); body_line_style_row_.Add("Solid", 0).Add("Dashed", 1).Add("Dotted", 2);
-        AddSliderRow(body_line_box_, body_line_thickness_row_, "Thickness", "1 px"); body_line_thickness_row_.Slider().SetRange(1, 8).SetStep(1); AddColor(body_line_box_, body_line_color_row_, "Colour");
-
-        AddToggleRow(behaviour_box_, single_row_, "Single open"); AddToggleRow(behaviour_box_, enforce_row_, "Enforce one");
-        AddToggleRow(animation_box_, animation_row_, "Enabled"); AddSliderRow(animation_box_, anim_open_row_, "Open ms", "120"); anim_open_row_.Slider().SetRange(0, 600).SetStep(10); AddSliderRow(animation_box_, anim_close_row_, "Close ms", "0"); anim_close_row_.Slider().SetRange(0, 600).SetStep(10);
-    }
-
-    void Connect()
-    {
-#define BIND_TOGGLE(row, field) row.WhenAction = [=] { cfg_.field = (bool)row.Toggle().GetData(); ApplyConfig(); }
-#define BIND_COLOR(row, field) row.WhenAction = [=] { cfg_.field = row.GetColor(0); ApplyConfig(); }
-#define BIND_SLIDER(row, field) row.WhenAction = [=] { cfg_.field = (int)row.GetData(); ApplyConfig(); }
-        BIND_TOGGLE(face_enabled_row_, face_enabled); BIND_COLOR(face_row_, face); BIND_TOGGLE(frame_enabled_row_, frame_enabled); BIND_SLIDER(frame_width_row_, frame_width); BIND_COLOR(frame_row_, frame); BIND_COLOR(ink_row_, ink); BIND_SLIDER(margin_x_row_, margin_x); BIND_SLIDER(margin_y_row_, margin_y); BIND_TOGGLE(shadow_row_, shadow); BIND_TOGGLE(highlight_row_, highlight);
-        BIND_SLIDER(header_height_row_, header_height); BIND_SLIDER(spacing_row_, item_spacing); BIND_SLIDER(header_body_gap_row_, header_body_gap); BIND_SLIDER(body_min_height_row_, body_min_height); BIND_TOGGLE(unified_row_, unified_frame); BIND_SLIDER(unified_radius_row_, unified_radius); BIND_SLIDER(unified_frame_width_row_, unified_frame_width);
-        BIND_TOGGLE(header_face_enabled_row_, header_face_enabled); BIND_COLOR(header_face_row_, header_face); BIND_TOGGLE(header_frame_enabled_row_, header_frame_enabled); BIND_SLIDER(header_frame_width_row_, header_frame_width); BIND_SLIDER(header_radius_row_, header_radius); BIND_COLOR(header_frame_row_, header_frame); BIND_COLOR(header_ink_row_, header_ink); BIND_SLIDER(header_font_row_, header_font_height); BIND_SLIDER(header_margin_x_row_, header_margin_x); BIND_SLIDER(header_margin_y_row_, header_margin_y);
-        BIND_TOGGLE(chevron_row_, show_chevron); BIND_SLIDER(chevron_size_row_, chevron_size); BIND_SLIDER(chevron_gap_row_, chevron_gap); BIND_TOGGLE(drag_reorder_row_, drag_reorder); BIND_TOGGLE(drag_row_, show_drag); BIND_SLIDER(drag_size_row_, drag_size); BIND_SLIDER(drag_gap_row_, drag_gap);
-        BIND_TOGGLE(body_transparent_row_, body_transparent); BIND_TOGGLE(body_face_enabled_row_, body_face_enabled); BIND_COLOR(body_face_row_, body_face); BIND_TOGGLE(body_frame_enabled_row_, body_frame_enabled); BIND_SLIDER(body_frame_width_row_, body_frame_width); BIND_SLIDER(body_radius_row_, body_radius); BIND_COLOR(body_frame_row_, body_frame); BIND_SLIDER(body_margin_x_row_, body_margin_x); BIND_SLIDER(body_margin_y_row_, body_margin_y); BIND_SLIDER(body_line_thickness_row_, body_line_thickness); BIND_COLOR(body_line_color_row_, body_line_color);
-        BIND_TOGGLE(single_row_, single_open); BIND_TOGGLE(enforce_row_, enforce_one); BIND_TOGGLE(animation_row_, animation); BIND_SLIDER(anim_open_row_, anim_open_ms); BIND_SLIDER(anim_close_row_, anim_close_ms);
-#undef BIND_TOGGLE
-#undef BIND_COLOR
-#undef BIND_SLIDER
-        chevron_side_row_.WhenSelect = [=](int) { cfg_.chevron_side = (int)chevron_side_row_.Dropdown().GetSelectedData() == 0 ? UiAlign::LEFT : UiAlign::RIGHT; ApplyConfig(); };
-        drag_side_row_.WhenSelect = [=](int) { cfg_.drag_side = (int)drag_side_row_.Dropdown().GetSelectedData() == 0 ? UiAlign::LEFT : UiAlign::RIGHT; ApplyConfig(); };
-        body_line_extent_row_.WhenSelect = [=](int) { int q = (int)body_line_extent_row_.Dropdown().GetSelectedData(); cfg_.body_line_extent = q == 1 ? SMALL : q == 2 ? MEDIUM : q == 3 ? LARGE : NONE; ApplyConfig(); };
-        body_line_style_row_.WhenSelect = [=](int) { int q = (int)body_line_style_row_.Dropdown().GetSelectedData(); cfg_.body_line_style = q == 1 ? DASHED : q == 2 ? DOTTED : SOLID; ApplyConfig(); };
-    }
-
-    void SyncRows()
-    {
-        face_enabled_row_.SetData(cfg_.face_enabled); face_row_.SetColor(0, cfg_.face); frame_enabled_row_.SetData(cfg_.frame_enabled); frame_width_row_.SetData(cfg_.frame_width); frame_row_.SetColor(0, cfg_.frame); ink_row_.SetColor(0, cfg_.ink); margin_x_row_.SetData(cfg_.margin_x); margin_y_row_.SetData(cfg_.margin_y); shadow_row_.SetData(cfg_.shadow); highlight_row_.SetData(cfg_.highlight);
-        header_height_row_.SetData(cfg_.header_height); spacing_row_.SetData(cfg_.item_spacing); header_body_gap_row_.SetData(cfg_.header_body_gap); body_min_height_row_.SetData(cfg_.body_min_height); unified_row_.SetData(cfg_.unified_frame); unified_radius_row_.SetData(cfg_.unified_radius); unified_frame_width_row_.SetData(cfg_.unified_frame_width);
-        header_face_enabled_row_.SetData(cfg_.header_face_enabled); header_face_row_.SetColor(0, cfg_.header_face); header_frame_enabled_row_.SetData(cfg_.header_frame_enabled); header_frame_width_row_.SetData(cfg_.header_frame_width); header_radius_row_.SetData(cfg_.header_radius); header_frame_row_.SetColor(0, cfg_.header_frame); header_ink_row_.SetColor(0, cfg_.header_ink); header_font_row_.SetData(cfg_.header_font_height); header_margin_x_row_.SetData(cfg_.header_margin_x); header_margin_y_row_.SetData(cfg_.header_margin_y);
-        chevron_row_.SetData(cfg_.show_chevron); chevron_side_row_.SelectByData(cfg_.chevron_side == UiAlign::LEFT ? 0 : 1); chevron_size_row_.SetData(cfg_.chevron_size); chevron_gap_row_.SetData(cfg_.chevron_gap); drag_reorder_row_.SetData(cfg_.drag_reorder); drag_row_.SetData(cfg_.show_drag); drag_side_row_.SelectByData(cfg_.drag_side == UiAlign::LEFT ? 0 : 1); drag_size_row_.SetData(cfg_.drag_size); drag_gap_row_.SetData(cfg_.drag_gap);
-        body_transparent_row_.SetData(cfg_.body_transparent); body_face_enabled_row_.SetData(cfg_.body_face_enabled); body_face_row_.SetColor(0, cfg_.body_face); body_frame_enabled_row_.SetData(cfg_.body_frame_enabled); body_frame_width_row_.SetData(cfg_.body_frame_width); body_radius_row_.SetData(cfg_.body_radius); body_frame_row_.SetColor(0, cfg_.body_frame); body_margin_x_row_.SetData(cfg_.body_margin_x); body_margin_y_row_.SetData(cfg_.body_margin_y); body_line_extent_row_.SelectByData(cfg_.body_line_extent == SMALL ? 1 : cfg_.body_line_extent == MEDIUM ? 2 : cfg_.body_line_extent == LARGE ? 3 : 0); body_line_style_row_.SelectByData(cfg_.body_line_style == DASHED ? 1 : cfg_.body_line_style == DOTTED ? 2 : 0); body_line_thickness_row_.SetData(cfg_.body_line_thickness); body_line_color_row_.SetColor(0, cfg_.body_line_color);
-        single_row_.SetData(cfg_.single_open); enforce_row_.SetData(cfg_.enforce_one); animation_row_.SetData(cfg_.animation); anim_open_row_.SetData(cfg_.anim_open_ms); anim_close_row_.SetData(cfg_.anim_close_ms);
-#define SETPX(row, field) row.SetValueText(Format("%d px", cfg_.field))
-        SETPX(frame_width_row_, frame_width); SETPX(margin_x_row_, margin_x); SETPX(margin_y_row_, margin_y); SETPX(header_height_row_, header_height); SETPX(spacing_row_, item_spacing); SETPX(header_body_gap_row_, header_body_gap); SETPX(body_min_height_row_, body_min_height); SETPX(unified_radius_row_, unified_radius); SETPX(unified_frame_width_row_, unified_frame_width); SETPX(header_frame_width_row_, header_frame_width); SETPX(header_radius_row_, header_radius); SETPX(header_font_row_, header_font_height); SETPX(header_margin_x_row_, header_margin_x); SETPX(header_margin_y_row_, header_margin_y); SETPX(chevron_size_row_, chevron_size); SETPX(chevron_gap_row_, chevron_gap); SETPX(drag_size_row_, drag_size); SETPX(drag_gap_row_, drag_gap); SETPX(body_frame_width_row_, body_frame_width); SETPX(body_radius_row_, body_radius); SETPX(body_margin_x_row_, body_margin_x); SETPX(body_margin_y_row_, body_margin_y); SETPX(body_line_thickness_row_, body_line_thickness);
-#undef SETPX
-        anim_open_row_.SetValueText(AsString(cfg_.anim_open_ms)); anim_close_row_.SetValueText(AsString(cfg_.anim_close_ms));
-    }
-
-    void ApplyConfig()
-    {
-        SyncRows();
-        UiAccordion::Style s = MakeAccordionStyle(Palette());
+        UiAccordion::Style s = UiTheme::ResolveAccordion();
         for(int i = 0; i < 4; i++) {
-            s.palette.face[i] = UiFill::Solid(cfg_.face);
-            s.palette.frame[i] = cfg_.frame;
-            s.palette.ink[i] = cfg_.ink;
-            s.header_style.palette.face[i] = UiFill::Solid(cfg_.header_face);
-            s.header_style.palette.frame[i] = cfg_.header_frame;
-            s.header_style.palette.ink[i] = cfg_.header_ink;
-            s.body_style.palette.face[i] = UiFill::Solid(cfg_.body_face);
-            s.body_style.palette.frame[i] = cfg_.body_frame;
+            { if(override_model_.Find("face")->override_active) s.palette.face[i] = UiFill::Solid(cfg_.face); }
+            { if(override_model_.Find("frame")->override_active) s.palette.frame[i] = cfg_.frame; }
+            { if(override_model_.Find("ink")->override_active) s.palette.ink[i] = cfg_.ink; }
+            { if(override_model_.Find("header_face")->override_active) s.header_style.palette.face[i] = UiFill::Solid(cfg_.header_face); }
+            { if(override_model_.Find("header_frame")->override_active) s.header_style.palette.frame[i] = cfg_.header_frame; }
+            { if(override_model_.Find("header_ink")->override_active) s.header_style.palette.ink[i] = cfg_.header_ink; }
+            { if(override_model_.Find("body_face")->override_active) s.body_style.palette.face[i] = UiFill::Solid(cfg_.body_face); }
+            { if(override_model_.Find("body_frame")->override_active) s.body_style.palette.frame[i] = cfg_.body_frame; }
         }
-        s.metrics.face_enabled = cfg_.face_enabled;
-        s.metrics.frame_enabled = cfg_.frame_enabled;
-        s.metrics.frame_width = cfg_.frame_width;
-        s.metrics.content_margin = Rect(cfg_.margin_x, cfg_.margin_y, cfg_.margin_x, cfg_.margin_y);
-        s.metrics.shadow.enabled = cfg_.shadow;
-        s.metrics.highlight.enabled = cfg_.highlight;
-        s.header_height = cfg_.header_height;
-        s.item_spacing = cfg_.item_spacing;
-        s.header_body_gap = cfg_.header_body_gap;
-        s.body_min_height = cfg_.body_min_height;
-        s.unified_section_frame = cfg_.unified_frame;
-        s.unified_section_radius = cfg_.unified_radius;
-        s.unified_section_frame_width = cfg_.unified_frame_width;
+        { if(override_model_.Find("face_enabled")->override_active) s.metrics.face_enabled = cfg_.face_enabled; }
+        { if(override_model_.Find("frame_enabled")->override_active) s.metrics.frame_enabled = cfg_.frame_enabled; }
+        { if(override_model_.Find("frame_width")->override_active) s.metrics.frame_width = cfg_.frame_width; }
+        { if(override_model_.Find("margin_x")->override_active || override_model_.Find("margin_y")->override_active) s.metrics.content_margin = Rect(cfg_.margin_x, cfg_.margin_y, cfg_.margin_x, cfg_.margin_y); }
+        { if(override_model_.Find("shadow")->override_active) s.metrics.shadow.enabled = cfg_.shadow; }
+        { if(override_model_.Find("highlight")->override_active) s.metrics.highlight.enabled = cfg_.highlight; }
+        { if(override_model_.Find("header_height")->override_active) s.header_height = cfg_.header_height; }
+        { if(override_model_.Find("item_spacing")->override_active) s.item_spacing = cfg_.item_spacing; }
+        { if(override_model_.Find("header_body_gap")->override_active) s.header_body_gap = cfg_.header_body_gap; }
+        { if(override_model_.Find("body_min_height")->override_active) s.body_min_height = cfg_.body_min_height; }
+        { if(override_model_.Find("unified_frame")->override_active) s.unified_section_frame = cfg_.unified_frame; }
+        { if(override_model_.Find("unified_radius")->override_active) s.unified_section_radius = cfg_.unified_radius; }
+        { if(override_model_.Find("unified_frame_width")->override_active) s.unified_section_frame_width = cfg_.unified_frame_width; }
 
-        s.header_style.metrics.face_enabled = cfg_.header_face_enabled;
-        s.header_style.metrics.frame_enabled = cfg_.header_frame_enabled;
-        s.header_style.metrics.frame_width = cfg_.header_frame_width;
-        s.header_style.metrics.radius = cfg_.header_radius;
-        s.header_style.metrics.content_margin = Rect(cfg_.header_margin_x, cfg_.header_margin_y, cfg_.header_margin_x, cfg_.header_margin_y);
-        s.header_style.title_font.Height(cfg_.header_font_height);
+        { if(override_model_.Find("header_face_enabled")->override_active) s.header_style.metrics.face_enabled = cfg_.header_face_enabled; }
+        { if(override_model_.Find("header_frame_enabled")->override_active) s.header_style.metrics.frame_enabled = cfg_.header_frame_enabled; }
+        { if(override_model_.Find("header_frame_width")->override_active) s.header_style.metrics.frame_width = cfg_.header_frame_width; }
+        { if(override_model_.Find("header_radius")->override_active) s.header_style.metrics.radius = cfg_.header_radius; }
+        { if(override_model_.Find("header_margin_x")->override_active || override_model_.Find("header_margin_y")->override_active) s.header_style.metrics.content_margin = Rect(cfg_.header_margin_x, cfg_.header_margin_y, cfg_.header_margin_x, cfg_.header_margin_y); }
+        if(override_model_.Find("header_font_height")->override_active) s.header_style.title_font.Height(cfg_.header_font_height);
 
         s.show_chevron = cfg_.show_chevron;
         s.chevron_side = cfg_.chevron_side;
         s.chevron_scale = true;
-        s.chevron_size = cfg_.chevron_size;
-        s.chevron_gap = cfg_.chevron_gap;
+        { if(override_model_.Find("chevron_size")->override_active) s.chevron_size = cfg_.chevron_size; }
+        { if(override_model_.Find("chevron_gap")->override_active) s.chevron_gap = cfg_.chevron_gap; }
         s.show_drag_handle = cfg_.show_drag;
         s.drag_side = cfg_.drag_side;
-        s.drag_size = cfg_.drag_size;
-        s.drag_gap = cfg_.drag_gap;
+        { if(override_model_.Find("drag_size")->override_active) s.drag_size = cfg_.drag_size; }
+        { if(override_model_.Find("drag_gap")->override_active) s.drag_gap = cfg_.drag_gap; }
 
-        s.body_style.transparent = cfg_.body_transparent;
-        s.body_style.metrics.face_enabled = cfg_.body_face_enabled;
-        s.body_style.metrics.frame_enabled = cfg_.body_frame_enabled;
-        s.body_style.metrics.frame_width = cfg_.body_frame_width;
-        s.body_style.metrics.radius = cfg_.body_radius;
-        s.body_style.metrics.content_margin = Rect(cfg_.body_margin_x, cfg_.body_margin_y, cfg_.body_margin_x, cfg_.body_margin_y);
-        s.body_line_extent = cfg_.body_line_extent;
-        s.body_line_style = cfg_.body_line_style;
-        s.body_line_thickness = cfg_.body_line_thickness;
-        s.body_line_color = cfg_.body_line_color;
+        { if(override_model_.Find("body_transparent")->override_active) s.body_style.transparent = cfg_.body_transparent; }
+        { if(override_model_.Find("body_face_enabled")->override_active) s.body_style.metrics.face_enabled = cfg_.body_face_enabled; }
+        { if(override_model_.Find("body_frame_enabled")->override_active) s.body_style.metrics.frame_enabled = cfg_.body_frame_enabled; }
+        { if(override_model_.Find("body_frame_width")->override_active) s.body_style.metrics.frame_width = cfg_.body_frame_width; }
+        { if(override_model_.Find("body_radius")->override_active) s.body_style.metrics.radius = cfg_.body_radius; }
+        { if(override_model_.Find("body_margin_x")->override_active || override_model_.Find("body_margin_y")->override_active) s.body_style.metrics.content_margin = Rect(cfg_.body_margin_x, cfg_.body_margin_y, cfg_.body_margin_x, cfg_.body_margin_y); }
+        { if(override_model_.Find("body_line_extent")->override_active) s.body_line_extent = cfg_.body_line_extent; }
+        { if(override_model_.Find("body_line_style")->override_active) s.body_line_style = cfg_.body_line_style; }
+        { if(override_model_.Find("body_line_thickness")->override_active) s.body_line_thickness = cfg_.body_line_thickness; }
+        { if(override_model_.Find("body_line_color")->override_active) s.body_line_color = cfg_.body_line_color; }
         s.single_open = cfg_.single_open;
         s.enforce_one = cfg_.enforce_one;
         s.animation_enabled = cfg_.animation;
@@ -343,16 +508,73 @@ private:
         accordion_.ShowDragHandle(cfg_.show_drag);
         accordion_.SetDragSide(cfg_.drag_side);
 
-        SetUsageCode("UiAccordion::Style style = UiAccordion::StyleDefault();\n"
-                     "// Header/* and Body/* remain composed style domains; Section and animation stay Accordion-owned.\n"
-                     "accordion.SetCustomStyle(style);\n");
-        Refresh();
+        SetUsageCode(BuildUsageCode()); Refresh();
     }
+    void ApplyDemoTheme() {}
+    String BuildUsageCode() const {
+        String code;
+        code << "UiAccordion accordion;\n";
+        bool authored=false;
+        if(override_model_.Find("face")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.face) << ");\n"; }
+        if(override_model_.Find("frame")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.palette.frame[i] = " << ColorCpp(cfg_.frame) << ";\n"; }
+        if(override_model_.Find("ink")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.palette.ink[i] = " << ColorCpp(cfg_.ink) << ";\n"; }
+        if(override_model_.Find("header_face")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.header_style.palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.header_face) << ");\n"; }
+        if(override_model_.Find("header_frame")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.header_style.palette.frame[i] = " << ColorCpp(cfg_.header_frame) << ";\n"; }
+        if(override_model_.Find("header_ink")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.header_style.palette.ink[i] = " << ColorCpp(cfg_.header_ink) << ";\n"; }
+        if(override_model_.Find("body_face")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.body_style.palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.body_face) << ");\n"; }
+        if(override_model_.Find("body_frame")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "for(int i=0;i<4;i++) style.body_style.palette.frame[i] = " << ColorCpp(cfg_.body_frame) << ";\n"; }
+        if(override_model_.Find("face_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.face_enabled = " << String(cfg_.face_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("frame_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.frame_enabled = " << String(cfg_.frame_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("frame_width")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.frame_width = " << AsString((int)cfg_.frame_width) << ";\n"; }
+        if(override_model_.Find("margin_x")->override_active || override_model_.Find("margin_y")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.content_margin = Rect(" << AsString((int)cfg_.margin_x) << ", " << AsString((int)cfg_.margin_y) << ", " << AsString((int)cfg_.margin_x) << ", " << AsString((int)cfg_.margin_y) << ");\n"; }
+        if(override_model_.Find("shadow")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.shadow.enabled = " << String(cfg_.shadow ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("highlight")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.metrics.highlight.enabled = " << String(cfg_.highlight ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("header_height")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_height = " << AsString((int)cfg_.header_height) << ";\n"; }
+        if(override_model_.Find("item_spacing")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.item_spacing = " << AsString((int)cfg_.item_spacing) << ";\n"; }
+        if(override_model_.Find("header_body_gap")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_body_gap = " << AsString((int)cfg_.header_body_gap) << ";\n"; }
+        if(override_model_.Find("body_min_height")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_min_height = " << AsString((int)cfg_.body_min_height) << ";\n"; }
+        if(override_model_.Find("unified_frame")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.unified_section_frame = " << String(cfg_.unified_frame ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("unified_radius")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.unified_section_radius = " << AsString((int)cfg_.unified_radius) << ";\n"; }
+        if(override_model_.Find("unified_frame_width")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.unified_section_frame_width = " << AsString((int)cfg_.unified_frame_width) << ";\n"; }
+        if(override_model_.Find("header_face_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.metrics.face_enabled = " << String(cfg_.header_face_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("header_frame_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.metrics.frame_enabled = " << String(cfg_.header_frame_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("header_frame_width")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.metrics.frame_width = " << AsString((int)cfg_.header_frame_width) << ";\n"; }
+        if(override_model_.Find("header_radius")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.metrics.radius = " << AsString((int)cfg_.header_radius) << ";\n"; }
+        if(override_model_.Find("header_margin_x")->override_active || override_model_.Find("header_margin_y")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.metrics.content_margin = Rect(" << AsString((int)cfg_.header_margin_x) << ", " << AsString((int)cfg_.header_margin_y) << ", " << AsString((int)cfg_.header_margin_x) << ", " << AsString((int)cfg_.header_margin_y) << ");\n"; }
+        if(override_model_.Find("chevron_size")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.chevron_size = " << AsString((int)cfg_.chevron_size) << ";\n"; }
+        if(override_model_.Find("chevron_gap")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.chevron_gap = " << AsString((int)cfg_.chevron_gap) << ";\n"; }
+        if(override_model_.Find("drag_size")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.drag_size = " << AsString((int)cfg_.drag_size) << ";\n"; }
+        if(override_model_.Find("drag_gap")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.drag_gap = " << AsString((int)cfg_.drag_gap) << ";\n"; }
+        if(override_model_.Find("body_transparent")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.transparent = " << String(cfg_.body_transparent ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("body_face_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.metrics.face_enabled = " << String(cfg_.body_face_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("body_frame_enabled")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.metrics.frame_enabled = " << String(cfg_.body_frame_enabled ? "true" : "false") << ";\n"; }
+        if(override_model_.Find("body_frame_width")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.metrics.frame_width = " << AsString((int)cfg_.body_frame_width) << ";\n"; }
+        if(override_model_.Find("body_radius")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.metrics.radius = " << AsString((int)cfg_.body_radius) << ";\n"; }
+        if(override_model_.Find("body_margin_x")->override_active || override_model_.Find("body_margin_y")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_style.metrics.content_margin = Rect(" << AsString((int)cfg_.body_margin_x) << ", " << AsString((int)cfg_.body_margin_y) << ", " << AsString((int)cfg_.body_margin_x) << ", " << AsString((int)cfg_.body_margin_y) << ");\n"; }
+        if(override_model_.Find("body_line_extent")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_line_extent = " << String("(UiSpan)") << AsString((int)cfg_.body_line_extent) << ";\n"; }
+        if(override_model_.Find("body_line_style")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_line_style = " << String("(UiLineStyle)") << AsString((int)cfg_.body_line_style) << ";\n"; }
+        if(override_model_.Find("body_line_thickness")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_line_thickness = " << AsString((int)cfg_.body_line_thickness) << ";\n"; }
+        if(override_model_.Find("body_line_color")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.body_line_color = " << ColorCpp(cfg_.body_line_color) << ";\n"; }
+        if(override_model_.Find("header_font_height")->override_active) { if(!authored) code << "UiAccordion::Style style = UiTheme::ResolveAccordion();\n"; authored=true; code << "style.header_style.title_font.Height(" << cfg_.header_font_height << ");\n"; }
+        if(authored) code << "accordion.SetCustomStyle(style);\n";
+        code << "accordion.SetSingleOpen(" << (cfg_.single_open ? "true" : "false") << ").SetEnforceOne(" << (cfg_.enforce_one ? "true" : "false") << ");\n";
+        code << "accordion.ShowChevron(" << (cfg_.show_chevron ? "true" : "false") << ").SetChevronSide((UiAlign)" << (int)cfg_.chevron_side << ");\n";
+        code << "accordion.SetAnimation(" << (cfg_.animation ? "true" : "false") << "," << cfg_.anim_open_ms << "," << cfg_.anim_close_ms << ");\n";
+        code << "accordion.EnableDragReorder(" << (cfg_.drag_reorder ? "true" : "false") << ").ShowDragHandle(" << (cfg_.show_drag ? "true" : "false") << ").SetDragSide((UiAlign)" << (int)cfg_.drag_side << ");\n";
+        code << "// Section children are borrowed: keep them alive longer than the accordion.\n";
+        code << "UiLabel section_content;\nsection_content.SetText(\"Section content\");\n";
+        code << "int section = accordion.AddSection(\"Content\", true);\naccordion.GetSectionContent(section).Add(section_content.SizePos());\n";
+        return code;
+    }
+
+    Config cfg_;
+    UiAccordion accordion_;
+    UiLabel body_a_,body_b_,body_c_;
 };
-
-} // namespace
-
-GUI_APP_MAIN
-{
-    UiAccordionDemoWindow().Run();
+}
+GUI_APP_MAIN {
+    Demo demo;
+    const Vector<String>& args=CommandLine();
+    if(args.GetCount()>=2 && args[0]=="--emit-code") { if(args.GetCount()>2) demo.ConfigureExample(); SaveFile(args[1],demo.GetGeneratedCode()); return; }
+    demo.Run();
 }

@@ -1,0 +1,15 @@
+description "List and Gallery designer with shared data, PropertyEditor and generated C++";
+
+uses
+    CtrlLib,
+    Ui,
+    Utilities/PropertyEditor;
+
+file
+    UiCollectionDemo.h,
+    UiCollectionDemo.cpp,
+    CollectionCode.cpp,
+    main.cpp;
+
+mainconfig
+    "" = "GUI";

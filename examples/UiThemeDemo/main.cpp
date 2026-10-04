@@ -7,7 +7,7 @@
 
     Demo hygiene header
     - Keep this package compiling in the active demo sweep.
-    - Prefer BuilderDemoSupport/shared shell and UiComposite inspector rows where practical.
+    - Keep the explicit native header and three compact Theme / Help / Exit actions.
     - Prefer UiTheme defaults; add local styling only when the demo intentionally showcases that variation.
 
     Changelog
@@ -16,17 +16,6 @@
 #include <Ui/Ui.h>
 
 using namespace Upp;
-
-static void PaintVerticalGradient(Draw& w, const Rect& r, Color top, Color bottom)
-{
-    if(r.IsEmpty())
-        return;
-    int h = max(1, r.GetHeight());
-    for(int i = 0; i < h; i++) {
-        int t = (255 * i) / max(1, h - 1);
-        w.DrawRect(r.left, r.top + i, r.GetWidth(), 1, Blend(bottom, top, t));
-    }
-}
 
 class ThemeSpecimen : public ParentCtrl {
 public:
@@ -414,20 +403,9 @@ public:
         SetRect(0, 0, DPI(1560), DPI(980));
         BackPaint();
 
-        Add(title_);
-        Add(copy_);
-        Add(mode_shell_);
-        mode_shell_.Add(mode_label_);
-        mode_shell_.Add(mode_toggle_);
+        BuildShell();
         Add(minimal_);
         Add(pill_);
-
-        title_.SetText("Preset Theme Directions").SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-        copy_.SetText("Minimal and Pill are role-driven presets. Use light/dark mode to verify normal, subtle, accent, and alert styling across the same controls.")
-             .SetAlign(UiAlign::CENTER, UiAlign::CENTER);
-        mode_label_.SetText("Light").SetAlign(UiAlign::LEFT, UiAlign::CENTER);
-        mode_toggle_.SetOn(false).SetShowFocus(false);
-        mode_toggle_.WhenAction = [=] { ApplyMode(mode_toggle_.GetData() ? UiThemeMode::Dark : UiThemeMode::Light); };
 
         ApplyMode(UiThemeMode::Light);
     }
@@ -436,74 +414,8 @@ public:
     {
         mode_ = mode;
 
-        UiLabel::Style heading = UiTheme::ResolveLabel(UiThemePreset::Minimal, mode_, UiLabelRole::Headline);
-        heading.align_h = UiAlign::CENTER;
-        title_.SetCustomStyle(heading);
-
-        UiLabel::Style sub = UiTheme::ResolveLabel(UiThemePreset::Minimal, mode_, UiLabelRole::Subheadline);
-        sub.align_h = UiAlign::CENTER;
-        copy_.SetCustomStyle(sub);
-
-        UiPanel::Style mode_shell_style = UiTheme::ResolvePanel(UiThemePreset::Minimal, mode_, UiPanelRole::Surface);
-        mode_shell_style.metrics.radius = DPI(999);
-        mode_shell_style.metrics.frame_width = DPI(1);
-        mode_shell_style.metrics.shadow.enabled = true;
-        mode_shell_style.metrics.shadow.inset = false;
-        mode_shell_style.metrics.shadow.distance = DPI(3);
-        mode_shell_style.metrics.shadow.offset_x = DPI(2);
-        mode_shell_style.metrics.shadow.offset_y = DPI(2);
-        mode_shell_style.metrics.shadow.mode = SHADOW_CURVE;
-        mode_shell_style.metrics.shadow.curve = ShadowSoft();
-        mode_shell_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 40 : 34;
-        mode_shell_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
-        mode_shell_.SetCustomStyle(mode_shell_style);
-        UiToggle::Style mode_toggle_style = UiTheme::ResolveToggle(UiThemePreset::Minimal, mode_);
-        mode_toggle_style.metrics.face_enabled = false;
-        mode_toggle_style.metrics.frame_enabled = false;
-        mode_toggle_style.metrics.frame_width = 0;
-        mode_toggle_style.metrics.radius = DPI(999);
-        mode_toggle_style.metrics.content_margin = Rect(0, 0, 0, 0);
-        mode_toggle_style.metrics.focus_enabled = false;
-        mode_toggle_style.metrics.shadow.enabled = false;
-        mode_toggle_style.metrics.shadow.inset = false;
-        mode_toggle_style.metrics.shadow.distance = DPI(2);
-        mode_toggle_style.metrics.shadow.offset_x = DPI(1);
-        mode_toggle_style.metrics.shadow.offset_y = DPI(1);
-        mode_toggle_style.metrics.shadow.mode = SHADOW_CURVE;
-        mode_toggle_style.metrics.shadow.curve = ShadowSoft();
-        mode_toggle_style.metrics.shadow.alpha = mode_ == UiThemeMode::Dark ? 32 : 24;
-        mode_toggle_style.metrics.shadow.color = mode_ == UiThemeMode::Dark ? Color(0, 0, 0) : Color(148, 160, 176);
-        mode_toggle_style.track_size = Size(DPI(52), DPI(27));
-        mode_toggle_style.thumb_inset = DPI(2);
-        mode_toggle_style.track_side = UiAlign::RIGHT;
-        mode_toggle_style.track_metrics.face_enabled = true;
-        mode_toggle_style.track_metrics.frame_enabled = true;
-        mode_toggle_style.track_metrics.frame_width = DPI(1);
-        mode_toggle_style.track_metrics.radius = DPI(999);
-        mode_toggle_style.thumb_metrics.face_enabled = true;
-        mode_toggle_style.thumb_metrics.frame_enabled = true;
-        mode_toggle_style.thumb_metrics.frame_width = DPI(1);
-        mode_toggle_style.thumb_metrics.radius = DPI(999);
-        if(mode_ == UiThemeMode::Dark) {
-            UiThemeDetail::SetFace(mode_toggle_style.palette, Color(14, 24, 39), Color(14, 24, 39), Color(14, 24, 39), Color(14, 24, 39));
-            UiThemeDetail::SetFrame(mode_toggle_style.palette, Color(45, 61, 87), Color(45, 61, 87), Color(45, 61, 87), Color(45, 61, 87));
-            UiThemeDetail::SetInk(mode_toggle_style.palette, White(), White(), White(), Color(146, 160, 181));
-            UiThemeDetail::SetFace(mode_toggle_style.track_palette, Color(36, 49, 71), Color(36, 49, 71), Color(23, 35, 54), Color(30, 41, 59));
-            UiThemeDetail::SetFrame(mode_toggle_style.track_palette, Color(66, 84, 112), Color(66, 84, 112), Color(66, 84, 112), Color(57, 72, 97));
-            UiThemeDetail::SetFace(mode_toggle_style.thumb_palette, Color(241, 245, 249), Color(241, 245, 249), Color(241, 245, 249), Color(196, 205, 219));
-            UiThemeDetail::SetFrame(mode_toggle_style.thumb_palette, Color(111, 127, 150), Color(111, 127, 150), Color(111, 127, 150), Color(94, 109, 131));
-        }
-        else {
-            UiThemeDetail::SetFace(mode_toggle_style.palette, White(), White(), White(), White());
-            UiThemeDetail::SetFrame(mode_toggle_style.palette, Color(222, 229, 237), Color(222, 229, 237), Color(222, 229, 237), Color(222, 229, 237));
-            UiThemeDetail::SetInk(mode_toggle_style.palette, Color(17, 24, 39), Color(17, 24, 39), Color(17, 24, 39), Color(148, 163, 184));
-            UiThemeDetail::SetFace(mode_toggle_style.track_palette, Color(230, 236, 242), Color(230, 236, 242), Color(17, 24, 39), Color(238, 242, 247));
-            UiThemeDetail::SetFrame(mode_toggle_style.track_palette, Color(198, 208, 220), Color(198, 208, 220), Color(17, 24, 39), Color(214, 222, 231));
-            UiThemeDetail::SetFace(mode_toggle_style.thumb_palette, White(), White(), White(), Color(245, 247, 250));
-            UiThemeDetail::SetFrame(mode_toggle_style.thumb_palette, Color(198, 208, 220), Color(198, 208, 220), Color(17, 24, 39), Color(214, 222, 231));
-        }
-        mode_toggle_.SetCustomStyle(mode_toggle_style).SetShowFocus(false);
-
+        auto context=UiTheme::GetContext(); context.mode=mode_; UiTheme::Set(context);
+        ApplyShellTheme();
         minimal_.ApplyTheme(mode_);
         pill_.ApplyTheme(mode_);
         Refresh();
@@ -513,14 +425,8 @@ public:
     {
         Rect r = GetSize();
         int m = DPI(20);
-        title_.SetRect(m, DPI(18), r.GetWidth() - m * 2, DPI(42));
-        copy_.SetRect(r.GetWidth() / 2 - DPI(420), DPI(66), DPI(840), DPI(40));
-        mode_shell_.SetRect(r.GetWidth() - DPI(214), DPI(14), DPI(178), DPI(56));
-        Rect ms = mode_shell_.GetSize();
-        mode_label_.SetRect(DPI(16), 0, DPI(70), ms.GetHeight());
-        mode_toggle_.SetRect(ms.GetWidth() - DPI(68), (ms.GetHeight() - DPI(27)) / 2, DPI(52), DPI(27));
-
-        int top = DPI(126);
+        shell_header_.SetRect(m,DPI(12),max(0,r.GetWidth()-m*2),DPI(72));
+        int top = DPI(94);
         int gap = DPI(26);
         int specimen_w = (r.GetWidth() - m * 2 - gap) / 2;
         int specimen_h = r.GetHeight() - top - DPI(26);
@@ -530,20 +436,49 @@ public:
 
     virtual void Paint(Draw& w) override
     {
-        Rect r = GetSize();
-        if(mode_ == UiThemeMode::Dark)
-            PaintVerticalGradient(w, r, Color(13, 20, 32), Color(19, 29, 43));
-        else
-            PaintVerticalGradient(w, r, Color(232, 238, 245), Color(212, 222, 232));
+        w.DrawRect(GetSize(), UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color);
     }
 
 private:
+
+    UiTitleCard shell_header_;
+    UiBoxLayout shell_actions_{UiDirection::H};
+    UiToolButton shell_theme_, shell_help_, shell_exit_;
+    UiPanel shell_preview_;
+    void BuildShell() {
+        Add(shell_header_);
+        shell_header_.SetTitle("UiTheme").SetSubTitle("Minimal and Pill presets across the same live controls").ShowTitleLine(false).SetContentCell(shell_actions_);
+        shell_actions_.SetGap(DPI(4)).SetAlignItems(UiCrossAlign::Center);
+        shell_actions_.AddSpacer(1).Expand(1);
+        shell_theme_.SetIcon(ICON_ACTION_DARK_MODE_48()).Tip("Light / Dark");
+        shell_help_.SetIcon(ICON_DESIGN_HELP_48()).Tip("Usage help");
+        shell_exit_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).Tip("Close demo");
+        for(UiToolButton* b : { &shell_theme_, &shell_help_, &shell_exit_ }) { b->SetIconSize(DPI(16),DPI(16)); shell_actions_.Add(*b).Fixed(DPI(34)); }
+        shell_theme_.WhenAction=[=]{ auto c=UiTheme::GetContext(); c.mode=c.mode==UiThemeMode::Dark?UiThemeMode::Light:UiThemeMode::Dark; UiTheme::Set(c); Ctrl::SwapDarkLight(); ApplyShellTheme(); ApplyMode(c.mode); Refresh(); };
+        shell_help_.WhenAction=[=]{ PromptOK("Compare the same controls under Minimal and Pill. Theme changes both specimens between Light and Dark. This is a specialized theme comparison, not a control code generator."); };
+        shell_exit_.WhenAction=[=]{ Close(); };
+        ApplyShellTheme();
+    }
+    void ApplyShellTheme() {
+        bool dark=UiTheme::GetContext().mode==UiThemeMode::Dark;
+        shell_header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        auto panel=UiTheme::ResolvePanel(UiPanelRole::Surface);
+        panel.transparent=false; panel.metrics.radius=DPI(8);
+        panel.metrics.face_enabled=panel.metrics.frame_enabled=true; panel.metrics.frame_width=DPI(1);
+        panel.metrics.shadow.enabled=false;
+        for(int i=0;i<4;i++) { panel.palette.face[i]=UiFill::Solid(dark?Color(18,18,18):Color(245,245,245)); panel.palette.frame[i]=dark?Color(48,48,48):Color(220,220,220); }
+        shell_preview_.SetCustomStyle(panel);
+        auto s=UiTheme::ResolveToolButton(UiRole::Standard); s.transparent=true; s.underline=false;
+        s.metrics.face_enabled=s.metrics.frame_enabled=s.metrics.focus_enabled=false; s.metrics.shadow.enabled=false;
+        for(int i=0;i<4;i++) { s.palette.face[i]=UiFill::None(); s.palette.frame[i]=Null; }
+        s.palette.icon[ST_NORMAL]=dark?Color(180,180,180):Color(110,110,110);
+        s.palette.icon[ST_HOT]=dark?White():Color(32,32,32); s.palette.icon[ST_PRESSED]=Color(0,120,212);
+        for(UiToolButton* b : { &shell_theme_, &shell_help_, &shell_exit_ }) b->SetCustomStyle(s);
+        s.palette.icon[ST_NORMAL]=Color(200,60,60); s.palette.icon[ST_HOT]=Color(240,85,85); s.palette.icon[ST_PRESSED]=Color(180,45,45); shell_exit_.SetCustomStyle(s);
+        shell_theme_.SetIcon(dark?ICON_ACTION_LIGHT_MODE_48():ICON_ACTION_DARK_MODE_48());
+    }
+
     UiThemeMode mode_ = UiThemeMode::Light;
-    UiLabel title_;
-    UiLabel copy_;
-    UiPanel mode_shell_;
-    UiLabel mode_label_;
-    UiToggle mode_toggle_;
     ThemeSpecimen minimal_;
     ThemeSpecimen pill_;
 };

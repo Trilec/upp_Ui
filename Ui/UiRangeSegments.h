@@ -253,6 +253,7 @@ private:
     const Style& GetEffectiveStyle() const;
     void         OnStyleChanged();
 
+    void CancelDrag();
     void NormalizeSegments();
     double NormalizeValue(double value) const;
     bool SetBoundaryValueInternal(int index, double value,

@@ -3,6 +3,7 @@
 #include <Ui/UiList.h>
 #include <Ui/UiPanel.h>
 #include <Ui/UiTheme.h>
+#include <cmath>
 
 namespace Upp {
 
@@ -57,8 +58,8 @@ UiGallery::UiGallery()
         scroll_y_ = vscroll_.GetPos();
         ClampScroll();
         PrepareItemRenders();
-        UpdateVisibleRangeNotification();
         Refresh();
+        UpdateVisibleRangeNotification();
     };
     SyncThemeStyle();
     BindModel(internal_model_);
@@ -171,6 +172,7 @@ UiGallery& UiGallery::SetModel(UiListModel& model)
     // Do not let an opening selection snapshot from the old model become
     // meaningful against a newly bound model.
     EndMarquee(false);
+    model_structure_serial_++;
     model_ = &model;
     BindModel(model);
     model_revision_ = -1;
@@ -240,6 +242,9 @@ UiGallery& UiGallery::SetOverscanRows(int rows)
 
 UiGallery& UiGallery::SetZoomRange(double minimum, double maximum, double step)
 {
+    if(IsNull(minimum) || IsNull(maximum) || IsNull(step) ||
+       !std::isfinite(minimum) || !std::isfinite(maximum) || !std::isfinite(step))
+        return *this;
     minimum = max(0.10, minimum);
     maximum = max(minimum, maximum);
     step = max(1.01, step);
@@ -253,7 +258,12 @@ UiGallery& UiGallery::SetZoomRange(double minimum, double maximum, double step)
 
 UiGallery& UiGallery::SetZoom(double zoom, Point anchor)
 {
+    if(IsNull(zoom) || !std::isfinite(zoom))
+        return *this;
     zoom = minmax(zoom, min_zoom_, max_zoom_);
+    if(base_item_size_.cx * zoom > INT_MAX - 1.0 ||
+       base_item_size_.cy * zoom > INT_MAX - 1.0)
+        return *this;
     if(fabs(zoom - zoom_) < 0.0001)
         return *this;
     if(!geometry_valid_)
@@ -289,9 +299,14 @@ UiGallery& UiGallery::SetZoom(double zoom, Point anchor)
 
     InvalidateItemRenderData();
     PrepareItemRenders();
-    UpdateVisibleRangeNotification();
     RefreshLayout();
     Refresh();
+    Ptr<UiGallery> self = this;
+    uint64 structure_serial = model_structure_serial_;
+    double resolved_zoom = zoom_;
+    UpdateVisibleRangeNotification();
+    if(!self || model_structure_serial_ != structure_serial || zoom_ != resolved_zoom)
+        return *this;
     if(WhenZoom)
         WhenZoom(zoom_);
     return *this;
@@ -299,7 +314,7 @@ UiGallery& UiGallery::SetZoom(double zoom, Point anchor)
 
 UiGallery& UiGallery::ZoomBy(double factor, Point anchor)
 {
-    if(factor <= 0)
+    if(IsNull(factor) || !std::isfinite(factor) || factor <= 0)
         return *this;
     return SetZoom(zoom_ * factor, anchor);
 }
@@ -308,13 +323,14 @@ UiGallery& UiGallery::SetSelectionMode(UiGallerySelectionMode mode)
 {
     if(selection_mode_ == mode)
         return *this;
-    EndMarquee(true);
+    EndMarquee(true, true, false);
     selection_mode_ = mode;
     if(mode == UIGALLERYSEL_SINGLE && selected_.GetCount() > 1) {
         int keep = IsSelectableIndex(cursor_) ? cursor_ : selected_[0];
         selected_.Clear();
         if(IsSelectableIndex(keep))
             selected_.FindAdd(keep);
+        cursor_ = anchor_ = IsSelectableIndex(keep) ? keep : -1;
     }
     NotifySelectionChange();
     return *this;
@@ -379,8 +395,11 @@ UiGallery& UiGallery::SetCursor(int index)
     SyncModel();
     if(!IsSelectableIndex(index))
         return *this;
-    SelectSingle(index);
+    Ptr<UiGallery> self = this;
+    uint64 structure_serial = model_structure_serial_;
     ScrollTo(index);
+    if(self && model_structure_serial_ == structure_serial)
+        SelectSingle(index);
     return *this;
 }
 
@@ -398,8 +417,8 @@ UiGallery& UiGallery::SetScrollPos(int y)
         updating_scrollbar_ = false;
     }
     PrepareItemRenders();
-    UpdateVisibleRangeNotification();
     Refresh();
+    UpdateVisibleRangeNotification();
     return *this;
 }
 

@@ -3,6 +3,27 @@
 
 namespace Upp {
 
+PropertyEditor::EditorCallbackGuard::EditorCallbackGuard(PropertyEditor& owner,
+                                                          const String& property_id)
+    : owner_(&owner), previous_dispatch_(owner.dispatching_editor_callback_),
+      previous_preview_(owner.applying_editor_preview_),
+      previous_inline_id_(owner.inline_preview_property_id_)
+{
+    owner.dispatching_editor_callback_ = true;
+    owner.applying_editor_preview_ = true;
+    owner.inline_preview_property_id_ = property_id;
+}
+
+PropertyEditor::EditorCallbackGuard::~EditorCallbackGuard()
+{
+    if(!owner_)
+        return;
+    owner_->dispatching_editor_callback_ = previous_dispatch_;
+    owner_->applying_editor_preview_ = previous_preview_;
+    owner_->inline_preview_property_id_ = previous_inline_id_;
+    owner_->PostPendingStructureRefresh();
+}
+
 void PropertyEditor::EnsureSelectedVisible()
 {
     if(selected_display_row_ < 0 || selected_display_row_ >= rows_.GetCount())
@@ -162,12 +183,14 @@ void PropertyEditor::ActivateRow(int display_index)
     BeginTransaction(item.id);
     Add(*active_editor_);
     Ptr<PropertyEditor> self = this;
-    active_editor_->WhenPreview = [self](Value value) {
-        if(self)
+    PropertyEditorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    active_editor_->WhenPreview = [self, source, generation](Value value) {
+        if(self && self->model_ == source && self->model_binding_generation_ == generation)
             self->ApplyEditorPreview(value);
     };
-    active_editor_->WhenCommit = [self](Value value) {
-        if(self)
+    active_editor_->WhenCommit = [self, source, generation](Value value) {
+        if(self && self->model_ == source && self->model_binding_generation_ == generation)
             self->ApplyEditorCommit(value);
     };
     const String property_id = item.id;
@@ -219,78 +242,76 @@ void PropertyEditor::CommitActiveEditor()
 
 void PropertyEditor::ApplyEditorPreview(const Value& value)
 {
-    if(syncing_editor_ || tearing_down_editor_ || !model_ ||
-       active_property_id_.IsEmpty())
+    if(syncing_editor_ || tearing_down_editor_ || !model_ || active_property_id_.IsEmpty())
         return;
-    PropertyEditorItem* item = model_->Find(active_property_id_);
-    if(!item)
+    const String property_id = active_property_id_;
+    const Value candidate = value;
+    PropertyEditorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    Ptr<PropertyEditor> self = this;
+    EditorCallbackGuard guard(*this, property_id);
+    BeginTransaction(property_id);
+    if(!self || model_ != source || model_binding_generation_ != generation)
         return;
-
-    BeginTransaction(item->id);
     String error;
-    applying_editor_preview_ = true;
-    const bool applied = model_->Preview(item->id, value, &error);
-    applying_editor_preview_ = false;
+    const bool applied = source->Preview(property_id, candidate, &error);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    PropertyEditorItem* item = source->Find(property_id);
     if(applied) {
-        dispatching_editor_callback_ = true;
-        WhenPreview(item->id, item->value);
-        dispatching_editor_callback_ = false;
-        Refresh();
+        const Value normalized = item ? item->value : candidate;
+        WhenPreview(property_id, normalized);
     }
-    else {
+    else if(active_editor_ && item) {
         syncing_editor_ = true;
         active_editor_->Configure(*item);
         active_editor_->SetEditorValue(item->value, item->mixed);
         syncing_editor_ = false;
-        Refresh();
     }
+    if(self)
+        Refresh();
 }
 
 void PropertyEditor::ApplyEditorCommit(const Value& value)
 {
-    if(syncing_editor_ || tearing_down_editor_ || !model_ ||
-       active_property_id_.IsEmpty())
+    if(syncing_editor_ || tearing_down_editor_ || !model_ || active_property_id_.IsEmpty())
         return;
-    PropertyEditorItem* item = model_->Find(active_property_id_);
+    const String property_id = active_property_id_;
+    const Value candidate = value;
+    PropertyEditorItem* item = model_->Find(property_id);
     if(!item)
         return;
-
-    const String property_id = item->id;
     const bool activate_override = item->overrideable && !item->override_active;
+    PropertyEditorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    Ptr<PropertyEditor> self = this;
+    EditorCallbackGuard guard(*this, property_id);
     BeginTransaction(property_id);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
     String error;
-    if(model_->Commit(property_id, value, &error)) {
-        item = model_->Find(property_id);
-        Value committed_value = item ? item->value : value;
-        if(active_editor_ && item) {
-            syncing_editor_ = true;
-            active_editor_->Configure(*item);
-            active_editor_->SetEditorValue(item->value, item->mixed);
-            syncing_editor_ = false;
-        }
-
-        // Any successfully authored value activates its override, regardless
-        // of whether the editor was inline, dropdown, popup, font or colour.
-        // Do this only after the editor has been synchronized so a host that
-        // rebuilds the model in WhenOverride cannot invalidate active_editor_
-        // before we finish touching it.
-        item = model_ ? model_->Find(property_id) : nullptr;
-        if(activate_override && item && item->overrideable && !item->override_active)
-            WhenOverride(property_id, true);
-
-        dispatching_editor_callback_ = true;
-        WhenCommit(property_id, committed_value);
-        dispatching_editor_callback_ = false;
-        EndTransaction();
-        Refresh();
-    }
-    else {
+    const bool committed = source->Commit(property_id, candidate, &error);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    item = source->Find(property_id);
+    const Value normalized = item ? item->value : candidate;
+    if(active_editor_ && item) {
         syncing_editor_ = true;
         active_editor_->Configure(*item);
         active_editor_->SetEditorValue(item->value, item->mixed);
         syncing_editor_ = false;
-        Refresh();
     }
+    if(committed) {
+        if(activate_override && item && item->overrideable && !item->override_active)
+            WhenOverride(property_id, true);
+        if(!self || model_ != source || model_binding_generation_ != generation)
+            return;
+        WhenCommit(property_id, normalized);
+        if(!self)
+            return;
+        EndTransaction();
+    }
+    Refresh();
 }
 
 void PropertyEditor::ResetSelected()
@@ -385,9 +406,9 @@ bool PropertyEditor::CommitColorText(const String& property_id,
 
     PropertyEditorItem *committed = model_->Find(property_id);
     if(committed) {
-        dispatching_editor_callback_ = true;
-        WhenCommit(property_id, committed->value);
-        dispatching_editor_callback_ = false;
+        EditorCallbackGuard guard(*this, property_id);
+        const Value committed_value = committed->value;
+        WhenCommit(property_id, committed_value);
     }
     EndTransaction();
     RefreshValue(property_id);

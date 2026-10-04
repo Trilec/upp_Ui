@@ -121,6 +121,8 @@ public:
     UiSlider& SetStep(double step);
 
     UiSlider& SetValue(double v);
+    UiSlider& SetCancelReverts(bool on = true) { cancel_reverts_ = on; return *this; }
+    bool DoesCancelRevert() const { return cancel_reverts_; }
     double    GetValue() const { return value_; }
     double    GetMin() const { return min_; }
     double    GetMax() const { return max_; }
@@ -149,6 +151,8 @@ public:
     // feedback and WhenAction for the committed release/action point.
     Event<> WhenAction;
     Event<> WhenChanging;
+    Event<> WhenBeginEdit;
+    Event<> WhenCancelEdit;
 
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
@@ -171,6 +175,8 @@ public:
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
     virtual bool Key(dword key, int count) override;
+    virtual void CancelMode() override;
+    virtual void State(int reason) override;
 
 private:
     void InvalidateStyleCache();
@@ -196,6 +202,7 @@ private:
     double step_ = 1.0;
 
     bool dragging_ = false;
+    bool cancel_reverts_ = false;
     bool expand_track_ = false;
     int  drag_offset_ = 0;
     double drag_start_value_ = 0.0;

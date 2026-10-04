@@ -1,3 +1,5 @@
+// Native UiMediaCard reference: edit content and theme overrides, compare live
+// cards with pooled Gallery rendering, and generate public-API usage C++.
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 #include <Utilities/PropertyEditor/PropertyValueEditors.h>
@@ -151,7 +153,13 @@ public:
         ConnectEvents();
 
         SelectPage(0);
+        ApplyTheme();
         ApplyProjection();
+    }
+
+    void Paint(Draw& w) override
+    {
+        w.DrawRect(GetSize(), window_face_);
     }
 
     void Layout() override
@@ -300,25 +308,25 @@ private:
               .SetInset(Rect(DPI(2), 0, DPI(2), 0))
               .SetAlignItems(UiCrossAlign::Center);
 
-        inspector_mode_.SetText("Content")
+        inspector_mode_.SetText("")
                        .SetIcon(ICON_DESIGN_TUNE_48())
-                       .SetIconSize(DPI(16), DPI(16))
+                       .SetIconSize(DPI(17), DPI(17))
                        .SetIconSide(UiAlign::LEFT)
-                       .SetCheckable().Tip("Content and structure");
-        overrides_mode_.SetText("Appearance")
+                       .SetCheckable().Tip("Inspector — content and structure");
+        overrides_mode_.SetText("")
                        .SetIcon(ICON_DESIGN_FORMAT_PAINT_48())
-                       .SetIconSize(DPI(16), DPI(16))
+                       .SetIconSize(DPI(17), DPI(17))
                        .SetIconSide(UiAlign::LEFT)
-                       .SetCheckable().Tip("Surface and style overrides");
-        code_mode_.SetText("Code")
+                       .SetCheckable().Tip("Theme overrides");
+        code_mode_.SetText("")
                   .SetIcon(ICON_DESIGN_CODE_BLOCKS_48())
-                  .SetIconSize(DPI(16), DPI(16))
+                  .SetIconSize(DPI(17), DPI(17))
                   .SetIconSide(UiAlign::LEFT)
                   .SetCheckable().Tip("Generated C++");
 
-        tools_.Add(inspector_mode_).Fixed(DPI(112));
-        tools_.Add(overrides_mode_).Fixed(DPI(130));
-        tools_.Add(code_mode_).Fixed(DPI(88));
+        tools_.Add(inspector_mode_).Fixed(DPI(38));
+        tools_.Add(overrides_mode_).Fixed(DPI(38));
+        tools_.Add(code_mode_).Fixed(DPI(38));
         tools_.AddSpacer(1).Expand(1);
 
         pages_.Add(inspector_page_, "inspector");
@@ -1125,17 +1133,86 @@ private:
         ctx.mode = ctx.mode == UiThemeMode::Dark
                  ? UiThemeMode::Light : UiThemeMode::Dark;
         UiTheme::Set(ctx);
+        Ctrl::SwapDarkLight();
+        ApplyTheme();
         ApplyProjection();
+    }
+
+    void ApplyTheme()
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_.SetCustomStyle(surface);
+        right_.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &inspector_page_, &overrides_page_, &code_page_ })
+            panel->SetCustomStyle(page_style);
+        for(UiLabel* label : { &editable_label_, &samples_label_, &gallery_label_, &caption_ })
+            label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        inspector_.SetPaletteMode(mode);
+        overrides_.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_, &help_, &exit_, &inspector_mode_, &overrides_mode_, &code_mode_, &copy_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_.SetCustomStyle(exit_style);
+        Refresh();
     }
 
     void UpdateThemeIcon()
     {
         theme_.SetIcon(UiTheme::GetContext().mode == UiThemeMode::Dark
-                     ? ICON_ACTION_DARK_MODE_48()
-                     : ICON_ACTION_LIGHT_MODE_48());
+                     ? ICON_ACTION_LIGHT_MODE_48()
+                     : ICON_ACTION_DARK_MODE_48());
     }
 
 private:
+    PropertyEditorFactory factory_;
+    PropertyEditorModel inspector_model_, override_model_;
+    UiListModel gallery_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
     UiToolButton theme_, help_, exit_;
@@ -1144,7 +1221,6 @@ private:
     UiLabel editable_label_, samples_label_, gallery_label_;
     UiMediaCard card_, empty_card_, full_card_;
     UiGallery gallery_;
-    UiListModel gallery_model_;
     UiMediaCardRender gallery_render_;
     UiLabel caption_;
     Image preview_image_ = MakePreviewImage();
@@ -1158,9 +1234,8 @@ private:
     UiMultiEdit code_;
     UiToolButton copy_;
 
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_, override_model_;
     String generated_;
+    Color window_face_ = SColorFace();
 };
 
 } // namespace

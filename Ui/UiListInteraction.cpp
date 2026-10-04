@@ -130,10 +130,7 @@ void UiList::MouseWheel(Point, int zdelta, dword)
     int extent = max(DPI(18), GetEffectiveStyle().row_height) + max(0, GetEffectiveStyle().item_spacing);
     int rows = max(1, vp.GetHeight() / max(1, extent));
     int step = max(1, rows / 2) * extent;
-    scroll_y_ -= sgn(zdelta) * step;
-    ClampScroll();
-    Layout();
-    Refresh();
+    SetScrollPos(scroll_y_ - sgn(zdelta) * step);
 }
 
 bool UiList::Key(dword key, int)

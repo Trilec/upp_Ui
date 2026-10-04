@@ -6,6 +6,8 @@ uses
 	CtrlCore,
 	CtrlLib,
 	Ui,
+	Ui/UiOsFileDialog,
+	plugin/png,
 	Utilities/PropertyEditor;
 
 file
@@ -16,6 +18,7 @@ file
 	UiGraphDemoCommands.cpp,
 	UiGraphDemoAuthoring.cpp,
 	UiGraphDemoData.cpp,
+	GraphImages.brc,
 	main.cpp;
 
 mainconfig

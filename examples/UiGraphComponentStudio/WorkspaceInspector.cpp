@@ -48,7 +48,7 @@ void NodeWorkspace::RebuildInspector()
         selection_label_.SetText(document_.family.name + " / " + (document_.edit_base ? String("Base style") : String(shape_names[document_.shape]) + " style"));
         bool editable = EditableStyle(document_) != nullptr;
         choice("role", "Role", s.role, "Standard|Subtle|Accent|Alert", "Node role", [this](Document& d, const Value& v) { EditableStyle(d)->role = (int)v; });
-        integer("radius", "Corner radius (-1 inherit)", s.radius, -1, 512, "Silhouette", [this](Document& d, const Value& v) { EditableStyle(d)->radius = (int)v; });
+        integer("radius", "Corner radius (-1 inherit)", s.radius, -1, 60, "Silhouette", [this](Document& d, const Value& v) { EditableStyle(d)->radius = (int)v; });
         integer("frame_width", "Frame width (-1 inherit)", s.frame_width, -1, 32, "Frame", [this](Document& d, const Value& v) { EditableStyle(d)->frame_width = (int)v; });
         integer("header_band", "Header band (-1 inherit)", s.header_band, -1, 1, "Header", [this](Document& d, const Value& v) { EditableStyle(d)->header_band = (int)v; });
         const char* keys[] = { "face", "frame", "ink", "header" };
@@ -73,8 +73,8 @@ void NodeWorkspace::RebuildInspector()
         selection_label_.SetText(document_.family.name + " / " + (page_ == 1 ? String("Template / Layout") : String(region_names[selection_.region])));
         text("family_name", "Family name", document_.family.name, "Family", [](Document& d, const Value& v) { d.family.name = (String)v; });
         choice("body_mode", "Body mode", (int)t.body_mode, "Stack|Centered|Media|Key value|Fields|Port rows|Flow tags", "Layout", [this](Document& d, const Value& v) { EditableLayout(d)->body_mode = (UiGraphNodeBodyMode)(int)v; });
-        integer("header", "Header height", Logical(t.header_height), -1, 1024, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->header_height = Metric(v); });
-        integer("footer", "Footer height", Logical(t.footer_height), 0, 1024, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->footer_height = Metric(v); });
+        integer("header", "Header height", Logical(t.header_height), -1, 1000, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->header_height = Metric(v); });
+        integer("footer", "Footer height", Logical(t.footer_height), 0, 1000, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->footer_height = Metric(v); });
         boolean("ellipse_bands", "Fit ellipse Header/Footer", t.ellipse_bands, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->ellipse_bands = (bool)v; });
         properties_.Find("ellipse_bands")->SetHelp("Ellipse/Circle only: fit contained Header and Footer bands outward. Their authored heights, port reservations and camera are unchanged. Other shapes and Micro keep conservative capacity.");
         integer("ellipse_width", "Band width (%)", t.ellipse_band_width_percent, 20, 100, "Regions", [this](Document& d, const Value& v) { EditableLayout(d)->ellipse_band_width_percent = (int)v; });
@@ -83,7 +83,7 @@ void NodeWorkspace::RebuildInspector()
         const char* names[] = { "Content left", "Content right", "Overlay left", "Overlay right" };
         for(int i = 0; i < 4; i++) {
             String id = "column" + AsString(i);
-            properties_.AddNumericInt(id, names[i], Logical(dimensions[i]), 0, 1024, 1, "Regions");
+            properties_.AddNumericInt(id, names[i], Logical(dimensions[i]), 0, 1000, 1, "Regions");
             AddSetter(id, [this, i](Document& d, const Value& v) { auto* t = EditableLayout(d); int* n[] = {&t->content_left_width, &t->content_right_width, &t->overlay_left_width, &t->overlay_right_width}; *n[i] = Metric(v); });
         }
         boolean("width_policy", "Use projected-width LOD", t.lod_widths.enabled, "LOD", [this](Document& d, const Value& v) { EditableLayout(d)->lod_widths.enabled = (bool)v; });
@@ -99,8 +99,8 @@ void NodeWorkspace::RebuildInspector()
         AddSetter("preview_data", [](Document& d, const Value& v) { Value data = ParseJSON((String)v); if(!data.Is<ValueMap>()) throw Exc("Expected JSON object"); d.data = data; });
         int show_labels = document_.data.Find("show_port_labels");
         boolean("preview_labels", "Show port labels", show_labels >= 0 && document_.data.GetValue(show_labels).Is<bool>() && (bool)document_.data.GetValue(show_labels), "Preview data (not exported)", [](Document& d, const Value& v) { d.data.Set("show_port_labels", v); });
-        integer("width", "Authored width", document_.size.cx, 32, 2048, "Preview size", [](Document& d, const Value& v) { d.size.cx = (int)v; });
-        integer("height", "Authored height", document_.size.cy, 24, 2048, "Preview size", [](Document& d, const Value& v) { d.size.cy = (int)v; });
+        integer("width", "Authored width", document_.size.cx, 32, 1000, "Preview size", [](Document& d, const Value& v) { d.size.cx = (int)v; });
+        integer("height", "Authored height", document_.size.cy, 24, 1000, "Preview size", [](Document& d, const Value& v) { d.size.cy = (int)v; });
     }
     else {
         String component_id = selection_.id;
@@ -126,7 +126,7 @@ void NodeWorkspace::RebuildInspector()
         choice("component_role", "Role", (int)r.component_style.role, "Inherit|Standard|Subtle|Accent|Alert", "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.role = (UiGraphNodeComponentRole)(int)v; }));
         AddPropertyFont(properties_, "font_face", "Font face", r.component_style.font_face, "Typography");
         AddSetter("font_face", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.component_style.font_face = (String)v; }));
-        integer("font_height", "Font height (0 = inherited)", Logical(r.font_height), 0, 256, "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.font_height = Metric(v); }));
+        integer("font_height", "Font height (0 = inherited)", Logical(r.font_height), 0, 96, "Typography", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.font_height = Metric(v); }));
         const int flags[] = { r.component_style.bold, r.component_style.italic, r.component_style.underline };
         const char* names[] = { "Bold", "Italic", "Underline" };
         for(int i = 0; i < 3; i++) {
@@ -158,13 +158,13 @@ void NodeWorkspace::RebuildInspector()
         choice("placement", "Placement", (int)r.placement, "Fill|Top|Bottom|Left|Right|Center", "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.placement = (UiGraphNodeSlotPlacement)(int)v; }));
         choice("align", "Horizontal", r.align_h == UiAlign::LEFT ? 0 : r.align_h == UiAlign::CENTER ? 1 : 2, "Left|Center|Right", "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { const UiAlign a[] = {UiAlign::LEFT, UiAlign::CENTER, UiAlign::RIGHT}; r.align_h = a[(int)v]; }));
         choice("vertical", "Vertical", r.align_v == UiAlign::TOP ? 0 : r.align_v == UiAlign::CENTER ? 1 : 2, "Top|Center|Bottom", "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { const UiAlign a[] = {UiAlign::TOP, UiAlign::CENTER, UiAlign::BOTTOM}; r.align_v = a[(int)v]; }));
-        integer("extent", "Extent (0 = natural)", Logical(r.extent), 0, 2048, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.extent = Metric(v); }));
-        integer("gap", "Gap (-1 = default)", Logical(r.gap_after), -1, 512, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.gap_after = Metric(v); }));
+        integer("extent", "Extent (0 = natural)", Logical(r.extent), 0, 1000, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.extent = Metric(v); }));
+        integer("gap", "Gap (-1 = default)", Logical(r.gap_after), -1, 60, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.gap_after = Metric(v); }));
         choice("flow", "When excluded", (int)r.flow, "Stable reservation|Reflow", "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.flow = (UiGraphNodeSlotFlow)(int)v; }));
         choice("overflow", "Overflow", (int)r.overflow, "Ellipsis|Clip|Wrap", "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.overflow = (UiGraphNodeOverflow)(int)v; }));
         integer("items", "Maximum rows / items", r.max_items, 1, 12, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.max_items = (int)v; }));
-        integer("preferred_width", "Preferred width", Logical(r.preferred_size.cx), 0, 2048, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cx = Metric(v); }));
-        integer("preferred_height", "Preferred height", Logical(r.preferred_size.cy), 0, 2048, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cy = Metric(v); }));
+        integer("preferred_width", "Preferred width", Logical(r.preferred_size.cx), 0, 1000, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cx = Metric(v); }));
+        integer("preferred_height", "Preferred height", Logical(r.preferred_size.cy), 0, 1000, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cy = Metric(v); }));
         choice("small", "Small representation", (int)r.small, "Hidden|Bar|Bar then dot|Dot", "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.small = (UiGraphNodeSmallMode)(int)v; }));
         integer("readable", "Readable minimum (pixels)", r.readable_min_px, 1, 128, "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.readable_min_px = (int)v; }));
         for(int field = 0; field < 3; field++) for(int state = 0; state < 4; state++) {

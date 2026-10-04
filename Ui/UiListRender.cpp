@@ -64,10 +64,12 @@ void UiList::PrepareItemRenders()
 
     UiVisibleRange range = GetVisibleRange(1);
     prepared_render_range_ = range;
-    if(!model_ || range.IsEmpty())
+    int needed = model_ ? range.GetCount() : 0;
+    if(item_render_pool_.GetCount() > needed)
+        item_render_pool_.SetCount(needed);
+    if(needed == 0)
         return;
 
-    int needed = range.GetCount();
     while(item_render_pool_.GetCount() < needed) {
         ItemRenderSlot& slot = item_render_pool_.Add();
         slot.render = item_render_->Clone();
@@ -75,7 +77,7 @@ void UiList::PrepareItemRenders()
 
     for(int slot_index = 0; slot_index < needed; slot_index++) {
         int index = range.first + slot_index;
-        ItemRenderSlot& slot = item_render_pool_[slot_index];
+        ItemRenderSlot& slot = item_render_pool_[index % needed];
         if(slot.index != index) {
             const UiModelItem& item = model_->Get(index);
             UiItemRenderData data = list_owned_style
@@ -116,15 +118,13 @@ void UiList::PrepareItemRenders()
             last_render_layout_count_++;
     }
 
-    for(int i = needed; i < item_render_pool_.GetCount(); i++)
-        item_render_pool_[i].index = -1;
 }
 
 UiItemRender* UiList::FindPreparedItemRender(int index)
 {
     if(prepared_render_range_.IsEmpty() || !prepared_render_range_.Contains(index))
         return nullptr;
-    int slot_index = index - prepared_render_range_.first;
+    int slot_index = index % prepared_render_range_.GetCount();
     if(slot_index < 0 || slot_index >= item_render_pool_.GetCount())
         return nullptr;
     ItemRenderSlot& slot = item_render_pool_[slot_index];

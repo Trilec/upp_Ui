@@ -2,6 +2,7 @@
 *.svg
 *.exe
 /build
+/bin
 /out
 /designs
 /examples/OLD

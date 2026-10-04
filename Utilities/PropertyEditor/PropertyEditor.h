@@ -151,6 +151,19 @@ public:
     Event<String> WhenGroupAction;
 
 private:
+    // Keeps model-driven rebuilds outside an editor's synchronous event stack.
+    class EditorCallbackGuard {
+    public:
+        EditorCallbackGuard(PropertyEditor& owner, const String& property_id);
+        ~EditorCallbackGuard();
+    private:
+        Ptr<PropertyEditor> owner_;
+        bool previous_dispatch_;
+        bool previous_preview_;
+        String previous_inline_id_;
+    };
+    void PostPendingStructureRefresh();
+
     struct DisplayRow : Moveable<DisplayRow> {
         bool group = false;
         String group_id;

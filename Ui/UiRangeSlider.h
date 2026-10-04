@@ -73,6 +73,12 @@ public:
     UiRangeSlider& SetStep(double step);
 
     UiRangeSlider& SetValues(double lower, double upper);
+    // Opt-in body dragging preserves the interval width. Cancellation can
+    // restore the gesture's starting values without firing WhenAction.
+    UiRangeSlider& EnableRangeDrag(bool on = true) { range_drag_enabled_ = on; return *this; }
+    bool IsRangeDragEnabled() const { return range_drag_enabled_; }
+    UiRangeSlider& SetCancelReverts(bool on = true) { cancel_reverts_ = on; return *this; }
+    bool DoesCancelRevert() const { return cancel_reverts_; }
     UiRangeSlider& EnableAdjustableBounds(bool on = true);
     bool HasAdjustableBounds() const { return adjustable_bounds_; }
     UiRangeSlider& SetBounds(double lower, double upper);
@@ -119,6 +125,8 @@ public:
 
     Event<> WhenAction;
     Event<> WhenChanging;
+    Event<> WhenBeginEdit;
+    Event<> WhenCancelEdit;
 
     Event<Draw&, const Rect&,
           const StyledPalette&, const StyledMetrics&, const StyledSkin&,
@@ -136,6 +144,8 @@ public:
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
     virtual bool Key(dword key, int count) override;
+    virtual void CancelMode() override;
+    virtual void State(int reason) override;
 
 private:
     void InvalidateStyleCache();
@@ -171,6 +181,10 @@ private:
 
     Handle active_handle_ = Handle::Lower;
     bool dragging_ = false;
+    bool range_drag_enabled_ = false;
+    bool dragging_range_ = false;
+    bool cancel_reverts_ = false;
+    int drag_start_pos_ = 0;
     bool adjustable_bounds_ = false;
     bool show_endpoint_markers_ = true;
     int drag_offset_ = 0;

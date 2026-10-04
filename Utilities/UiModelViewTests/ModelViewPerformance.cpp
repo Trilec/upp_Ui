@@ -195,6 +195,31 @@ void TestListScale(TestCtx& t, UiListModel& model)
              "single-row model update preserves bounded UiList paint work");
 }
 
+void TestExpandingCollectionViewport(TestCtx& t, UiListModel& model)
+{
+    UiBoxLayout root(UiDirection::V), views(UiDirection::H);
+    UiLabel header;
+    UiList list;
+    UiGallery gallery;
+    list.SetModel(model);
+    gallery.SetModel(model);
+    root.SetGap(8).SetInset(0);
+    views.SetGap(8).SetInset(0);
+    views.Add(list).Expand(1).MinMain(180);
+    views.Add(gallery).Expand(2).MinMain(320);
+    root.Add(header).Fixed(60);
+    root.Add(views).Expand(1).MinMain(120);
+    root.SetRect(0, 0, 900, 540);
+    root.Layout();
+    views.Layout();
+    list.Layout();
+    gallery.Layout();
+    t.Expect(views.GetSize().cy == 472 && list.GetSize().cy == 472 && gallery.GetSize().cy == 472,
+             "vertical Expand bounds collection viewports to available space despite 100,000-item natural height");
+    t.Expect(list.GetLiveItemRenderCount() < 40 && gallery.GetLiveItemRenderCount() < 100,
+             "nested comparison layout keeps both renderer pools bounded to the displayed viewport");
+}
+
 void TestGalleryScale(TestCtx& t, UiListModel& model)
 {
     t.Section("UiGallery high-scale viewport + renderer pool");
@@ -357,6 +382,7 @@ int RunModelViewPerformanceSuite()
     UiListModel model;
     TestModelBulkChange(t, model);
     TestListScale(t, model);
+    TestExpandingCollectionViewport(t, model);
     TestGalleryScale(t, model);
     TestTableScale(t);
 

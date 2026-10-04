@@ -1,4 +1,5 @@
 #include <Ui/Ui.h>
+#include <limits>
 
 using namespace Upp;
 
@@ -105,12 +106,177 @@ void TestGalleryCorrections(TestCtx& t)
     UiTheme::Set(saved);
 }
 
+void TestGalleryReuse(TestCtx& t)
+{
+    UiListModel model;
+    BuildModel(model);
+    UiGallery gallery;
+    gallery.SetModel(model).SetItemSize(Size(48, 48)).SetGap(6).SetInset(8);
+    gallery.SetRect(0, 0, 800, 600);
+    gallery.Layout();
+    struct DirtyDraw : DrawingDraw {
+        Rect dirty;
+        DirtyDraw(Size size, Rect rect) : DrawingDraw(size), dirty(rect) {}
+        bool IsPaintingOp(const Rect& rect) const override { return dirty.Intersects(rect); }
+        Rect GetPaintRect() const override { return dirty; }
+    };
+    DirtyDraw dirty(gallery.GetSize(), gallery.GetItemRect(0));
+    gallery.Paint(dirty);
+    t.Expect(gallery.GetLastPaintItemCount() == 1,
+             "a tile-sized dirty region paints only the affected tile");
+
+    gallery.SetZoom(std::numeric_limits<double>::quiet_NaN());
+    gallery.ZoomBy(std::numeric_limits<double>::infinity());
+    gallery.SetZoomRange(0.5, std::numeric_limits<double>::infinity());
+    t.Expect(gallery.GetZoom() == 1.0 && gallery.GetMaxZoom() == 2.5,
+             "non-finite zoom input preserves valid geometry and range");
+    gallery.SetZoomRange(0.5, 1e300).SetZoom(1e200);
+    t.Expect(gallery.GetZoom() == 1.0 && gallery.GetItemSize() == Size(48, 48),
+             "finite zoom outside integer tile capacity preserves the last valid size");
+    gallery.SetZoomRange(0.5, 2.5);
+    int large_pool = gallery.GetLiveItemRenderCount();
+    gallery.SetRect(0, 0, 200, 160);
+    gallery.Layout();
+    t.Expect(gallery.GetLiveItemRenderCount() == gallery.GetVisibleRange(true).GetCount()
+             && gallery.GetLiveItemRenderCount() < large_pool,
+             "shrinking the viewport releases surplus renderers and their assets");
+
+    ValueArray tokens;
+    tokens.Add(3);
+    tokens.Add(8);
+    gallery.SetData(tokens);
+    t.Expect(gallery.GetSelectionCount() == 1 && gallery.GetCursor() == 3,
+             "array binding respects single-selection mode and chooses its first valid token");
+
+    model.Get(0).enabled = false;
+    model.Get(model.GetCount() - 1).group_header = true;
+    model.Touch(0, model.GetCount());
+    gallery.Key(K_HOME, 1);
+    t.Expect(gallery.GetCursor() == 1, "Home skips a disabled first item");
+    gallery.Key(K_END, 1);
+    t.Expect(gallery.GetCursor() == model.GetCount() - 2, "End skips a terminal group header");
+
+    gallery.SetSelectionMode(UIGALLERYSEL_MULTI).SelectAll();
+    int builds = gallery.GetGeometryBuildCount();
+    model.Get(12).text = "Local text update";
+    model.Touch(12);
+    t.Expect(gallery.GetSelectionCount() == model.GetCount() - 2
+             && gallery.GetGeometryBuildCount() == builds,
+             "local text edit preserves a large selection and uniform geometry");
+    model.Get(12).enabled = false;
+    model.Touch(12);
+    t.Expect(!gallery.IsSelected(12), "ranged update prunes a newly disabled selected item");
+
+    UiListModel replacement;
+    BuildModel(replacement);
+    gallery.ScrollTo(0);
+    gallery.Layout();
+    Point tile = gallery.GetItemRect(2).CenterPoint();
+    gallery.WhenSelection = [&] { gallery.SetModel(replacement); };
+    gallery.LeftDown(tile, 0);
+    t.Expect(&gallery.Model() == &replacement && gallery.GetCursor() == -1,
+             "selection callback model replacement is not overwritten by the opening click");
+
+    gallery.WhenSelection = [&] { gallery.ClearModel(); };
+    int actions = 0;
+    gallery.WhenAction = [&] { actions++; };
+    gallery.Layout();
+    gallery.LeftDouble(gallery.GetItemRect(0).CenterPoint(), 0);
+    t.Expect(actions == 0, "double-click does not activate an item removed by its selection callback");
+    gallery.Layout();
+    t.Expect(gallery.GetLiveItemRenderCount() == 0,
+             "clearing the active model releases prepared renderers");
+}
+
+void TestGalleryCallbacksAndScroll(TestCtx& t)
+{
+    UiListModel model, replacement;
+    BuildModel(model);
+    BuildModel(replacement);
+    UiGallery gallery;
+    gallery.SetModel(model).SetSelectionMode(UIGALLERYSEL_MULTI);
+    gallery.SetRect(0, 0, 500, 300);
+    gallery.Layout();
+    gallery.WhenVisibleRange = [&](int, int) { gallery.SetModel(replacement); };
+    gallery.SetCursor(399);
+    t.Expect(&gallery.Model() == &replacement && gallery.GetCursor() == -1,
+             "visible-range callback model switch cancels pending cursor selection");
+    gallery.WhenVisibleRange.Clear();
+    gallery.SetModel(model);
+    gallery.Layout();
+    gallery.WhenVisibleRange = [&](int first, int last) {
+        if(first >= 0) {
+            model.Get(first).description = "Lazy prepared asset";
+            model.Touch(first, last - first + 1);
+        }
+    };
+    gallery.SetCursor(399);
+    t.Expect(gallery.GetCursor() == 399,
+             "lazy ranged data preparation during scrolling preserves cursor selection");
+    gallery.WhenVisibleRange.Clear();
+    gallery.SetScrollPos(0);
+    gallery.Select(5).Select(2, true);
+    Point background = gallery.GetViewportRect().TopLeft() + Point(2, 2);
+    gallery.LeftDown(background, K_CTRL);
+    gallery.MouseMove(background + Point(50, 50), K_CTRL);
+    gallery.Key(K_ESCAPE, 1);
+    t.Expect(gallery.IsSelected(2) && gallery.IsSelected(5) && gallery.GetCursor() == 2
+             && !gallery.IsMarqueeSelecting(),
+             "Escape restores both the opening marquee selection and cursor");
+    gallery.Select(399);
+    gallery.LeftDown(background, 0);
+    gallery.MouseMove(background + Point(50, 50), 0);
+    model.Remove(0);
+    t.Expect(gallery.IsSelected(398) && gallery.GetCursor() == 398
+             && !gallery.IsMarqueeSelecting(),
+             "structural edit during marquee restores old identities before remapping them");
+
+    One<UiGallery> dying;
+    dying.Create().SetModel(model);
+    dying->SetRect(0, 0, 500, 300);
+    dying->Layout();
+    Point tile = dying->GetItemRect(0).CenterPoint();
+    dying->WhenSelection = [&] { dying.Clear(); };
+    dying->LeftDouble(tile, 0);
+    t.Expect(!dying, "a selection callback can destroy the double-clicked Gallery safely");
+
+    struct TrackingRender : UiItemRenderBasic {
+        int* bindings;
+        Value previous;
+        TrackingRender(int& count) : bindings(&count) {}
+        One<UiItemRender> Clone() const override
+        {
+            One<UiItemRender> result = new TrackingRender(*bindings);
+            CopyConfigurationTo(*result);
+            return result;
+        }
+        void Layout() override
+        {
+            if(previous != GetData().data) {
+                ++*bindings;
+                previous = GetData().data;
+            }
+            UiItemRenderBasic::Layout();
+        }
+    };
+    int bindings = 0;
+    TrackingRender render(bindings);
+    gallery.SetItemRender(render).SetItemSize(Size(60, 60)).SetGap(5).SetInset(0);
+    gallery.Layout();
+    gallery.SetScrollPos(650);
+    int before = bindings;
+    gallery.SetScrollPos(715);
+    t.Expect(bindings - before == gallery.GetColumnCount(),
+             "one-row scroll rebinds only entering items while retaining overlapping renderer data");
+    }
 } // namespace
 
 int RunGalleryRegressionSuite()
 {
     TestCtx t;
     TestGalleryCorrections(t);
+    TestGalleryReuse(t);
+    TestGalleryCallbacksAndScroll(t);
     Cout() << "\nChecks: " << t.checks << ", Fails: " << t.fails << '\n';
     return t.fails ? 1 : 0;
 }

@@ -1,16 +1,8 @@
 uses
-	Core,
-	Draw,
-	CtrlCore,
-	CtrlLib,
-	plugin/png,
-	plugin/jpg,
-	Ui;
-
+    CtrlLib,
+    Ui,
+    Utilities/PropertyEditor;
 file
-	UiDocReviewPanel.h,
-	main.cpp;
-
+    main.cpp;
 mainconfig
-	"" = "GUI";
-
+    "" = "GUI";

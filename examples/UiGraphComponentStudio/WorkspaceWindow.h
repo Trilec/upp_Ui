@@ -27,6 +27,10 @@ class NodeWorkspace : public TopWindow {
     Image preview_image_, preview_small_;
 
     UiBoxLayout root_ { UiDirection::V }, header_ { UiDirection::H }, body_ { UiDirection::H };
+    UiBoxLayout file_tools_ { UiDirection::H };
+    UiPanel rail_surface_, preview_surface_;
+    UiTitleCard title_;
+    UiToolButton theme_, help_, exit_;
     UiBoxLayout left_ { UiDirection::V }, center_top_ { UiDirection::V }, rail_ { UiDirection::V };
     UiBoxLayout threshold_row_ { UiDirection::H }, three_up_ { UiDirection::H }, table_box_ { UiDirection::V };
     UiBoxLayout preview_box_ { UiDirection::V }, region_box_ { UiDirection::V }, overlay_box_ { UiDirection::V };
@@ -38,7 +42,7 @@ class NodeWorkspace : public TopWindow {
     UiLabel heading_, current_, status_, family_label_, shape_label_, scope_label_, palette_label_;
     UiLabel preview_label_, region_label_, overlay_label_, table_label_, selection_label_, preview_data_label_;
     UiLabel preview_names_[3];
-    UiButton new_, clone_, open_, save_, save_as_, undo_button_, theme_;
+    UiButton new_, clone_, open_, save_, save_as_, undo_button_;
     UiButton shape_buttons_[9], detach_layout_, detach_style_, copy_all_;
     UiButton expand_;
     UiButton camera_buttons_[6], remove_, copy_code_, save_code_;
@@ -60,6 +64,7 @@ class NodeWorkspace : public TopWindow {
     UiGraphNodeTemplate* EditableLayout(Document& d);
     Appearance* EditableStyle(Document& d);
     void BuildShell();
+    void ApplyShellTheme();
     void Connect();
     void ApplyDocument(bool update_range = true);
     void Reports();

@@ -3,7 +3,8 @@ uses
 	Ui;
 
 file
-	main.cpp;
+	main.cpp,
+	../UiModelViewTests/GalleryRegression.cpp;
 
 mainconfig
 	"" = "CONSOLE";

@@ -1,3 +1,4 @@
+// Self-contained UiDropdownDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
@@ -21,6 +22,7 @@ String CppString(const String& value)
         if(c == '\\') out << "\\\\";
         else if(c == '"') out << "\\\"";
         else if(c == '\n') out << "\\n";
+        else if(c == '\r') out << "\\r";
         else out.Cat(c);
     }
     return out << '"';
@@ -88,8 +90,10 @@ public:
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
         theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark");
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
         header_actions_.Add(theme_button_).Fixed(DPI(34));
+        help_button_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Demo help");
+        header_actions_.Add(help_button_).Fixed(DPI(34));
         header_actions_.Add(exit_button_).Fixed(DPI(34));
 
         preview_panel_.Add(dropdown_);
@@ -105,12 +109,16 @@ public:
         rail_panel_.Add(code_);
 
         page_bar_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        props_button_.SetText("Properties").SetCheckable().SetChecked(true);
-        data_button_.SetText("Data").SetCheckable();
-        code_button_.SetText("Code").SetCheckable();
-        page_bar_.Add(props_button_).Expand(1);
-        page_bar_.Add(data_button_).Expand(1);
-        page_bar_.Add(code_button_).Expand(1);
+        props_button_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().SetChecked(true);
+        data_button_.SetIcon(ICON_DESIGN_WIDGETS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        code_button_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        page_bar_.Add(props_button_).Fixed(DPI(38));
+        props_button_.Tip("Inspector"); code_button_.Tip("Generated code"); overrides_button_.Tip("Theme Overrides");
+        overrides_button_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        page_bar_.Add(overrides_button_).Fixed(DPI(38));
+        page_bar_.Add(data_button_).Fixed(DPI(38));
+        page_bar_.Add(code_button_).Fixed(DPI(38));
+        page_bar_.AddSpacer(1).Expand(1);
 
         properties_.SetFactory(&factory_);
         properties_.SetModel(&property_model_);
@@ -135,6 +143,8 @@ public:
         ApplyProjection();
         SetPage(0);
     }
+
+    void Paint(Draw& draw) override { draw.DrawRect(GetSize(), window_face_); }
 
     virtual void Layout() override
     {
@@ -161,6 +171,25 @@ public:
         LayoutDataPage();
         code_mode_.SetRect(DPI(8), y, max(0, rr.GetWidth() - DPI(16)), DPI(32));
         code_.SetRect(DPI(8), y + DPI(40), max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - y - DPI(48)));
+    }
+
+    void ExportGenerated(const String& directory)
+    {
+        RealizeDirectory(directory);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiDropdownDemo_single_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiDropdownDemo_single_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiDropdownDemo_single_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = property_model_.Find("text")) property_model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(property_model_.Find(id)) { property_model_.SetValue(id, Color(88, 99, 111), false); break; }
+        ApplyProjection();
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiDropdownDemo_single_authored.cpp"), code_.GetTextUtf8());
+        }
     }
 
 private:
@@ -284,8 +313,10 @@ private:
     void Connect()
     {
         theme_button_.WhenAction = [=] { ToggleTheme(); };
+        help_button_.WhenAction = [=] { PromptOK("UiDropdownDemo: select a preview type, edit its Inspector or Theme Overrides, then copy the selected control from Generated Code."); };
+        overrides_button_.WhenAction = [=] { SelectStylePage(true); };
         exit_button_.WhenAction = [=] { Close(); };
-        props_button_.WhenAction = [=] { SetPage(0); };
+        props_button_.WhenAction = [=] { SelectStylePage(false); };
         data_button_.WhenAction = [=] { SetPage(1); };
         code_button_.WhenAction = [=] { SetPage(2); };
         code_mode_.WhenAction = [=] { UpdateCode(); };
@@ -314,26 +345,26 @@ private:
     UiDropdown::Style MakeStyle() const
     {
         UiDropdown::Style style = UiTheme::ResolveDropdown(ParseRole(AsString(Get("role"))));
-        style.metrics.radius = DPI((int)Get("radius"));
-        style.metrics.frame_width = DPI((int)Get("frame_width"));
-        style.metrics.frame_enabled = (int)Get("frame_width") > 0;
-        style.content_gap = DPI((int)Get("content_gap"));
-        style.indicator_size = DPI((int)Get("indicator_size"));
-        style.popup_min_width = DPI((int)Get("popup_min_width"));
-        style.popup_max_height = DPI((int)Get("popup_max_height"));
-        style.popup_item_height = DPI((int)Get("popup_item_height"));
-        style.popup_max_items = (int)Get("popup_max_items");
-        style.popup_show_scrollbar = (bool)Get("popup_scrollbar");
-        style.popup_space = DPI((int)Get("popup_space"));
-        style.popup_frame_width = DPI((int)Get("popup_frame_width"));
-        style.popup_radius = DPI((int)Get("popup_radius"));
-        style.popup_frame_color = Color(Get("popup_frame"));
-        style.popup_background_color = Color(Get("popup_background"));
+        if(Changed("radius")) style.metrics.radius = DPI((int)Get("radius"));
+        if(Changed("frame_width")) style.metrics.frame_width = DPI((int)Get("frame_width"));
+        if(Changed("frame_width")) style.metrics.frame_enabled = (int)Get("frame_width") > 0;
+        if(Changed("content_gap")) style.content_gap = DPI((int)Get("content_gap"));
+        if(Changed("indicator_size")) style.indicator_size = DPI((int)Get("indicator_size"));
+        if(Changed("popup_min_width")) style.popup_min_width = DPI((int)Get("popup_min_width"));
+        if(Changed("popup_max_height")) style.popup_max_height = DPI((int)Get("popup_max_height"));
+        if(Changed("popup_item_height")) style.popup_item_height = DPI((int)Get("popup_item_height"));
+        if(Changed("popup_max_items")) style.popup_max_items = (int)Get("popup_max_items");
+        if(Changed("popup_scrollbar")) style.popup_show_scrollbar = (bool)Get("popup_scrollbar");
+        if(Changed("popup_space")) style.popup_space = DPI((int)Get("popup_space"));
+        if(Changed("popup_frame_width")) style.popup_frame_width = DPI((int)Get("popup_frame_width"));
+        if(Changed("popup_radius")) style.popup_radius = DPI((int)Get("popup_radius"));
+        if(Changed("popup_frame")) style.popup_frame_color = Color(Get("popup_frame"));
+        if(Changed("popup_background")) style.popup_background_color = Color(Get("popup_background"));
         for(int i = 0; i < 4; i++) {
-            style.palette.face[i] = UiFill::Solid(Color(Get("face")));
-            style.palette.frame[i] = Color(Get("frame"));
-            style.palette.ink[i] = Color(Get("ink"));
-            style.palette.icon[i] = Color(Get("icon_ink"));
+            if(Changed("face")) style.palette.face[i] = UiFill::Solid(Color(Get("face")));
+            if(Changed("frame")) style.palette.frame[i] = Color(Get("frame"));
+            if(Changed("ink")) style.palette.ink[i] = Color(Get("ink"));
+            if(Changed("icon_ink")) style.palette.icon[i] = Color(Get("icon_ink"));
         }
         return style;
     }
@@ -381,7 +412,10 @@ private:
     void SetPage(int page)
     {
         page_ = minmax(page, 0, 2);
-        props_button_.SetChecked(page_ == 0);
+        if(page_ != 0) overrides_view_ = false;
+        UpdatePropertyPage();
+        props_button_.SetChecked(page_ == 0 && !overrides_view_);
+        overrides_button_.SetChecked(page_ == 0 && overrides_view_);
         data_button_.SetChecked(page_ == 1);
         code_button_.SetChecked(page_ == 2);
         properties_.Show(page_ == 0);
@@ -510,6 +544,45 @@ private:
         out << "dropdown.SetCustomStyle(style);\n";
     }
 
+    String AuthoredStyleCode(const String& source) const
+    {
+        String result;
+        for(const String& line : Split(source, '\n', false)) {
+            bool keep = true;
+            if(TrimLeft(line).StartsWith("style.metrics.radius")) keep = Changed("radius");
+            if(TrimLeft(line).StartsWith("style.metrics.frame_width")) keep = Changed("frame_width");
+            if(TrimLeft(line).StartsWith("style.metrics.frame_enabled")) keep = Changed("frame_width");
+            if(TrimLeft(line).StartsWith("style.content_gap")) keep = Changed("content_gap");
+            if(TrimLeft(line).StartsWith("style.indicator_size")) keep = Changed("indicator_size");
+            if(TrimLeft(line).StartsWith("style.popup_min_width")) keep = Changed("popup_min_width");
+            if(TrimLeft(line).StartsWith("style.popup_max_height")) keep = Changed("popup_max_height");
+            if(TrimLeft(line).StartsWith("style.popup_item_height")) keep = Changed("popup_item_height");
+            if(TrimLeft(line).StartsWith("style.popup_max_items")) keep = Changed("popup_max_items");
+            if(TrimLeft(line).StartsWith("style.popup_show_scrollbar")) keep = Changed("popup_scrollbar");
+            if(TrimLeft(line).StartsWith("style.popup_space")) keep = Changed("popup_space");
+            if(TrimLeft(line).StartsWith("style.popup_frame_width")) keep = Changed("popup_frame_width");
+            if(TrimLeft(line).StartsWith("style.popup_radius")) keep = Changed("popup_radius");
+            if(TrimLeft(line).StartsWith("style.popup_frame_color")) keep = Changed("popup_frame");
+            if(TrimLeft(line).StartsWith("style.popup_background_color")) keep = Changed("popup_background");
+            if(TrimLeft(line).StartsWith("style.palette.face")) keep = Changed("face");
+            if(TrimLeft(line).StartsWith("style.palette.frame")) keep = Changed("frame");
+            if(TrimLeft(line).StartsWith("style.palette.ink")) keep = Changed("ink");
+            if(TrimLeft(line).StartsWith("style.palette.icon")) keep = Changed("icon_ink");
+            if(keep) result << line << "\n";
+        }
+        Vector<String> lines = Split(result, '\n', false);
+        bool authored = false;
+        for(const String& line : lines) if(TrimLeft(line).StartsWith("style.")) authored = true;
+        result.Clear();
+        for(int i = 0; i < lines.GetCount(); i++) {
+            String trimmed = TrimLeft(lines[i]);
+            if(trimmed.StartsWith("for(int state") && i + 1 < lines.GetCount() && TrimBoth(lines[i + 1]) == "}") { i++; continue; }
+            if(!authored && (lines[i].Find("::Style style =") >= 0 || lines[i].Find(".SetCustomStyle(style)") >= 0)) continue;
+            result << lines[i] << "\n";
+        }
+        return result;
+    }
+
     void UpdateCode()
     {
         String mode = AsString(code_mode_.GetSelectedData());
@@ -529,6 +602,24 @@ private:
         else if(mode == "explicit") EmitStyle(out, false);
         else out << "\n// Usage mode keeps popup chrome on the active UiTheme defaults.\n";
         out << "\ndropdown.WhenSelect = [&](int row) { Value id = dropdown.GetSelectedData(); /* react */ };\n";
+        if(mode == "changes") out = AuthoredStyleCode(out);
+        const String preamble = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
+        if(out.StartsWith(preamble)) {
+            String body = out.Mid(preamble.GetCount());
+            String members, setup;
+            for(const String& line : Split(body, '\n', false)) {
+                String declaration = TrimBoth(line);
+                bool member = declaration.StartsWith("Ui") && declaration.EndsWith(";")
+                           && declaration.Find("::") < 0 && declaration.Find('(') < 0
+                           && declaration.Find('=') < 0 && declaration.Find('.') < 0;
+                if(member) members << "    " << declaration << "\n";
+                else setup << "        " << line << "\n";
+            }
+            out = preamble + "class ControlExample : public ParentCtrl {\n" + members
+                + "public:\n    ControlExample() {\n" + setup;
+            out << "        Add(dropdown.HSizePos(DPI(12), DPI(12)).VCenterPos(DPI(40)));\n";
+            out << "    }\n};\n";
+        }
         code_.SetTextUtf8(out);
     }
 
@@ -542,43 +633,112 @@ private:
         ApplyProjection();
     }
 
+    bool IsStyleProperty(const String& id) const
+    {
+        static const char* ids[] = { "content_gap", "face", "frame", "frame_width", "icon_ink", "indicator_size", "ink", "popup_background", "popup_frame", "popup_frame_width", "popup_item_height", "popup_max_height", "popup_max_items", "popup_min_width", "popup_radius", "popup_scrollbar", "popup_space", "radius" };
+        for(const char* name : ids) if(id == name) return true;
+        return false;
+    }
+
+    void UpdatePropertyPage()
+    {
+        for(const PropertyEditorItem& item : property_model_.GetItems())
+            property_model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
+        property_model_.StructureChanged();
+    }
+
+    void SelectStylePage(bool style)
+    {
+        overrides_view_ = style;
+        SetPage(0);
+    }
+
     void ApplyTheme()
     {
-        UiTitleCard::Style hs = UiTheme::ResolveTitleCard(UiRole::Accent);
-        hs.title_line = false;
-        header_.SetCustomStyle(hs);
-        preview_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-        rail_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-        data_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        theme_button_.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_panel_.SetCustomStyle(surface);
+        rail_panel_.SetCustomStyle(surface);
+
+
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        properties_.SetPaletteMode(mode);
+
+        for(PropertyEditor* editor : { &properties_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_button_, &help_button_, &exit_button_, &props_button_, &overrides_button_, &code_button_, &data_button_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_button_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_button_.SetCustomStyle(exit_style);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        data_panel_.SetCustomStyle(page_style);
         status_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         item_text_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         item_enabled_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-        props_button_.SetCustomStyle(UiTheme::ResolveButton(page_ == 0 ? UiRole::Accent : UiRole::Subtle));
-        data_button_.SetCustomStyle(UiTheme::ResolveButton(page_ == 1 ? UiRole::Accent : UiRole::Subtle));
-        code_button_.SetCustomStyle(UiTheme::ResolveButton(page_ == 2 ? UiRole::Accent : UiRole::Subtle));
-        theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
-        exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
-            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        Refresh();
     }
 
 private:
+    bool overrides_view_ = false;
+    Color window_face_ = SColorFace();
     UiListModel items_;
+    PropertyEditorFactory factory_;
+    PropertyEditorModel property_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
-    UiToolButton theme_button_, exit_button_;
+    UiToolButton theme_button_, help_button_, exit_button_;
     UiPanel preview_panel_, rail_panel_;
     UiDropdown dropdown_;
     UiLabel status_;
 
     UiBoxLayout page_bar_ { UiDirection::H };
-    UiButton props_button_, data_button_, code_button_;
+    UiToolButton props_button_, overrides_button_, data_button_, code_button_;
     int page_ = 0;
 
     PropertyEditor properties_;
-    PropertyEditorFactory factory_;
-    PropertyEditorModel property_model_;
 
     UiPanel data_panel_;
     UiList data_list_;
@@ -596,5 +756,8 @@ private:
 
 GUI_APP_MAIN
 {
-    UiDropdownDemoWindow().Run();
+    UiDropdownDemoWindow demo;
+    const Vector<String>& args = CommandLine();
+    if(args.GetCount() == 2 && args[0] == "--export-generated") demo.ExportGenerated(args[1]);
+    else demo.Run();
 }

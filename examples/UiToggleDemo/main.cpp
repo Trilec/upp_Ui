@@ -1,3 +1,4 @@
+// Self-contained UiToggleDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
@@ -64,8 +65,10 @@ public:
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
         header_actions_.AddSpacer(1).Expand(1);
         theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("Toggle light/dark");
-        exit_button_.SetIcon(ICON_NAVIGATION_EXIT_TO_APP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
+        exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("Close demo");
         header_actions_.Add(theme_button_).Fixed(DPI(34));
+        help_button_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("Demo help");
+        header_actions_.Add(help_button_).Fixed(DPI(34));
         header_actions_.Add(exit_button_).Fixed(DPI(34));
 
         preview_panel_.Add(toggle_);
@@ -77,10 +80,14 @@ public:
         rail_panel_.Add(code_mode_);
         rail_panel_.Add(code_);
         view_bar_.SetGap(DPI(5)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
-        props_button_.SetText("Properties").SetCheckable().SetChecked(true);
-        code_button_.SetText("Code").SetCheckable();
-        view_bar_.Add(props_button_).Expand(1);
-        view_bar_.Add(code_button_).Expand(1);
+        props_button_.SetIcon(ICON_DESIGN_TUNE_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable().SetChecked(true);
+        code_button_.SetIcon(ICON_DESIGN_CODE_BLOCKS_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(props_button_).Fixed(DPI(38));
+        props_button_.Tip("Inspector"); code_button_.Tip("Generated code"); overrides_button_.Tip("Theme Overrides");
+        overrides_button_.SetIcon(ICON_DESIGN_FORMAT_PAINT_48()).SetIconSize(DPI(17), DPI(17)).SetCheckable();
+        view_bar_.Add(overrides_button_).Fixed(DPI(38));
+        view_bar_.Add(code_button_).Fixed(DPI(38));
+        view_bar_.AddSpacer(1).Expand(1);
 
         code_mode_.UseInternalModel().Clear()
                   .Add("Usage", "usage")
@@ -103,6 +110,8 @@ public:
         ApplyProjection();
         SetCodeView(false);
     }
+
+    void Paint(Draw& draw) override { draw.DrawRect(GetSize(), window_face_); }
 
     virtual void Layout() override
     {
@@ -129,6 +138,25 @@ public:
         properties_.SetRect(DPI(8), y, max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - y - DPI(8)));
         code_mode_.SetRect(DPI(8), y, max(0, rr.GetWidth() - DPI(16)), DPI(32));
         code_.SetRect(DPI(8), y + DPI(40), max(0, rr.GetWidth() - DPI(16)), max(0, rr.GetHeight() - y - DPI(48)));
+    }
+
+    void ExportGenerated(const String& directory)
+    {
+        RealizeDirectory(directory);
+        code_mode_.SelectByData("usage"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiToggleDemo_single_usage.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiToggleDemo_single_changes.cpp"), code_.GetTextUtf8());
+        code_mode_.SelectByData("explicit"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiToggleDemo_single_explicit.cpp"), code_.GetTextUtf8());
+        {
+        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
+        for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
+        ApplyProjection();
+        code_mode_.SelectByData("changes"); UpdateCode();
+        SaveFile(AppendFileName(directory, "UiToggleDemo_single_authored.cpp"), code_.GetTextUtf8());
+        }
     }
 
 private:
@@ -192,8 +220,10 @@ private:
     void Connect()
     {
         theme_button_.WhenAction = [=] { ToggleTheme(); };
+        help_button_.WhenAction = [=] { PromptOK("UiToggleDemo: select a preview type, edit its Inspector or Theme Overrides, then copy the selected control from Generated Code."); };
+        overrides_button_.WhenAction = [=] { SelectStylePage(true); };
         exit_button_.WhenAction = [=] { Close(); };
-        props_button_.WhenAction = [=] { SetCodeView(false); };
+        props_button_.WhenAction = [=] { SelectStylePage(false); };
         code_button_.WhenAction = [=] { SetCodeView(true); };
         code_mode_.WhenAction = [=] { UpdateCode(); };
         properties_.WhenPreview = [=](String, Value) { ApplyProjection(); };
@@ -217,24 +247,24 @@ private:
     UiToggle::Style MakeStyle() const
     {
         UiToggle::Style style = UiTheme::ResolveToggle(UiRole::Accent);
-        style.direction = ParseDirection(AsString(Get("direction")));
-        style.track_side = ParseSide(AsString(Get("track_side")));
-        style.track_size = Size(DPI((int)Get("track_width")), DPI((int)Get("track_height")));
-        style.thumb_size = Size(DPI((int)Get("thumb_width")), DPI((int)Get("thumb_height")));
-        style.thumb_inset = DPI((int)Get("thumb_inset"));
-        style.animate = (bool)Get("animate");
-        style.animation_ms = (int)Get("animation_ms");
-        style.track_metrics.radius = DPI((int)Get("track_radius"));
-        style.track_metrics.frame_width = DPI((int)Get("track_frame_width"));
-        style.track_metrics.frame_enabled = (int)Get("track_frame_width") > 0;
-        style.thumb_metrics.radius = DPI((int)Get("thumb_radius"));
-        style.thumb_metrics.frame_width = DPI((int)Get("thumb_frame_width"));
-        style.thumb_metrics.frame_enabled = (int)Get("thumb_frame_width") > 0;
+        if(Changed("direction")) style.direction = ParseDirection(AsString(Get("direction")));
+        if(Changed("track_side")) style.track_side = ParseSide(AsString(Get("track_side")));
+        if(Changed("track_height") || Changed("track_width")) style.track_size = Size(DPI((int)Get("track_width")), DPI((int)Get("track_height")));
+        if(Changed("thumb_height") || Changed("thumb_width")) style.thumb_size = Size(DPI((int)Get("thumb_width")), DPI((int)Get("thumb_height")));
+        if(Changed("thumb_inset")) style.thumb_inset = DPI((int)Get("thumb_inset"));
+        if(Changed("animate")) style.animate = (bool)Get("animate");
+        if(Changed("animation_ms")) style.animation_ms = (int)Get("animation_ms");
+        if(Changed("track_radius")) style.track_metrics.radius = DPI((int)Get("track_radius"));
+        if(Changed("track_frame_width")) style.track_metrics.frame_width = DPI((int)Get("track_frame_width"));
+        if(Changed("track_frame_width")) style.track_metrics.frame_enabled = (int)Get("track_frame_width") > 0;
+        if(Changed("thumb_radius")) style.thumb_metrics.radius = DPI((int)Get("thumb_radius"));
+        if(Changed("thumb_frame_width")) style.thumb_metrics.frame_width = DPI((int)Get("thumb_frame_width"));
+        if(Changed("thumb_frame_width")) style.thumb_metrics.frame_enabled = (int)Get("thumb_frame_width") > 0;
         for(int i = 0; i < 4; i++) {
-            style.track_palette.face[i] = UiFill::Solid(Color(Get("track_face")));
-            style.track_palette.frame[i] = Color(Get("track_frame"));
-            style.thumb_palette.face[i] = UiFill::Solid(Color(Get("thumb_face")));
-            style.thumb_palette.frame[i] = Color(Get("thumb_frame"));
+            if(Changed("track_face")) style.track_palette.face[i] = UiFill::Solid(Color(Get("track_face")));
+            if(Changed("track_frame")) style.track_palette.frame[i] = Color(Get("track_frame"));
+            if(Changed("thumb_face")) style.thumb_palette.face[i] = UiFill::Solid(Color(Get("thumb_face")));
+            if(Changed("thumb_frame")) style.thumb_palette.frame[i] = Color(Get("thumb_frame"));
         }
         return style;
     }
@@ -265,7 +295,10 @@ private:
     void SetCodeView(bool on)
     {
         code_view_ = on;
-        props_button_.SetChecked(!on);
+        if(on) overrides_view_ = false;
+        UpdatePropertyPage();
+        props_button_.SetChecked(!on && !overrides_view_);
+        overrides_button_.SetChecked(!on && overrides_view_);
         code_button_.SetChecked(on);
         properties_.Show(!on);
         code_mode_.Show(on);
@@ -304,6 +337,43 @@ private:
         out << "toggle.SetCustomStyle(style);\n";
     }
 
+    String AuthoredStyleCode(const String& source) const
+    {
+        String result;
+        for(const String& line : Split(source, '\n', false)) {
+            bool keep = true;
+            if(TrimLeft(line).StartsWith("style.direction")) keep = Changed("direction");
+            if(TrimLeft(line).StartsWith("style.track_side")) keep = Changed("track_side");
+            if(TrimLeft(line).StartsWith("style.track_size")) keep = Changed("track_height") || Changed("track_width");
+            if(TrimLeft(line).StartsWith("style.thumb_size")) keep = Changed("thumb_height") || Changed("thumb_width");
+            if(TrimLeft(line).StartsWith("style.thumb_inset")) keep = Changed("thumb_inset");
+            if(TrimLeft(line).StartsWith("style.animate")) keep = Changed("animate");
+            if(TrimLeft(line).StartsWith("style.animation_ms")) keep = Changed("animation_ms");
+            if(TrimLeft(line).StartsWith("style.track_metrics.radius")) keep = Changed("track_radius");
+            if(TrimLeft(line).StartsWith("style.track_metrics.frame_width")) keep = Changed("track_frame_width");
+            if(TrimLeft(line).StartsWith("style.track_metrics.frame_enabled")) keep = Changed("track_frame_width");
+            if(TrimLeft(line).StartsWith("style.thumb_metrics.radius")) keep = Changed("thumb_radius");
+            if(TrimLeft(line).StartsWith("style.thumb_metrics.frame_width")) keep = Changed("thumb_frame_width");
+            if(TrimLeft(line).StartsWith("style.thumb_metrics.frame_enabled")) keep = Changed("thumb_frame_width");
+            if(TrimLeft(line).StartsWith("style.track_palette.face")) keep = Changed("track_face");
+            if(TrimLeft(line).StartsWith("style.track_palette.frame")) keep = Changed("track_frame");
+            if(TrimLeft(line).StartsWith("style.thumb_palette.face")) keep = Changed("thumb_face");
+            if(TrimLeft(line).StartsWith("style.thumb_palette.frame")) keep = Changed("thumb_frame");
+            if(keep) result << line << "\n";
+        }
+        Vector<String> lines = Split(result, '\n', false);
+        bool authored = false;
+        for(const String& line : lines) if(TrimLeft(line).StartsWith("style.")) authored = true;
+        result.Clear();
+        for(int i = 0; i < lines.GetCount(); i++) {
+            String trimmed = TrimLeft(lines[i]);
+            if(trimmed.StartsWith("for(int state") && i + 1 < lines.GetCount() && TrimBoth(lines[i + 1]) == "}") { i++; continue; }
+            if(!authored && (lines[i].Find("::Style style =") >= 0 || lines[i].Find(".SetCustomStyle(style)") >= 0)) continue;
+            result << lines[i] << "\n";
+        }
+        return result;
+    }
+
     void UpdateCode()
     {
         String mode = AsString(code_mode_.GetSelectedData());
@@ -322,6 +392,24 @@ private:
         else if(mode == "explicit") EmitStyle(out, false);
         else out << "\n// Usage mode deliberately relies on the active UiTheme style.\n";
         out << "\ntoggle.WhenAction = [&] { bool on = toggle.IsOn(); /* react to the new value */ };\n";
+        if(mode == "changes") out = AuthoredStyleCode(out);
+        const String preamble = "#include <Ui/Ui.h>\n\nusing namespace Upp;\n\n";
+        if(out.StartsWith(preamble)) {
+            String body = out.Mid(preamble.GetCount());
+            String members, setup;
+            for(const String& line : Split(body, '\n', false)) {
+                String declaration = TrimBoth(line);
+                bool member = declaration.StartsWith("Ui") && declaration.EndsWith(";")
+                           && declaration.Find("::") < 0 && declaration.Find('(') < 0
+                           && declaration.Find('=') < 0 && declaration.Find('.') < 0;
+                if(member) members << "    " << declaration << "\n";
+                else setup << "        " << line << "\n";
+            }
+            out = preamble + "class ControlExample : public ParentCtrl {\n" + members
+                + "public:\n    ControlExample() {\n" + setup;
+            out << "        Add(toggle.HSizePos(DPI(12), DPI(12)).VCenterPos(DPI(80)));\n";
+            out << "    }\n};\n";
+        }
         code_.SetTextUtf8(out);
     }
 
@@ -335,35 +423,102 @@ private:
         ApplyProjection();
     }
 
+    bool IsStyleProperty(const String& id) const
+    {
+        static const char* ids[] = { "animate", "animation_ms", "direction", "thumb_face", "thumb_frame", "thumb_frame_width", "thumb_height", "thumb_inset", "thumb_radius", "thumb_width", "track_face", "track_frame", "track_frame_width", "track_height", "track_radius", "track_side", "track_width" };
+        for(const char* name : ids) if(id == name) return true;
+        return false;
+    }
+
+    void UpdatePropertyPage()
+    {
+        for(const PropertyEditorItem& item : model_.GetItems())
+            model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
+        model_.StructureChanged();
+    }
+
+    void SelectStylePage(bool style)
+    {
+        overrides_view_ = style;
+        SetCodeView(false);
+    }
+
     void ApplyTheme()
     {
-        UiTitleCard::Style hs = UiTheme::ResolveTitleCard(UiRole::Accent);
-        hs.title_line = false;
-        header_.SetCustomStyle(hs);
-        preview_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-        rail_panel_.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        theme_button_.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        header_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        preview_panel_.SetCustomStyle(surface);
+        rail_panel_.SetCustomStyle(surface);
+
+
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        properties_.SetPaletteMode(mode);
+
+        for(PropertyEditor* editor : { &properties_ }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &theme_button_, &help_button_, &exit_button_, &props_button_, &overrides_button_, &code_button_ }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = exit_button_.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        exit_button_.SetCustomStyle(exit_style);
         state_label_.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-        props_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Subtle : UiRole::Accent));
-        code_button_.SetCustomStyle(UiTheme::ResolveButton(code_view_ ? UiRole::Accent : UiRole::Subtle));
-        theme_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Standard));
-        exit_button_.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
         code_mode_.SetCustomStyle(UiTheme::ResolveDropdown(UiRole::Standard));
-        properties_.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark
-            ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
+        Refresh();
     }
 
 private:
+    bool overrides_view_ = false;
+    Color window_face_ = SColorFace();
+    PropertyEditorFactory factory_;
+    PropertyEditorModel model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
-    UiToolButton theme_button_, exit_button_;
+    UiToolButton theme_button_, help_button_, exit_button_;
     UiPanel preview_panel_, rail_panel_;
     UiToggle toggle_;
     UiLabel state_label_;
     UiBoxLayout view_bar_ { UiDirection::H };
-    UiButton props_button_, code_button_;
+    UiToolButton props_button_, overrides_button_, code_button_;
     PropertyEditor properties_;
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
     UiDropdown code_mode_;
     UiMultiEdit code_;
     bool code_view_ = false;
@@ -373,5 +528,8 @@ private:
 
 GUI_APP_MAIN
 {
-    UiToggleDemoWindow().Run();
+    UiToggleDemoWindow demo;
+    const Vector<String>& args = CommandLine();
+    if(args.GetCount() == 2 && args[0] == "--export-generated") demo.ExportGenerated(args[1]);
+    else demo.Run();
 }

@@ -660,52 +660,71 @@ void UiLabelDemo::ToggleTheme()
 }
 
 void UiLabelDemo::ApplyTheme()
-{
-    UiTitleCard::Style header_style = UiTheme::ResolveTitleCard(UiRole::Accent);
-    header_style.title_line = false;
-    header_style.card_line = true;
-    header_style.card_line_style = SOLID;
-    header_style.card_line_length = LARGE;
-    header_style.card_line_side = UiAlign::BOTTOM;
-    header_style.card_line_thickness = DPI(1);
-    header_style.card_line_gap = 0;
-    header_style.card_line_color_enabled = true;
-    header_style.card_line_color = Color(0, 120, 212);
-    header_style.media_tint_mono = true;
-    tc_header.SetCustomStyle(header_style);
-    pnl_preview.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Surface));
-    pnl_right_rail.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_inspector_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_overrides_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    pnl_code_page.SetCustomStyle(UiTheme::ResolvePanel(UiPanelRole::Subtle));
-    lbl_preview_caption.SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
-    btn_exit.SetCustomStyle(UiTheme::ResolveToolButton(UiRole::Alert));
-    ConfigureModeButton(btn_inspector_mode);
-    ConfigureModeButton(btn_overrides_mode);
-    ConfigureModeButton(btn_code_mode);
-    pe_inspector.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
-    pe_overrides.SetPaletteMode(UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
-}
+    {
+        const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
+        btn_theme.SetIcon(dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
+        window_face_ = UiTheme::ResolvePanel(UiPanelRole::Surface).palette.face[ST_NORMAL].color;
+        tc_header.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
+        UiPanel::Style surface = UiTheme::ResolvePanel(UiPanelRole::Surface);
+        const Color panel_face = dark ? Color(18, 18, 18) : Color(245, 245, 245);
+        surface.transparent = false;
+        surface.metrics.face_enabled = true;
+        surface.metrics.frame_enabled = true;
+        surface.metrics.frame_width = DPI(1);
+        surface.metrics.radius = DPI(8);
+        surface.metrics.shadow.enabled = false;
+        surface.metrics.focus_enabled = false;
+        for(int state = 0; state < 4; state++) {
+            surface.palette.face[state] = UiFill::Solid(panel_face);
+            surface.palette.frame[state] = dark ? Color(48, 48, 48) : Color(220, 220, 220);
+        }
+        pnl_preview.SetCustomStyle(surface);
+        pnl_right_rail.SetCustomStyle(surface);
+        UiPanel::Style page_style = surface;
+        page_style.transparent = true;
+        page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
+        for(UiPanel* panel : { &pnl_inspector_page, &pnl_overrides_page, &pnl_code_page })
+            panel->SetCustomStyle(page_style);
+        for(UiLabel* label : { &lbl_preview_caption })
+            label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
+        const auto mode = dark
+                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+        pe_inspector.SetPaletteMode(mode);
+        pe_overrides.SetPaletteMode(mode);
+        for(PropertyEditor* editor : { &pe_inspector, &pe_overrides }) {
+            PropertyEditorStyle editor_style = editor->GetStyle();
+            editor_style.show_frame = false;
+            editor_style.background = panel_face;
+            editor_style.show_group_summaries = true;
+            editor->SetStyle(editor_style);
+        }
+        for(UiToolButton* button : { &btn_theme, &btn_help, &btn_exit, &btn_inspector_mode, &btn_overrides_mode, &btn_code_mode, &btn_copy_code }) {
+            UiToolButton::Style style = UiTheme::ResolveToolButton(UiRole::Standard);
+            style.transparent = true;
+            style.metrics.face_enabled = style.metrics.frame_enabled = false;
+            style.metrics.focus_enabled = false;
+            style.metrics.shadow.enabled = false;
+            style.underline = false;
+            for(int state = 0; state < 4; state++) {
+                style.palette.face[state] = UiFill::None();
+                style.palette.frame[state] = Null;
+            }
+            const Color neutral = dark ? Color(180, 180, 180) : Color(110, 110, 110);
+            style.palette.icon[ST_NORMAL] = neutral;
+            style.palette.icon[ST_HOT] = dark ? White() : Color(32, 32, 32);
+            style.palette.icon[ST_PRESSED] = Color(0, 120, 212);
+            style.palette.icon[ST_DISABLED] = Blend(neutral, panel_face, 150);
+            button->SetCustomStyle(style);
+        }
+        UiToolButton::Style exit_style = btn_exit.GetStyle();
+        exit_style.palette.icon[ST_NORMAL] = Color(200, 60, 60);
+        exit_style.palette.icon[ST_HOT] = Color(240, 85, 85);
+        exit_style.palette.icon[ST_PRESSED] = Color(180, 45, 45);
+        btn_exit.SetCustomStyle(exit_style);
+        Refresh();
+    }
 
-void UiLabelDemo::ConfigureModeButton(UiToolButton& button)
-{
-    // Keep a checkable mode button visibly "selected": a blue-tinted face, blue
-    // ink/icon and a 2px accent underline in the checked (pressed) state, with
-    // a lighter face on hover. The rest of the style stays theme-driven.
-    UiToolButton::Style style = button.GetStyle();
-    const bool dark = UiTheme::GetContext().mode == UiThemeMode::Dark;
-    const Color accent   = Color(0, 112, 216);
-    const Color selected = dark ? Color(22, 52, 96) : Color(207, 226, 250);
-    const Color hover    = dark ? Color(30, 34, 40) : Color(246, 248, 251);
-    style.palette.face[ST_HOT]     = UiFill::Solid(hover);
-    style.palette.face[ST_PRESSED] = UiFill::Solid(selected);
-    style.palette.ink[ST_PRESSED]  = accent;
-    style.palette.icon[ST_PRESSED] = accent;
-    style.underline = true;
-    style.underline_width = DPI(2);
-    style.underline_offset = DPI(0);
-    button.SetCustomStyle(style);
-}
+
 
 void UiLabelDemo::Layout()
 {
@@ -731,3 +750,16 @@ void UiLabelDemo::Layout()
 }
 
 } // namespace Upp
+
+namespace Upp {
+void UiLabelDemo::Paint(Draw& draw) { draw.DrawRect(GetSize(), window_face_); }
+}
+
+namespace Upp {
+void UiLabelDemo::ExportGenerated(const String& directory)
+{
+    RealizeDirectory(directory);
+    UpdateGeneratedCode();
+    SaveFile(AppendFileName(directory, "UiLabelDemo_default.cpp"), str_generated_code);
+}
+}

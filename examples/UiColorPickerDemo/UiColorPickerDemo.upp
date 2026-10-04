@@ -1,6 +1,7 @@
 description "UiColorPicker demo\377";
 
 uses
+	Utilities/PropertyEditor,
 	Ui,
 	plugin/png,
 	plugin/jpg,

@@ -120,6 +120,12 @@ UiList::UiList()
 {
     BackPaint();
     WantFocus();
+    Add(vscroll_);
+    vscroll_.EnableThinIdle(true);
+    vscroll_.WhenScroll = [=] {
+        if(!updating_scrollbar_)
+            SetScrollPos(vscroll_.GetPos());
+    };
     Add(drag_marker_);
     drag_marker_.Color(Color(56, 146, 255)).IgnoreMouse().Hide();
 
