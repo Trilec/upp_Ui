@@ -2,6 +2,13 @@
 
 Version: **1.1.0**
 
+## 2026-10 - adapter naming
+
+- renamed the built-in adapter implementation and regression package to remove
+  the historical V1 label; there remains one PropertyEditor control and factory;
+- maintained demos use complete registration; the original subset entry point
+  remains a compatibility wrapper for existing applications.
+
 ## 2026-10 - editor callback lifecycle and integer presentation
 
 - protect active and inline editor Preview/Commit across synchronous model structure notifications; defer row rebuilding until the editor callback stack unwinds, including nested event processing;

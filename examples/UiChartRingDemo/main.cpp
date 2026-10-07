@@ -66,7 +66,7 @@ public:
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
 
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
         BuildHeader();
         BuildPreview();
         BuildRightRail();

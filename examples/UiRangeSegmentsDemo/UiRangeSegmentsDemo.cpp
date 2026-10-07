@@ -86,7 +86,7 @@ UiRangeSegmentsDemo::UiRangeSegmentsDemo()
     lod.Add(UiRangeSegment(18, "LOD 3"));
     ranges_.SetRange(0, 100).SetSegments(lod).SetValueDisplay(UiRangeSegments::ValueDisplay::Percent);
 
-    RegisterPropertyEditorV1Editors(factory_);
+    RegisterPropertyEditorEditors(factory_);
     BuildHeader();
     BuildPreview();
     BuildRightRail();

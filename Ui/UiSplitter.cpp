@@ -456,7 +456,7 @@ void UiSplitter::Paint(Draw& w)
         if(feedback != track)
             UiPaintStyledSurface(w, feedback, style.track_palette, style.track_metrics, style.track_skin, st, false, false, false);
         UiPaintStyledSurface(w, track, style.track_palette, style.track_metrics, style.track_skin,
-                             feedback != track ? ST_NORMAL : st, false, false, false);
+                             st, false, false, false);
 
         Rect thumb = GetThumbRect(i);
         UiPaintStyledSurface(w, thumb, style.thumb_palette, style.thumb_metrics, style.thumb_skin, st, false, false, false);

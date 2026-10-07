@@ -23,7 +23,7 @@ public:
     void ConfigureExport(const String& mode) { model_.SetValue("mode",mode); Apply(); }
     Demo() {
         Title("UiOsFileDialog Demo"); Sizeable().Zoomable(); SetRect(0,0,DPI(1160),DPI(760));
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("UiOsFileDialog").SetSubTitle("Native file and folder selection through one public wrapper").ShowTitleLine(false)
                .SetContentCell(actions_);

@@ -26,6 +26,11 @@ source paths are recorded in `tests/ui_release_inventory.json` under
 `retired_test_packages`; the normalized-source audit is documented in
 `tests/CONTROL_AUDIT.md`.
 
+The inventory is maintained source metadata used by `examples/build_demos.py` and
+`scripts/ValidateUiRelease.ps1`; it is not a generated test report or private log.
+Keep it when cleaning build outputs, so canonical demos and coverage routes remain
+discoverable without scanning old executables.
+
 Focused RangeSegments, Gallery, callback lifecycle, numeric, Doc, PropertyEditor,
 native/platform and other unique regression targets remain separate. Gallery's
 small entry point already uses the shared aggregate source. Different test bodies

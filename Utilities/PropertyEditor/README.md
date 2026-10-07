@@ -11,7 +11,7 @@ Version: **1.1.0**
 - `Utilities/PropertyEditorDemo` — broad built-in/editor interaction demonstration
 - `Utilities/PropertyEditorSemanticDemo` — semantic value/editor capability demonstration
 - `Utilities/PropertyEditorTests` — legacy and regression coverage
-- `Utilities/PropertyEditorV1RunTests` — focused interaction and stress coverage
+- `Utilities/PropertyEditorBuiltinRunTests` — focused interaction and stress coverage
 - `Utilities/PropertyEditorSemanticRunTests` — semantic adapter/model contract coverage
 - `Utilities/PropertyEditorCoreProbe` — verifies the headless package boundary
 
@@ -89,7 +89,11 @@ PropertyEditorFactory factory;
 RegisterPropertyEditorEditors(factory);
 ```
 
-`RegisterPropertyEditorV1Editors()` remains available for compatibility with older callers that intentionally want only the original adapter set.
+There is one PropertyEditor control. `PropertyBuiltinEditors.cpp` supplies its
+range, matrix, icon, font and image adapters; semantic adapters extend the same
+factory. `RegisterPropertyEditorV1Editors()` is a compatibility entry point for
+the original subset, not another editor implementation. Maintained demos use the
+complete `RegisterPropertyEditorEditors()` entry point.
 
 Bounded `Integer` properties automatically offer numeric entry and a slider toggle.
 The slider uses the property's authored minimum, maximum and step; the model kind
@@ -241,7 +245,7 @@ Inline hosting uses the same model normalization, preview, commit, validation, r
 
 ## Resource providers
 
-Icon choices use the shared `UiIconCatalog`, and font faces use the platform font catalogue. Both catalogues are initialized lazily and reused.
+Icon choices use the shared `UiIconCatalog`, and font faces use the shared Project/System font catalogue. Icons reuse UiIconCatalog; fonts follow the shared UiFonts catalogue revision, including project imports and switches.
 
 Image/reference values stay application-defined. Image providers may additionally register a thumbnail resolver. The PropertyEditor package itself does not load project assets and has no SymbolPicker dependency.
 

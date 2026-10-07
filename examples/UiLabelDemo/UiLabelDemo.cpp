@@ -160,7 +160,7 @@ UiLabelDemo::UiLabelDemo()
     context.mode = UiThemeMode::Light;
     UiTheme::Set(context);
 
-    RegisterPropertyEditorV1Editors(pe_factory);
+    RegisterPropertyEditorEditors(pe_factory);
     pe_factory.RegisterPicker("label-demo-image",
         [=](Value& value, Ctrl *owner) { return PickImage(value, owner); });
     pe_factory.RegisterThumbnailProvider("label-demo-image",

@@ -588,8 +588,9 @@ Consolidation decisions/checkpoints:
   UiFontSelectorDemo and UiOsFileDialogDemo are theme/font/platform utilities.
   UiLabelGeneratedSmoke is generated-code infrastructure. Preserve or explicitly
   relocate these rather than presenting them as competing canonical builders.
-- UiGraphDesignMatrix contains only a retirement README, no executable package;
-  its former implementation is in Git history. Empty List/Gallery directories
+- UiGraphDesignMatrix was a retirement README without an executable package.
+  Its obsolete stub was removed on 2026-10-07; Git retains the implementation.
+  Empty List/Gallery directories
   after source deletion are not active demos.
 
 Test source comparison covered nine aggregate packages and their 49 suite sources.

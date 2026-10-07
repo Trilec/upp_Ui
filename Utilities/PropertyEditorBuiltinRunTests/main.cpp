@@ -54,7 +54,14 @@ CONSOLE_APP_MAIN
     t.Expect(radius.indent == 2, "property indentation has a public metadata API");
 
     PropertyEditorFactory& factory = PropertyEditorFactory::Global();
-    RegisterPropertyEditorV1Editors(factory);
+    PropertyEditorFactory legacy;
+    RegisterPropertyEditorV1Editors(legacy);
+    t.Expect(legacy.HasCustom(PropertyEditorFontId()) && legacy.HasCustom(PropertyEditorAdjustableRangeId())
+             && !legacy.HasCustom(PropertyEditorDateTimeId()),
+             "legacy registration remains the original adapter subset");
+    RegisterPropertyEditorEditors(factory);
+    t.Expect(factory.HasCustom(PropertyEditorDateTimeId()) && factory.HasCustom(PropertyEditorOptionalId()),
+             "canonical registration includes the semantic adapters in the same factory");
     t.Expect(factory.HasCustom(PropertyEditorRangeDoubleId()), "range editor registered");
     t.Expect(factory.HasCustom(PropertyEditorAdjustableRangeId()),
              "adjustable-domain range editor registered");
@@ -346,7 +353,7 @@ CONSOLE_APP_MAIN
     t.Expect(editor.GetInlineEditorCount() == 0,
              "detaching the model destroys all inline editors");
 
-    Cout() << "PropertyEditorV1RunTests: Checks: " << t.checks
+    Cout() << "PropertyEditorBuiltinRunTests: Checks: " << t.checks
            << " Fails: " << t.fails << "\n";
     SetExitCode(t.fails ? 1 : 0);
 }

@@ -3,6 +3,7 @@
 
 #include <Ui/Ui.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
+#include <plugin/png/png.h>
 using namespace Upp;
 namespace {
 String QuoteCpp(const String& s) {
@@ -148,6 +149,60 @@ public:
         TopWindow::Close(); return pass;
     }
     void SelectRole(const String& role) { inspector_model_.SetValue("role",role); ReadProperties(); ApplyProjection(); }
+    bool VerifyAppearance(const String& directory) {
+        int checks=0, failed=0;
+        auto expect=[&](bool ok, const String& text) { checks++; if(!ok) { failed++; Cout()<<"FAIL: "<<text<<'\n'; } };
+        auto saturation=[](Color c) { int high=max(c.GetR(),max(c.GetG(),c.GetB())); int low=min(c.GetR(),min(c.GetG(),c.GetB())); return high ? double(high-low)/high : 0.0; };
+        RealizeDirectory(directory);
+        TopWindow::Open(); Ctrl::ProcessEvents();
+        for(UiThemeMode mode : {UiThemeMode::Light, UiThemeMode::Dark}) {
+            UiTheme::Set(UiThemePreset::Minimal,mode); ApplyTheme();
+            for(const char* role : {"Standard","Subtle","Accent","Alert"}) {
+                SelectRole(role);
+                for(int kind=0;kind<2;kind++) for(int orientation=0;orientation<2;orientation++) {
+                    inspector_model_.SetValue("orientation",orientation);
+                    inspector_model_.SetValue("split_percent",50);
+                    SelectConcreteExample(kind ? "--quad" : "--splitter");
+                    Ctrl::ProcessEvents();
+                    UiSplitter& live=kind ? quad_.RootSplitter() : splitter_;
+                    const auto& style=live.GetStyle();
+                    if(SelectedRole()==UiRole::Accent || SelectedRole()==UiRole::Alert) {
+                        Color idle=style.track_palette.face[ST_NORMAL].color;
+                        Color hot=style.track_palette.face[ST_HOT].color;
+                        Color pressed=style.track_palette.face[ST_PRESSED].color;
+                        expect(saturation(idle)<saturation(hot) && saturation(hot)<saturation(pressed),"role chroma increases from idle to hover to drag");
+                        expect(saturation(pressed)<1.0 && hot!=style.background_palette.face[ST_NORMAL].color,"hover retains colour and drag stays softened");
+                    }
+                    Rect track=live.GetFeedbackTrackRect(0,ST_NORMAL);
+                    Point sample=track.CenterPoint();
+                    if(live.IsVert()) sample.x=track.left+DPI(24); else sample.y=track.top+DPI(24);
+                    for(int state=ST_NORMAL;state<=ST_PRESSED;state++) {
+                        live.MouseLeave();
+                        if(state!=ST_NORMAL) live.MouseMove(sample,0);
+                        if(state==ST_PRESSED) live.LeftDown(sample,0);
+                        ImageDraw draw(live.GetSize()); live.DrawCtrl(draw); Image image=draw;
+                        bool inside=sample.x>=0 && sample.y>=0 && sample.x<image.GetWidth() && sample.y<image.GetHeight();
+                        Color pixel=Null;
+                        if(inside) { const RGBA& p=image[sample.y][sample.x]; pixel=Color(p.r,p.g,p.b); }
+                        expect(pixel==style.track_palette.face[state].color,"painted centre follows current interaction state, including expanded drag track");
+                        if(kind==0 && orientation==0 && (SelectedRole()==UiRole::Accent || SelectedRole()==UiRole::Alert)) {
+                            ImageDraw full(GetSize()); DrawCtrl(full);
+                            PNGEncoder().SaveFile(AppendFileName(directory,Format("splitter-%s-%s-%d.png",mode==UiThemeMode::Dark ? "dark" : "light",role,state)),full);
+                        }
+                        if(state==ST_PRESSED) { expect(live.HasCapture(),"native drag captures the splitter"); live.LeftUp(sample,0); expect(!live.HasCapture(),"drag completion releases capture"); }
+                    }
+                    live.MouseLeave();
+                    live.Disable(); ImageDraw disabled_draw(live.GetSize()); live.DrawCtrl(disabled_draw); Image disabled=disabled_draw;
+                    const RGBA& p=disabled[sample.y][sample.x];
+                    expect(Color(p.r,p.g,p.b)==style.track_palette.face[ST_DISABLED].color,"disabled track follows its palette");
+                    live.Enable();
+                }
+            }
+        }
+        TopWindow::Close();
+        Cout()<<"SPLITTER_APPEARANCE checks="<<checks<<" failed="<<failed<<'\n';
+        return failed==0;
+    }
     String GetGeneratedCode() const { return generated_; }
     void SelectConcreteExample(const String& type) { inspector_model_.SetValue("kind",type=="--quad" ? 1 : 0); ReadProperties(); ApplyProjection(); }
     void ConfigureExample() {
@@ -576,6 +631,7 @@ private:
 GUI_APP_MAIN {
     Demo demo;
     const Vector<String>& args=CommandLine();
+    if(args.GetCount()==1 && args[0].StartsWith("--verify-appearance=")) { SetExitCode(demo.VerifyAppearance(args[0].Mid(20))?0:1); return; }
     if(args.GetCount()==1 && args[0]=="--verify-selectors") { SetExitCode(demo.VerifySelectors()?0:1); return; }
     if(args.GetCount()>=2 && args[0]=="--emit-code") { for(int i=2;i<args.GetCount();i++) { if(args[i]=="--configured") demo.ConfigureExample(); else if(args[i].StartsWith("--role=")) demo.SelectRole(args[i].Mid(7)); else demo.SelectConcreteExample(args[i]); } SaveFile(args[1],demo.GetGeneratedCode()); return; }
     demo.Run();

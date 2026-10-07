@@ -815,7 +815,7 @@ private:
     bool expanded_ = false;
 };
 
-void RegisterPropertyEditorV1Editors(PropertyEditorFactory& factory)
+void RegisterPropertyEditorBuiltinEditors(PropertyEditorFactory& factory)
 {
     if(!factory.HasCustom(PropertyEditorRangeDoubleId()))
         factory.RegisterCustom(PropertyEditorRangeDoubleId(), [] {
@@ -841,6 +841,12 @@ void RegisterPropertyEditorV1Editors(PropertyEditorFactory& factory)
         factory.RegisterCustom(PropertyEditorAdjustableRangeId(), [] {
             return One<PropertyValueEditor>(new PropertyAdjustableRangeValueEditor);
         });
+}
+
+// Source compatibility for applications that registered only these adapters.
+void RegisterPropertyEditorV1Editors(PropertyEditorFactory& factory)
+{
+    RegisterPropertyEditorBuiltinEditors(factory);
 }
 
 static Value PeNormalizeRange(Value value, double mn, double mx, double step)

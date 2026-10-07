@@ -11,7 +11,7 @@ file
 	PropertyWorkingRangeEditors.h,
 	PropertyWorkingRangeEditors.cpp,
 	PropertyWorkingRangeAutoRegister.cpp,
-	PropertyV1Editors.cpp,
+	PropertyBuiltinEditors.cpp,
 	PropertySemanticEditorsInternal.h,
 	PropertySemanticEditors.cpp,
 	PropertySemanticScalarEditors.cpp,

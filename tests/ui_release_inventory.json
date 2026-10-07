@@ -2,7 +2,7 @@
   "schema": 1,
   "version_header": "Ui/UiVersion.h",
   "inventory_base": "297beabdea87e3cc2c32282968e262ef68392abb",
-  "scope": "Coverage register, not a release PASS. An example path is a review starting point, not accepted full API coverage.",
+  "scope": "Maintained control/demo coverage register consumed by build_demos.py and ValidateUiRelease.ps1; not generated results or a release PASS.",
   "support_headers": [
     "Ui/UiBaseEdit.h",
     "Ui/UiIndicatorBase.h",
@@ -79,12 +79,6 @@
         "Utilities/UiGraphScaleTests"
       ],
       "state": "38 copied standalone packages retired after current normalized implementation and driver/manifest checks; aggregate suite bodies preserve all assertions. See retired_test_packages for exact routes."
-    },
-    {
-      "paths": [
-        "examples/UiGraphDesignMatrix"
-      ],
-      "state": "retired explanatory stub; no executable target; delete only when current references are updated"
     }
   ],
   "open_release_gates": [
@@ -783,5 +777,9 @@
       "retained_source": "Utilities/UiGraphScaleTests/Scale.cpp",
       "suite": "RunScaleSuite"
     }
+  ],
+  "reference_docs": [
+    "docs/PROJECT_FONTS.md",
+    "docs/MEDIA_CONTROLS.md"
   ]
 }

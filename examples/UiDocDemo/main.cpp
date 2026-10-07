@@ -29,7 +29,7 @@ public:
     Demo() {
         Title("UiDoc Demo"); Sizeable().Zoomable(); SetRect(0,0,DPI(1320),DPI(840));
         UiThemeContext context=UiTheme::GetContext(); context.mode=UiThemeMode::Light; context.preset=UiThemePreset::Minimal; UiTheme::Set(context);
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
         BuildHeader(); BuildPreview(); BuildRightRail(); BuildModels();
         inspector_.SetFactory(&factory_); inspector_.SetModel(&inspector_model_); inspector_.SetLabelRatio(46);
         overrides_.SetFactory(&factory_); overrides_.SetModel(&override_model_); overrides_.SetLabelRatio(46);

@@ -1,6 +1,6 @@
 # PropertyEditor Visual Design
 
-Version: **1.0.0**
+Version: **1.1.0**
 
 ## Visual package responsibilities
 
@@ -17,7 +17,7 @@ Version: **1.0.0**
 
 `PropertyEditorFactory` is the single editor-creation authority for built-in
 and custom editors. `PropertyValueEditors.cpp` contains the built-in semantic
-kind mapping; `PropertyV1Editors.cpp` registers the first-class Range, Matrix,
+kind mapping; `PropertyBuiltinEditors.cpp` registers the first-class Range, Matrix,
 Icon, Font and Image adapters through that same factory. There is no parallel
 advanced-editor path.
 

@@ -88,7 +88,7 @@ public:
         context.preset = UiThemePreset::Minimal;
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
 
         Add(header_);
         Add(preview_panel_);

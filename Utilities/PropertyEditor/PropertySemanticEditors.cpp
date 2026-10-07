@@ -21,7 +21,7 @@ void RegisterPropertyEditorSemanticEditors(PropertyEditorFactory& factory)
 
 void RegisterPropertyEditorEditors(PropertyEditorFactory& factory)
 {
-    RegisterPropertyEditorV1Editors(factory);
+    RegisterPropertyEditorBuiltinEditors(factory);
     RegisterPropertyEditorSemanticEditors(factory);
 }
 

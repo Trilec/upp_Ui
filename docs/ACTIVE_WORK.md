@@ -1,99 +1,48 @@
 # ACTIVE WORK
 
-Remote main is authoritative. Refresh before editing/publishing; never force-push.
-Keep this recovery index <=100 lines. Contracts belong in the nine reader guides.
+Fetch the applicable remote branch before publishing; preserve concurrent work
+and never force-push. This is a current recovery index, not a validation log.
+Contracts live in the reader guides; historical checkpoints live in Git.
 
-## UiTag prepared primitive — 2026-09-30
-BASE: `1ba4b24bc4ed1a38f2a416324f3f762a11bc0d08` / `codex/uitag-hardening`.
-STATUS: implementation/tests/reference demo/docs complete; native visual acceptance pending.
-VALIDATION: UiTag 30/0; MediaCard 35/0; UiTag demo Debug BLITZ/NOBLITZ + Release build PASS.
-NEXT: Curt visually checks UiTagDemo interaction/theme/image-fill presentation; then merge normally.
-## All-controls audit — 2026-09-27
+## Splitter and repository polish — 2026-10-07
+BASE: `2cc2df0` / `codex/uitag-hardening`.
+TASK: softer Accent/Alert idle, hover and drag; one PropertyEditor registration path.
+TOUCHED: splitter resolver/paint/demo; PropertyEditor adapters/demos; release metadata.
+STATUS: focused validation complete; no whole-library release certification.
+VALIDATION: 25 affected demos build; Release BLITZ and Debug no-BLITZ splitter
+224/0 each; selectors pass; generated C++ 40/0; PropertyEditor 158/0 + 44/0 +
+143/0; theme 1092/0 + 13/0; inventory, reader links and diff checks pass.
+PUBLISHED: containing commit; recover with `git log -1 -- Ui/UiSplitter.cpp`.
+NEXT: use bin/windows-x64/UiSplitterDemo.exe for the current reference; continue open gates below.
 
-REPORT: [50-control register and findings](../tests/CONTROL_AUDIT.md).
-STATUS: first-pass audit complete; production repairs remain open. Six defects
-reproduced; callback/child-lifetime risks identified; UiDoc geometry test fails 1/34.
-EVIDENCE: 22 native targets built; 18 pass, 1 fails, 1 lacks summary, 2 interactive.
-DOCS: catalogue/links checked; UMK nest-list instructions and runner corrected.
+## Shared project fonts — 2026-10-07
+PUBLISHED: Ui `2cc2df0`; UiDesigner `416d6fe`.
+CONTRACT: [shared fonts and acceptance](PROJECT_FONTS.md).
+VALIDATION: Ui 83/0 in Release BLITZ and Debug no-BLITZ; Designer fonts 43/0,
+assistant 318/0, PropertyEditor 143/0, theme 1105/0; generated application 9/0.
+Designer export-theme regression 53/0; full Designer Release application built.
+NEXT: Font Picker reuses catalogue/revision; other adapters, shaping and real
+multi-monitor DPI transitions remain separate acceptance.
 
-## Designer-driven control repairs and skills — 2026-09-27
+## Demo and all-controls audit
+BASELINE: consistent self-contained shell and family selectors; splitter defaults
+published at `11d0698`. [Coverage register](../tests/ui_release_inventory.json)
+drives maintained demos and records coverage routes; build output stays in build.
+STATUS: publication slices are not full-library visual/API acceptance.
+NEXT: remaining control/role/state/generated-code gates; [audit](../tests/CONTROL_AUDIT.md).
+UiTag's native visual/theme/image-fill acceptance remains open.
 
-TASK: list Fit sizing, selection contrast, scrolling integration, slider/caret
-geometry and cached circle rendering; portable development/mockup skills.
-STATUS: implemented; earlier checkpoints below retain their separate open gates.
-VALIDATION: Designer AssistantDesignerTests 318 checks / 0 failures; native
-Designer visual checks for carets, circles and collapsed toolbars. This is not a
-new full-library, Graph or cross-platform acceptance pass.
-DOC REVIEW: all 50 inventory controls have catalogue entries; local reader links
-checked; recent control contracts and skill entry points added. Skill ZIP contents
-and authored reference links verified. Latest sources remain authoritative.
+## UiTab theme boundary
+PUBLISHED: `8114269`; active caps/strip fills include explicit None.
+STATUS: newer native UiTabThemePaintTest + Designer ThemeStudioRoleTest/open checks
+remain the acceptance boundary; source review alone does not close them.
 
-## Release hygiene — UI-RC-HYGIENE-01
-
-BASE: `297beabdea87e3cc2c32282968e262ef68392abb` / main.
-TASK: all-controls release-readiness implementation and evidence coverage.
-TOUCHED: root reader docs; nine canonical guides; `Ui/UiVersion.h`, `Ui.h`, `Ui.upp`;
-`UiRangeSegmentsPaint.cpp`; two `Ui/srcdoc.tpp` references;
-`scripts/ValidateUiRelease.ps1`; `tests/ui_release_inventory.json`; this file.
-STATUS: PARTIAL overall; documentation/version/validation infrastructure implemented.
-PUBLISHED: containing commit; recover with `git log -1 -- scripts/ValidateUiRelease.ps1`.
-VALIDATION: complete source originals matched Git blobs; reviewed source/diff;
-standalone version-header compile/run and local manifest/guide-link checks PASS.
-PowerShell/native U++/Windows not executed here. No whole-library acceptance claim.
-NEXT ACTION: continue remaining per-control source/demo/generated-code gates from the
-inventory. Gary runs the small Surgical profile on latest main; not the Full profile.
-
-UiVersion.h owns Ui `1.0.0-rc.1` as an UNRELEASED candidate identity, not certification.
-Sibling package versions and persistence schemas are unchanged. The inventory lists
-50 concrete controls and distinct source, demo, code-generation and platform evidence.
-It does not mark unreviewed controls PASS. Historical tests/demos are retained until
-a replacement proves the same useful coverage. Remote branch inventory is main only.
-
-Published source fix: `297beabdea87e3cc2c32282968e262ef68392abb`.
-Paths: `Ui/UiRangeSegments*.{h,cpp}`, `Ui/UiDirectContentHost.{h,cpp}`,
-`Utilities/UiReleaseSmoke`. Distinct role ramps, finite inputs, minimum-span
-normalization, callback/capture safety, linear projection, bounded AA/cache,
-borrowed-child lifetime/parent guards. Extracted normalization: 20,002/0 via Clang.
-Native focused smoke: expected 58 checks, zero failures; not yet run on Windows.
-The additional percent-format arithmetic fix divides before multiplying by 100.
-
-Documentation: nine guides plus this file. RangeSegments is in Controls; UiDoc is
-in Models; generic scale/LOD is in Drawing; Graph contracts and open limitations
-are in `09_UIGRAPH_DEVELOPMENT.md`. Superseded checkpoint pages remain in Git history.
-Do not resurrect their obsolete build tasks or convert old PASS into current PASS.
-
-## Parallel reusable Theme fix — UI-TAB-THEME-01
-
-BASE: `11783c34ade07ceb8bf03b760eb58b314b2edd59` / main.
-TASK: Theme-owned active UiTab caps and strip fills, including explicit None.
-TOUCHED: `Ui/UiTab.cpp`; `Utilities/UiTabThemePaintTest`.
-STATUS: IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
-PUBLISHED: `8114269abd91cc33569f68117bef4fd4d537897a`.
-VALIDATION: source/API/diff review PASS; native pixel test not compiled/run here.
-NEXT ACTION: existing Designer gate: UiTabThemePaintTest + ThemeStudioRoleTest,
-canonical Designer compile/open; Curt owns visual checks. No broad Graph matrix.
-
-## Parallel UiGraph — UIGRAPH-NODE-WORKSPACE-03E2
-
-BASE: `4c997824f741f1555269f95aec3462e7674045e0` / main.
-TASK: Content footprint underlay in Overlay diagram; explicit Overlay/fit summaries.
-TOUCHED: `examples/UiGraphComponentStudio/{WorkspaceViews.h,WorkspaceViews.cpp,WorkspaceOverlayTests.cpp}`.
-STATUS: accumulated 03E1/03E2 IMPLEMENTATION COMPLETE — PLATFORM VALIDATION PENDING.
+## UiGraph workspace boundary
+APP: UiGraphComponentStudio; the obsolete DesignMatrix stub is removed.
+STATUS: 03E1/03E2 Overlay/content underlay changes still need their native gate.
 PUBLISHED: recover with `git log -1 -- examples/UiGraphComponentStudio/WorkspaceOverlayTests.cpp`.
-VALIDATION: pinned full source/diff review PASS; newer native tests not executed here.
-NEXT ACTION: existing `scripts/ValidateUiGraphWorkspace.ps1` Debug gate with required
-ancestor and -Launch; require positive existing summaries AND OVERLAY summary.
-See Graph Development for manual checks. Do not restart old matrix work.
-
-The preceding 03D gate remains reported PASS at
-`57e8d38167cde7cee2bc62b0093979af86ca91ca` (U++18468 / CLANGx64).
-Reported suites: Render 9/0; EllipseBands 16/0; Workspace 44/0; native View 45/0;
-Band UI 23/0; startup 5/0; WorkspaceComponent 24/0; Component 21/0;
-ExecutionPath 8/0; Presentation 87/0; evidence-reader 12/0. Generated C++ compiled.
-This earlier PASS does NOT validate source added afterwards. Full earlier evidence
-and historical executable identity remain in Git at `8114269abd91cc33569f68117bef4fd4d537897a`.
-Preserve one NodeGeometry.presentation authority, immutable camera baseline,
-independent Content/Overlay, native component/Micro budgets and 03C performance work.
-Active authoring app: UiGraphComponentStudio. DesignMatrix is retired.
-Open: held-button Escape/physical DND, diagram inventory, full V8 post-port zones,
-threshold undo and compact lifecycle. No closure claimed by release hygiene.
+The earlier 03D gate at `57e8d38` does not validate later source additions.
+NEXT: existing ValidateUiGraphWorkspace Debug/launch gate and positive Overlay summary;
+held-button Escape/DND, diagram inventory, post-port zones, undo and compact lifecycle.
+Preserve one presentation geometry authority, immutable camera baseline, independent
+Content/Overlay and native component/Micro budgets. See [Graph Development](09_UIGRAPH_DEVELOPMENT.md).

@@ -85,10 +85,11 @@ function Assert-Inventory($Inventory) {
     if (!$seen.Count) { throw 'Empty control inventory' }
     $active = Join-Path $Repo 'docs/ACTIVE_WORK.md'
     if (@(Get-Content -LiteralPath $active).Count -gt 100) { throw 'ACTIVE_WORK exceeds 100 lines' }
-    $expected = @(@($Inventory.guides | ForEach-Object { Split-Path -Leaf $_ }) + @('ACTIVE_WORK.md') | Sort-Object)
+    $referenceDocs = if ($Inventory.PSObject.Properties['reference_docs']) { @($Inventory.reference_docs) } else { @() }
+    $expected = @(@(@($Inventory.guides) + $referenceDocs | ForEach-Object { Split-Path -Leaf $_ }) + @('ACTIVE_WORK.md') | Sort-Object)
     $actual = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'docs') -File -Filter '*.md' | ForEach-Object { $_.Name } | Sort-Object)
     if (@(Compare-Object $expected $actual).Count) { throw 'Canonical guide inventory differs from docs/*.md' }
-    $readerFiles = @('README.md','GETTING_STARTED.md','CHANGELOG.md') + @($Inventory.guides)
+    $readerFiles = @('README.md','GETTING_STARTED.md','CHANGELOG.md') + @($Inventory.guides) + $referenceDocs
     foreach ($relative in $readerFiles) {
         $file = Join-Path $Repo $relative
         $text = Get-Content -Raw -LiteralPath $file

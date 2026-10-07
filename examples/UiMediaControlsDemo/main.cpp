@@ -257,7 +257,7 @@ public:
     MediaDemo() {
         Title("Ui media controls designer").Sizeable().Zoomable(); SetRect(0,0,DPI(1200),DPI(780));
         UiThemeContext context=UiTheme::GetContext(); context.mode=UiThemeMode::Light; context.preset=UiThemePreset::Minimal; UiTheme::Set(context);
-        RegisterPropertyEditorV1Editors(factory_); BuildModels();
+        RegisterPropertyEditorEditors(factory_); BuildModels();
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("Media controls").SetSubTitle("Raw colour samples and host-driven playback; select a control to inspect and generate its C++").ShowTitleLine(false).SetContentInset(DPI(8)).SetContentCell(header_actions_);
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center); header_actions_.AddSpacer(1).Expand(1);

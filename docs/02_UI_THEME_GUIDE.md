@@ -34,6 +34,11 @@ button's filled face. Pure layouts, nonvisual models and helper geometry have no
 invented colored face. Actual swatch/image/series data is separate from surrounding
 control decoration; Alert must not alter a color being edited.
 
+Splitter Accent and Alert tracks retain their role hue during hover. Idle colours
+are muted, hover is slightly lighter with more chroma, and drag is stronger while
+still softened. The expanded feedback band and its centre use the same state;
+hover must not fade into the surrounding surface. Explicit palettes remain authored.
+
 Family vocabulary remains supported: UiButtonRole, UiToolButtonRole, UiEditRole,
 UiPanelRole and UiLabelRole. Typography roles (Body, Headline, Subheadline, Title,
 Caption, Badge, Footnote; UiTextSize Body/H1/H2/H3) are distinct from universal

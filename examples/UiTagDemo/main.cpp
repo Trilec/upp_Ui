@@ -377,7 +377,7 @@ public:
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
 
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
         factory_.RegisterPicker("tag-demo-image",
             [=](Value& value, Ctrl *owner) { return PickImage(value, owner); });
         factory_.RegisterThumbnailProvider("tag-demo-image",

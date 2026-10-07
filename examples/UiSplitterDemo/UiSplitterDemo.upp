@@ -4,7 +4,8 @@ uses
     Draw,
     CtrlCore,
     CtrlLib,
-    Ui;
+    Ui,
+    plugin/png;
 
 file
     main.cpp;

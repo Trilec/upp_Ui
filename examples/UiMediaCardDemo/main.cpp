@@ -141,7 +141,7 @@ public:
         ctx.mode = UiThemeMode::Light;
         UiTheme::Set(ctx);
 
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
 
         BuildHeader();
         BuildPreview();

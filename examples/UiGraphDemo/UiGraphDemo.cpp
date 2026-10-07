@@ -288,7 +288,7 @@ UiGraphDemo::UiGraphDemo()
     Sizeable().Zoomable();
     SetRect(0, 0, DPI(1380), DPI(860));
 
-    RegisterPropertyEditorV1Editors(pe_factory);
+    RegisterPropertyEditorEditors(pe_factory);
     RegisterPropertyEditorWorkingRangeEditors(pe_factory);
 
     BuildHeader();

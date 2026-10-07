@@ -14,7 +14,7 @@ UiButtonDemo::UiButtonDemo()
     context.mode = UiThemeMode::Light;
     UiTheme::Set(context);
 
-    RegisterPropertyEditorV1Editors(pe_factory);
+    RegisterPropertyEditorEditors(pe_factory);
     pe_factory.RegisterPicker("button-demo-image",
         [=](Value& value, Ctrl *owner) { return PickImage(value, owner); });
     pe_factory.RegisterThumbnailProvider("button-demo-image",

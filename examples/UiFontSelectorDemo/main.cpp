@@ -27,7 +27,7 @@ public:
     }
     Demo() {
         Title("U++ Font Helper"); Sizeable().Zoomable(); SetRect(0,0,DPI(1160),DPI(760));
-        RegisterPropertyEditorV1Editors(factory_);
+        RegisterPropertyEditorEditors(factory_);
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("U++ Font Helper").SetSubTitle("Select an installed font and generate its public Font configuration").ShowTitleLine(false)
                .SetContentCell(actions_);

@@ -36,8 +36,8 @@ popup/editor or a measured application-wide performance benchmark.
 - Hosts own application commands, persistence and Undo.
 - Inline editor allocation is limited to the viewport plus overscan.
 - Validation and read-only checks remain in the headless model as well as UI.
-- PropertyV1Editors.cpp is actively registered by PropertySemanticEditors.cpp.
-  Its name alone is not grounds for removal.
+- PropertyBuiltinEditors.cpp is actively registered by PropertySemanticEditors.cpp.
+  These are adapters for the single PropertyEditor control, not a separate editor version.
 
 ## Further lifecycle work
 
@@ -61,7 +61,7 @@ popup/editor or a measured application-wide performance benchmark.
 
 - PropertyEditorTests: 143 checks, zero failures (10 new checks).
 - PropertyEditorSemanticRunTests: 44 checks, zero failures.
-- PropertyEditorV1RunTests: 156 checks, zero failures.
+- PropertyEditorBuiltinRunTests: 156 checks, zero failures.
 - Designer AssistantDesignerTests: 200 checks, zero failures.
 
 The preceding palette repair was tested natively for Inspector colours and

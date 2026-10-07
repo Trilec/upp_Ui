@@ -118,7 +118,7 @@ const char *PropertyEditorIconId();
 const char *PropertyEditorFontId();
 const char *PropertyEditorImageId();
 
-// Semantic v2 adapters. These remain visual-package custom editors so the
+// Semantic adapters. These remain visual-package custom editors so the
 // PropertyEditorCore schema stays headless and applications can still use the
 // generic Custom escape hatch for their own domain types.
 const char *PropertyEditorDateTimeId();
@@ -131,6 +131,8 @@ const char *PropertyEditorKeyChordId();
 const char *PropertyEditorReferenceId();
 const char *PropertyEditorOptionalId();
 
+void RegisterPropertyEditorBuiltinEditors(PropertyEditorFactory& factory);
+// Legacy subset registration; use RegisterPropertyEditorEditors in new code.
 void RegisterPropertyEditorV1Editors(PropertyEditorFactory& factory);
 void RegisterPropertyEditorSemanticEditors(PropertyEditorFactory& factory);
 // Preferred complete registration point for new applications/demos.
