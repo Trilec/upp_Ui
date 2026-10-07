@@ -67,25 +67,25 @@ public:
         StyledSkin    background_skin;
 
         int  hit_width = DPI(8);
-        int  track_thickness = DPI(1);
+        int  track_thickness = DPI(6);
         int  hot_track_thickness = 0;
         int  pressed_track_thickness = 0;
         bool expand_track_on_hot = true;
         bool expand_track_on_pressed = true;
         Rect track_inset = Rect(0, 0, 0, 0);
 
-        int  thumb_main = DPI(42);
+        int  thumb_main = DPI(60);
         int  thumb_cross = DPI(8);
-        Rect thumb_inset = Rect(0, 0, 0, 0);
+        Rect thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
         bool paint_background = false;
         bool show_grip = true;
         UiSplitterGripVisual grip_visual = UISPLITTER_GRIP_LINES;
-        int  grip_count = 2;
+        int  grip_count = 1;
         int  grip_size = DPI(2);
-        int  grip_gap = DPI(3);
+        int  grip_gap = DPI(1);
         Color grip_color = Null;
-        int  grip_dot_count = 6;
-        int  grip_dot_gap = DPI(3);
+        int  grip_dot_count = 1;
+        int  grip_dot_gap = DPI(1);
         int  grip_dot_size = DPI(2);
 
         String label;

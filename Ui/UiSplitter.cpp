@@ -37,10 +37,10 @@ const UiSplitter::Style& UiSplitter::StyleDefault()
         s.track_metrics.radius = 0;
         s.track_metrics.focus_enabled = false;
 
-        s.thumb_metrics.face_enabled = true;
+        s.thumb_metrics.face_enabled = false;
         s.thumb_metrics.frame_enabled = true;
         s.thumb_metrics.frame_width = 1;
-        s.thumb_metrics.radius = DPI(4);
+        s.thumb_metrics.radius = DPI(1);
         s.thumb_metrics.focus_enabled = false;
 
         s.background_metrics.face_enabled = true;
@@ -48,24 +48,24 @@ const UiSplitter::Style& UiSplitter::StyleDefault()
         s.background_metrics.focus_enabled = false;
 
         s.hit_width = DPI(8);
-        s.track_thickness = DPI(1);
+        s.track_thickness = DPI(6);
         s.hot_track_thickness = 0;
         s.pressed_track_thickness = 0;
         s.expand_track_on_hot = true;
         s.expand_track_on_pressed = true;
         s.track_inset = Rect(0, 0, 0, 0);
-        s.thumb_main = DPI(42);
+        s.thumb_main = DPI(60);
         s.thumb_cross = DPI(8);
-        s.thumb_inset = Rect(0, 0, 0, 0);
+        s.thumb_inset = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
         s.paint_background = false;
         s.show_grip = true;
         s.grip_visual = UISPLITTER_GRIP_LINES;
-        s.grip_count = 2;
+        s.grip_count = 1;
         s.grip_size = DPI(2);
-        s.grip_gap = DPI(3);
+        s.grip_gap = DPI(1);
         s.grip_color = Null;
-        s.grip_dot_count = 6;
-        s.grip_dot_gap = DPI(3);
+        s.grip_dot_count = 1;
+        s.grip_dot_gap = DPI(1);
         s.grip_dot_size = DPI(2);
         s.label_font = SansSerifZ(11);
         s.label_color = Null;

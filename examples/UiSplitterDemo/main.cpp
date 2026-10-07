@@ -43,20 +43,31 @@ struct SplitterConfig {
     int min_a = DPI(140);
     int min_b = DPI(140);
 
-    int hit_width = DPI(14);
-    int track_thickness = DPI(2);
-    int track_inset = 0;
-    int thumb_width = DPI(14);
-    int thumb_height = DPI(84);
-    int thumb_inset = 0;
-    int thumb_radius = DPI(8);
-    int thumb_frame_width = DPI(1);
-    bool thumb_face = true;
-    bool thumb_frame = true;
-    bool show_grip = true;
-    int grip_count = 6;
-    int grip_dot = DPI(2);
-    int grip_gap = DPI(3);
+    int hit_width, track_thickness, track_inset;
+    int thumb_width, thumb_height, thumb_inset, thumb_radius, thumb_frame_width;
+    bool thumb_face, thumb_frame, show_grip;
+    int grip_count, grip_dot, grip_gap;
+
+    SplitterConfig(const UiSplitter::Style& style = UiTheme::ResolveSplitter()) {
+        hit_width = style.hit_width;
+        track_thickness = style.track_thickness;
+        track_inset = style.track_inset.left;
+        thumb_width = style.thumb_cross;
+        thumb_height = style.thumb_main;
+        thumb_inset = style.thumb_inset.left;
+        thumb_radius = style.thumb_metrics.radius;
+        thumb_frame_width = style.thumb_metrics.frame_width;
+        thumb_face = style.thumb_metrics.face_enabled;
+        thumb_frame = style.thumb_metrics.frame_enabled;
+        show_grip = style.show_grip;
+        grip_count = style.grip_count;
+        grip_dot = style.grip_size;
+        grip_gap = style.grip_gap;
+        track = style.track_palette.face[ST_NORMAL].color;
+        thumb_face_color = style.thumb_palette.face[ST_NORMAL].color;
+        thumb_frame_color = style.thumb_palette.frame[ST_NORMAL];
+        thumb_ink = style.thumb_palette.ink[ST_NORMAL];
+    }
 
     Color track = Color(148, 163, 184);
     Color thumb_face_color = Color(241, 245, 249);
@@ -115,8 +126,28 @@ public:
             while(host && host!=&splitter_ && host!=&quad_) host=host->GetParent();
             pass &= host==(i==0 ? (Ctrl*)&splitter_ : (Ctrl*)&quad_);
         }
+        for(UiThemeMode mode : {UiThemeMode::Light, UiThemeMode::Dark}) {
+            UiThemeContext ctx = UiTheme::GetContext(); ctx.mode = mode; UiTheme::Set(ctx);
+            ApplyTheme();
+            for(const char* role : {"Standard", "Subtle", "Accent", "Alert"}) {
+                inspector_model_.SetValue("role", role); ReadProperties(); ApplyProjection();
+                for(int i = 0; i < 2; i++) {
+                    family_buttons_[i].WhenAction(); Ctrl::ProcessEvents();
+                    const auto& style = i == 0 ? splitter_.GetStyle() : quad_.RootSplitter().GetStyle();
+                    auto expected = UiTheme::ResolveSplitter(SelectedRole());
+                    pass &= style.track_thickness == DPI(6) && style.thumb_main == DPI(60) && style.thumb_cross == DPI(8);
+                    pass &= style.track_inset == Rect(0,0,0,0) && style.thumb_inset == Rect(DPI(2),DPI(2),DPI(2),DPI(2));
+                    pass &= style.thumb_metrics.radius == DPI(1) && style.thumb_metrics.frame_width == 1;
+                    pass &= !style.thumb_metrics.face_enabled && style.thumb_metrics.frame_enabled;
+                    pass &= style.grip_count == 1 && style.grip_size == DPI(2) && style.grip_gap == DPI(1);
+                    pass &= style.thumb_palette.frame[ST_NORMAL] == expected.thumb_palette.frame[ST_NORMAL];
+                    pass &= RoleName() == "Accent" || generated_.Find("UiRole::" + RoleName()) >= 0;
+                }
+            }
+        }
         TopWindow::Close(); return pass;
     }
+    void SelectRole(const String& role) { inspector_model_.SetValue("role",role); ReadProperties(); ApplyProjection(); }
     String GetGeneratedCode() const { return generated_; }
     void SelectConcreteExample(const String& type) { inspector_model_.SetValue("kind",type=="--quad" ? 1 : 0); ReadProperties(); ApplyProjection(); }
     void ConfigureExample() {
@@ -187,7 +218,11 @@ private:
     }
     PreviewPanel& Preview() { return preview_; }
     const DemoPalette& Palette() const { return palette_; }
-    void SetUsageCode(const String& code) { generated_=code; code_.SetData(code); }
+    void SetUsageCode(const String& code) {
+        generated_ = code;
+        generated_.Replace("UiTheme::ResolveSplitter()", "UiTheme::ResolveSplitter(UiRole::" + RoleName() + ")");
+        code_.SetData(generated_);
+    }
     UiButton family_buttons_[2];
     int selected_family_=-1;
     PropertyEditorFactory factory_;
@@ -279,6 +314,7 @@ private:
         inspector_model_.AddInteger("quad.min_c","Pane C minimum",DPI(140),"Four panes").SetRange(0,1000,1);
         inspector_model_.AddInteger("quad.min_d","Pane D minimum",DPI(140),"Four panes").SetRange(0,1000,1);
 
+        inspector_model_.AddChoice("role","Role","Accent","Control").AddChoice("Standard","Standard").AddChoice("Subtle","Subtle").AddChoice("Accent","Accent").AddChoice("Alert","Alert").SetDefault("Accent");
         inspector_model_.AddChoice("orientation","Orientation",cfg_.orientation,"Control").AddChoice(0,"Horizontal").AddChoice(1,"Vertical").SetDefault(cfg_.orientation);
         inspector_model_.AddInteger("split_percent","Split percent",cfg_.split_percent,"Control").SetRange(0,100,1).SetDefault(cfg_.split_percent);
         inspector_model_.AddInteger("min_a","Min a",cfg_.min_a,"Control").SetRange(0,1000,1).SetDefault(cfg_.min_a);
@@ -324,9 +360,14 @@ private:
         override_model_.AddColor("pane_b","Pane b",cfg_.pane_b,"Appearance").SetDefault(cfg_.pane_b);
         override_model_.Find("pane_b")->overrideable=true;
     }
+    String RoleName() const { return AsString(inspector_model_.Find("role")->value); }
+    UiRole SelectedRole() const {
+        String role = RoleName();
+        return role == "Standard" ? UiRole::Standard : role == "Subtle" ? UiRole::Subtle : role == "Alert" ? UiRole::Alert : UiRole::Accent;
+    }
     void ReadProperties() {
-        SplitterConfig defaults;
-        UiSplitter::Style inherited=UiTheme::ResolveSplitter();
+        UiSplitter::Style inherited=UiTheme::ResolveSplitter(SelectedRole());
+        SplitterConfig defaults(inherited);
         defaults.track=inherited.track_palette.face[ST_NORMAL].color;
         defaults.thumb_face_color=inherited.thumb_palette.face[ST_NORMAL].color;
         defaults.thumb_frame_color=inherited.thumb_palette.frame[ST_NORMAL];
@@ -355,12 +396,20 @@ private:
         cfg_.thumb_ink = override_model_.Find("thumb_ink")->override_active ? Color(override_model_.Find("thumb_ink")->value) : defaults.thumb_ink;
         cfg_.pane_a = override_model_.Find("pane_a")->override_active ? Color(override_model_.Find("pane_a")->value) : defaults.pane_a;
         cfg_.pane_b = override_model_.Find("pane_b")->override_active ? Color(override_model_.Find("pane_b")->value) : defaults.pane_b;
+        for(const char* id : {"track", "thumb_face_color", "thumb_frame_color", "thumb_ink"}) {
+            auto& row = *override_model_.Find(id);
+            if(!row.override_active) {
+                row.value = id == String("track") ? defaults.track : id == String("thumb_face_color") ? defaults.thumb_face_color : id == String("thumb_frame_color") ? defaults.thumb_frame_color : defaults.thumb_ink;
+                row.default_value = row.value;
+                override_model_.ValueChanged(id);
+            }
+        }
     }
 
     void ApplyDemoTheme()
     {
         for(UiButton& button:family_buttons_) button.SetCustomStyle(UiTheme::ResolveButton());
-        UiSplitter::Style s = UiTheme::ResolveSplitter();
+        UiSplitter::Style s = UiTheme::ResolveSplitter(SelectedRole());
         cfg_.track = s.track_palette.face[ST_NORMAL].IsSolid() ? s.track_palette.face[ST_NORMAL].color : cfg_.track;
         cfg_.thumb_face_color = s.thumb_palette.face[ST_NORMAL].IsSolid() ? s.thumb_palette.face[ST_NORMAL].color : cfg_.thumb_face_color;
         cfg_.thumb_frame_color = s.thumb_palette.frame[ST_NORMAL];
@@ -385,7 +434,7 @@ private:
     }
     UiSplitter::Style BuildSplitterStyle() const
     {
-        UiSplitter::Style s = UiTheme::ResolveSplitter();
+        UiSplitter::Style s = UiTheme::ResolveSplitter(SelectedRole());
         { if(override_model_.Find("hit_width")->override_active) s.hit_width = cfg_.hit_width; }
         { if(override_model_.Find("track_thickness")->override_active) s.track_thickness = cfg_.track_thickness; }
         { if(override_model_.Find("track_inset")->override_active) s.track_inset = Rect(cfg_.track_inset, cfg_.track_inset, cfg_.track_inset, cfg_.track_inset); }
@@ -403,9 +452,9 @@ private:
         { if(override_model_.Find("thumb_face")->override_active) s.thumb_metrics.face_enabled = cfg_.thumb_face; }
         { if(override_model_.Find("thumb_frame")->override_active) s.thumb_metrics.frame_enabled = cfg_.thumb_frame; }
         { if(override_model_.Find("show_grip")->override_active) s.show_grip = cfg_.show_grip; }
-        { if(override_model_.Find("grip_count")->override_active) s.grip_dot_count = cfg_.grip_count; }
-        { if(override_model_.Find("grip_dot")->override_active) s.grip_dot_size = cfg_.grip_dot; }
-        { if(override_model_.Find("grip_gap")->override_active) s.grip_dot_gap = cfg_.grip_gap; }
+        { if(override_model_.Find("grip_count")->override_active) s.grip_count = s.grip_dot_count = cfg_.grip_count; }
+        { if(override_model_.Find("grip_dot")->override_active) s.grip_size = s.grip_dot_size = cfg_.grip_dot; }
+        { if(override_model_.Find("grip_gap")->override_active) s.grip_gap = s.grip_dot_gap = cfg_.grip_gap; }
         s.label.Clear();
 
 
@@ -482,9 +531,9 @@ private:
         if(override_model_.Find("thumb_face")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.thumb_metrics.face_enabled = " << String(cfg_.thumb_face ? "true" : "false") << ";\n"; }
         if(override_model_.Find("thumb_frame")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.thumb_metrics.frame_enabled = " << String(cfg_.thumb_frame ? "true" : "false") << ";\n"; }
         if(override_model_.Find("show_grip")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.show_grip = " << String(cfg_.show_grip ? "true" : "false") << ";\n"; }
-        if(override_model_.Find("grip_count")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_dot_count = " << AsString((int)cfg_.grip_count) << ";\n"; }
-        if(override_model_.Find("grip_dot")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_dot_size = " << AsString((int)cfg_.grip_dot) << ";\n"; }
-        if(override_model_.Find("grip_gap")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_dot_gap = " << AsString((int)cfg_.grip_gap) << ";\n"; }
+        if(override_model_.Find("grip_count")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_count = style.grip_dot_count = " << AsString((int)cfg_.grip_count) << ";\n"; }
+        if(override_model_.Find("grip_dot")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_size = style.grip_dot_size = " << AsString((int)cfg_.grip_dot) << ";\n"; }
+        if(override_model_.Find("grip_gap")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.grip_gap = style.grip_dot_gap = " << AsString((int)cfg_.grip_gap) << ";\n"; }
         if(false) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.thumb_icon = SplitterIcon(" << AsString((int)cfg_.orientation) << ");\n"; }
         if(override_model_.Find("track")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "for(int i=0;i<4;i++) style.track_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.track) << ");\n"; }
         if(override_model_.Find("thumb_ink")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "for(int i=0;i<4;i++) style.track_palette.ink[i] = " << ColorCpp(cfg_.thumb_ink) << ";\n"; }
@@ -495,6 +544,10 @@ private:
         if(override_model_.Find("thumb_face_color")->override_active || override_model_.Find("track")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Blend(" << ColorCpp(cfg_.thumb_face_color) << ", " << ColorCpp(cfg_.track) << ", 84));\n"; }
         if(override_model_.Find("track")->override_active || override_model_.Find("thumb_ink")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.track_palette.face[ST_HOT] = UiFill::Solid(Blend(" << ColorCpp(cfg_.track) << ", " << ColorCpp(cfg_.thumb_ink) << ", 32));\n"; }
         if(override_model_.Find("track")->override_active || override_model_.Find("thumb_ink")->override_active) { if(!authored) code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n"; authored=true; code << "style.track_palette.face[ST_PRESSED] = UiFill::Solid(Blend(" << ColorCpp(cfg_.track) << ", " << ColorCpp(cfg_.thumb_ink) << ", 64));\n"; }
+        if(!authored && SelectedRole() != UiRole::Accent) {
+            code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n";
+            authored = true;
+        }
         if(authored) code << (use_quad ? "splitter.SetSplitterStyle(style);\n" : "splitter.SetCustomStyle(style);\n");
         code << "UiPanel pane_a,pane_b;\n";
         if(override_model_.Find("pane_a")->override_active) code << "{ UiPanel::Style panel_style=pane_a.GetStyle(); for(int state=0;state<4;state++) panel_style.palette.face[state]=UiFill::Solid(" << ColorCpp(cfg_.pane_a) << "); pane_a.SetCustomStyle(panel_style); }\n";
@@ -524,6 +577,6 @@ GUI_APP_MAIN {
     Demo demo;
     const Vector<String>& args=CommandLine();
     if(args.GetCount()==1 && args[0]=="--verify-selectors") { SetExitCode(demo.VerifySelectors()?0:1); return; }
-    if(args.GetCount()>=2 && args[0]=="--emit-code") { for(int i=2;i<args.GetCount();i++) { if(args[i]=="--configured") demo.ConfigureExample(); else demo.SelectConcreteExample(args[i]); } SaveFile(args[1],demo.GetGeneratedCode()); return; }
+    if(args.GetCount()>=2 && args[0]=="--emit-code") { for(int i=2;i<args.GetCount();i++) { if(args[i]=="--configured") demo.ConfigureExample(); else if(args[i].StartsWith("--role=")) demo.SelectRole(args[i].Mid(7)); else demo.SelectConcreteExample(args[i]); } SaveFile(args[1],demo.GetGeneratedCode()); return; }
     demo.Run();
 }
