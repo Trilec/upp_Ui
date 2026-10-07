@@ -4,6 +4,18 @@ UiStyle provides value-only style primitives. UiTheme maps context and semantic
 roles into concrete family styles. A control either follows those defaults or owns
 an explicit custom-style snapshot. There is no separate demo-only theme system.
 
+## Project typography
+
+`UiFonts.h` supplies a revisioned project catalogue and Body / Heading / Code
+families through `UiTheme::SetTypography`. Role resolvers keep their existing
+sizes/palettes, while explicit custom-style snapshots remain explicit. Register
+copied/embedded assets outside Paint; persist `project:<family-id>` selections,
+not private aliases or runtime face indices. Optional `system:<name>` selections
+and legacy family-name projects retain their separate meaning.
+
+See [PROJECT_FONTS.md](PROJECT_FONTS.md) for supported formats/platforms, lifetime
+limits, PropertyEditor refresh, Designer resources/export and runnable acceptance.
+
 ## Minimal baseline and roles
 
 The universal semantic roles are `UiRole::Standard`, `Subtle`, `Accent`, `Alert`.

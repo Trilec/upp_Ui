@@ -20,6 +20,7 @@
 
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/UiStyle.h>
+#include <Ui/UiFonts.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDoc/UiDocCore.h>
 
@@ -188,6 +189,8 @@ private:
     UiDocCore* model_ = &internal_model_;
     Vector<Ptr<UiDocCore>> bound_models_;
     Style style_;
+    bool custom_font_style_ = false;
+    mutable uint64 font_revision_ = 0;
 
     int anchor_pos_ = 0;
     int caret_pos_ = 0;

@@ -94,7 +94,8 @@ const UiGroupPanel::Style& UiGroupPanel::GetEffectiveStyle() const
     return themed_style_;
 }
 
-UiGroupPanel& UiGroupPanel::SetCustomStyle(const Style& s) { style_ = s; has_custom_style_ = true; OnStyleChanged(); return *this; }
+UiGroupPanel& UiGroupPanel::SetCustomStyle(const Style& s) { style_ = s;
+    UiApplyTypography(style_, false); has_custom_style_ = true; OnStyleChanged(); return *this; }
 UiGroupPanel& UiGroupPanel::ClearCustomStyle() { has_custom_style_ = false; style_ = StyleDefault(); InvalidateStyleCache(); OnStyleChanged(); return *this; }
 
 void UiGroupPanel::OnStyleChanged()

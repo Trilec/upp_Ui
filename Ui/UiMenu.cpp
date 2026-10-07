@@ -549,6 +549,7 @@ void UiMenu::OnStyleChanged()
 UiMenu& UiMenu::SetCustomStyle(const Style& s)
 {
     style_ = s;
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;

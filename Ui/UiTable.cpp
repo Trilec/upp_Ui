@@ -202,6 +202,7 @@ void UiTable::OnStyleChanged()
 UiTable& UiTable::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;

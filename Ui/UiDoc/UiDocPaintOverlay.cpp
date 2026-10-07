@@ -53,7 +53,7 @@ void PaintOverlayCountBadge(Draw& w, const Rect& marker, int count, Color color)
     Image face = UiGetCachedAACircleImage(badge.GetSize(), color);
     UiDrawCachedRaster(w, badge, face);
     String label = count > 9 ? String("9+") : AsString(count);
-    Font font = SansSerifZ(DPI(6)).Bold();
+    Font font = UiFonts::Inherit(SansSerifZ(6).Bold(), UiTypographyRole::Heading);
     Size ts = GetTextSize(label, font);
     w.DrawText(badge.left + (badge.GetWidth() - ts.cx) / 2,
                badge.top + (badge.GetHeight() - ts.cy) / 2,
@@ -90,7 +90,7 @@ void UiDoc::PaintEmbeds(Draw& w)
                 Color line = Blend(style_.page_frame, style_.page_face, 35);
                 w.DrawRect(rc.left, y, rc.GetWidth(), 1, line);
                 String label = "Page break";
-                Font font = SansSerifZ(DPI(9));
+                Font font = UiFonts::Inherit(SansSerifZ(9));
                 Size ts = GetTextSize(label, font);
                 w.DrawRect(rc.CenterPoint().x - ts.cx / 2 - DPI(4), y - ts.cy / 2,
                            ts.cx + DPI(8), ts.cy, style_.page_face);
@@ -180,9 +180,9 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
     else
         PaintOverlayMarkerShapeAA(w, icon_rect, lane ? lane->shape : MARKER_SQUARE, accent);
 
-    Font title_font = SansSerifZ(DPI(9)).Bold();
-    Font body_font = SansSerifZ(DPI(9));
-    Font type_font = SansSerifZ(DPI(8));
+    Font title_font = UiFonts::Inherit(SansSerifZ(9).Bold(), UiTypographyRole::Heading);
+    Font body_font = UiFonts::Inherit(SansSerifZ(9));
+    Font type_font = UiFonts::Inherit(SansSerifZ(8));
     String title = UiDocMetadataTitle(*annotation);
     String type = annotation->type.Mid(9);
     type.Replace("_", " ");
@@ -233,7 +233,7 @@ void UiDoc::PaintGutter(Draw& w)
     w.DrawRect(area, Blend(style_.page_face, SColorShadow(), 4));
 
     if(show_line_numbers_) {
-        Font font = SansSerifZ(DPI(8));
+        Font font = UiFonts::Inherit(SansSerifZ(8));
         Color ink = SColorDisabled();
         for(int i = 0; i < paragraphs_.GetCount(); i++) {
             int y = page_rect_.top + paragraphs_[i].top - scroll_y_;

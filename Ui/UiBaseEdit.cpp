@@ -161,6 +161,7 @@ static bool UiBaseEditNeedsTransparentBackpaint(const UiBaseEdit::Style& s)
 UiBaseEdit& UiBaseEdit::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;
@@ -721,7 +722,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
     if(!line_metrics_dirty_ && !placeholder_width_dirty_)
         return;
 
-    Font fnt = style.font;
+    Font fnt = style.metrics.use_text_font ? style.metrics.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 
@@ -1620,6 +1621,7 @@ int64 UiBaseEdit::GetMousePos(Point p) const
 
 Rect UiBaseEdit::GetCaretRect(int64 pos) const
 {
+    EnsureTextMetricsCache();
     const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::GetCaretRect");
 
@@ -1754,7 +1756,7 @@ void UiBaseEdit::Paint(Draw& w)
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();
 
-    Font fnt = style.font;
+    Font fnt = style.metrics.use_text_font ? style.metrics.text_font : style.font;
     if(IsNull(fnt))
         fnt = StdFont();
 

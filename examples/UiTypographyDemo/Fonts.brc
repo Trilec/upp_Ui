@@ -1,0 +1,8 @@
+BINARY(pt_sans_regular, "fonts/PT_Sans-Web-Regular.ttf")
+BINARY(pt_sans_bold, "fonts/PT_Sans-Web-Bold.ttf")
+BINARY(pt_sans_italic, "fonts/PT_Sans-Web-Italic.ttf")
+BINARY(pt_sans_bolditalic, "fonts/PT_Sans-Web-BoldItalic.ttf")
+BINARY(pt_serif_regular, "fonts/PT_Serif-Web-Regular.ttf")
+BINARY(pt_serif_bold, "fonts/PT_Serif-Web-Bold.ttf")
+BINARY(pt_serif_italic, "fonts/PT_Serif-Web-Italic.ttf")
+BINARY(pt_serif_bolditalic, "fonts/PT_Serif-Web-BoldItalic.ttf")

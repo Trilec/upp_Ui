@@ -245,6 +245,7 @@ UiLabel& UiLabel::SetCustomStyle(const Style& s)
 {
     align_h_override_ = align_v_override_ = false;
     style_ = s;
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;
@@ -1113,6 +1114,7 @@ UiLabel& UiLabel::SetUnderline(bool on, int thickness, int offset)
 
 Size UiLabel::GetMinSize() const
 {
+    GetEffectiveStyle(); // A typography revision can invalidate the cached measurement.
     if(!minsize_dirty_)
         return cached_minsize_;
 

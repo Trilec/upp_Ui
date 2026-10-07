@@ -278,6 +278,7 @@ void UiButton::RebuildTextLinesFromStyle(const Style& st)
 UiButton& UiButton::SetCustomStyle(const Style& s)
 {
     style_ = Style(s);
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;

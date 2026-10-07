@@ -25,6 +25,8 @@ namespace Upp {
 
 class UiTheme : public UiThemeRaw {
 public:
+    static void SetTypography(const UiTypography& typography) { UiFonts::SetTypography(typography); }
+    static UiTypography GetTypography() { return UiFonts::GetTypography(); }
     static UiAccordion::Style ResolveAccordion(UiRole role = UiRole::Standard)
     {
         UiAccordion::Style s = UiAccordion::StyleDefault();
@@ -48,7 +50,7 @@ public:
         s.header_style.media_tint_mono = true;
         s.header_style.title_font = SansSerifZ(11).Bold();
         s.header_style.subtitle_font = SansSerifZ(8);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiButton::Style ResolveButton(UiRole role)

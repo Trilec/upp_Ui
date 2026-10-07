@@ -38,6 +38,7 @@
 #ifndef _Ui_UiTheme_h_
 #define _Ui_UiTheme_h_
 
+#include <Ui/UiFonts.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiButton.h>
 #include <Ui/UiToolButton.h>
@@ -607,13 +608,13 @@ inline void ApplyLabelTextSize(UiLabel::Style& s, UiTextSize size)
 {
     switch(size) {
     case UiTextSize::H1:
-        s.font = SansSerifZ(24).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(24).Bold(), UiTypographyRole::Heading);
         break;
     case UiTextSize::H2:
-        s.font = SansSerifZ(16).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(16).Bold(), UiTypographyRole::Heading);
         break;
     case UiTextSize::H3:
-        s.font = SansSerifZ(12).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(12).Bold(), UiTypographyRole::Heading);
         break;
     case UiTextSize::Body:
     default:
@@ -743,12 +744,12 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
     UiToolButton::Style s = UiToolButton::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     default:
-        return s;
+        return UiApplyTypography(s);
     }
 }
 
@@ -758,7 +759,7 @@ inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
 
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
@@ -766,12 +767,12 @@ inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
         SetFrame(s.palette, Color(219, 227, 238), Color(191, 219, 254), Color(147, 197, 253), Color(226, 232, 240));
         SetInk(s.palette, Color(100, 116, 139), Color(37, 99, 235), Color(29, 78, 216), Color(148, 163, 184));
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         SetFace(s.palette, Null, Color(243, 244, 246), Color(229, 231, 235), Null);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(8);
         s.metrics.content_margin = Rect(DPI(14), DPI(8), DPI(14), DPI(8));
@@ -779,19 +780,19 @@ inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
         SetFrame(s.palette, Color(17, 24, 39), Color(31, 41, 55), Color(15, 23, 42), Color(203, 213, 225));
         SetInk(s.palette, White(), White(), White(), Color(100, 116, 139));
         SetIcon(s.palette, White(), White(), White(), Color(100, 116, 139));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         s.metrics.face_enabled = true;
         SetFace(s.palette, Null, Null, Color(243, 244, 246), Null);
         SetFrame(s.palette, Color(156, 163, 175), Color(107, 114, 128), Color(75, 85, 99), Color(209, 213, 219));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.radius = 0;
         s.metrics.content_margin = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
         s.content_gap = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.metrics.content_margin = Rect(DPI(14), DPI(9), DPI(14), DPI(9));
@@ -802,23 +803,23 @@ inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 54;
         s.metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     }
 
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
 {
     switch(role) {
     case UiButtonRole::Standard:
-        return s;
+        return UiApplyTypography(s);
     case UiButtonRole::Accent: {
         Color accent = Color(37, 99, 235);
         SetFrame(s.palette, accent, LtColor(accent, 6), DkColor(accent, 14), Blend(accent, White(), 170));
         SetInk(s.palette, accent, LtColor(accent, 6), DkColor(accent, 14), Color(148, 163, 184));
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
-        return s;
+        return UiApplyTypography(s);
     }
     case UiButtonRole::Subtle:
         s.metrics.radius = min(s.metrics.radius, DPI(6));
@@ -827,7 +828,7 @@ inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
         SetFrame(s.palette, Null, Null, Null, Null);
         SetInk(s.palette, Color(107, 114, 128), Color(17, 24, 39), Color(17, 24, 39), Color(156, 163, 175));
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
-        return s;
+        return UiApplyTypography(s);
     case UiButtonRole::Icon:
         s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.radius = max(s.metrics.radius, DPI(10));
@@ -835,16 +836,16 @@ inline UiButton::Style ApplyButtonRole(UiButton::Style s, UiButtonRole role)
         s.align_h = UiAlign::CENTER;
         s.align_v = UiAlign::CENTER;
         s.icon_side = UiAlign::LEFT;
-        return s;
+        return UiApplyTypography(s);
     case UiButtonRole::Danger: {
         Color danger = Color(220, 38, 38);
         SetFrame(s.palette, danger, LtColor(danger, 6), DkColor(danger, 12), Blend(danger, White(), 170));
         SetInk(s.palette, danger, LtColor(danger, 6), DkColor(danger, 12), Color(148, 163, 184));
         SetIcon(s.palette, s.palette.ink[ST_NORMAL], s.palette.ink[ST_HOT], s.palette.ink[ST_PRESSED], s.palette.ink[ST_DISABLED]);
-        return s;
+        return UiApplyTypography(s);
     }
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
@@ -853,29 +854,29 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
 
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.content_margin = Rect(DPI(12), DPI(7), DPI(12), DPI(7));
         SetFace(s.palette, Color(248, 250, 252), Color(255, 255, 255), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(219, 227, 238), Color(191, 219, 254), Color(147, 197, 253), Color(226, 232, 240));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
         SetFace(s.palette, Color(255, 255, 255), Color(255, 255, 255), Color(248, 250, 252), Color(248, 250, 252));
         SetFrame(s.palette, Color(148, 163, 184), Color(100, 116, 139), Color(71, 85, 105), Color(203, 213, 225));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.content_margin = Rect(DPI(8), DPI(5), DPI(8), DPI(5));
         s.metrics.radius = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.metrics.shadow.enabled = true;
@@ -885,28 +886,28 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
         s.metrics.shadow.color = Color(148, 163, 184);
         SetFace(s.palette, Color(255, 255, 255), Color(255, 255, 255), Color(248, 250, 252), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(203, 213, 225), Color(226, 232, 240));
-        return s;
+        return UiApplyTypography(s);
     }
 
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiBaseEdit::Style ApplyEditRole(UiBaseEdit::Style s, UiEditRole role)
 {
     switch(role) {
     case UiEditRole::Field:
-        return s;
+        return UiApplyTypography(s);
     case UiEditRole::Subtle:
         s.metrics.face_enabled = false;
         s.metrics.radius = min(s.metrics.radius, DPI(6));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        return s;
+        return UiApplyTypography(s);
     case UiEditRole::Strong:
         s.metrics.radius = max(s.metrics.radius, DPI(8));
         SetFrame(s.palette, Color(148, 163, 184), Color(100, 116, 139), Color(71, 85, 105), Color(203, 213, 225));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
@@ -914,17 +915,17 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
     UiToggle::Style s = UiToggle::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     default:
-        return s;
+        return UiApplyTypography(s);
     }
 }
 
@@ -933,7 +934,7 @@ inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
     UiCheckBox::Style s = UiCheckBox::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.frame_enabled = true;
@@ -941,10 +942,10 @@ inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
         s.metrics.frame_enabled = true;
@@ -952,16 +953,16 @@ inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
         SetFace(s.palette, Color(241, 245, 249), Color(226, 232, 240), Color(226, 232, 240), Color(248, 250, 252));
         SetFrame(s.palette, Color(203, 213, 225), Color(148, 163, 184), Color(100, 116, 139), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.indicator_gap = DPI(8);
         s.indicator_size = DPI(16);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.metrics.frame_enabled = true;
@@ -974,9 +975,9 @@ inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiCheckBox::Style ApplyCheckBoxVisual(UiCheckBox::Style s, UiCheckVisual visual)
@@ -984,7 +985,7 @@ inline UiCheckBox::Style ApplyCheckBoxVisual(UiCheckBox::Style s, UiCheckVisual 
     switch(visual) {
     case UICHECKVIS_CLASSIC:
         s.indicator_metrics.radius = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     case UICHECKVIS_CHIP:
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
@@ -993,15 +994,15 @@ inline UiCheckBox::Style ApplyCheckBoxVisual(UiCheckBox::Style s, UiCheckVisual 
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.indicator_size = DPI(14);
-        return s;
+        return UiApplyTypography(s);
     case UICHECKVIS_LIST:
         s.indicator_size = DPI(14);
         s.indicator_metrics.frame_enabled = false;
         s.indicator_metrics.face_enabled = false;
         s.metrics.content_margin = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
@@ -1009,7 +1010,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
     UiRadioButton::Style s = UiRadioButton::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.metrics.frame_enabled = true;
@@ -1017,10 +1018,10 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
         s.metrics.frame_enabled = true;
@@ -1028,16 +1029,16 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         SetFace(s.palette, Color(241, 245, 249), Color(226, 232, 240), Color(226, 232, 240), Color(248, 250, 252));
         SetFrame(s.palette, Color(203, 213, 225), Color(148, 163, 184), Color(100, 116, 139), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.indicator_gap = DPI(8);
         s.indicator_size = DPI(16);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.metrics.frame_enabled = true;
@@ -1050,9 +1051,9 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiRadioButton::Style ApplyRadioButtonVisual(UiRadioButton::Style s, UiRadioVisual visual)
@@ -1060,7 +1061,7 @@ inline UiRadioButton::Style ApplyRadioButtonVisual(UiRadioButton::Style s, UiRad
     switch(visual) {
     case UIRADIOVIS_CLASSIC:
         s.indicator_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UIRADIOVIS_PILLS:
         s.metrics.frame_enabled = true;
         s.metrics.frame_width = DPI(1);
@@ -1068,14 +1069,14 @@ inline UiRadioButton::Style ApplyRadioButtonVisual(UiRadioButton::Style s, UiRad
         s.metrics.content_margin = Rect(DPI(10), DPI(6), DPI(10), DPI(6));
         SetFace(s.palette, Color(255, 255, 255), Color(248, 250, 252), Color(241, 245, 249), Color(248, 250, 252));
         SetFrame(s.palette, Color(226, 232, 240), Color(203, 213, 225), Color(148, 163, 184), Color(226, 232, 240));
-        return s;
+        return UiApplyTypography(s);
     case UIRADIOVIS_LIST:
         s.indicator_metrics.frame_enabled = false;
         s.indicator_metrics.face_enabled = false;
         s.metrics.content_margin = Rect(DPI(4), DPI(1), DPI(0), DPI(1));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
@@ -1083,21 +1084,21 @@ inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
     UiProgressBar::Style s = UiProgressBar::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.fill_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
         s.fill_metrics.radius = 0;
         s.track_metrics.frame_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.track_metrics.radius = DPI(6);
         s.fill_metrics.radius = DPI(6);
         SetFace(s.track_palette, Color(203, 213, 225), Color(203, 213, 225), Color(203, 213, 225), Color(226, 232, 240));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.track_metrics.face_enabled = false;
         s.track_metrics.frame_enabled = true;
@@ -1105,12 +1106,12 @@ inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
         s.fill_metrics.frame_enabled = false;
         s.track_metrics.radius = 0;
         s.fill_metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.font = StdFontZ(10);
         s.content_inset = Rect(0, 0, 0, 0);
         s.indeterminate_span = DPI(30);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.track_metrics.radius = DPI(999);
         s.fill_metrics.radius = DPI(999);
@@ -1119,9 +1120,9 @@ inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
         s.track_metrics.shadow.distance = DPI(3);
         s.track_metrics.shadow.alpha = 36;
         s.track_metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline void TuneProgressBarRole(UiProgressBar::Style& s, UiThemeMode mode, UiRole role)
@@ -1163,7 +1164,7 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
     UiSlider::Style s = UiSlider::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
@@ -1176,12 +1177,12 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         SetInk(s.track_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
         SetFace(s.thumb_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
         SetFrame(s.thumb_palette, Color(214, 223, 235), Color(195, 205, 220), Color(176, 188, 208), Color(148, 163, 184));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = DPI(4);
         s.track_size.cy = DPI(3);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.track_size.cy = DPI(6);
         s.thumb_size = Size(DPI(18), DPI(18));
@@ -1189,20 +1190,20 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         SetFrame(s.track_palette, Color(148, 163, 184), Color(96, 165, 250), Color(59, 130, 246), Color(203, 213, 225));
         SetFace(s.thumb_palette, Color(15, 23, 42), Color(30, 41, 59), Color(37, 99, 235), Color(148, 163, 184));
         SetFrame(s.thumb_palette, Color(15, 23, 42), Color(30, 41, 59), Color(37, 99, 235), Color(148, 163, 184));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.track_metrics.face_enabled = false;
         s.track_metrics.frame_enabled = true;
         s.track_metrics.frame_width = DPI(1);
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.track_size = Size(DPI(100), DPI(3));
         s.thumb_size = Size(DPI(12), DPI(16));
         s.tick_len_major = DPI(4);
         s.tick_len_minor = DPI(2);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.track_size.cy = DPI(4);
         s.thumb_size = Size(DPI(14), DPI(18));
@@ -1220,9 +1221,9 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
         SetInk(s.track_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
         SetFace(s.thumb_palette, Color(37, 99, 235), Color(29, 78, 216), Color(30, 64, 175), Color(148, 163, 184));
         SetFrame(s.thumb_palette, Color(214, 223, 235), Color(195, 205, 220), Color(176, 188, 208), Color(148, 163, 184));
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
@@ -1230,12 +1231,12 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
     UiScrollBar::Style s = UiScrollBar::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
         s.arrow_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = 0;
@@ -1246,7 +1247,7 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.track_paint_px_hot = DPI(2);
         s.thumb_paint_px_idle = DPI(10);
         s.thumb_paint_px_hot = DPI(12);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.show_arrows = true;
         s.arrows_layout = UIARROWS_SPLIT;
@@ -1254,14 +1255,14 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.track_paint_px_hot = s.thick_px;
         s.thumb_paint_px_idle = max(DPI(1), s.thick_px - DPI(4));
         s.thumb_paint_px_hot = s.thick_px;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.track_metrics.face_enabled = false;
         s.track_metrics.frame_enabled = true;
         s.track_metrics.radius = 0;
         s.thumb_metrics.radius = DPI(4);
         s.arrow_metrics.radius = DPI(4);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.thin_idle = true;
         s.thin_px = DPI(4);
@@ -1271,7 +1272,7 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.thumb_paint_px_idle = DPI(8);
         s.thumb_paint_px_hot = DPI(12);
         s.arrow_size = DPI(12);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.track_metrics.radius = DPI(999);
         s.thumb_metrics.radius = DPI(999);
@@ -1283,9 +1284,9 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
         s.thumb_metrics.shadow.distance = DPI(2);
         s.thumb_metrics.shadow.alpha = 42;
         s.thumb_metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiSplitter::Style ResolveSplitterBase(UiThemePreset preset)
@@ -1293,30 +1294,30 @@ inline UiSplitter::Style ResolveSplitterBase(UiThemePreset preset)
     UiSplitter::Style s = UiSplitter::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.thumb_metrics.radius = DPI(999);
         s.track_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.thumb_metrics.radius = 0;
         s.track_metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.thumb_metrics.radius = DPI(6);
         s.track_thickness = DPI(2);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.thumb_metrics.face_enabled = false;
         s.thumb_metrics.frame_enabled = true;
         s.track_thickness = DPI(1);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.hit_width = DPI(6);
         s.thumb_main = DPI(28);
         s.thumb_cross = DPI(6);
         s.grip_dot_count = 4;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.thumb_metrics.radius = DPI(8);
         s.thumb_metrics.shadow.enabled = true;
@@ -1324,9 +1325,9 @@ inline UiSplitter::Style ResolveSplitterBase(UiThemePreset preset)
         s.thumb_metrics.shadow.distance = DPI(2);
         s.thumb_metrics.shadow.alpha = 36;
         s.thumb_metrics.shadow.color = Color(100, 116, 139);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
@@ -1334,32 +1335,32 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
     UiPanel::Style s = UiPanel::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(30);
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
             s.palette.frame[i] = Color(226, 232, 240);
         }
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(Color(241, 245, 249));
             s.palette.frame[i] = Color(203, 213, 225);
         }
         s.metrics.radius = DPI(10);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.content_margin = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
         s.metrics.radius = DPI(6);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(18);
         s.metrics.shadow.enabled = true;
@@ -1371,31 +1372,31 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
             s.palette.face[i] = UiFill::Solid(Color(255, 255, 255));
             s.palette.frame[i] = Color(226, 232, 240);
         }
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiPanel::Style ApplyPanelRole(UiPanel::Style s, UiPanelRole role)
 {
     switch(role) {
     case UiPanelRole::Surface:
-        return s;
+        return UiApplyTypography(s);
     case UiPanelRole::Subtle:
         s.metrics.face_enabled = false;
         s.metrics.radius = min(s.metrics.radius, DPI(8));
         for(int i = 0; i < 4; i++)
             s.palette.frame[i] = Color(226, 232, 240);
-        return s;
+        return UiApplyTypography(s);
     case UiPanelRole::Strong:
         s.metrics.radius = max(s.metrics.radius, DPI(10));
         for(int i = 0; i < 4; i++) {
             s.palette.face[i] = UiFill::Solid(Color(241, 245, 249));
             s.palette.frame[i] = Color(203, 213, 225);
         }
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
@@ -1414,23 +1415,23 @@ inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
     switch(preset) {
     case UiThemePreset::Pill:
         ApplyPillGeometry(s);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.radius = DPI(6);
         s.inset = Rect(DPI(6), DPI(6), DPI(6), DPI(6));
         s.header_inset = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(18);
         s.metrics.shadow.enabled = true;
@@ -1438,10 +1439,10 @@ inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
         s.metrics.shadow.distance = DPI(4);
         s.metrics.shadow.alpha = 48;
         s.metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Minimal:
     default:
-        return s;
+        return UiApplyTypography(s);
     }
 }
 
@@ -1572,29 +1573,29 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
     s.popup_item_style = UiLabel::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(999);
         s.popup_radius = DPI(14);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
         s.popup_radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
         s.popup_radius = DPI(10);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.metrics.face_enabled = false;
         s.popup_radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.content_margin = Rect(DPI(8), DPI(4), DPI(8), DPI(4));
         s.popup_item_height = DPI(28);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.popup_radius = DPI(14);
@@ -1603,9 +1604,9 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiTab::Style ResolveTabBase(UiThemePreset preset)
@@ -1613,29 +1614,29 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
     UiTab::Style s = UiTab::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(14);
         s.tab_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
         s.tab_metrics.radius = 0;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(10);
         s.tab_metrics.radius = DPI(10);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.tab_metrics.radius = 0;
         s.metrics.face_enabled = false;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.tab_extent = DPI(30);
         s.item_spacing = DPI(4);
         s.tab_padding = Rect(DPI(10), DPI(5), DPI(10), DPI(5));
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(14);
         s.tab_metrics.radius = DPI(12);
@@ -1644,9 +1645,9 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
         s.metrics.shadow.distance = DPI(3);
         s.metrics.shadow.alpha = 42;
         s.metrics.shadow.color = Color(148, 163, 184);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
@@ -1659,7 +1660,7 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
         s.tab_metrics.face_enabled = true;
         s.tab_metrics.frame_enabled = true;
         s.open_corner_radius = DPI(6);
-        return s;
+        return UiApplyTypography(s);
     case UITAB_UNDERLINE:
         s.tab_metrics.face_enabled = false;
         s.tab_metrics.frame_enabled = false;
@@ -1673,62 +1674,62 @@ inline UiTab::Style ApplyTabVisual(UiTab::Style s, UiTabVisual visual)
         }
         s.tab_palette.ink[ST_HOT] = Color(30, 41, 59);
         s.tab_palette.ink[ST_PRESSED] = Color(15, 23, 42);
-        return s;
+        return UiApplyTypography(s);
     case UITAB_SEGMENTED:
         s.item_spacing = DPI(2);
         s.body_gap = DPI(6);
         s.strip_inset = Rect(DPI(5), DPI(5), DPI(5), DPI(5));
         s.tab_metrics.radius = DPI(999);
-        return s;
+        return UiApplyTypography(s);
     case UITAB_RAIL:
         s.tab_metrics.face_enabled = false;
         s.tab_metrics.frame_enabled = false;
         s.item_spacing = DPI(10);
         s.body_gap = DPI(6);
         s.tab_padding = Rect(DPI(8), DPI(8), DPI(8), DPI(8));
-        return s;
+        return UiApplyTypography(s);
     case UITAB_DOCUMENT:
         s.item_spacing = DPI(8);
         s.body_gap = DPI(4);
         s.tab_metrics.radius = DPI(8);
         s.open_corner_radius = 0;
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
 {
     UiTitleCard::Style s = UiTitleCard::StyleDefault();
     switch(preset) {
     case UiThemePreset::Minimal:
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Pill:
         s.metrics.radius = DPI(18);
         s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.media_reserve = DPI(84);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Linear:
         s.metrics.radius = 0;
         s.title_line_length = MEDIUM;
         s.card_line_length = MEDIUM;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Solid:
         s.metrics.radius = DPI(14);
         s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
         s.media_reserve = DPI(84);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Outline:
         s.metrics.radius = 0;
         s.transparent = true;
         s.title_line_length = MEDIUM;
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Compact:
         s.metrics.radius = DPI(8);
         s.metrics.content_margin = Rect(DPI(10), DPI(8), DPI(10), DPI(8));
         s.media_reserve = DPI(64);
         s.title_subtitle_gap = DPI(2);
         s.subtitle_copy_gap = DPI(3);
-        return s;
+        return UiApplyTypography(s);
     case UiThemePreset::Layered:
         s.metrics.radius = DPI(16);
         s.metrics.content_margin = Rect(DPI(14), DPI(12), DPI(14), DPI(12));
@@ -1738,9 +1739,9 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
         s.metrics.shadow.alpha = 52;
         s.metrics.shadow.color = Color(148, 163, 184);
         s.media_reserve = DPI(84);
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
 {
@@ -1771,34 +1772,34 @@ inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
     case UiThemePreset::Layered:
         break;
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline UiLabel::Style ApplyLabelRole(UiLabel::Style s, UiLabelRole role)
 {
     switch(role) {
     case UiLabelRole::Body:
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Headline:
-        s.font = SansSerifZ(24).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(24).Bold(), UiTypographyRole::Heading);
         s.align_h = UiAlign::LEFT;
         s.align_v = UiAlign::TOP;
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Subheadline:
-        s.font = SansSerifZ(18).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(18).Bold(), UiTypographyRole::Heading);
         s.align_h = UiAlign::LEFT;
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Title:
-        s.font = SansSerifZ(16).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(16).Bold(), UiTypographyRole::Heading);
         s.align_h = UiAlign::LEFT;
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Caption:
         s.font = SansSerifZ(11);
         for(int i = 0; i < 4; i++)
             s.palette.ink[i] = Color(100, 116, 139);
         s.palette.ink[ST_DISABLED] = Color(148, 163, 184);
         s.align_h = UiAlign::LEFT;
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Badge:
         s.metrics.face_enabled = true;
         s.metrics.frame_enabled = true;
@@ -1818,16 +1819,16 @@ inline UiLabel::Style ApplyLabelRole(UiLabel::Style s, UiLabelRole role)
         // icon/text relationship itself is still one shared content gap.
         s.metrics.content_margin = Rect(DPI(6), DPI(2), DPI(8), DPI(2));
         s.content_gap = DPI(8);
-        return s;
+        return UiApplyTypography(s);
     case UiLabelRole::Footnote:
-        s.font = SansSerifZ(DPI(9));
+        s.font = SansSerifZ(9);
         for(int i = 0; i < 4; i++)
             s.palette.ink[i] = Color(148, 163, 184);
         s.palette.ink[ST_DISABLED] = Color(203, 213, 225);
         s.align_v = UiAlign::TOP;
-        return s;
+        return UiApplyTypography(s);
     }
-    return s;
+    return UiApplyTypography(s);
 }
 
 inline void TuneMinimalToolButton(UiToolButton::Style& s, UiThemeMode mode, UiToolButtonRole role)
@@ -2467,7 +2468,7 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
     s.palette.icon[ST_DISABLED] = standard.ink_disabled;
     switch(role) {
     case UiLabelRole::Headline:
-        s.font = SansSerifZ(28).Bold();
+        s.font = UiFonts::Inherit(SansSerifZ(28).Bold(), UiTypographyRole::Heading);
         break;
     case UiLabelRole::Subheadline:
         s.font = SansSerifZ(11).Bold();
@@ -2560,7 +2561,7 @@ public:
     static uint64 GetRevision()
     {
         Mutex::Lock __(UiThemeDetail::ThemeMutex());
-        return UiThemeDetail::ThemeRevisionRef();
+        return UiThemeDetail::ThemeRevisionRef() + UiFonts::GetRevision();
     }
 
     static UiButton::Style ResolveButton(UiRole role) { return ResolveButton(GetContext(), role); }
@@ -2635,7 +2636,7 @@ public:
         s.active_bg = s.selection_bg;
         s.active_border = color(list.drag_marker, s.selection_border);
         s.resize_guide = s.active_border;
-        return s;
+        return UiApplyTypography(s);
     }
     static UiTable::Style ResolveTable(UiRole role)
     {
@@ -2654,15 +2655,24 @@ public:
         s.muted_ink = text.palette.ink[ST_DISABLED];
         s.selection_bg = s.active_bg = selection.selected_face;
         s.active_border = s.selection_border = s.resize_guide = edge.palette.frame[ST_PRESSED];
-        return s;
+        return UiApplyTypography(s);
     }
     static UiDoc::Style ResolveDoc()
     {
         UiThemeContext ctx = GetContext();
         UiDoc::Style s = UiDoc::StyleDefault();
         UiThemeDetail::ApplyMode(s.palette, ctx.mode);
+        if(UiThemeDetail::ResolveEffectiveMode(ctx.mode) == UiThemeMode::Dark) {
+            s.page_face = UiThemeDetail::ForceDarkFace(s.page_face);
+            s.page_frame = UiThemeDetail::ForceDarkFrame(s.page_frame);
+            s.table_grid = UiThemeDetail::ForceDarkFrame(s.table_grid);
+            s.caret_ink = UiThemeDetail::ForceDarkInk(s.caret_ink);
+            s.selection_fill = UiThemeDetail::ForceDarkFace(s.selection_fill);
+            s.search_fill = UiThemeDetail::ForceDarkFace(s.search_fill);
+            s.annotation_fill = UiThemeDetail::ForceDarkFace(s.annotation_fill);
+        }
         s.font = ResolveLabel(ctx, UiLabelRole::Body).font;
-        return s;
+        return UiApplyTypography(s);
     }
     static UiBezierCurveEditor::Style ResolveBezierCurveEditor()
     {
@@ -2676,7 +2686,7 @@ public:
         s.handle_fill = accent.ink;
         s.handle_selected = accent.frame;
         s.handle_ring = shell.face;
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiButton::Style ResolveButton(const UiThemeContext& ctx, UiRole role)
@@ -2697,10 +2707,10 @@ public:
                 UiThemeDetail::TunePillButtonRole(s, normalized.mode, role);
                 UiThemeDetail::ApplyPillGeometry(s);
             }
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiToolButton::Style ResolveToolButton(const UiThemeContext& ctx, UiRole role)
@@ -2718,10 +2728,10 @@ public:
             UiThemeDetail::TuneMinimalToolButton(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiBaseEdit::Style ResolveEdit(const UiThemeContext& ctx, UiRole role)
@@ -2734,10 +2744,10 @@ public:
             UiThemeDetail::TuneMinimalEdit(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiBaseEdit::Style ResolveEdit(const UiThemeContext& ctx, UiEditRole role = UiEditRole::Field)
@@ -2752,10 +2762,10 @@ public:
             UiThemeDetail::TuneMinimalEdit(s, normalized.mode, universal);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiCheckBox::Style ResolveCheckBox(const UiThemeContext& ctx, UiRole role, UiCheckVisual visual = UICHECKVIS_CLASSIC)
@@ -2768,11 +2778,11 @@ public:
             UiThemeDetail::TuneMinimalCheckBox(s, normalized.mode, visual, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.indicator_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiCheckBox::Style ResolveCheckBox(const UiThemeContext& ctx, UiCheckVisual visual = UICHECKVIS_CLASSIC)
@@ -2784,11 +2794,11 @@ public:
             UiThemeDetail::TuneMinimalCheckBox(s, normalized.mode, visual, UiRole::Standard);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.indicator_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiToggle::Style ResolveToggle(const UiThemeContext& ctx)
@@ -2805,7 +2815,7 @@ public:
             UiThemeDetail::TuneMinimalToggle(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
@@ -2823,7 +2833,7 @@ public:
             s.thumb_metrics.frame_enabled = colors.thumb_metrics.frame_enabled;
             s.thumb_metrics.frame_width = colors.thumb_metrics.frame_width;
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiRadioButton::Style ResolveRadioButton(const UiThemeContext& ctx, UiRole role, UiRadioVisual visual = UIRADIOVIS_CLASSIC)
@@ -2836,11 +2846,11 @@ public:
             UiThemeDetail::TuneMinimalRadioButton(s, normalized.mode, visual, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.indicator_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiRadioButton::Style ResolveRadioButton(const UiThemeContext& ctx, UiRadioVisual visual = UIRADIOVIS_CLASSIC)
@@ -2852,11 +2862,11 @@ public:
             UiThemeDetail::TuneMinimalRadioButton(s, normalized.mode, visual, UiRole::Standard);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.indicator_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiProgressBar::Style ResolveProgressBar(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
@@ -2869,7 +2879,7 @@ public:
             s.track_metrics.radius = DPI(999);
             s.fill_metrics.radius = DPI(999);
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiSlider::Style ResolveSlider(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
@@ -2880,13 +2890,13 @@ public:
             UiThemeDetail::TuneMinimalSlider(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         if(!IsNull(s.tick_color) && UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark)
             s.tick_color = UiThemeDetail::ForceDarkFrame(s.tick_color);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiScrollBar::Style ResolveScrollBar(const UiThemeContext& ctx)
@@ -2898,7 +2908,7 @@ public:
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.arrow_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiSplitter::Style ResolveSplitter(const UiThemeContext& ctx, UiRole role = UiRole::Accent)
@@ -2910,14 +2920,14 @@ public:
             UiThemeDetail::TuneMinimalSplitter(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         if(UiThemeDetail::IsPillPreset(normalized.preset))
             UiThemeDetail::ApplyPillGeometry(s);
         UiThemeDetail::ApplyMode(s.track_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.thumb_palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.background_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiSplitter::Style ResolveSplitter(UiRole role)
@@ -2934,7 +2944,7 @@ public:
             UiThemeDetail::TuneMinimalPanel(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         return ResolvePanel(normalized, UiThemeDetail::ToPanelRole(role));
     }
@@ -2949,10 +2959,10 @@ public:
             UiThemeDetail::TuneMinimalPanel(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiScrollPanel::Style ResolveScrollPanel(const UiThemeContext& ctx, UiRole role)
@@ -2963,7 +2973,7 @@ public:
         s.metrics = panel.metrics;
         s.skin = panel.skin;
         s.transparent = panel.transparent;
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiGroupPanel::Style ResolveGroupPanel(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
@@ -2975,10 +2985,10 @@ public:
             UiThemeDetail::TuneMinimalGroupPanel(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiGroupPanel::Style ResolveGroupPanel(UiRole role = UiRole::Standard)
@@ -2995,11 +3005,11 @@ public:
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.popup_item_style.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiDropdown::Style ResolveDropdown(const UiThemeContext& ctx)
@@ -3010,11 +3020,11 @@ public:
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, UiRole::Standard);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.popup_item_style.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiTab::Style ResolveTab(const UiThemeContext& ctx, UiRole role, UiTabVisual visual = UITAB_CLASSIC)
@@ -3027,7 +3037,7 @@ public:
             UiThemeDetail::TuneMinimalTab(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.tab_palette, normalized.mode);
@@ -3037,7 +3047,7 @@ public:
             s.tab_palette = colors.tab_palette;
             s.active_frame_color = colors.active_frame_color;
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiTab::Style ResolveTab(const UiThemeContext& ctx, UiTabVisual visual = UITAB_CLASSIC)
@@ -3049,11 +3059,11 @@ public:
             UiThemeDetail::TuneMinimalTab(s, normalized.mode, UiRole::Standard);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyMode(s.tab_palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
     static UiTitleCard::Style ResolveTitleCard(const UiThemeContext& ctx)
     {
@@ -3062,7 +3072,7 @@ public:
             return ResolveTitleCard(normalized, UiRole::Standard);
         UiTitleCard::Style s = UiThemeDetail::ResolveTitleCardBase(normalized.preset);
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiTitleCard::Style ResolveTitleCard(const UiThemeContext& ctx, UiRole role)
@@ -3148,7 +3158,7 @@ public:
             }
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         if(role != UiRole::Standard) {
@@ -3164,7 +3174,7 @@ public:
             s.metrics.face_enabled = colors.metrics.face_enabled;
             s.metrics.frame_enabled = colors.metrics.frame_enabled;
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiTree::Style ResolveTree(const UiThemeContext& ctx)
@@ -3191,7 +3201,7 @@ public:
         s.glyph_color = colors.muted_ink;
         s.glyph_hot_color = colors.hot_ink;
         s.glyph_selected_color = colors.selected_ink;
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiTree::Style ResolveTreeBase(const UiThemeContext& ctx)
@@ -3230,7 +3240,7 @@ public:
             }
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         if(UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark) {
@@ -3245,7 +3255,7 @@ public:
             s.line_color = UiThemeDetail::ForceDarkFrame(s.line_color);
             s.glyph_color = UiThemeDetail::ForceDarkInk(s.glyph_color);
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
 
@@ -3372,7 +3382,7 @@ public:
             s.palette.icon[ST_DISABLED] = s.disabled_ink;
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         switch(normalized.preset) {
         case UiThemePreset::Pill:
@@ -3483,7 +3493,7 @@ public:
             s.metadata_default = colors.metadata_default;
             s.check_frame = colors.check_frame; s.check_fill = colors.check_fill;
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiMenu::Style ResolveMenu(const UiThemeContext& ctx)
@@ -3511,7 +3521,7 @@ public:
             s.shadow_color = dark ? Color(0, 0, 0) : Color(148, 163, 184);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s);
-            return s;
+            return UiApplyTypography(s);
         }
         switch(normalized.preset) {
         case UiThemePreset::Pill:
@@ -3577,7 +3587,7 @@ public:
             s.check_color = UiThemeDetail::ForceDarkInk(s.check_color);
             s.arrow_color = UiThemeDetail::ForceDarkInk(s.arrow_color);
         }
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiLabel::Style ResolveLabel(const UiThemeContext& ctx, UiLabelRole role = UiLabelRole::Body)
@@ -3590,10 +3600,10 @@ public:
             UiThemeDetail::TuneMinimalLabel(s, normalized.mode, role);
             if(UiThemeDetail::IsPillPreset(normalized.preset))
                 UiThemeDetail::ApplyPillGeometry(s, role);
-            return s;
+            return UiApplyTypography(s);
         }
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiLabel::Style ResolveLabel(const UiThemeContext& ctx, UiRole role, UiTextSize size = UiTextSize::Body)
@@ -3608,7 +3618,7 @@ public:
             UiThemeDetail::ApplyMode(s.palette, normalized.mode);
         UiThemeDetail::ApplyLabelUniversalRole(s, normalized.mode, role);
         UiThemeDetail::ApplyLabelTextSize(s, size);
-        return s;
+        return UiApplyTypography(s);
     }
 
     static UiButton::Style ResolveButton(UiThemePreset preset, UiThemeMode mode, UiButtonRole role = UiButtonRole::Standard)

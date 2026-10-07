@@ -54,21 +54,6 @@ static const Vector<UiDropdown::Item>& PeIconCatalogItems()
     return items;
 }
 
-static const Vector<String>& PeFontFaceCatalog()
-{
-    static Vector<String> faces;
-    static bool initialized = false;
-    if(!initialized) {
-        initialized = true;
-        for(int i = 0; i < Font::GetFaceCount(); i++) {
-            String face = Font::GetFaceName(i);
-            if(!face.IsEmpty())
-                faces.Add(face);
-        }
-    }
-    return faces;
-}
-
 class PropertyRangeValueEditor : public PropertyValueEditor {
 public:
     PropertyRangeValueEditor()
@@ -518,41 +503,60 @@ public:
         drop_.UseInternalModel();
         drop_.SetPlaceholderText("Select font...");
         drop_.WhenSelectData = [=](const Value& value) {
-            if(!syncing_) {
-                WhenPreview(value);
-                WhenCommit(value);
+            if(syncing_) return;
+            if(AsString(value) == "__font_source__") {
+                include_system_ = !include_system_; source_chosen_ = true; PopulateFaces(true); return;
             }
+            value_ = AsString(value);
+            Value selected = value_;
+            Ptr<PropertyFontValueEditor> safe = this;
+            WhenPreview(selected);
+            if(safe) safe->WhenCommit(selected);
         };
+        UiFonts::Watch(*this);
         PopulateFaces();
     }
-
+    ~PropertyFontValueEditor() { UiFonts::Unwatch(*this); }
+    void Layout() override { PopulateFaces(); drop_.SetRect(GetSize()); }
     void Configure(const PropertyEditorItem& item) override
     {
+        PopulateFaces();
         drop_.Enable(item.enabled && item.value_editable && !item.read_only);
     }
-
     void SetEditorValue(const Value& value, bool mixed) override
     {
+        value_ = AsString(value); mixed_ = mixed;
+        PopulateFaces(true);
+    }
+    Value GetEditorValue() const override { return value_; }
+    void FocusEditor() override { PopulateFaces(); drop_.SetFocus(); }
+private:
+    void PopulateFaces(bool force = false)
+    {
+        if(!force && revision_ == UiFonts::GetRevision()) return;
+        revision_ = UiFonts::GetRevision();
         syncing_ = true;
-        if(mixed)
-            drop_.ClearSelection();
-        else
-            drop_.SetDataSilently(AsString(value));
+        drop_.Clear();
+        if(!source_chosen_) include_system_ = UiFonts::Catalog().Choices(false).IsEmpty();
+        const auto choices = UiFonts::Catalog().Choices(include_system_);
+        for(int i = 0; i < choices.GetCount(); ++i)
+            drop_.Add(choices[i], choices.GetKey(i));
+        String selected = value_;
+        if(!selected.StartsWith("project:") && !selected.StartsWith("system:")) selected = "system:" + selected;
+        if(!mixed_ && !value_.IsEmpty()) {
+            if(choices.Find(selected) < 0) drop_.Add(UiFonts::Catalog().HasSelection(selected) ? "System / " + value_ :
+                "Missing / " + value_ + " (using " + UiFonts::Resolve(selected, StdFont()).resolved_family + ")", selected);
+            drop_.SetDataSilently(selected);
+        }
+        else drop_.ClearSelection();
+        drop_.Add(include_system_ ? "Hide system fonts..." : "Show system fonts...", "__font_source__");
         syncing_ = false;
     }
-
-    Value GetEditorValue() const override { return drop_.GetSelectedData(); }
-    void FocusEditor() override { drop_.SetFocus(); }
-
-private:
-    void PopulateFaces()
-    {
-        for(const String& face : PeFontFaceCatalog())
-            drop_.Add(face, face);
-    }
-
     UiDropdown drop_;
-    bool syncing_ = false;
+    String value_;
+    uint64 revision_ = 0;
+    bool syncing_ = false, mixed_ = false;
+    bool include_system_ = false, source_chosen_ = false;
 };
 
 class PropertyImageThumbnailCtrl : public Ctrl {

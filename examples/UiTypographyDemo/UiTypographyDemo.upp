@@ -1,0 +1,11 @@
+uses
+	CtrlLib,
+	Ui,
+	plugin/png,
+	Utilities/PropertyEditor;
+file
+	main.cpp,
+	Fonts.brc,
+	fonts/manifest.json;
+mainconfig
+	"" = "GUI";

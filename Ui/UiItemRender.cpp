@@ -1,3 +1,4 @@
+#include <Ui/UiFonts.h>
 #include <Ui/UiItemRender.h>
 #include <Ui/UiList.h>
 #include <Ui/UiTheme.h>
@@ -120,7 +121,7 @@ Font ResolveItemFont(const UiItemRenderData& data, const UiItemRenderStyle& styl
     Font f = data.use_custom_font ? data.custom_font : style.title_font;
     if(data.emphasized && !data.use_custom_font)
         f.Bold();
-    return f;
+    return UiFonts::Normalize(f);
 }
 
 Font ShrinkVerticalItemFont(Font font, int steps)
@@ -213,6 +214,7 @@ UiItemRender& UiItemRender::SetData(const UiItemRenderData& data)
 UiItemRender& UiItemRender::SetCustomStyle(const UiItemRenderStyle& style)
 {
     custom_style_ = style;
+    UiApplyTypography(custom_style_, false);
     has_custom_style_ = true;
     InvalidateLayout();
     return *this;

@@ -79,8 +79,8 @@ inline Vector<String> UiDocMetadataWrapLines(const String& text, const Font& fon
 
 inline int UiDocMetadataCardHeight(const UiDocAnnotation& annotation, int width)
 {
-    Font title_font = SansSerifZ(DPI(9)).Bold();
-    Font body_font = SansSerifZ(DPI(9));
+    Font title_font = UiFonts::Inherit(SansSerifZ(9).Bold(), UiTypographyRole::Heading);
+    Font body_font = UiFonts::Inherit(SansSerifZ(9));
     int icon = DPI(12);
     int pad = DPI(7);
     int header = max(icon, title_font.GetHeight());

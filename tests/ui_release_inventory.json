@@ -8,6 +8,7 @@
     "Ui/UiIndicatorBase.h",
     "Ui/UiStyle.h",
     "Ui/UiTheme.h",
+    "Ui/UiFonts.h",
     "Ui/UiThemeStructureContract.h",
     "Ui/UiDraw.h",
     "Ui/UiRenderLayer.h",
@@ -510,6 +511,10 @@
     }
   ],
   "specialist_examples": [
+    {
+      "package": "UiTypographyDemo",
+      "purpose": "Privately loaded project fonts, shared typography and focused native acceptance"
+    },
     {
       "package": "UiDocEditorDemo",
       "purpose": "Document ribbon, file, annotation and review workflows; canonical control builder is UiDocDemo"

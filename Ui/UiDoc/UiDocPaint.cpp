@@ -145,7 +145,7 @@ void UiDoc::PaintText(Draw& w)
                 }
                 marker = AsString(ordinal) + ".";
             }
-            Font marker_font = SansSerifZ(DPI(10));
+            Font marker_font = UiFonts::Inherit(SansSerifZ(10));
             if(role == "list.bullet")
                 marker_font.Bold();
             int marker_x = origin_x + indent_px + DPI(4);

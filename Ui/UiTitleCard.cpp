@@ -92,6 +92,7 @@ const UiTitleCard::Style& UiTitleCard::GetEffectiveStyle() const
 UiTitleCard& UiTitleCard::SetCustomStyle(const Style& s)
 {
     style_ = s;
+    UiApplyTypography(style_, false);
     has_custom_style_ = true;
     OnStyleChanged();
     return *this;

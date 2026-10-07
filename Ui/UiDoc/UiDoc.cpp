@@ -159,6 +159,7 @@ UiDoc& UiDoc::SetModel(UiDocCore& model)
 
 UiDoc& UiDoc::SetCustomStyle(const Style& style)
 {
+    custom_font_style_ = true;
     style_ = style;
     OnStyleChanged();
     return *this;
@@ -276,17 +277,17 @@ void UiDoc::OnCoreChange(const UiDocApplyResult& result)
 Font UiDoc::BaseFont() const
 {
     if(style_.metrics.use_text_font && !IsNull(style_.metrics.text_font))
-        return style_.metrics.text_font;
+        return custom_font_style_ ? UiFonts::Normalize(style_.metrics.text_font) : UiFonts::Inherit(style_.metrics.text_font);
     if(!IsNull(style_.font))
-        return style_.font;
-    return StdFont();
+        return custom_font_style_ ? UiFonts::Normalize(style_.font) : UiFonts::Inherit(style_.font);
+    return UiFonts::Inherit(StdFont());
 }
 
 Font UiDoc::ResolveFont(const UiDocTextStyle& style, const String& block_role) const
 {
     Font font = BaseFont();
-    if(!style.font_face.IsEmpty() && Font::FindFaceNameIndex(style.font_face) >= 0)
-        font.FaceName(style.font_face);
+    if(!style.font_face.IsEmpty())
+        UiFonts::ApplySelection(font, style.font_face);
     if(style.font_height > 0)
         font.Height(style.font_height);
     else if(style.size_delta)
@@ -313,8 +314,8 @@ Font UiDoc::ResolveFont(const UiDocTextStyle& style, const String& block_role) c
         font.Bold();
         font.Height(max(font.GetHeight(), DPI(16)));
     }
-    else if(block_role == "code") {
-        Font mono = MonospaceZ(max(DPI(9), font.GetHeight()));
+    else if(block_role == "code" && style.font_face.IsEmpty()) {
+        Font mono = Monospace().Height(max(DPI(9), font.GetHeight()));
         if(style.flags & UiDocTextStyle::BOLD)
             mono.Bold();
         if(style.flags & UiDocTextStyle::ITALIC)
@@ -324,7 +325,12 @@ Font UiDoc::ResolveFont(const UiDocTextStyle& style, const String& block_role) c
     else if(block_role == "screenplay.scene" || block_role == "screenplay.character" || block_role == "screenplay.transition")
         font.Bold();
 
-    return font;
+    if(style.font_face.IsEmpty() && block_role.StartsWith("heading.")) {
+        UiTypography t = UiFonts::GetTypography();
+        if(!t.heading.IsEmpty()) UiFonts::ApplySelection(font, t.heading);
+    }
+    if(block_role == "code" && style.font_face.IsEmpty()) font = UiFonts::Inherit(font, UiTypographyRole::Code);
+    return UiFonts::Normalize(font);
 }
 
 Color UiDoc::ResolveInk(const UiDocTextStyle& text_style) const

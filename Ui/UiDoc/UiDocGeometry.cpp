@@ -55,6 +55,12 @@ int GeometryInlineImageHeight(const UiDocCore& core, const UiDocEmbedBlock& embe
 
 void UiDoc::EnsureLayout() const
 {
+    if(font_revision_ != UiFonts::GetRevision()) {
+        font_revision_ = UiFonts::GetRevision();
+        auto *self = const_cast<UiDoc*>(this);
+        self->glyph_width_cache_.Clear();
+        self->InvalidateAllLayout();
+    }
     if(paragraph_index_dirty_)
         RebuildParagraphIndex();
 

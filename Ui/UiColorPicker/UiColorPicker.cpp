@@ -314,7 +314,7 @@ public:
             Rect badge = RectC(swatch.left + DPI(2), swatch.top + DPI(2), diameter, diameter);
             draw.DrawEllipse(badge, SColorPaper(), DPI(1), SColorShadow());
             String number = AsString(display_.hero_number);
-            Font font = SansSerif().Height(DPI(9)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
             Size text = GetTextSize(number, font);
             draw.DrawText(badge.left + (badge.GetWidth() - text.cx) / 2,
                           badge.top + (badge.GetHeight() - text.cy) / 2,
@@ -325,7 +325,7 @@ public:
             Rect hero = RectC(swatch.right - diameter - DPI(2), swatch.bottom - diameter - DPI(2), diameter, diameter);
             draw.DrawEllipse(hero, SColorPaper(), DPI(1), SColorHighlight());
             String mark = "*";
-            Font font = SansSerif().Height(DPI(10)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(10)).Bold());
             Size text = GetTextSize(mark, font);
             draw.DrawText(hero.left + (hero.GetWidth() - text.cx) / 2,
                           hero.top + (hero.GetHeight() - text.cy) / 2 - DPI(1),
@@ -333,7 +333,7 @@ public:
         }
         if(display_.gamut_mapped && !compact_) {
             String mark = "!";
-            Font font = SansSerif().Height(DPI(9)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
             Size text = GetTextSize(mark, font);
             draw.DrawText(swatch.right - text.cx - DPI(2), swatch.top + DPI(1), mark, font, SColorHighlight());
         }
@@ -1408,7 +1408,7 @@ private:
             draw.DrawLine(centre.x, centre.y, edge.x, edge.y, DPI(1), guide);
             Point label = WheelPoint_(angle, 88, wheel);
             String text = AsString(angle);
-            Font font = SansSerif().Height(DPI(8));
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)));
             Size size = GetTextSize(text, font);
             draw.DrawText(label.x - size.cx / 2, label.y - size.cy / 2,
                           text, font, Blend(SColorText(), SurfaceColor_(), 130));
@@ -1472,14 +1472,14 @@ private:
             if(i == active_family_)
                 draw.DrawEllipse(marker.Inflated(DPI(4)), Null, DPI(2), SColorHighlight());
             String number = AsString(i + 1);
-            Font font = SansSerif().Height(DPI(9)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
             Size text = GetTextSize(number, font);
             draw.DrawText(marker.left + (marker.GetWidth() - text.cx) / 2,
                           marker.top + (marker.GetHeight() - text.cy) / 2,
                           number, font, SColorText());
             if(family.locked) {
                 String lock = "L";
-                Font small = SansSerif().Height(DPI(7)).Bold();
+                Font small = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
                 draw.DrawText(marker.right - DPI(2), marker.bottom - DPI(7), lock, small, SColorText());
             }
         }
@@ -1625,7 +1625,7 @@ public:
         DrawFrame_(draw, rect, FrameColor_());
         if(image_.IsEmpty()) {
             String text = "Click, drop or paste an image";
-            Font font = SansSerif().Height(DPI(11));
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(11)));
             Size size = GetTextSize(text, font);
             draw.DrawText(rect.left + (rect.GetWidth() - size.cx) / 2,
                           rect.top + (rect.GetHeight() - size.cy) / 2,
@@ -1825,7 +1825,7 @@ private:
             draw.DrawEllipse(marker.Inflated(DPI(2)), SColorPaper(), DPI(1), SColorShadow());
             draw.DrawEllipse(marker, seed_[i].color, DPI(2), i == 0 ? Color(255, 220, 40) : Color(80, 190, 255));
             String text = i == 0 ? "A" : "B";
-            Font font = SansSerif().Height(DPI(8)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)).Bold());
             Size size = GetTextSize(text, font);
             draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
                           marker.top + (marker.GetHeight() - size.cy) / 2,
@@ -1839,7 +1839,7 @@ private:
             draw.DrawEllipse(marker.Inflated(DPI(2)), SColorPaper(), DPI(1), SColorShadow());
             draw.DrawEllipse(marker, color, DPI(2), White());
             String text = AsString(i + 1);
-            Font font = SansSerif().Height(DPI(8)).Bold();
+            Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)).Bold());
             Size size = GetTextSize(text, font);
             draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
                           marker.top + (marker.GetHeight() - size.cy) / 2,
@@ -1855,7 +1855,7 @@ private:
                 draw.DrawEllipse(marker.Inflated(DPI(2)), SColorPaper(), DPI(1), SColorShadow());
                 draw.DrawEllipse(marker, color, DPI(2), White());
                 String text = AsString(i + 1);
-                Font font = SansSerif().Height(DPI(7)).Bold();
+                Font font = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
                 Size size = GetTextSize(text, font);
                 Color ink = IsDark(color) ? White() : Black();
                 draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
@@ -2548,7 +2548,7 @@ void UiColorPicker::Impl::ConfigureControls()
     accept_button_.SetText("OK");
     cancel_button_.SetText("Cancel");
     UiLineEdit::Style footer_style = UiTheme::ResolveEdit(UiRole::Subtle);
-    footer_style.font = Monospace().Height(DPI(10));
+    footer_style.font = UiFonts::Inherit(Monospace().Height(DPI(10)), UiTypographyRole::Code);
     footer_hex_.SetCustomStyle(footer_style);
     footer_detail_.SetCustomStyle(footer_style);
 
