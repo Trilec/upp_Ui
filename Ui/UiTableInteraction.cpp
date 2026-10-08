@@ -323,8 +323,16 @@ void UiTable::LeftDown(Point p, dword flags)
 void UiTable::LeftDouble(Point p, dword flags)
 {
     LeftDown(p, flags);
-    if(HitTest(p).zone == HIT_CELL)
+    if(HitTest(p).zone != HIT_CELL)
+        return;
+    if(CanEditCell(active_cell_.row, active_cell_.col))
         BeginEdit();
+    else {
+        // Activation can replace the model or destroy the table. End capture first.
+        LeftUp(p, flags);
+        auto notify = WhenAction;
+        notify();
+    }
 }
 
 void UiTable::LeftUp(Point, dword)
@@ -429,6 +437,10 @@ bool UiTable::Key(dword key, int)
             CommitEdit();
         else if(CanEditCell(active_cell_.row, active_cell_.col))
             BeginEdit();
+        else if(active_cell_.IsValid()) {
+            auto notify = WhenAction;
+            notify();
+        }
         return true;
     case K_ESCAPE:
         if(editing_) {

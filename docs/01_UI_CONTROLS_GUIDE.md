@@ -75,6 +75,7 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiMatrixSelector](../Ui/UiMatrixSelector.h) | Spatial cell/ordered-pair choice with shared glyphs. | [UiMatrixSelectorDemo](../examples/UiMatrixSelectorDemo) |
 | [UiColorMatrix](../Ui/UiColorMatrix.h) | One to eight ordered color values with one shared picker. | [UiColorMatrixDemo](../examples/UiColorMatrixDemo) |
 | [UiDateTime](../Ui/UiDateTime.h) | Local date/time/date-time input and picker. | [UiDateTimeDemo](../examples/UiDateTimeDemo) |
+| [UiColorPickerMicro](../Ui/UiColorPickerMicro.h) | Compact palette, Apply/hex footer, optional ramps and RGB sliders. [Contract](../Ui/UiColorPickerMicro.md). | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiColorPicker](../Ui/UiColorPicker/UiColorPicker.h) | Multi-slot color editing, palettes and image/screen picking. | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiDropdown](../Ui/UiDropdown.h) | Collapsed choice and model-backed popup. | [UiDropdownDemo](../examples/UiDropdownDemo) |
 | [UiMenu](../Ui/UiMenu.h) | Command/check/radio/submenu model presentation. | [UiMenuDemo](../examples/UiMenuDemo) |
@@ -100,6 +101,7 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
+| [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileBrowserDemo](../examples/UiFileBrowserDemo) |
 | [UiOsFileDialog](../Ui/UiOsFileDialog/UiOsFileDialog.h) | Native file/folder selection through a platform wrapper. | [UiOsFileDialogDemo](../examples/UiOsFileDialogDemo) |
 
 ## Prepared presentation primitives
@@ -174,6 +176,11 @@ larger editing surface rather than a compact multi-color field.
 UiSlider owns one scalar value. UiRangeSlider reuses its style for an ordered
 lower/upper interval inside a hard range. SetRange sets the domain, SetStep sets
 snap units, SetValues sets the interval, GetLowerValue/GetUpperValue read it.
+UiSlider::SetTrackInset chooses a device-pixel end inset for compact composites;
+-1 restores automatic spacing, and half the thumb is always reserved. ExpandTrack
+uses the available width. GetTrackGeometry reports the painted track for aligned
+labels and interaction tests.
+
 Active handles are explicit keyboard/wheel targets. SetStart/End/StartEnd are
 established animation-friendly aliases over the same state, not another model.
 
@@ -286,6 +293,10 @@ UiPanel/UiScrollPanel/UiTitleCard each host one content root; UiTitleCard uses i
 adjacent SetContentCell. UiGroupPanel has independently replaceable header-content
 and body-content roots. Use a box/grid/absolute layout inside a root for several
 children. Parenting still does not imply deletion ownership.
+A derived UiPanel may override the protected ResolveThemeStyle hook to refine
+inherited metrics without freezing an explicit style. InvalidateStyleCache once
+after derived construction; explicit native style setters and ClearCustomStyle
+retain the normal panel contract (as exercised by UiColorPickerMicro).
 
 UiMediaCard is a media-centric presentation rather than a general child host. Header
 and Footer are optional prepared text bands; absent content reserves no geometry.

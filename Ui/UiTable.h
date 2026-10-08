@@ -161,6 +161,19 @@ public:
 
     UiTable& SetCustomStyle(const Style& s);
     UiTable& ClearCustomStyle();
+    // Explicit scrollbar recipe; callers re-resolve it when changing themes.
+    UiTable& SetScrollBarStyle(const UiScrollBar::Style& style)
+    {
+        hscroll_.SetCustomStyle(style);
+        vscroll_.SetCustomStyle(style);
+        return *this;
+    }
+    UiTable& ClearScrollBarStyle()
+    {
+        hscroll_.ClearCustomStyle();
+        vscroll_.ClearCustomStyle();
+        return *this;
+    }
     bool HasCustomStyle() const { return has_custom_style_; }
     const Style& GetStyle() const { return GetEffectiveStyle(); }
     const Style& GetCustomStyle() const { return style_; }

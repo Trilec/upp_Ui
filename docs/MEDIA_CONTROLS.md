@@ -6,7 +6,7 @@ on CineView, OpenImageIO, FFmpeg, UiTimeline, a GPU renderer or a network servic
 
 | Name | Generic responsibility | CineView supplies |
 | --- | --- | --- |
-| `UiColorProbe` | Display swatch, copyable RGBA readout, Point/Area and Source/Display choices; raw HDR values and explicit quality label | Image coordinate/rectangle selection, pixel sampling, averaging rules, colour transforms, actual proxy resolution |
+| `UiColorProbe` | Display swatch, copyable RGBA readout, Live/Point/Area and Source/Display choices; raw HDR values and explicit quality label | Image coordinate/rectangle selection, pixel sampling, averaging rules, colour transforms, actual proxy resolution |
 | `UiPlaybackBar` | Transport requests, integer frame scrubber, editable range, marker ticks/navigation and supplied cache coverage | Media decoding, audio clock, playback scheduling, frame rate/timecode formatting, remote synchronisation |
 | `UiRangeSlider` | Scalar interval, optional outer bounds, whole-interval dragging, preview/commit/cancel | HDR meaning, tone mapping, exposure/black/white transform, command history |
 
@@ -121,3 +121,83 @@ still pending; these checks do not constitute a full Ui release certification.
 The implementation is a first iteration. No media throughput, audio synchronisation, progressive transport or
 GPU/HDR-output performance is implied by these control tests. High-DPI acceptance
 on multiple displays and the broader Ui release matrix remain separate work.
+
+Integer/hex readouts mark clipped channels with `*`; `IsChannelClipped(channel)`
+exposes this presentation state. Canonical numeric/hex copy text remains valid
+without the marker. Float supports raw HDR values above 1 and negative values.
+Mode defaults to Live; existing Point/Area enum values are preserved. The themed
+buttons expose the selected mode and request host handling through `WhenOptions`.
+Setters remain silent. S/D, right-click and Shift+F10 open the sampling menu.
+The control owns no image, mouse-selection, averaging or held-sample logic.
+The Workbench implements live hover, click-to-hold Point and drag-to-hold Area,
+with source-coordinate overlays and bounded row buffers for the exact region.
+It captures Source and Display separately and supplies the requested capture.
+
+Focused validation on 2026-10-05: the Debug media-control self-test passed 51
+checks. The host Workbench passed 226 Debug checks, including native mode/menu,
+held-sample and rectangle-overlay checks; dark/light and narrow renders were
+inspected. Its actual Release executable compiled and passed startup/normal close.
+
+
+## Single-track review timeline (2026-10-06)
+
+`UiRangeSlider::EnablePosition()` adds a separate scalar playhead while preserving
+the existing interval and optional outer bounds. `SetPosition` is silent;
+`WhenPositionChanging`, `WhenPositionAction` and `WhenPositionCancel` distinguish
+preview, commit and rollback. Plain track clicks seek; inner/outer thumb hits edit
+the corresponding handle. Shift-drag translates the interval when range dragging
+is enabled. Escape, capture loss and disabling use the existing cancellation policy.
+The default remains the original two/four-handle range interaction.
+
+`SetSelectedTrackThickness(px)` makes the selected interval thicker than the base
+track. Zero inherits the base thickness. `SetThumbSize` controls inner handles;
+`SetBoundThumbSize` optionally controls the smaller outer handles. Public
+`GetThumbRect(handle)` reports the same geometry used for paint and hit testing.
+
+`UiPlaybackBar::SetCombinedTimeline()` uses that playhead and interval in one
+track with markers and cache coverage. The horizontal toolbar is centred above
+the track, with outer domain and trimmed In/Out readouts. `ShowPauseButton(false)`
+omits the separate Pause command; both forward and reverse play buttons request
+Pause when already playing in that direction. `ShowTime(false)` lets the host put
+its current-frame information elsewhere. These features are opt-in; legacy
+placement and the int64 frame-domain contract remain supported.
+
+
+## Reviewer typography and hover (2026-10-06)
+
+`UiColorProbe::SetFont(Font)` sets the numeric channel font independently of row
+height; `SetFont(Null)` restores the host font. Channel colours are refreshed from
+the current theme, including after a font override. Optional caption content stays
+host-owned and can use the same font through its own label style.
+
+Neutral `UiPlaybackBar` transport icons intensify on hover and re-resolve the theme
+when styles/icons are refreshed. Reapplying the same playback state does not rebuild
+all seven buttons. `UiSlider` now paints its existing hot-state palettes on mouse
+enter and returns to normal on mouse leave; disabled and captured/pressed states
+retain priority. Hover does not change a value, emit an edit, or acquire capture.
+
+
+## Review-tool emphasis and cache line (2026-10-07)
+
+`UiPlaybackBar::Style::icon_sizes[7]` optionally overrides the common
+`icon_size` per command, in the documented command order. A zero size keeps
+the common fallback. Forward/reverse play retain their slot's size when showing
+Pause. `transport_offset` adds a bounded cross-axis inset in combined layout;
+it leaves the transport's major-axis centre and the legacy layout unchanged.
+`coverage_thickness` controls the passive cache line (minimum one pixel,
+default `DPI(2)`), independently of the timeline's track thickness.
+
+`UiColorProbe` defaults to a restrained, slightly square selection outline
+with transparent fill; inactive icons are dimmed and hover intensifies the
+icon. The outline follows the host's light/dark theme. Sampling/copy contracts,
+silent setters and the existing default geometry are unchanged.
+
+
+Focused Windows validation for this revision: Debug and Release each pass 53
+maintained media-demo self-tests and 576 native selector checks. The two affected
+public headers compile separately; all six exported C++ examples compile and
+instantiate in both configurations. CineView's 98 native checks also cover the
+new per-command emphasis, transport inset, sampler/mode selection outlines and
+Skip-field geometry. Evidence: `upp_cineview/build/skip-correction-shared` and
+`upp_cineview/build/skip-correction-acceptance.txt`; this is focused validation,
+not the broader Ui release gate or multi-display/high-DPI acceptance.

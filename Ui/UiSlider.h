@@ -1,4 +1,4 @@
-﻿#ifndef _Ui_UiSlider_h_
+#ifndef _Ui_UiSlider_h_
 #define _Ui_UiSlider_h_
 
 /*
@@ -131,6 +131,10 @@ public:
     UiSlider& SetTicks(bool on = true, int major_ticks = 10, int minor_per_major = 0);
     UiSlider& SetTickSide(UiAlign side);
     UiSlider& SetTrackSize(Size sz);
+    // Device-pixel track inset; -1 keeps automatic legacy spacing. Explicit
+    // values still reserve half the thumb so both end positions remain visible.
+    UiSlider& SetTrackInset(int inset = -1) { track_inset_ = max(-1, inset); RefreshLayout(); Refresh(); return *this; }
+    int GetTrackInset() const { return track_inset_; }
     UiSlider& ExpandTrack(bool on = true) { expand_track_ = on; RefreshLayout(); Refresh(); return *this; }
     bool      IsTrackExpanded() const { return expand_track_; }
     // Exposes the actual painted track for layout/composition tests. With
@@ -172,6 +176,8 @@ public:
 
     virtual void LeftDown(Point p, dword flags) override;
     virtual void LeftUp(Point p, dword flags) override;
+    virtual void MouseEnter(Point p, dword flags) override;
+    virtual void MouseLeave() override;
     virtual void MouseMove(Point p, dword flags) override;
     virtual void MouseWheel(Point p, int zdelta, dword flags) override;
     virtual bool Key(dword key, int count) override;
@@ -202,8 +208,10 @@ private:
     double step_ = 1.0;
 
     bool dragging_ = false;
+    bool hot_ = false;
     bool cancel_reverts_ = false;
     bool expand_track_ = false;
+    int track_inset_ = -1;
     int  drag_offset_ = 0;
     double drag_start_value_ = 0.0;
 

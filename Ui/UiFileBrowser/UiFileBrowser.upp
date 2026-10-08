@@ -1,0 +1,25 @@
+description "Reusable native file and sequence browser; no imaging or playback dependency";
+
+uses CtrlLib, Ui;
+library(WIN32) "windowscodecs ole32";
+
+file
+    UiFileBrowser.h,
+    UiFileBrowser.cpp,
+    UiFileBrowserUi.cpp,
+    UiFileBrowserLayout.cpp,
+    UiFileBrowserOptions.cpp,
+    UiFileBrowserStyle.cpp,
+    UiFileBrowserAppearance.h,
+    UiFileBrowserAppearance.cpp,
+    UiFileBrowserModel.h,
+    UiFileBrowserModel.cpp,
+    UiFileBrowserScanner.h,
+    UiFileBrowserScanner.cpp,
+    UiFileBrowserPreview.h,
+    UiFileBrowserPreview.cpp,
+    UiFileBrowserPreviewUi.cpp,
+    UiFileBrowserCreate.h,
+    UiFileBrowserCreate.cpp,
+    UiFileBrowserNative.h,
+    README.md;

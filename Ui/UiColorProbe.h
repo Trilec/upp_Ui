@@ -15,7 +15,7 @@ struct UiColorSample {
 };
 class UiColorProbe : public Ctrl {
 public:
-    enum class Mode { Point, Area };
+    enum class Mode { Point, Area, Live };
     enum class Space { Source, Display };
     enum class Format { Float, Integer, Hex };
     UiColorProbe();
@@ -23,6 +23,8 @@ public:
     const UiColorSample& GetSample() const { return sample_; }
     UiColorProbe& SetMode(Mode mode);
     Mode GetMode() const { return mode_; }
+    void OpenSamplingOptions();
+    virtual bool Key(dword key, int count) override;
     UiColorProbe& SetSpace(Space space);
     Space GetSpace() const { return space_; }
     UiColorProbe& SetPrecision(int digits);
@@ -38,6 +40,9 @@ public:
     String GetSampleText() const;
     String GetDisplayHex() const;
     bool IsAlphaShown() const { return alpha_; }
+    // Numeric readout font; Null restores the host font. Colours still follow the theme.
+    UiColorProbe& SetFont(Font font);
+    Font GetFont() const { return IsNull(font_) ? GetStdFont() : font_; }
     UiColorProbe& SetIconColor(Color color);
     UiColorProbe& SetControlsSide(UiAlign side);
     UiAlign GetControlsSide() const { return controls_side_; }
@@ -49,9 +54,11 @@ public:
     // Supply a label or a layout containing arbitrary host controls.
     UiDirectContentHost& Accessory() { return accessory_; }
     String GetChannelText(int channel) const;
-    // Setters are silent. Sampling options request resampling; format edits do not.
+    bool IsChannelClipped(int channel) const;
+    // Setters are silent. Options request host mode/space handling; format edits do not.
     Event<Mode, Space> WhenOptions;
     Event<Format, int> WhenFormat;
+    virtual void Paint(Draw& w) override;
     virtual void Layout() override;
     virtual Size GetMinSize() const override;
 private:
@@ -81,6 +88,7 @@ private:
         Color color = Null;
         virtual void Paint(Draw& w) override;
     };
+    void SyncFont();
     void UpdateReadout();
     void UpdateButtons();
     void OpenOptions();
@@ -88,13 +96,15 @@ private:
     void OpenCopy();
     Channel channels_[4];
     Swatch swatch_;
-    IconButton mode_button_, area_button_, format_button_, copy_button_;
+    IconButton live_button_, mode_button_, area_button_, space_button_, format_button_, copy_button_;
     UiMenu options_, formats_, copy_menu_;
     UiDirectContentHost accessory_;
     UiColorSample sample_;
-    Mode mode_ = Mode::Point;
+    Mode mode_ = Mode::Live;
     Space space_ = Space::Source;
     Format format_ = Format::Float;
+    Font font_ = Null;
+    uint64 font_theme_revision_ = UINT64_MAX;
     int precision_ = 2, bits_ = 8;
     bool alpha_ = false, swatch_shown_ = true, copy_shown_ = false;
     UiAlign controls_side_ = UiAlign::RIGHT;

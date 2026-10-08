@@ -67,7 +67,7 @@ class MediaDemo : public TopWindow {
         Authored(model_.AddColor("swatch","Host display swatch",Color(45,130,210),"Probe"));
         Authored(model_.AddText("space_label","Sample space label","Linear","Probe"));
         Authored(model_.AddText("quality","Sample quality label","512 proxy","Probe"));
-        Authored(model_.AddChoice("sampling","Sampling mode","Point","Probe").AddChoice("Point","Point").AddChoice("Area","Area"));
+        Authored(model_.AddChoice("sampling","Sampling mode","Live","Probe").AddChoice("Live","Live").AddChoice("Point","Point").AddChoice("Area","Area"));
         Authored(model_.AddChoice("sample_space","Sampling space","Source","Probe").AddChoice("Source","Source").AddChoice("Display","Display"));
         Authored(model_.AddChoice("number_format","Number format","Float","Probe").AddChoice("Float","Float").AddChoice("Integer","Integer").AddChoice("Hex","Hex"));
         Authored(model_.AddNumericInt("bits","Integer bit depth",8,1,16,1,"Probe"));
@@ -161,7 +161,7 @@ class MediaDemo : public TopWindow {
         UiColorSample sample; sample.valid=(bool)Get("valid"); sample.r=(double)Get("r"); sample.g=(double)Get("g"); sample.b=(double)Get("b"); sample.a=(double)Get("a");
         sample.swatch=Color(Get("swatch")); sample.space=AsString(Get("space_label")); sample.quality=AsString(Get("quality"));
         probe_.SetSample(sample).SetPrecision((int)Get("precision")).SetBitDepth((int)Get("bits"));
-        probe_.SetMode(AsString(Get("sampling"))=="Area"?UiColorProbe::Mode::Area:UiColorProbe::Mode::Point);
+        probe_.SetMode(AsString(Get("sampling"))=="Area"?UiColorProbe::Mode::Area:AsString(Get("sampling"))=="Point"?UiColorProbe::Mode::Point:UiColorProbe::Mode::Live);
         probe_.SetSpace(AsString(Get("sample_space"))=="Display"?UiColorProbe::Space::Display:UiColorProbe::Space::Source);
         String format=AsString(Get("number_format")); probe_.SetFormat(format=="Hex"?UiColorProbe::Format::Hex:format=="Integer"?UiColorProbe::Format::Integer:UiColorProbe::Format::Float);
         probe_.ShowAlpha((bool)Get("alpha")).ShowSwatch((bool)Get("swatch_shown")).ShowCopy((bool)Get("copy_colour")).SetControlsSide(MediaSide(AsString(Get("probe_side"))));
@@ -290,7 +290,7 @@ public:
         overrides_.WhenOverride=[=](String id,bool active){if(auto* item=override_model_.Find(id)){item->override_active=active; override_model_.StructureChanged(); ApplyProjection();}};
         inspector_.WhenReset=[=](String id){if(auto* item=model_.Find(id))model_.SetValue(id,item->default_value);};
         overrides_.WhenReset=[=](String id){if(auto* item=override_model_.Find(id)){item->override_active=false; override_model_.SetValue(id,item->default_value); override_model_.StructureChanged(); ApplyProjection();}};
-        probe_.WhenOptions=[=](UiColorProbe::Mode mode,UiColorProbe::Space space){model_.SetValue("sampling",mode==UiColorProbe::Mode::Area?"Area":"Point",false);model_.SetValue("sample_space",space==UiColorProbe::Space::Display?"Display":"Source",false);inspector_.RefreshValue("sampling");inspector_.RefreshValue("sample_space");if(page_==2) code_.SetTextUtf8(Usage());Log("Host resamples for selected options");};
+        probe_.WhenOptions=[=](UiColorProbe::Mode mode,UiColorProbe::Space space){model_.SetValue("sampling",mode==UiColorProbe::Mode::Area?"Area":mode==UiColorProbe::Mode::Point?"Point":"Live",false);model_.SetValue("sample_space",space==UiColorProbe::Space::Display?"Display":"Source",false);inspector_.RefreshValue("sampling");inspector_.RefreshValue("sample_space");if(page_==2) code_.SetTextUtf8(Usage());Log("Host resamples for selected options");};
         probe_.WhenFormat=[=](UiColorProbe::Format format,int bits){model_.SetValue("number_format",format==UiColorProbe::Format::Hex?"Hex":format==UiColorProbe::Format::Integer?"Integer":"Float",false);model_.SetValue("bits",bits,false);inspector_.RefreshValue("number_format");inspector_.RefreshValue("bits");if(page_==2) code_.SetTextUtf8(Usage());};
         playback_.WhenSeek=[=](int64 frame,bool preview){model_.SetValue("position",AsString(frame),false);inspector_.RefreshValue("position");if(page_==2) code_.SetTextUtf8(Usage());Log(preview?"Seek preview":"Seek committed");};
         playback_.WhenRange=[=](int64 a,int64 b,bool preview){model_.SetValue("selection_first",AsString(a),false);model_.SetValue("selection_last",AsString(b),false);inspector_.RefreshValue("selection_first");inspector_.RefreshValue("selection_last");if(page_==2) code_.SetTextUtf8(Usage());Log(preview?"Range preview":"Range committed");};
@@ -487,8 +487,10 @@ public:
         range_edit.Slider().LeftDown(rp, 0); range_edit.Slider().Key(K_ESCAPE, 1);
         check(range_edit.LowerField().GetValue() == 20 && range_edit.UpperField().GetValue() == 40, "Range edit fields resynchronise after cancel");
         UiColorSample rgb; rgb.valid = true; rgb.r = .5; rgb.g = -1; rgb.b = 2; rgb.swatch = Color(12,34,56);
+        check(UiColorProbe().GetMode() == UiColorProbe::Mode::Live, "New probes default to live hover");
         probe_.SetSample(rgb).SetFormat(UiColorProbe::Format::Integer).SetBitDepth(8);
         check(probe_.GetChannelText(0) == "128" && probe_.GetChannelText(1) == "0" && probe_.GetChannelText(2) == "255", "8-bit display mapping");
+        check(probe_.IsChannelClipped(1) && probe_.IsChannelClipped(2) && !probe_.IsChannelClipped(0), "Bounded conversion identifies HDR clipping");
         probe_.SetBitDepth(16); check(probe_.GetChannelText(0) == "32768", "16-bit display mapping");
         probe_.SetBitDepth(5); check(probe_.GetChannelText(0) == "16", "5-bit display mapping");
         probe_.SetFormat(UiColorProbe::Format::Hex);
@@ -496,9 +498,15 @@ public:
         check(probe_.GetSample().g == -1 && probe_.GetSample().b == 2, "Changing display format preserves HDR source");
         probe_.SetFormat(UiColorProbe::Format::Float).SetPrecision(2);
         check(probe_.GetChannelText(0) == "0.50" && probe_.GetChannelText(1) == "-1.00", "Compact float readout");
+        check(probe_.GetChannelText(2) == "2.00" && !probe_.IsChannelClipped(2), "Float preserves HDR without clipping");
+        Font compact = Font(GetStdFont()).Height(std::max(1,GetStdFont().GetHeight()-DPI(2)));
+        probe_.SetFont(compact);
+        check(probe_.GetFont() == compact && probe_.GetSample().b == 2,"Probe font override preserves raw sample");
+        probe_.SetFont(Null);
+        check(probe_.GetFont() == GetStdFont(),"Probe Null font restores host typography");
         probe_.ShowAlpha(false).ShowCopy(false);
         probe_.SetControlsSide(UiAlign::RIGHT).SetRowHeight(DPI(22));
-        check(probe_.GetMinSize() == Size(DPI(196),DPI(22)), "Compact default dimensions with four-pixel gaps");
+        check(probe_.GetMinSize() == Size(DPI(244),DPI(22)), "Compact default dimensions with four-pixel gaps");
         probe_.ShowAlpha().ShowCopy(); check(probe_.IsAlphaShown() && probe_.IsCopyShown(), "Optional alpha and copy");
         probe_.SetFormat(UiColorProbe::Format::Hex);
         check(probe_.GetSampleText() == "#8000FFFF", "RGBA hexadecimal includes alpha");
@@ -507,7 +515,7 @@ public:
         check(probe_.GetGap() == DPI(4), "Four-pixel default spacing");
         probe_.SetControlsSide(UiAlign::TOP).SetRowHeight(DPI(16));
         probe_.SetRect(0,0,DPI(180),probe_.GetMinSize().cy);
-        check(probe_.Accessory().IsShown() && probe_.Accessory().GetRect().right <= DPI(140), "Top-left borrowed content leaves space for top-right icons");
+        check(probe_.Accessory().IsShown() && probe_.Accessory().GetRect().right <= DPI(116), "Top-left borrowed content leaves space for top-right icons");
         probe_.SetControlsSide(UiAlign::RIGHT);
         check(!probe_.Accessory().IsShown(), "Inline mode needs no label/header");
         check(!IsNull(UiIconFromName("ICON_MEDIA_PLAY_48")), "Transport icon in shared catalogue");

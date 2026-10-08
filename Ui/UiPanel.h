@@ -59,7 +59,14 @@ private:
     bool has_custom_style_ = false;
     Size user_min_size_ = Size(0, 0);
 
+protected:
+    // Composite panels may refine inherited metrics without freezing a custom
+    // style. Explicit styles still bypass the resolver. Invalidate once after
+    // derived construction, since base construction resolves the base theme.
+    virtual Style ResolveThemeStyle() const;
     void InvalidateStyleCache();
+
+private:
     Style& StyleEdit();
     void SyncThemeStyle();
 

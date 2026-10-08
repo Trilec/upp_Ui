@@ -38,7 +38,8 @@
     "Utilities/IconExportCore"
   ],
   "optional_platform_packages": [
-    "Ui/UiOsFileDialog"
+    "Ui/UiOsFileDialog",
+    "Ui/UiFileBrowser"
   ],
   "surgical_targets": [
     {
@@ -502,6 +503,20 @@
       "header": "Ui/UiOsFileDialog/UiOsFileDialog.h",
       "example": "examples/UiOsFileDialogDemo",
       "source_review": "pending"
+    },
+    {
+      "type": "UiColorPickerMicro",
+      "family": "choosers",
+      "header": "Ui/UiColorPickerMicro.h",
+      "example": "examples/UiColorPickerDemo",
+      "source_review": "focused migration review; Windows native and generated-code checks recorded in CineView build evidence"
+    },
+    {
+      "type": "UiFileBrowser",
+      "family": "collections",
+      "header": "Ui/UiFileBrowser/UiFileBrowser.h",
+      "example": "examples/UiFileBrowserDemo",
+      "source_review": "focused migration review; Windows model/native checks; other platforms and 100k performance acceptance pending"
     }
   ],
   "specialist_examples": [

@@ -194,6 +194,7 @@ UiRangeSlider& UiRangeSlider::SetRange(double mn, double mx)
     else
         SetBoundsInternal(bound_lower_, bound_upper_, false, false);
     SetValuesInternal(lower_, upper_, false, false);
+    SetPosition(position_);
     return *this;
 }
 
@@ -201,6 +202,7 @@ UiRangeSlider& UiRangeSlider::SetStep(double step)
 {
     step_ = step > 0 ? step : 0;
     SetValuesInternal(lower_, upper_, false, false);
+    SetPosition(position_);
     return *this;
 }
 
@@ -305,6 +307,33 @@ UiRangeSlider& UiRangeSlider::SetThumbSize(Size sz)
     return *this;
 }
 
+UiRangeSlider& UiRangeSlider::EnablePosition(bool on)
+{
+    if(position_enabled_ == on) return *this;
+    Ptr<UiRangeSlider> self = this;
+    CancelMode();
+    if(!self) return *this;
+    if(HasCapture()) ReleaseCapture();
+    position_enabled_ = on;
+    if(!on && active_handle_ == Handle::Position) active_handle_ = Handle::Lower;
+    Refresh(); return *this;
+}
+UiRangeSlider& UiRangeSlider::SetPosition(double value)
+{
+    if(!std::isfinite(value)) return *this;
+    position_ = NormalizeValue(value); Refresh(); return *this;
+}
+UiRangeSlider& UiRangeSlider::SetSelectedTrackThickness(int pixels)
+{
+    selected_thickness_ = max(0, pixels); RefreshLayout(); Refresh(); return *this;
+}
+UiRangeSlider& UiRangeSlider::SetBoundThumbSize(Size size)
+{
+    bound_thumb_size_ = size.cx > 0 && size.cy > 0
+        ? Size(max(DPI(9), size.cx), max(DPI(9), size.cy)) : Size(0,0);
+    RefreshLayout(); Refresh(); return *this;
+}
+
 void UiRangeSlider::SetData(const Value& v)
 {
     if(IsNull(v) || !v.Is<ValueArray>())
@@ -329,6 +358,15 @@ Size UiRangeSlider::GetMinSize() const
     int track_major = max(DPI(50), style.track_size.cx);
     int track_cross = max(1, style.track_size.cy);
     Size thumb = Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    if(adjustable_bounds_) {
+        thumb.cx = max(thumb.cx, bound_thumb_size_.cx);
+        thumb.cy = max(thumb.cy, bound_thumb_size_.cy);
+    }
+    if(position_enabled_) {
+        thumb.cx = max(thumb.cx, dir_ == UiDirection::H ? DPI(8) : DPI(18));
+        thumb.cy = max(thumb.cy, dir_ == UiDirection::H ? DPI(18) : DPI(8));
+    }
+    track_cross = max(track_cross, selected_thickness_);
     int cross = dir_ == UiDirection::H ? max(DPI(18), max(track_cross, thumb.cy))
                                        : max(DPI(18), max(track_cross, thumb.cx));
     int tick_span = style.show_ticks ? (style.tick_gap + max(style.tick_len_major, style.tick_len_minor)) : 0;
@@ -364,7 +402,7 @@ Rect UiRangeSlider::GetTrackRect() const
     // expected to consume the remainder.
     int track_cross = max(1, style.track_size.cy);
     int major = dir_ == UiDirection::H ? outer.GetWidth() : outer.GetHeight();
-    int thumb_major = max(DPI(6), dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy);
+    int thumb_major = max(DPI(6), dir_ == UiDirection::H ? max(style.thumb_size.cx, bound_thumb_size_.cx) : max(style.thumb_size.cy, bound_thumb_size_.cy));
     int pad = min(major / 2, max(max(DPI(8), track_cross * 2 + DPI(2)), (thumb_major + 1) / 2));
     if(dir_ == UiDirection::H) {
         int width = max(0, outer.GetWidth() - 2 * pad);
@@ -419,6 +457,8 @@ Rect UiRangeSlider::GetThumbRect(Handle handle) const
     Size thumb = bound ? Size(max(DPI(9), style.thumb_size.cx / 2),
                               max(DPI(9), style.thumb_size.cy / 2))
                        : Size(max(DPI(6), style.thumb_size.cx), max(DPI(6), style.thumb_size.cy));
+    if(bound && bound_thumb_size_.cx > 0 && bound_thumb_size_.cy > 0) thumb = bound_thumb_size_;
+    if(handle == Handle::Position) thumb = dir_ == UiDirection::H ? Size(DPI(8), DPI(18)) : Size(DPI(18), DPI(8));
     thumb.cx = min(thumb.cx, max(0, GetSize().cx));
     thumb.cy = min(thumb.cy, max(0, GetSize().cy));
     int pos = ValueToPos(GetHandleValue(handle));
@@ -462,6 +502,7 @@ double UiRangeSlider::GetHandleValue(Handle handle) const
     case Handle::Upper: return upper_;
     case Handle::LowerBound: return bound_lower_;
     case Handle::UpperBound: return bound_upper_;
+    case Handle::Position: return position_;
     }
     return lower_;
 }
@@ -532,6 +573,16 @@ bool UiRangeSlider::SetHandleValueInternal(Handle handle, double value, bool fir
         nv = min(nv, lower_);
         target = &bound_lower_;
         break;
+    case Handle::Position:
+        if(!position_enabled_ || std::fabs(nv - position_) < 1e-12) return false;
+        position_ = nv; Refresh();
+        {
+            Ptr<UiRangeSlider> self = this;
+            auto changing = WhenPositionChanging, action = WhenPositionAction;
+            if(fire_changing) changing();
+            if(self && fire_action) action();
+        }
+        return true;
     case Handle::UpperBound:
         if(!adjustable_bounds_) return false;
         nv = max(nv, upper_);
@@ -588,6 +639,18 @@ void UiRangeSlider::Paint(Draw& w)
         selected.top = max(track.top, min(track.bottom, lower.CenterPoint().y));
         selected.bottom = max(selected.top, min(track.bottom, upper.CenterPoint().y));
     }
+    if(selected_thickness_ > 0) {
+        // Selected thickness shares the same centreline as the full-domain track.
+        if(dir_ == UiDirection::H) {
+            int thickness = min(selected_thickness_, outer.GetHeight());
+            selected.top = track.CenterPoint().y - thickness / 2;
+            selected.bottom = selected.top + thickness;
+        } else {
+            int thickness = min(selected_thickness_, outer.GetWidth());
+            selected.left = track.CenterPoint().x - thickness / 2;
+            selected.right = selected.left + thickness;
+        }
+    }
     if(!selected.IsEmpty())
         UiPaintFaceFrameDash(w, selected, selected_palette, selected_metrics, base_state);
 
@@ -610,9 +673,8 @@ void UiRangeSlider::Paint(Draw& w)
         for(Handle handle : { Handle::LowerBound, Handle::UpperBound }) {
             Rect thumb = GetThumbRect(handle);
             const Point center = thumb.CenterPoint();
-            const int radius = max(DPI(4), min(thumb.GetWidth(), thumb.GetHeight()) / 2);
-            Rect outer = RectC(center.x - radius, center.y - radius,
-                               radius * 2 + 1, radius * 2 + 1);
+            // Paint exactly the geometry used by hit testing, including custom sizes.
+            Rect outer = thumb;
             UiDrawCachedRaster(w, outer, UiGetCachedAACircleImage(outer.GetSize(), ring));
             Rect inner = outer.Deflated(DPI(2));
             if(!inner.IsEmpty())
@@ -680,6 +742,13 @@ void UiRangeSlider::Paint(Draw& w)
     UiRangeSliderPaintThumb_(w, lower, style, lower_state);
     UiRangeSliderPaintThumb_(w, upper, style, upper_state);
 
+    if(position_enabled_) {
+        Rect marker = GetThumbRect(Handle::Position);
+        Color ink = disabled ? SColorDisabled() : style.thumb_palette.ink[ST_NORMAL];
+        if(IsNull(ink)) ink = SColorText();
+        if(dir_ == UiDirection::H) w.DrawRect(marker.CenterPoint().x, marker.top, DPI(2), marker.GetHeight(), ink);
+        else w.DrawRect(marker.left, marker.CenterPoint().y, marker.GetWidth(), DPI(2), ink);
+    }
     if(WhenPaintForeground)
         WhenPaintForeground(w, outer, style.thumb_palette, style.thumb_metrics,
                             style.thumb_skin,
@@ -687,7 +756,7 @@ void UiRangeSlider::Paint(Draw& w)
                             has_focus);
 }
 
-void UiRangeSlider::LeftDown(Point p, dword)
+void UiRangeSlider::LeftDown(Point p, dword flags)
 {
     if(!IsEnabled() || !IsShowEnabled())
         return;
@@ -696,14 +765,18 @@ void UiRangeSlider::LeftDown(Point p, dword)
     SetFocus();
     if(!self) return;
     active_handle_ = PickHandle(p);
+    // Preserve handle hit targets. Everywhere else edits the independent playhead.
+    if(position_enabled_ && !GetThumbRect(active_handle_).Contains(p) && !(flags & K_SHIFT))
+        active_handle_ = Handle::Position;
     Rect thumb = GetThumbRect(active_handle_);
+    drag_start_position_ = position_;
     drag_start_lower_ = lower_;
     drag_start_upper_ = upper_;
     drag_start_bound_lower_ = bound_lower_;
     drag_start_bound_upper_ = bound_upper_;
     Rect track = GetTrackRect();
     int axis = dir_ == UiDirection::H ? p.x : p.y;
-    dragging_range_ = range_drag_enabled_ && !thumb.Contains(p)
+    dragging_range_ = range_drag_enabled_ && active_handle_ != Handle::Position && !thumb.Contains(p)
                      && axis > (dir_ == UiDirection::H ? track.left : track.top) + ValueToPos(lower_)
                      && axis < (dir_ == UiDirection::H ? track.left : track.top) + ValueToPos(upper_)
                      && track.Inflated(DPI(4)).Contains(p);
@@ -742,8 +815,9 @@ void UiRangeSlider::LeftUp(Point, dword)
                 || std::fabs(bound_lower_ - drag_start_bound_lower_) >= 1e-12
                 || std::fabs(bound_upper_ - drag_start_bound_upper_) >= 1e-12;
     Ptr<UiRangeSlider> self = this;
-    if(changed && WhenAction)
-        WhenAction();
+    // A click on the playhead still commits, so a host can complete a preview seek.
+    auto action = active_handle_ == Handle::Position ? WhenPositionAction : WhenAction;
+    if(active_handle_ == Handle::Position || changed) action();
     if(self)
         Refresh();
 }
@@ -828,9 +902,10 @@ void UiRangeSlider::CancelMode()
     if(cancel_reverts_) {
         lower_ = drag_start_lower_; upper_ = drag_start_upper_;
         bound_lower_ = drag_start_bound_lower_; bound_upper_ = drag_start_bound_upper_;
+        position_ = drag_start_position_;
     }
     Refresh();
-    auto notify = WhenCancelEdit; notify();
+    auto notify = active_handle_ == Handle::Position ? WhenPositionCancel : WhenCancelEdit; notify();
 }
 void UiRangeSlider::State(int reason)
 {

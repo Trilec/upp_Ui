@@ -244,9 +244,24 @@ public:
 
     int GetRevision() const { return revision_; }
 
+    // Coalesce bulk edits into one reset. Nested scopes publish only at the end.
+    void BeginUpdate() { ++update_depth_; }
+    void EndUpdate()
+    {
+        ASSERT(update_depth_ > 0);
+        if(update_depth_ > 0 && --update_depth_ == 0 && update_pending_) {
+            update_pending_ = false;
+            Notify(UI_MODEL_RESET);
+        }
+    }
+
 protected:
     void Notify(UiModelChangeKind kind, int a = -1, int b = -1, int c = -1)
     {
+        if(update_depth_) {
+            update_pending_ = true;
+            return;
+        }
         revision_++;
         UiModelChange ch;
         ch.kind = kind;
@@ -258,6 +273,18 @@ protected:
 
 private:
     int revision_ = 0;
+    int update_depth_ = 0;
+    bool update_pending_ = false;
+};
+
+class UiModelUpdate {
+public:
+    explicit UiModelUpdate(UiDataModelBase& model) : model_(model) { model_.BeginUpdate(); }
+    ~UiModelUpdate() { model_.EndUpdate(); }
+    UiModelUpdate(const UiModelUpdate&) = delete;
+    UiModelUpdate& operator=(const UiModelUpdate&) = delete;
+private:
+    UiDataModelBase& model_;
 };
 
 // Views may leave callbacks attached to previously used external models and

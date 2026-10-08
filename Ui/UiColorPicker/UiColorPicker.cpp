@@ -2716,6 +2716,10 @@ void UiColorPicker::Impl::ConfigureChannelRows()
         config[3] = { "A", 0, 100, 2, 10000, true };
         break;
     }
+    // Hidden controls retain layout slots. Rebuild the row membership so RGB
+    // has four channels and CMYK has five, rather than squeezing four editors
+    // plus an invisible fifth into a fixed 104-pixel region.
+    channel_rows_.PauseLayout().ClearItems();
     for(int i = 0; i < 5; i++) {
         bool visible = i < channel_row_count_;
         numeric_row_[i]->Show(visible);
@@ -2723,8 +2727,10 @@ void UiColorPicker::Impl::ConfigureChannelRows()
             numeric_row_[i]->Configure(config[i].label, config[i].minimum, config[i].maximum,
                                        config[i].precision, config[i].steps, config[i].alpha);
             numeric_row_[i]->EnableAlpha(alpha_enabled_);
+            channel_rows_.Add(*numeric_row_[i]).Expand(1);
         }
     }
+    channel_rows_.ResumeLayout();
 }
 
 void UiColorPicker::Impl::WireEvents()
@@ -4501,6 +4507,9 @@ void UiColorPicker::Impl::Layout()
     footer_.Layout();
 
     if(page_mode_ == PAGE_COLOR) {
+        // Font/preset changes can increase an editor's natural height. Honour
+        // that measurement on each layout instead of clipping its baseline.
+        color_right_.ItemAt(1).Fixed(max(DPI(104), channel_rows_.GetMinSize().cy));
         color_page_.Layout();
         color_columns_.Layout();
         color_left_.Layout();

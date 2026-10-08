@@ -108,6 +108,7 @@
 #include <Ui/UiColorMatrix.h>
 #include <Ui/UiDateTime.h>
 #include <Ui/UiColorPicker/UiColorPicker.h>
+#include <Ui/UiColorPickerMicro.h>
 #include <Ui/UiBreadcrumbs.h>
 #include <Ui/UiSliderEdit.h>
 #include <Ui/UiScrollBar.h>

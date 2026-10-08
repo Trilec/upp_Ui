@@ -2,6 +2,7 @@
 // Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
 
 #include <Ui/Ui.h>
+#include <plugin/png/png.h>
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
@@ -18,16 +19,28 @@ class PreviewPanel : public UiPanel {
 public: Rect GetCanvasRect() const { return Rect(GetSize()).Deflated(DPI(24)); }
 };
 
-struct ColorConfig { bool alpha=true; int slot_count=4; int active_slot=0; Color color=Color(255,59,48); int opacity=255; int page=0; int channels=1; int radius=DPI(8); };
+struct ColorConfig { bool alpha=true; int slot_count=4; int active_slot=0; Color color=Color(255,59,48); int opacity=255; int page=0; int channels=1; int radius=DPI(8); bool micro=false, micro_rgb=false, micro_ramps=true; int micro_columns=8, micro_palette=0; };
 class Demo : public TopWindow {
 public:
     Demo() {
         BuildShell("UiColorPicker","Inspect color spaces, picker pages, editable slots, and alpha.");
-        Preview().Add(picker_);
+        Preview().Add(picker_); Preview().Add(micro_);
+        micro_.WhenLayoutChange=[this] { LayoutPreviewContent(); };
+        micro_.WhenAction=[this] {
+            cfg_.color=micro_.GetColor(); inspector_model_.SetValue("color",cfg_.color);
+            SetUsageCode(BuildUsageCode());
+        };
         picker_.WhenAction=[=]{ cfg_.color=picker_.GetColor(); cfg_.opacity=picker_.GetAlpha(); inspector_model_.SetValue("color",cfg_.color); inspector_model_.SetValue("opacity",cfg_.opacity); SetUsageCode(BuildUsageCode()); };
         BuildProperties(); ApplyTheme(); ApplyProjection();
     }
 
+    void ConfigureMicroExample(bool rgb=false, bool dark=false, int palette=0) {
+        UiThemeContext ctx=UiTheme::GetContext();
+        if((ctx.mode == UiThemeMode::Dark) != dark) Ctrl::SwapDarkLight();
+        ctx.mode=dark ? UiThemeMode::Dark : UiThemeMode::Light; UiTheme::Set(ctx);
+        inspector_model_.SetValue("micro",true); inspector_model_.SetValue("micro_rgb",rgb);
+        inspector_model_.SetValue("micro_palette",palette); ReadProperties(); ApplyTheme(); ApplyProjection();
+    }
     void Paint(Draw& w) override { w.DrawRect(GetSize(), window_face_); }
     void Layout() override
     {
@@ -197,6 +210,11 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        inspector_model_.AddBoolean("micro","Use micro picker",false,"Micro picker").SetDefault(false);
+        inspector_model_.AddBoolean("micro_rgb","RGB sliders",false,"Micro picker").SetDefault(false);
+        inspector_model_.AddBoolean("micro_ramps","Colour ramps",true,"Micro picker").SetDefault(true);
+        inspector_model_.AddInteger("micro_columns","Columns",8,"Micro picker").SetRange(1,16,1).SetDefault(8);
+        inspector_model_.AddChoice("micro_palette","Palette view",0,"Micro picker").AddChoice(0,"Standard").AddChoice(1,"Greyscale").AddChoice(2,"Spectrum").SetDefault(0);
         inspector_model_.AddBoolean("alpha","Alpha",cfg_.alpha,"Control").SetDefault(cfg_.alpha);
         inspector_model_.AddInteger("slot_count","Slot count",cfg_.slot_count,"Control").SetRange(1,8,1).SetDefault(cfg_.slot_count);
         inspector_model_.AddInteger("active_slot","Active slot",cfg_.active_slot,"Control").SetRange(0,7,1).SetDefault(cfg_.active_slot);
@@ -209,6 +227,11 @@ private:
     }
     void ReadProperties() {
         ColorConfig defaults;
+        cfg_.micro=bool(inspector_model_.Find("micro")->value);
+        cfg_.micro_rgb=bool(inspector_model_.Find("micro_rgb")->value);
+        cfg_.micro_ramps=bool(inspector_model_.Find("micro_ramps")->value);
+        cfg_.micro_columns=int(inspector_model_.Find("micro_columns")->value);
+        cfg_.micro_palette=int(inspector_model_.Find("micro_palette")->value);
         cfg_.alpha = bool(inspector_model_.Find("alpha")->value);
         cfg_.slot_count = int(inspector_model_.Find("slot_count")->value);
         cfg_.active_slot = int(inspector_model_.Find("active_slot")->value);
@@ -220,9 +243,16 @@ private:
     }
 
 
-    void LayoutPreviewContent() { picker_.SetRect(Preview().GetCanvasRect()); }
-    void ApplyDemoTheme() { picker_.ClearCustomStyle(); }
+    void LayoutPreviewContent() {
+        Rect bounds=Preview().GetCanvasRect(); picker_.SetRect(bounds);
+        Size size=micro_.GetMinSize();
+        micro_.SetRect(bounds.left+max(0,(bounds.Width()-size.cx)/2),bounds.top+max(0,(bounds.Height()-size.cy)/2),size.cx,size.cy);
+    }
+    void ApplyDemoTheme() { picker_.ClearCustomStyle(); micro_.ClearCustomStyle(); }
     void ApplyProjection() {
+        picker_.Show(!cfg_.micro); micro_.Show(cfg_.micro);
+        micro_.SetColor(cfg_.color).SetColumns(cfg_.micro_columns).ShowRamps(cfg_.micro_ramps)
+              .SetRGBMode(cfg_.micro_rgb).SetPaletteMode((UiColorPickerMicro::PaletteMode)cfg_.micro_palette);
         cfg_.slot_count=clamp(cfg_.slot_count,1,8); cfg_.active_slot=clamp(cfg_.active_slot,0,cfg_.slot_count-1);
         inspector_model_.Find("active_slot")->SetRange(0,cfg_.slot_count-1,1);
         inspector_model_.SetValue("active_slot",cfg_.active_slot);
@@ -234,6 +264,11 @@ private:
         SetUsageCode(BuildUsageCode()); LayoutPreviewContent();
     }
     String BuildUsageCode() const {
+        if(cfg_.micro) {
+            return "UiColorPickerMicro picker;\n" + Format("picker.SetColor(%s).SetColumns(%d).ShowRamps(%s).SetRGBMode(%s);\n",
+                ColorCpp(micro_.GetColor()),cfg_.micro_columns,cfg_.micro_ramps ? "true" : "false",cfg_.micro_rgb ? "true" : "false") +
+                Format("picker.SetPaletteMode((UiColorPickerMicro::PaletteMode)%d);\n",cfg_.micro_palette);
+        }
         String code="UiColorPicker picker;\n";
         code << "picker.SetSlotCount(" << cfg_.slot_count << ").SetAlphaEnabled(" << (cfg_.alpha ? "true" : "false") << ");\n";
         Vector<UiColorPicker::SlotValue> slots=picker_.GetSlots();
@@ -245,11 +280,22 @@ private:
 
     ColorConfig cfg_;
     UiColorPicker picker_;
+    UiColorPickerMicro micro_;
 };
 }
 GUI_APP_MAIN {
     Demo demo;
     const Vector<String>& args=CommandLine();
     if(args.GetCount()>=2 && args[0]=="--emit-code") { if(args.GetCount()>2) demo.ConfigureExample(); SaveFile(args[1],demo.GetGeneratedCode()); return; }
+    if(args.GetCount()>=2 && (args[0]=="--render-micro" || args[0]=="--emit-micro-code")) {
+        demo.ConfigureMicroExample(args.GetCount()>3 && args[3]=="rgb",args.GetCount()>2 && args[2]=="dark",args.GetCount()>4 ? ScanInt(args[4]) : 0);
+        if(args[0]=="--emit-micro-code") { SaveFile(args[1],demo.GetGeneratedCode()); return; }
+        demo.SetTimeCallback(200,[&] {
+            ImageDraw draw(demo.GetSize()); demo.DrawCtrl(draw);
+            if(!PNGEncoder().SaveFile(args[1],draw)) SetExitCode(1);
+            demo.Close();
+        });
+    }
+    if(args.GetCount() && args[0]=="--smoke") demo.SetTimeCallback(500,[&] { demo.Close(); });
     demo.Run();
 }

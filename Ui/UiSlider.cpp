@@ -281,7 +281,9 @@ Rect UiSlider::GetTrackRect() const
     const int track_cross = max(1, style.track_size.cy);
     const int major = dir_ == UiDirection::H ? outer.GetWidth() : outer.GetHeight();
     const int thumb_major = max(DPI(6), dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy);
-    const int pad = min(major / 2, max(max(DPI(8), track_cross * 2 + DPI(2)), (thumb_major + 1) / 2));
+    const int automatic_pad = max(max(DPI(8), track_cross * 2 + DPI(2)), (thumb_major + 1) / 2);
+    const int requested_pad = track_inset_ < 0 ? automatic_pad : max(track_inset_, (thumb_major + 1) / 2);
+    const int pad = min(major / 2, requested_pad);
     if(dir_ == UiDirection::H) {
         int available = max(0, outer.GetWidth() - 2 * pad);
         int width = expand_track_ ? available : min(available, track_major);
@@ -391,7 +393,7 @@ void UiSlider::Paint(Draw& w)
 
     StyledState st = !IsEnabled() || !IsShowEnabled() ? ST_DISABLED
                    : dragging_ ? ST_PRESSED
-                   : ST_NORMAL;
+                   : hot_ ? ST_HOT : ST_NORMAL;
     bool has_focus = HasFocus();
     if(WhenPaintBackground)
         WhenPaintBackground(w, outer, style.track_palette, style.track_metrics, style.track_skin, st, has_focus);
@@ -567,6 +569,10 @@ void UiSlider::LeftUp(Point, dword)
             Refresh();
     }
 }
+
+// Hover changes appearance only; it never starts a value edit or capture.
+void UiSlider::MouseEnter(Point, dword) { hot_ = true; Refresh(); }
+void UiSlider::MouseLeave() { hot_ = false; Refresh(); }
 
 void UiSlider::MouseMove(Point p, dword)
 {

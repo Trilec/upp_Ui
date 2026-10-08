@@ -70,6 +70,11 @@ UiPanel::UiPanel()
     SyncThemeStyle();
 }
 
+UiPanel::Style UiPanel::ResolveThemeStyle() const
+{
+    return UiTheme::ResolvePanel();
+}
+
 void UiPanel::InvalidateStyleCache()
 {
     theme_revision_ = 0;
@@ -94,7 +99,7 @@ void UiPanel::SyncThemeStyle()
     if(theme_revision_ == revision)
         return;
 
-    themed_style_ = UiTheme::ResolvePanel();
+    themed_style_ = ResolveThemeStyle();
     theme_revision_ = revision;
 }
 

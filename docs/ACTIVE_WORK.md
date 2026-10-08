@@ -46,3 +46,18 @@ NEXT: existing ValidateUiGraphWorkspace Debug/launch gate and positive Overlay s
 held-button Escape/DND, diagram inventory, post-port zones, undo and compact lifecycle.
 Preserve one presentation geometry authority, immutable camera baseline, independent
 Content/Overlay and native component/Micro budgets. See [Graph Development](09_UIGRAPH_DEVELOPMENT.md).
+
+## Shared browser and micro picker — 2026-10-07
+MIGRATION: UiColorPickerMicro is core Ui; Ui/UiFileBrowser is optional.
+Maintained examples: UiColorPickerDemo (family) and UiFileBrowserDemo.
+Contracts: Ui/UiColorPickerMicro.md and Ui/UiFileBrowser/README.md.
+Focused Windows checks recorded under upp_cineview/build; no clean release gate or cross-platform/100k acceptance claimed.
+Windows: browser 25 model / 164 native PASS (Debug/Release + BLITZ); picker
+family/native captures, nine headers/generated C++, Ui smoke 73/0 and ranges
+60/0 PASS in Debug/Release; CineView core/media/native + EXR provider PASS.
+
+## Compact media controls — 2026-10-07
+Playback Style adds per-command icon sizes, combined transport inset and cache-line thickness.
+Probe defaults to a neutral selected outline; geometry and sampling contracts remain intact.
+Debug/Release: media demo 53 self-test + 576 selector PASS; two standalone headers and six generated examples compile/run.
+Guide: MEDIA_CONTROLS.md. Evidence: upp_cineview/build/skip-correction-shared; viewer native 98 PASS.

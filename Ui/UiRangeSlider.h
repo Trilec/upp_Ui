@@ -45,7 +45,8 @@ public:
         Lower,
         Upper,
         LowerBound,
-        UpperBound
+        UpperBound,
+        Position
     };
 
     static const Style& StyleDefault();
@@ -108,6 +109,17 @@ public:
     UiRangeSlider& SetTickSide(UiAlign side);
     UiRangeSlider& SetTrackSize(Size sz);
     UiRangeSlider& SetThumbSize(Size sz);
+    // Optional timeline playhead: plain track clicks seek; Shift-drag moves the
+    // selected interval. Existing two/four-handle interaction is unchanged by default.
+    UiRangeSlider& EnablePosition(bool on = true);
+    bool IsPositionEnabled() const { return position_enabled_; }
+    UiRangeSlider& SetPosition(double value);
+    double GetPosition() const { return position_; }
+    UiRangeSlider& SetSelectedTrackThickness(int pixels);
+    int GetSelectedTrackThickness() const { return selected_thickness_; }
+    UiRangeSlider& SetBoundThumbSize(Size size);
+    Rect GetThumbRect(Handle handle) const;
+    Event<> WhenPositionChanging, WhenPositionAction, WhenPositionCancel;
 
     virtual void SetData(const Value& v) override;
     virtual Value GetData() const override;
@@ -153,7 +165,6 @@ private:
     void SyncThemeStyle();
     const Style& GetEffectiveStyle() const;
 
-    Rect GetThumbRect(Handle handle) const;
     int ValueToPos(double v) const;
     double PosToValue(int pos) const;
     double NormalizeValue(double v) const;
@@ -187,6 +198,10 @@ private:
     int drag_start_pos_ = 0;
     bool adjustable_bounds_ = false;
     bool show_endpoint_markers_ = true;
+    bool position_enabled_ = false;
+    double position_ = 0, drag_start_position_ = 0;
+    int selected_thickness_ = 0; // Zero inherits the base track thickness.
+    Size bound_thumb_size_ = Size(0, 0); // Zero preserves the theme-derived size.
     int drag_offset_ = 0;
     double drag_start_lower_ = 0.0;
     double drag_start_upper_ = 100.0;
