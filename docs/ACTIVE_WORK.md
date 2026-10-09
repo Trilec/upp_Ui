@@ -12,7 +12,8 @@ TOUCHED: StyledMetrics/drawing; GroupPanel, Tag, Graph and RangeSegments;
 STATUS: implemented; focused validation recorded below, broader visual gates stay open.
 VALIDATION: Release controls 14/0 suites, including accent 1023/0; theme 2/0 suites.
 Debug no-BLITZ accent 1023/0 and five isolated public headers compile; 32 demos build.
-Designer Release and Debug no-BLITZ 2107/0 each; generated C++ 12/0.
+Designer Release and Debug no-BLITZ 2120/0 each; generated C++ 12/0.
+Designer checks include immediate visual-dependent field visibility and Undo.
 27 unchanged demo exports compile, 136/0 runtime checks; 57 catalogue entries
 covered by 26 compiled usage snippets; reader links and skill snapshots checked.
 PUBLISHED: containing main commits; recover with `git log -1 -- Ui/UiDraw.cpp`
