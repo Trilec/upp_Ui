@@ -37,6 +37,13 @@ void UiButtonDemo::BuildOverrideModel()
 {
     UiButton::Style base = UiTheme::ResolveButton();
     static const char *labels[] = { "Normal", "Hot", "Pressed", "Disabled" };
+    MarkOverride(pe_model_override.AddBoolean("metrics.frame_accent.top","Top",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top),"Frame Accent"));
+    MarkOverride(pe_model_override.AddBoolean("metrics.frame_accent.bottom","Bottom",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Frame Accent"));
+    MarkOverride(pe_model_override.AddBoolean("metrics.frame_accent.left","Left",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left),"Frame Accent"));
+    MarkOverride(pe_model_override.AddBoolean("metrics.frame_accent.right","Right",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right),"Frame Accent"));
+    MarkOverride(pe_model_override.AddNumericInt("metrics.frame_accent.thickness","Thickness",base.metrics.frame_accent.thickness,0,12,1,"Frame Accent"));
+    MarkOverride(pe_model_override.AddNumericInt("metrics.frame_accent.alpha","Opacity",base.metrics.frame_accent.alpha,0,255,1,"Frame Accent"));
+    MarkOverride(pe_model_override.AddColor("metrics.frame_accent.color","Colour",base.metrics.frame_accent.color,"Frame Accent"));
 
     MarkOverride(pe_model_override.AddNumericInt("radius", "Radius", base.metrics.radius,
                                                  0, 60, 1, "General"));

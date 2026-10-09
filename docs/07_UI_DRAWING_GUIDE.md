@@ -80,6 +80,40 @@ Authored polygon vertices are semantic topology. Do not silently simplify them.
 Generated-polyline simplification needs a declared combined budget: flattening at
 0.35 and independently simplifying at 0.35 is not a 0.35 end-to-end guarantee.
 
+## Frame Accent
+
+`UiPaintFaceFrameDash` draws `metrics.frame_accent` after the normal face/frame,
+including when the normal frame is hidden. The accent is an antialiased partial
+rounded ring just inside the frame, using the same surface and radius. Side masks
+meet at the 45-degree corner bisectors; adjacent selected sides form a continuous
+curve. It is additional decoration and must not be included in layout insets.
+
+A specialized painter can opt in explicitly:
+
+```cpp
+UiPaintFrameAccent(w, surface, palette, metrics, state);
+```
+
+Here `surface` is the shadow-adjusted outer surface used for the ordinary frame,
+not the content rectangle. The helper handles normal-frame inset, rounded
+geometry, state-colour fallback and opacity. Do not call it again after the
+shared face/frame helper has already painted the accent, and do not approximate
+the corners with separate straight strips or a shadow. GroupPanel preserves its
+centered header gaps through its existing frame clipping; ScrollPanel paints
+chrome in fixed panel coordinates.
+
+Paint overrides that replace the default surface own the complete replacement,
+including whether to invoke this helper. Prepared/cached presentations must
+include consumed accent edges, thickness, resolved colour and alpha in their
+pixel-affecting state. A metrics field that a specialized subpart never consumes
+must not appear as a working inspector property.
+
+UiTag includes accent fields in prepared decoration/cache state, so Paint still
+consumes ready resources. Graph's rectangular styled-surface paths scale accent
+thickness with the camera and consume the same helper; nonrectangular/custom node
+silhouettes need an appropriate explicit painter. See
+[Graph shape support](08_UIGRAPH_GUIDE.md#shapes-and-actual-controls).
+
 ## Circular controls and clipping
 
 UiProgressRing/UiChartRing use native stroked arcs through UiPaintCircularArc.

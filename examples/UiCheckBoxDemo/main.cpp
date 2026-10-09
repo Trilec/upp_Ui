@@ -6,6 +6,75 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->enabled && row->value != row->default_value) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->enabled || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->enabled || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
+bool HasFrameAccentChanges(const PropertyEditorModel& model)
+{
+    for(const PropertyEditorItem& item : model.GetItems())
+        if(item.id.Find(".frame_accent.") >= 0 && item.enabled && item.value != item.default_value) return true;
+    return false;
+}
+
 
 String CppBool(bool value) { return value ? "true" : "false"; }
 String CppColor(Color c)
@@ -264,6 +333,10 @@ private:
         model_.SetGroupSubtitle("Layout", "indicator placement and geometry");
         model_.SetGroupSubtitle("Body", "outer control surface");
         model_.SetGroupSubtitle("Indicator", "checkbox marker surface");
+        { auto accent_base = UiTheme::ResolveCheckBox();
+          AddFrameAccentProperties(model_, "metrics.frame_accent.", accent_base.metrics, "metrics / Frame Accent");
+          AddFrameAccentProperties(model_, "indicator_metrics.frame_accent.", accent_base.indicator_metrics, "indicator_metrics / Frame Accent");
+        }
         model_.StructureChanged();
     }
 
@@ -294,10 +367,27 @@ private:
         };
     }
 
+    void UpdateFrameAccentAvailability()
+    {
+        const UiCheckVisual visual = ParseVisual(AsString(Get("visual")));
+        for(int i = 0; i < model_.GetCount(); i++) {
+            PropertyEditorItem& row = model_[i];
+            bool supported = row.enabled;
+            if(row.id.StartsWith("metrics.frame_accent.")) { supported = visual == UICHECKVIS_CHIP; row.help = "The outer surface accent is painted only by Chip. Values are retained for that visual."; }
+            if(row.id.StartsWith("indicator_metrics.frame_accent.")) { supported = visual != UICHECKVIS_LIST; row.help = "List uses a line marker instead of a framed indicator; choose another visual to edit this accent."; }
+            if(row.enabled != supported) {
+                row.enabled = supported;
+                model_.ValueChanged(row.id);
+            }
+        }
+    }
+
     UiCheckBox::Style MakeStyle() const
     {
         const UiCheckVisual visual = ParseVisual(AsString(Get("visual")));
         UiCheckBox::Style style = UiTheme::ResolveCheckBox(visual);
+        ApplyFrameAccentProperties(style.metrics, model_, "metrics.frame_accent.");
+        ApplyFrameAccentProperties(style.indicator_metrics, model_, "indicator_metrics.frame_accent.");
         if(Changed("indicator_side")) style.indicator_side = ParseSide(AsString(Get("indicator_side")));
         if(Changed("indicator_size")) style.indicator_size = DPI((int)Get("indicator_size"));
         if(Changed("indicator_gap")) style.indicator_gap = DPI((int)Get("indicator_gap"));
@@ -328,6 +418,7 @@ private:
 
     void ApplyProjection()
     {
+        UpdateFrameAccentAvailability();
         const UiCheckVisual visual = ParseVisual(AsString(Get("visual")));
         UiCheckState state = ParseState(AsString(Get("state")));
         const bool tri_state = (bool)Get("tri_state");
@@ -379,6 +470,7 @@ private:
                    Changed("indicator_face_enabled") || Changed("indicator_frame_enabled") || Changed("indicator_radius") ||
                    Changed("indicator_frame_width") || Changed("indicator_face") || Changed("indicator_frame") || Changed("mark_ink") ||
                    Changed("checked_icon") || Changed("tri_state_icon") || Changed("marker_render_mode");
+        any |= HasFrameAccentChanges(model_);
         if(!any) return;
         out << "\n// Local design changes. State/behaviour remains separate below.\n";
         out << "UiCheckBox::Style style = UiTheme::ResolveCheckBox(" << VisualCode(ParseVisual(AsString(Get("visual")))) << ");\n";
@@ -412,6 +504,10 @@ private:
             out << "style.tri_state_icon = " << (icon.IsEmpty() ? "Image()" : "UiIconFromName(" + CppString(icon) + ")") << ";\n";
         }
         if(use("marker_render_mode")) out << "style.marker_render_mode = UiIconRenderMode::" << AsString(Get("marker_render_mode")) << ";\n";
+        { bool authored = true;
+          EmitFrameAccentProperties(out, model_, "metrics.frame_accent.", "style.metrics", String(), authored);
+          EmitFrameAccentProperties(out, model_, "indicator_metrics.frame_accent.", "style.indicator_metrics", String(), authored);
+        }
         out << "check.SetCustomStyle(style);\n";
     }
 
@@ -502,6 +598,7 @@ private:
 
     bool IsStyleProperty(const String& id) const
     {
+        if(id.Find(".frame_accent.") >= 0) return true;
         static const char* ids[] = { "body_face", "body_face_enabled", "body_frame", "body_frame_enabled", "body_frame_width", "body_radius", "checked_icon", "indicator_face", "indicator_face_enabled", "indicator_frame", "indicator_frame_enabled", "indicator_frame_width", "indicator_gap", "indicator_radius", "indicator_side", "indicator_size", "mark_ink", "mark_thickness", "marker_render_mode", "text_ink", "tri_state_icon" };
         for(const char* name : ids) if(id == name) return true;
         return false;

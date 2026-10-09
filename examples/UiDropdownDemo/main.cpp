@@ -6,6 +6,75 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->value != row->default_value) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->value != row->default_value) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->value != row->default_value) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
+bool HasFrameAccentChanges(const PropertyEditorModel& model)
+{
+    for(const PropertyEditorItem& item : model.GetItems())
+        if(item.id.Find(".frame_accent.") >= 0 && item.value != item.default_value) return true;
+    return false;
+}
+
 
 String CppBool(bool value) { return value ? "true" : "false"; }
 String CppColor(Color c)
@@ -267,6 +336,7 @@ private:
         property_model_.SetGroupSubtitle("General", "collapsed control behaviour");
         property_model_.SetGroupSubtitle("Popup", "popup geometry and chrome");
         property_model_.SetGroupSubtitle("Popup / Markers", "selection/check and reorder affordances");
+        { auto style = UiTheme::ResolveDropdown(); AddFrameAccentProperties(property_model_, "metrics.frame_accent.", style.metrics, "Frame Accent"); }
         property_model_.StructureChanged();
     }
 
@@ -345,6 +415,7 @@ private:
     UiDropdown::Style MakeStyle() const
     {
         UiDropdown::Style style = UiTheme::ResolveDropdown(ParseRole(AsString(Get("role"))));
+        ApplyFrameAccentProperties(style.metrics, property_model_, "metrics.frame_accent.");
         if(Changed("radius")) style.metrics.radius = DPI((int)Get("radius"));
         if(Changed("frame_width")) style.metrics.frame_width = DPI((int)Get("frame_width"));
         if(Changed("frame_width")) style.metrics.frame_enabled = (int)Get("frame_width") > 0;
@@ -518,6 +589,7 @@ private:
         bool any = !only_changes || Changed("radius") || Changed("frame_width") || Changed("face") || Changed("frame") || Changed("ink") || Changed("icon_ink") ||
                    Changed("popup_min_width") || Changed("popup_max_height") || Changed("popup_item_height") || Changed("popup_max_items") || Changed("popup_scrollbar") ||
                    Changed("popup_space") || Changed("popup_frame_width") || Changed("popup_radius") || Changed("popup_frame") || Changed("popup_background");
+        any |= HasFrameAccentChanges(property_model_);
         if(!any) return;
         out << "\n// Optional local design changes. Popup styling is a nested domain of UiDropdown::Style.\n";
         out << "UiDropdown::Style style = UiTheme::ResolveDropdown(" << RoleCode(ParseRole(AsString(Get("role")))) << ");\n";
@@ -541,6 +613,7 @@ private:
             if(use("icon_ink")) out << "    style.palette.icon[state] = " << CppColor(Color(Get("icon_ink"))) << ";\n";
             out << "}\n";
         }
+        { bool authored = true; EmitFrameAccentProperties(out, property_model_, "metrics.frame_accent.", "style.metrics", String(), authored); }
         out << "dropdown.SetCustomStyle(style);\n";
     }
 
@@ -635,6 +708,7 @@ private:
 
     bool IsStyleProperty(const String& id) const
     {
+        if(id.Find(".frame_accent.") >= 0) return true;
         static const char* ids[] = { "content_gap", "face", "frame", "frame_width", "icon_ink", "indicator_size", "ink", "popup_background", "popup_frame", "popup_frame_width", "popup_item_height", "popup_max_height", "popup_max_items", "popup_min_width", "popup_radius", "popup_scrollbar", "popup_space", "radius" };
         for(const char* name : ids) if(id == name) return true;
         return false;

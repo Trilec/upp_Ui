@@ -37,6 +37,13 @@ void ApplySurface(StyledPalette& palette, StyledMetrics& metrics, const Property
     if(active("surface.frame")) metrics.frame_enabled = value("surface.frame");
     if(active("surface.frame_width")) metrics.frame_width = DPI((int)value("surface.frame_width"));
     if(active("surface.radius")) metrics.radius = DPI((int)value("surface.radius"));
+    if(active("surface.frame_accent.top")) { if((bool)value("surface.frame_accent.top")) metrics.frame_accent.edges |= StyledFrameAccent::Top; else metrics.frame_accent.edges &= ~StyledFrameAccent::Top; }
+    if(active("surface.frame_accent.bottom")) { if((bool)value("surface.frame_accent.bottom")) metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; }
+    if(active("surface.frame_accent.left")) { if((bool)value("surface.frame_accent.left")) metrics.frame_accent.edges |= StyledFrameAccent::Left; else metrics.frame_accent.edges &= ~StyledFrameAccent::Left; }
+    if(active("surface.frame_accent.right")) { if((bool)value("surface.frame_accent.right")) metrics.frame_accent.edges |= StyledFrameAccent::Right; else metrics.frame_accent.edges &= ~StyledFrameAccent::Right; }
+    if(active("surface.frame_accent.thickness")) metrics.frame_accent.thickness = (int)value("surface.frame_accent.thickness");
+    if(active("surface.frame_accent.alpha")) metrics.frame_accent.alpha = (int)value("surface.frame_accent.alpha");
+    if(active("surface.frame_accent.color")) metrics.frame_accent.color = (Color)value("surface.frame_accent.color");
     if(active("surface.margin_x")) metrics.content_margin.left = metrics.content_margin.right = DPI((int)value("surface.margin_x"));
     if(active("surface.margin_y")) metrics.content_margin.top = metrics.content_margin.bottom = DPI((int)value("surface.margin_y"));
     if(active("surface.focus")) metrics.focus_enabled = value("surface.focus");
@@ -149,6 +156,13 @@ String UiCollectionDemo::GenerateCode() const
         override_bool(metrics + "frame_enabled", "surface.frame");
         override_number(metrics + "frame_width", "surface.frame_width");
         override_number(metrics + "radius", "surface.radius");
+        if(Active("surface.frame_accent.top")) out << "    " << metrics << "frame_accent.edges " << ((bool)Override("surface.frame_accent.top") ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n";
+        if(Active("surface.frame_accent.bottom")) out << "    " << metrics << "frame_accent.edges " << ((bool)Override("surface.frame_accent.bottom") ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n";
+        if(Active("surface.frame_accent.left")) out << "    " << metrics << "frame_accent.edges " << ((bool)Override("surface.frame_accent.left") ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n";
+        if(Active("surface.frame_accent.right")) out << "    " << metrics << "frame_accent.edges " << ((bool)Override("surface.frame_accent.right") ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n";
+        if(Active("surface.frame_accent.thickness")) out << "    " << metrics << "frame_accent.thickness = " << (int)Override("surface.frame_accent.thickness") << ";\n";
+        if(Active("surface.frame_accent.alpha")) out << "    " << metrics << "frame_accent.alpha = " << (int)Override("surface.frame_accent.alpha") << ";\n";
+        if(Active("surface.frame_accent.color")) out << "    " << metrics << "frame_accent.color = " << CppColor(Color(Override("surface.frame_accent.color"))) << ";\n";
         override_number(metrics + "content_margin.left", "surface.margin_x");
         override_number(metrics + "content_margin.right", "surface.margin_x");
         override_number(metrics + "content_margin.top", "surface.margin_y");
@@ -281,6 +295,16 @@ bool UiCollectionDemo::RunAcceptance(const String& directory)
     SaveFile(AppendFileName(directory, "configured.cpp"), GenerateCode());
     override_model.Find("surface.face.normal")->override_active = true;
     override_model.SetValue("surface.face.normal", Color(24, 40, 70));
+            for(int accent_index = 0; accent_index < override_model.GetCount(); accent_index++) {
+                PropertyEditorItem& row = override_model[accent_index];
+                if(row.id.Find("frame_accent.") < 0) continue;
+                row.override_active = true;
+                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
+                else if(row.id.EndsWith(".alpha")) row.value = 190;
+            }
+
     override_model.Find("renderer.font_height")->override_active = true;
     override_model.SetValue("renderer.font_height", 17);
     override_model.Find("list.font_height")->override_active = true;

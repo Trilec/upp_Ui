@@ -37,7 +37,7 @@
       path objects and may consume UiGeometry directly.
 
     Migration
-    - UiDrawBase.h is the byte-for-byte pre-facade implementation. It is internal
+    - UiDrawBase.h retains the base implementation and shared accent seam. It is internal
       to this header so the cache seam can be evaluated without rewriting the
       large shared drawing implementation from partial edits.
 */
@@ -127,8 +127,12 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
                                  const StyledMetrics& metrics,
                                  StyledState st)
 {
-    if(outer.IsEmpty() || (!metrics.face_enabled && !metrics.frame_enabled))
+    if(outer.IsEmpty())
         return;
+    if(!metrics.face_enabled && !metrics.frame_enabled) {
+        UiPaintFrameAccent(w, outer, palette, metrics, st);
+        return;
+    }
 
     if(!UiCanCacheStyledFaceFrame(palette, metrics, st)) {
         UiPaintFaceFrameDashBase(w, outer, palette, metrics, st);
@@ -139,8 +143,10 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
     const bool draws_face = metrics.face_enabled && fill.IsSolid() && !IsNull(fill.color);
     const bool draws_frame = metrics.frame_enabled && metrics.frame_width > 0
                           && !IsNull(palette.frame[st]);
-    if(!draws_face && !draws_frame)
+    if(!draws_face && !draws_frame) {
+        UiPaintFrameAccent(w, outer, palette, metrics, st);
         return;
+    }
 
     Image cached = UiGetCachedStyledFaceFrame(outer.GetSize(), palette, metrics, st);
     if(IsNull(cached)) {
@@ -148,6 +154,7 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
         return;
     }
     w.DrawImage(outer.left, outer.top, cached);
+    UiPaintFrameAccent(w, outer, palette, metrics, st);
 }
 
 inline bool UiCanUseCachedStyledBackground(const StyledPalette& palette,
@@ -182,6 +189,7 @@ inline void UiPaintStyledBackground(Draw& w,
         pre.face_enabled = false;
         pre.frame_enabled = false;
         pre.highlight.enabled = false;
+        pre.frame_accent.edges = StyledFrameAccent::None;
         UiPaintStyledBackgroundBase(w, outer, palette, pre, skin, st, focus);
     }
 
@@ -195,6 +203,7 @@ inline void UiPaintStyledBackground(Draw& w,
         StyledMetrics post = metrics;
         post.face_enabled = false;
         post.frame_enabled = false;
+        post.frame_accent.edges = StyledFrameAccent::None;
         if(!post.shadow.inset)
             post.shadow.enabled = false;
         UiPaintStyledBackgroundBase(w, outer, palette, post, skin, st, focus);

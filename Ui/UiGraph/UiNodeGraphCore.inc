@@ -464,6 +464,7 @@ StyledMetrics ScaleNodeMetrics(const StyledMetrics& source, double zoom)
     out.content_margin = ScaleThickness(source.content_margin, zoom);
     out.radius = ScaleMetric(source.radius, zoom);
     out.frame_width = ScaleMetric(source.frame_width, zoom);
+    out.frame_accent.thickness = ScaleMetric(source.frame_accent.thickness, zoom);
     out.focus_margin = ScaleMetric(source.focus_margin, zoom);
     out.highlight.thickness = ScaleMetric(source.highlight.thickness, zoom);
     out.highlight.offset_x = fround(source.highlight.offset_x * zoom);

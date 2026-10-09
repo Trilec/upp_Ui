@@ -1,4 +1,4 @@
-#include "UiGraphDemo.h"
+﻿#include "UiGraphDemo.h"
 
 namespace Upp {
 namespace {
@@ -557,6 +557,14 @@ void UiGraphDemo::BuildStyleEditorModel()
 
     pe_model_style.AddBoolean("frame_enabled", "Enabled", base.metrics.frame_enabled, "Frame");
     pe_model_style.AddNumericInt("frame_width", "Width", base.metrics.frame_width, 0, 12, 1, "Frame").SetUnit("px");
+    pe_model_style.AddBoolean("frame_accent_top", "Top", bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top), "Frame Accent");
+    pe_model_style.AddBoolean("frame_accent_bottom", "Bottom", bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom), "Frame Accent");
+    pe_model_style.AddBoolean("frame_accent_left", "Left", bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left), "Frame Accent");
+    pe_model_style.AddBoolean("frame_accent_right", "Right", bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right), "Frame Accent");
+    pe_model_style.AddNumericInt("frame_accent_thickness", "Thickness", base.metrics.frame_accent.thickness, 0, 12, 1, "Frame Accent").SetUnit("px");
+    pe_model_style.AddColor("frame_accent_color", "Colour", base.metrics.frame_accent.color, "Frame Accent");
+    pe_model_style.AddNumericInt("frame_accent_alpha", "Opacity", base.metrics.frame_accent.alpha, 0, 255, 1, "Frame Accent");
+    pe_model_style.SetGroupSubtitle("Frame Accent", "rounded rectangular node surfaces; independent of the normal frame");
     for(int i = 0; i < 4; i++) {
         int si = GraphDemoStyleIndex(i);
         pe_model_style.AddColor("frame." + String(GraphDemoStateId(i)), labels[i], base.palette.frame[si], "Frame");
@@ -862,6 +870,12 @@ void UiGraphDemo::SyncStyleEditor()
     const UiGraphNode* node = SelectedNode();
     for(int i = 0; i < pe_model_style.GetCount(); i++)
         pe_model_style[i].enabled = node != nullptr;
+    bool accent_supported = node && (node->shape == UiGraphNodeShape::Rectangle ||
+        node->shape == UiGraphNodeShape::LegacyRectangle ||
+        node->shape == UiGraphNodeShape::RoundedRectangle || node->shape == UiGraphNodeShape::Square ||
+        node->shape == UiGraphNodeShape::Capsule);
+    for(int i=0;i<pe_model_style.GetCount();i++)
+        if(pe_model_style[i].id.StartsWith("frame_accent_")) pe_model_style[i].enabled = accent_supported;
     if(node) {
         UiGraphNodeStyle style = ResolvePresentedStyle(*node);
         for(int i = 0; i < 4; i++) {
@@ -878,6 +892,13 @@ void UiGraphDemo::SyncStyleEditor()
         }
         pe_model_style.SetValue("frame_enabled", style.metrics.frame_enabled, false);
         pe_model_style.SetValue("frame_width", style.metrics.frame_width, false);
+        pe_model_style.SetValue("frame_accent_top", bool(style.metrics.frame_accent.edges & StyledFrameAccent::Top), false);
+        pe_model_style.SetValue("frame_accent_bottom", bool(style.metrics.frame_accent.edges & StyledFrameAccent::Bottom), false);
+        pe_model_style.SetValue("frame_accent_left", bool(style.metrics.frame_accent.edges & StyledFrameAccent::Left), false);
+        pe_model_style.SetValue("frame_accent_right", bool(style.metrics.frame_accent.edges & StyledFrameAccent::Right), false);
+        pe_model_style.SetValue("frame_accent_thickness", style.metrics.frame_accent.thickness, false);
+        pe_model_style.SetValue("frame_accent_color", style.metrics.frame_accent.color, false);
+        pe_model_style.SetValue("frame_accent_alpha", style.metrics.frame_accent.alpha, false);
         pe_model_style.SetValue("font_title_face", style.title_font.GetFaceName(), false);
         pe_model_style.SetValue("font_title", max(1, style.title_font.GetHeight()), false);
         pe_model_style.SetValue("font_subtitle_face", style.subtitle_font.GetFaceName(), false);
@@ -952,7 +973,7 @@ void UiGraphDemo::ApplyNodeProperty(const String& id, const Value& value)
     graph_.Model().UpdateNode(selected_node_, node);
     UpdateStatus();
     MarkGeneratedCodeDirty();
-    if(id == "role" || id == "style_preset") SyncStyleEditor();
+    if(id == "role" || id == "style_preset" || id == "shape") SyncStyleEditor();
 }
 
 void UiGraphDemo::ApplyEdgeProperty(const String& id, const Value& value)
@@ -1022,6 +1043,13 @@ void UiGraphDemo::ApplyStyleProperty(const String& id, const Value& value)
 
     if(id == "frame_enabled") style.metrics.frame_enabled = (bool)value;
     else if(id == "frame_width") style.metrics.frame_width = max(0, (int)value);
+    else if(id == "frame_accent_top") style.metrics.frame_accent.edges = (style.metrics.frame_accent.edges & ~StyledFrameAccent::Top) | ((bool)value ? StyledFrameAccent::Top : 0);
+    else if(id == "frame_accent_bottom") style.metrics.frame_accent.edges = (style.metrics.frame_accent.edges & ~StyledFrameAccent::Bottom) | ((bool)value ? StyledFrameAccent::Bottom : 0);
+    else if(id == "frame_accent_left") style.metrics.frame_accent.edges = (style.metrics.frame_accent.edges & ~StyledFrameAccent::Left) | ((bool)value ? StyledFrameAccent::Left : 0);
+    else if(id == "frame_accent_right") style.metrics.frame_accent.edges = (style.metrics.frame_accent.edges & ~StyledFrameAccent::Right) | ((bool)value ? StyledFrameAccent::Right : 0);
+    else if(id == "frame_accent_thickness") style.metrics.frame_accent.thickness = max(0,(int)value);
+    else if(id == "frame_accent_color") style.metrics.frame_accent.color = Color(value);
+    else if(id == "frame_accent_alpha") style.metrics.frame_accent.alpha = clamp((int)value,0,255);
     else if(id == "font_title_face") style.title_font.FaceName(AsString(value));
     else if(id == "font_title") style.title_font.Height(max(6, (int)value));
     else if(id == "font_subtitle_face") style.subtitle_font.FaceName(AsString(value));
@@ -1261,6 +1289,10 @@ String UiGraphDemo::GenerateUsageCode(bool topology, bool authored)
         ApplyNodeProperty("title", String("Authored \"node\"\\path\nnext line"));
         ApplyStyleProperty("font_title", 18);
         ApplyStyleProperty("frame_width", 3);
+        ApplyStyleProperty("frame_accent_top", true);
+        ApplyStyleProperty("frame_accent_thickness", 3);
+        ApplyStyleProperty("frame_accent_color", Color(45,110,180));
+        ApplyStyleProperty("frame_accent_alpha", 190);
         ApplyStyleProperty("shadow_enabled", true);
     }
     code_recipe_.Select(topology ? 1 : 0);
@@ -1413,6 +1445,12 @@ void UiGraphDemo::UpdateGeneratedCode()
             out << sv << ".metrics.face_enabled = " << (style.metrics.face_enabled ? "true" : "false") << ";\n";
             out << sv << ".metrics.radius = " << style.metrics.radius << ";\n";
             out << sv << ".metrics.frame_width = " << style.metrics.frame_width << ";\n";
+            if(!style.metrics.frame_accent.IsDefault()) {
+                out << sv << ".metrics.frame_accent.edges = " << style.metrics.frame_accent.edges << ";\n";
+                out << sv << ".metrics.frame_accent.thickness = " << style.metrics.frame_accent.thickness << ";\n";
+                out << sv << ".metrics.frame_accent.color = " << GraphDemoColorCode(style.metrics.frame_accent.color) << ";\n";
+                out << sv << ".metrics.frame_accent.alpha = " << style.metrics.frame_accent.alpha << ";\n";
+            }
             out << sv << ".metrics.content_margin = Rect(" << style.metrics.content_margin.left << ", "
                 << style.metrics.content_margin.top << ", " << style.metrics.content_margin.right << ", "
                 << style.metrics.content_margin.bottom << ");\n";

@@ -125,6 +125,13 @@ void UiButtonDemo::UpdateGeneratedCode()
         };
 
         emit_int("radius", "style.metrics.radius", true);
+    if(OverrideActive("metrics.frame_accent.top")) out << "style.metrics.frame_accent.edges " << ((bool)OverrideValue("metrics.frame_accent.top") ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n";
+    if(OverrideActive("metrics.frame_accent.bottom")) out << "style.metrics.frame_accent.edges " << ((bool)OverrideValue("metrics.frame_accent.bottom") ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n";
+    if(OverrideActive("metrics.frame_accent.left")) out << "style.metrics.frame_accent.edges " << ((bool)OverrideValue("metrics.frame_accent.left") ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n";
+    if(OverrideActive("metrics.frame_accent.right")) out << "style.metrics.frame_accent.edges " << ((bool)OverrideValue("metrics.frame_accent.right") ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n";
+    if(OverrideActive("metrics.frame_accent.thickness")) out << "style.metrics.frame_accent.thickness = " << (int)OverrideValue("metrics.frame_accent.thickness") << ";\n";
+    if(OverrideActive("metrics.frame_accent.alpha")) out << "style.metrics.frame_accent.alpha = " << (int)OverrideValue("metrics.frame_accent.alpha") << ";\n";
+    if(OverrideActive("metrics.frame_accent.color")) out << "style.metrics.frame_accent.color = " << CppColor(Color(OverrideValue("metrics.frame_accent.color"))) << ";\n";
         emit_bool("transparent", "style.transparent");
         emit_bool("high_contrast", "style.metrics.high_contrast");
         emit_bool("face_enabled", "style.metrics.face_enabled");

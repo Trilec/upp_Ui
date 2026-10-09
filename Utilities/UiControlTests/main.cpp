@@ -2,6 +2,7 @@
 
 using namespace Upp;
 
+int RunFrameAccentSuite();
 int RunButtonSuite();
 int RunColorMatrixSuite();
 int RunDateTimeSuite();
@@ -19,6 +20,7 @@ int RunTabSuite();
 CONSOLE_APP_MAIN
 {
     int failed = 0;
+    failed += RunFrameAccentSuite() != 0;
     failed += RunButtonSuite() != 0;
     failed += RunColorMatrixSuite() != 0;
     failed += RunDateTimeSuite() != 0;
@@ -33,7 +35,7 @@ CONSOLE_APP_MAIN
     failed += RunStackSuite() != 0;
     failed += RunTabSuite() != 0;
 
-    Cout() << "\nUI_CONTROL_TESTS_SUMMARY suites=13 failed_suites="
+    Cout() << "\nUI_CONTROL_TESTS_SUMMARY suites=14 failed_suites="
            << failed << '\n';
     SetExitCode(failed ? 1 : 0);
 }

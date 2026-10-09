@@ -6,6 +6,75 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->value != row->default_value) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->value != row->default_value) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->value != row->default_value) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
+bool HasFrameAccentChanges(const PropertyEditorModel& model)
+{
+    for(const PropertyEditorItem& item : model.GetItems())
+        if(item.id.Find(".frame_accent.") >= 0 && item.value != item.default_value) return true;
+    return false;
+}
+
 
 enum EditSample : int {
     EDIT_LINE = 0,
@@ -60,6 +129,7 @@ String AlignCode(const String& value)
 }
 
 struct EditConfig {
+    StyledFrameAccent frame_accent;
     String text;
     String placeholder;
     bool enabled = true;
@@ -379,6 +449,7 @@ private:
     {
         const EditConfig& cfg = cfg_[sample];
         model_.Clear(false);
+        { StyledMetrics metrics; metrics.frame_accent = cfg.frame_accent; AddFrameAccentProperties(model_, "metrics.frame_accent.", metrics, "Frame Accent"); }
 
         if(sample == EDIT_MULTI)
             Resettable(model_.AddMultiline("text", "Text", cfg.text, "Content").SetExpandedRowSpan(3));
@@ -450,6 +521,13 @@ private:
         if(sample == EDIT_MULTI)
             model_.SetGroupSubtitle("Whitespace", "multi-line whitespace rendering");
         const EditConfig defaults;
+        model_.Find("metrics.frame_accent.top")->default_value = false;
+        model_.Find("metrics.frame_accent.bottom")->default_value = false;
+        model_.Find("metrics.frame_accent.left")->default_value = false;
+        model_.Find("metrics.frame_accent.right")->default_value = false;
+        model_.Find("metrics.frame_accent.thickness")->default_value = defaults.frame_accent.thickness;
+        model_.Find("metrics.frame_accent.alpha")->default_value = defaults.frame_accent.alpha;
+        model_.Find("metrics.frame_accent.color")->default_value = defaults.frame_accent.color;
         if(PropertyEditorItem* item = model_.Find("block_caret")) item->default_value = defaults.block_caret;
         if(PropertyEditorItem* item = model_.Find("caret")) item->default_value = defaults.caret;
         if(PropertyEditorItem* item = model_.Find("caret_width")) item->default_value = defaults.caret_width;
@@ -479,6 +557,14 @@ private:
     void PullConfig(EditSample sample)
     {
         EditConfig& cfg = cfg_[sample];
+        cfg.frame_accent.edges = StyledFrameAccent::None;
+        if((bool)Get("metrics.frame_accent.top")) cfg.frame_accent.edges |= StyledFrameAccent::Top;
+        if((bool)Get("metrics.frame_accent.bottom")) cfg.frame_accent.edges |= StyledFrameAccent::Bottom;
+        if((bool)Get("metrics.frame_accent.left")) cfg.frame_accent.edges |= StyledFrameAccent::Left;
+        if((bool)Get("metrics.frame_accent.right")) cfg.frame_accent.edges |= StyledFrameAccent::Right;
+        cfg.frame_accent.thickness = (int)Get("metrics.frame_accent.thickness");
+        cfg.frame_accent.alpha = (int)Get("metrics.frame_accent.alpha");
+        cfg.frame_accent.color = Color(Get("metrics.frame_accent.color"));
         cfg.text = AsString(Get("text"));
         cfg.placeholder = AsString(Get("placeholder"));
         cfg.enabled = (bool)Get("enabled");
@@ -532,6 +618,11 @@ private:
     {
         const EditConfig defaults;
         UiBaseEdit::Style style = UiTheme::ResolveEdit(UiRole::Standard);
+        if(cfg.frame_accent.edges != defaults.frame_accent.edges) style.metrics.frame_accent.edges = cfg.frame_accent.edges;
+        if(cfg.frame_accent.thickness != defaults.frame_accent.thickness) style.metrics.frame_accent.thickness = cfg.frame_accent.thickness;
+        if(cfg.frame_accent.alpha != defaults.frame_accent.alpha) style.metrics.frame_accent.alpha = cfg.frame_accent.alpha;
+        if(cfg.frame_accent.color != defaults.frame_accent.color) style.metrics.frame_accent.color = cfg.frame_accent.color;
+
         for(int i = 0; i < 4; i++) {
             if(cfg.face != defaults.face) style.palette.face[i] = UiFill::Solid(cfg.face);
             if(cfg.frame != defaults.frame) style.palette.frame[i] = cfg.frame;
@@ -749,6 +840,7 @@ private:
 
     bool AnyStyleChange() const
     {
+        if(HasFrameAccentChanges(model_)) return true;
         static const char *ids[] = {
             "face", "frame", "ink", "placeholder_ink", "frame_width", "radius",
             "font_height", "margin_x", "margin_y", "text_align", "caret", "caret_width",
@@ -794,6 +886,7 @@ private:
                 << "    style.underline[state] = " << CppColor(cfg.underline) << ";\n"
                 << "}\n";
         }
+        { bool authored = true; EmitFrameAccentProperties(out, model_, "metrics.frame_accent.", "style.metrics", String(), authored); }
         out << "edit.SetCustomStyle(style);\n";
     }
 
@@ -942,6 +1035,7 @@ private:
 
     bool IsStyleProperty(const String& id) const
     {
+        if(id.Find(".frame_accent.") >= 0) return true;
         static const char* ids[] = { "block_caret", "caret", "caret_width", "face", "font_height", "frame", "frame_width", "ink", "margin_x", "margin_y", "placeholder_ink", "radius", "selection_face", "selection_ink", "show_line_endings", "show_spaces", "show_tabs", "tab_size", "text_align", "underline", "underline_enabled", "underline_width" };
         for(const char* name : ids) if(id == name) return true;
         return false;

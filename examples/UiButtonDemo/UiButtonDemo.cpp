@@ -408,6 +408,16 @@ void UiButtonDemo::ExportGenerated(const String& directory)
         SaveFile(AppendFileName(directory,String("UiButtonDemo_")+names[kind]+"_default.cpp"),str_generated_code);
         InspectorModel().SetValue("text",String("Quoted \"command\"\t\r\nC:\\media"),false);
         auto& model=OverrideModel();
+            for(int accent_index = 0; accent_index < model.GetCount(); accent_index++) {
+                PropertyEditorItem& row = model[accent_index];
+                if(row.id.Find("frame_accent.") < 0) continue;
+                row.override_active = true;
+                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
+                else if(row.id.EndsWith(".alpha")) row.value = 190;
+            }
+
         const char* id=kind==0?"radius":"metrics.radius";
         if(auto* item=model.Find(id)) { item->override_active=true; model.SetValue(id,17,false); }
         if(kind==2) tool_inspector.SetValue("checked",true,false);

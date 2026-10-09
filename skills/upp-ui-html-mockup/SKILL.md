@@ -11,6 +11,11 @@ Use [native mapping](references/native-mapping.md) and the bundled
 components. Check the [theme contract](references/upstream/docs/02_UI_THEME_GUIDE.md)
 when defining colors, states, radii, frames, typography and shadows.
 Read only the relevant native headers/examples when the checkout is available.
+The [usage recipes](references/upstream/docs/CONTROL_USAGE.md) show small native
+API examples. A coloured partial rounded border maps to shared **Frame Accent**:
+Top/Bottom/Left/Right flags with thickness, colour and alpha, additional to the
+ordinary frame and without extra padding. Verify custom-painted subparts consume
+it before promising native support.
 
 Start with the requested user workflow and hierarchy. Map each significant region
 to a Ui control or supported layout before spending effort on visual decoration.

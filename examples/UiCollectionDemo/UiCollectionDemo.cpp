@@ -198,6 +198,13 @@ void UiCollectionDemo::BuildProperties()
     boolean("surface.frame", "Frame enabled", true, "Surface / Geometry");
     number("surface.frame_width", "Frame width", 1, 0, 8, "Surface / Geometry");
     number("surface.radius", "Radius", 0, 0, 32, "Surface / Geometry");
+    boolean("surface.frame_accent.top", "Top", false, "Surface / Frame Accent");
+    boolean("surface.frame_accent.bottom", "Bottom", false, "Surface / Frame Accent");
+    boolean("surface.frame_accent.left", "Left", false, "Surface / Frame Accent");
+    boolean("surface.frame_accent.right", "Right", false, "Surface / Frame Accent");
+    number("surface.frame_accent.thickness", "Thickness", DPI(2), 0, DPI(12), "Surface / Frame Accent");
+    number("surface.frame_accent.alpha", "Opacity", 255, 0, 255, "Surface / Frame Accent");
+    color("surface.frame_accent.color", "Colour (Null follows frame)", Null, "Surface / Frame Accent");
     number("surface.margin_x", "Content margin X", 0, 0, 32, "Surface / Geometry");
     number("surface.margin_y", "Content margin Y", 0, 0, 32, "Surface / Geometry");
     boolean("surface.focus", "Focus ring", true, "Surface / Effects");

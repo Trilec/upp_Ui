@@ -17,6 +17,9 @@ control and its reference example. Full demos are self-contained packages with a
 live preview, production PropertyEditor and C++ examples; UiLabelDemo defines the
 reference shell.
 
+[Control usage recipes](docs/CONTROL_USAGE.md) give a small public API example for
+every catalogue entry, including shared Frame Accent decoration on panel surfaces.
+
 For AI-assisted work, see [Skills](skills/README.md): packaged native U++/Ui
 development guidance and HTML mockups grounded in the available controls. Each
 ZIP includes its instructions and supporting references.
@@ -28,7 +31,7 @@ The release-readiness pass is in progress: a release-candidate identifier is **n
 a certificate that every control, demo, generated recipe or platform has passed.
 See [ACTIVE_WORK](docs/ACTIVE_WORK.md) for current published/validated boundaries
 and the [coverage register](tests/ui_release_inventory.json) for remaining gates.
-The [50-control audit](tests/CONTROL_AUDIT.md) records current findings, reproduced
+The [control audit](tests/CONTROL_AUDIT.md) records current findings, reproduced
 defects and test results, including checks that still need manual validation.
 
 The maintainer's validation environment is Windows, U++18468 and CLANGx64. Recent
@@ -42,6 +45,7 @@ package versions and saved-data schemas are independent of the Ui release number
 | --- | --- |
 | [Coding](docs/00_UPP_CODING_GUIDE.md) | ownership, APIs, packages, review and release rules |
 | [Controls](docs/01_UI_CONTROLS_GUIDE.md) | complete control catalogue and practical contracts |
+| [Control usage recipes](docs/CONTROL_USAGE.md) | short public API examples for every concrete catalogue entry |
 | [Theme](docs/02_UI_THEME_GUIDE.md) | Minimal roles, states, inheritance and explicit styles |
 | [Models](docs/03_UI_MODEL_GUIDE.md) | model authority, binding, transactions and UiDoc |
 | [Demos](docs/04_UI_DEMO_GUIDE.md) | readable standalone demos and generated C++ |
@@ -59,8 +63,8 @@ the bounded ACTIVE_WORK file; completed checkpoint history belongs in Git.
 `Ui/` is the library. `Utilities/` contains reusable PropertyEditor/authoring/icon
 packages and regression executables. `examples/` contains demos and specialized
 authoring tools. `tests/` contains additional tests, assets and the release inventory.
-`scripts/` contains focused validation entry points. `docs/` contains the nine guides
-above plus ACTIVE_WORK (maximum 100 lines).
+`scripts/` contains focused validation entry points. `docs/` contains the canonical
+guides, focused reference contracts and ACTIVE_WORK (maximum 100 lines).
 `skills/` contains the maintained skill sources and uploadable ZIPs; local backups
 are excluded from Git.
 

@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -206,6 +268,10 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = UiTheme::ResolveTree();
+          AddFrameAccentProperties(override_model_, "metrics.frame_accent.", accent_base.metrics, "Frame Accent");
+        }
+
         inspector_model_.AddBoolean("root_visible","Root visible",cfg_.root_visible,"Control").SetDefault(cfg_.root_visible);
         inspector_model_.AddBoolean("multiple","Multiple",cfg_.multiple,"Control").SetDefault(cfg_.multiple);
         inspector_model_.AddBoolean("drag_drop","Drag drop",cfg_.drag_drop,"Control").SetDefault(cfg_.drag_drop);
@@ -358,6 +424,7 @@ private:
         { if(override_model_.Find("hot_face")->override_active) s.hot_face=cfg_.hot_face; }
         { if(override_model_.Find("selected_face")->override_active) s.selected_face=cfg_.selected_face; }
         { if(override_model_.Find("line_color")->override_active) s.line_color=cfg_.line_color; }
+        ApplyFrameAccentProperties(s.metrics, override_model_, "metrics.frame_accent.");
         tree_.SetCustomStyle(s).SetRootVisible(cfg_.root_visible).SetSelectionMode(cfg_.multiple ? UITREESEL_MULTI : UITREESEL_SINGLE)
           .EnableDragDrop(cfg_.drag_drop).EnableInternalMutation(cfg_.internal_mutation).EnableRenameOnDblClick(cfg_.rename)
           .ShowConnectorLines(cfg_.connectors).ShowMetadataMarker(cfg_.metadata).SetGlyphStyle((UiTreeGlyphStyle)cfg_.glyph);
@@ -406,6 +473,7 @@ private:
         if(override_model_.Find("hot_face")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.hot_face = " << ColorCpp(cfg_.hot_face) << ";\n"; }
         if(override_model_.Find("selected_face")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.selected_face = " << ColorCpp(cfg_.selected_face) << ";\n"; }
         if(override_model_.Find("line_color")->override_active) { if(!authored) code << "UiTree::Style style = tree.GetStyle();\n"; authored=true; code << "style.line_color = " << ColorCpp(cfg_.line_color) << ";\n"; }
+        EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "style.metrics", "UiTree::Style style = tree.GetStyle();\n", authored);
         if(authored) code << "tree.SetCustomStyle(style);\n";
         int id=0;
         for(int i=0;i<model_.GetChildCount(model_.Root());i++) EmitNode(code,model_.GetChild(model_.Root(),i),"model.Root()",id);

@@ -5,6 +5,7 @@
 | Header/body/footer, matrix | UiGridLayout or nested UiBoxLayout | Explicit expanding area, meaningful row/column constraints |
 | Toolbar, action row, wrapping cards | UiBoxLayout | Supported wrap and cross-axis policy; not every flex rule exists |
 | Card/surface/group | UiPanel / UiGroupPanel | Surface vs layout; group has header/body slots |
+| Coloured top/bottom/side edge following a rounded border | StyledMetrics.frame_accent | Additional to the ordinary frame; independent edge flags, thickness, colour and alpha; no layout inset |
 | Heading and explanatory text | UiLabel / UiTitleCard | Use TitleCard only when its media/content structure helps |
 | Action, compact icon, split action | UiButton / UiToolButton / UiSplitButton | Distinct main and dropdown actions |
 | Check/switch/radio | UiCheckBox / UiToggle / UiRadioButton | Different semantics and keyboard behavior |
@@ -29,7 +30,8 @@ control automatically implements CSS media queries.
 
 Theme handoff should map background/surface, ink, muted ink, accent, alert, frame,
 focus and interaction states to the corresponding family style. Radius, border,
-padding and shadows are geometry, not just decoration. Preserve image aspect ratio
+padding and shadows have geometry contracts; Frame Accent is decorative and does
+not add padding. Preserve image aspect ratio
 and state tint; provide native icon identifiers only when verified in UiIcons.h.
 
 CSS blur/backdrop filters, arbitrary transforms, sticky DOM behavior, rich web

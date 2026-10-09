@@ -40,6 +40,13 @@ void UiButtonDemo::BuildSplitModels() {
         split_inspector.AddText("description","Option description","Current workspace","Popup data");
         UiSplitButton::Style base=UiTheme::ResolveButton(AsString(InspectorValue("role"))=="Subtle" ? UiRole::Subtle : AsString(InspectorValue("role"))=="Accent" ? UiRole::Accent : AsString(InspectorValue("role"))=="Alert" ? UiRole::Alert : UiRole::Standard);
         FamilyMarkOverride(split_overrides.AddNumericInt("metrics.radius","Radius",base.metrics.radius,0,60,1,"Button"));
+        FamilyMarkOverride(split_overrides.AddBoolean("metrics.frame_accent.top","Top",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top),"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddBoolean("metrics.frame_accent.bottom","Bottom",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddBoolean("metrics.frame_accent.left","Left",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left),"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddBoolean("metrics.frame_accent.right","Right",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right),"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddNumericInt("metrics.frame_accent.thickness","Thickness",base.metrics.frame_accent.thickness,0,12,1,"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddNumericInt("metrics.frame_accent.alpha","Opacity",base.metrics.frame_accent.alpha,0,255,1,"Frame Accent"));
+        FamilyMarkOverride(split_overrides.AddColor("metrics.frame_accent.color","Colour",base.metrics.frame_accent.color,"Frame Accent"));
         FamilyMarkOverride(split_overrides.AddNumericInt("metrics.frame_width","Frame Width",base.metrics.frame_width,0,12,1,"Button"));
         FamilyMarkOverride(split_overrides.AddBoolean("metrics.face_enabled","Face Enabled",base.metrics.face_enabled,"Button"));
         FamilyMarkOverride(split_overrides.AddBoolean("metrics.frame_enabled","Frame Enabled",base.metrics.frame_enabled,"Button"));
@@ -110,6 +117,13 @@ void UiButtonDemo::ApplySplitProjection() {
         UiSplitButton::Style base=UiTheme::ResolveButton(AsString(InspectorValue("role"))=="Subtle" ? UiRole::Subtle : AsString(InspectorValue("role"))=="Accent" ? UiRole::Accent : AsString(InspectorValue("role"))=="Alert" ? UiRole::Alert : UiRole::Standard);
         UiSplitButton::Style style=base;
         if(OverrideActive("metrics.radius")) style.metrics.radius = (int)OverrideValue("metrics.radius"); else split_overrides.SetValue("metrics.radius",base.metrics.radius,false);
+        if(OverrideActive("metrics.frame_accent.top")) { if((bool)OverrideValue("metrics.frame_accent.top")) style.metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else split_overrides.SetValue("metrics.frame_accent.top",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(OverrideActive("metrics.frame_accent.bottom")) { if((bool)OverrideValue("metrics.frame_accent.bottom")) style.metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else split_overrides.SetValue("metrics.frame_accent.bottom",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(OverrideActive("metrics.frame_accent.left")) { if((bool)OverrideValue("metrics.frame_accent.left")) style.metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else split_overrides.SetValue("metrics.frame_accent.left",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(OverrideActive("metrics.frame_accent.right")) { if((bool)OverrideValue("metrics.frame_accent.right")) style.metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else split_overrides.SetValue("metrics.frame_accent.right",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(OverrideActive("metrics.frame_accent.thickness")) style.metrics.frame_accent.thickness = (int)OverrideValue("metrics.frame_accent.thickness"); else split_overrides.SetValue("metrics.frame_accent.thickness",base.metrics.frame_accent.thickness,false);
+        if(OverrideActive("metrics.frame_accent.alpha")) style.metrics.frame_accent.alpha = (int)OverrideValue("metrics.frame_accent.alpha"); else split_overrides.SetValue("metrics.frame_accent.alpha",base.metrics.frame_accent.alpha,false);
+        if(OverrideActive("metrics.frame_accent.color")) style.metrics.frame_accent.color = (Color)OverrideValue("metrics.frame_accent.color"); else split_overrides.SetValue("metrics.frame_accent.color",base.metrics.frame_accent.color,false);
         if(OverrideActive("metrics.frame_width")) style.metrics.frame_width = (int)OverrideValue("metrics.frame_width"); else split_overrides.SetValue("metrics.frame_width",base.metrics.frame_width,false);
         if(OverrideActive("metrics.face_enabled")) style.metrics.face_enabled = (bool)OverrideValue("metrics.face_enabled"); else split_overrides.SetValue("metrics.face_enabled",base.metrics.face_enabled,false);
         if(OverrideActive("metrics.frame_enabled")) style.metrics.frame_enabled = (bool)OverrideValue("metrics.frame_enabled"); else split_overrides.SetValue("metrics.frame_enabled",base.metrics.frame_enabled,false);
@@ -183,6 +197,13 @@ void UiButtonDemo::GenerateSplitCode() {
         bool authored=false; for(int i=0;i<split_overrides.GetCount();i++) authored |= split_overrides[i].override_active;
         if(authored || AsString(InspectorValue("role"))!="Standard") { str_generated_code << "        auto style = UiTheme::ResolveButton(UiRole::" << AsString(InspectorValue("role")) << ");\n";
         { String id="metrics.radius"; if(OverrideActive(id)) str_generated_code << "        style.metrics.radius = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.top"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="metrics.frame_accent.bottom"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="metrics.frame_accent.left"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="metrics.frame_accent.right"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="metrics.frame_accent.thickness"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.thickness = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.alpha"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.alpha = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.color"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.color = " << FamilyCppColor((Color)OverrideValue(id)) << ";\n"; }
         { String id="metrics.frame_width"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_width = " << AsString((int)OverrideValue(id)) << ";\n"; }
         { String id="metrics.face_enabled"; if(OverrideActive(id)) str_generated_code << "        style.metrics.face_enabled = " << FamilyBoolCode((bool)OverrideValue(id)) << ";\n"; }
         { String id="metrics.frame_enabled"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_enabled = " << FamilyBoolCode((bool)OverrideValue(id)) << ";\n"; }
@@ -253,6 +274,13 @@ void UiButtonDemo::BuildToolModels() {
         tool_inspector.AddChoice("icon_side","Icon side","LEFT","Behavior").AddChoice("LEFT","LEFT").AddChoice("RIGHT","RIGHT").AddChoice("TOP","TOP").AddChoice("BOTTOM","BOTTOM");
         UiToolButton::Style base=UiTheme::ResolveToolButton(AsString(InspectorValue("role"))=="Subtle" ? UiRole::Subtle : AsString(InspectorValue("role"))=="Accent" ? UiRole::Accent : AsString(InspectorValue("role"))=="Alert" ? UiRole::Alert : UiRole::Standard);
         FamilyMarkOverride(tool_overrides.AddNumericInt("metrics.radius","Radius",base.metrics.radius,0,60,1,"Button"));
+        FamilyMarkOverride(tool_overrides.AddBoolean("metrics.frame_accent.top","Top",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top),"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddBoolean("metrics.frame_accent.bottom","Bottom",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddBoolean("metrics.frame_accent.left","Left",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left),"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddBoolean("metrics.frame_accent.right","Right",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right),"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddNumericInt("metrics.frame_accent.thickness","Thickness",base.metrics.frame_accent.thickness,0,12,1,"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddNumericInt("metrics.frame_accent.alpha","Opacity",base.metrics.frame_accent.alpha,0,255,1,"Frame Accent"));
+        FamilyMarkOverride(tool_overrides.AddColor("metrics.frame_accent.color","Colour",base.metrics.frame_accent.color,"Frame Accent"));
         FamilyMarkOverride(tool_overrides.AddNumericInt("metrics.frame_width","Frame Width",base.metrics.frame_width,0,12,1,"Button"));
         FamilyMarkOverride(tool_overrides.AddBoolean("metrics.face_enabled","Face Enabled",base.metrics.face_enabled,"Button"));
         FamilyMarkOverride(tool_overrides.AddBoolean("metrics.frame_enabled","Frame Enabled",base.metrics.frame_enabled,"Button"));
@@ -318,6 +346,13 @@ void UiButtonDemo::ApplyToolProjection() {
         UiToolButton::Style base=UiTheme::ResolveToolButton(AsString(InspectorValue("role"))=="Subtle" ? UiRole::Subtle : AsString(InspectorValue("role"))=="Accent" ? UiRole::Accent : AsString(InspectorValue("role"))=="Alert" ? UiRole::Alert : UiRole::Standard);
         UiToolButton::Style style=base;
         if(OverrideActive("metrics.radius")) style.metrics.radius = (int)OverrideValue("metrics.radius"); else tool_overrides.SetValue("metrics.radius",base.metrics.radius,false);
+        if(OverrideActive("metrics.frame_accent.top")) { if((bool)OverrideValue("metrics.frame_accent.top")) style.metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else tool_overrides.SetValue("metrics.frame_accent.top",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(OverrideActive("metrics.frame_accent.bottom")) { if((bool)OverrideValue("metrics.frame_accent.bottom")) style.metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else tool_overrides.SetValue("metrics.frame_accent.bottom",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(OverrideActive("metrics.frame_accent.left")) { if((bool)OverrideValue("metrics.frame_accent.left")) style.metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else tool_overrides.SetValue("metrics.frame_accent.left",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(OverrideActive("metrics.frame_accent.right")) { if((bool)OverrideValue("metrics.frame_accent.right")) style.metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else tool_overrides.SetValue("metrics.frame_accent.right",bool(base.metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(OverrideActive("metrics.frame_accent.thickness")) style.metrics.frame_accent.thickness = (int)OverrideValue("metrics.frame_accent.thickness"); else tool_overrides.SetValue("metrics.frame_accent.thickness",base.metrics.frame_accent.thickness,false);
+        if(OverrideActive("metrics.frame_accent.alpha")) style.metrics.frame_accent.alpha = (int)OverrideValue("metrics.frame_accent.alpha"); else tool_overrides.SetValue("metrics.frame_accent.alpha",base.metrics.frame_accent.alpha,false);
+        if(OverrideActive("metrics.frame_accent.color")) style.metrics.frame_accent.color = (Color)OverrideValue("metrics.frame_accent.color"); else tool_overrides.SetValue("metrics.frame_accent.color",base.metrics.frame_accent.color,false);
         if(OverrideActive("metrics.frame_width")) style.metrics.frame_width = (int)OverrideValue("metrics.frame_width"); else tool_overrides.SetValue("metrics.frame_width",base.metrics.frame_width,false);
         if(OverrideActive("metrics.face_enabled")) style.metrics.face_enabled = (bool)OverrideValue("metrics.face_enabled"); else tool_overrides.SetValue("metrics.face_enabled",base.metrics.face_enabled,false);
         if(OverrideActive("metrics.frame_enabled")) style.metrics.frame_enabled = (bool)OverrideValue("metrics.frame_enabled"); else tool_overrides.SetValue("metrics.frame_enabled",base.metrics.frame_enabled,false);
@@ -386,6 +421,13 @@ void UiButtonDemo::GenerateToolCode() {
         bool authored=false; for(int i=0;i<tool_overrides.GetCount();i++) authored |= tool_overrides[i].override_active;
         if(authored || AsString(InspectorValue("role"))!="Standard") { str_generated_code << "        auto style = UiTheme::ResolveToolButton(UiRole::" << AsString(InspectorValue("role")) << ");\n";
         { String id="metrics.radius"; if(OverrideActive(id)) str_generated_code << "        style.metrics.radius = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.top"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="metrics.frame_accent.bottom"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="metrics.frame_accent.left"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="metrics.frame_accent.right"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.edges " << ((bool)OverrideValue(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="metrics.frame_accent.thickness"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.thickness = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.alpha"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.alpha = " << AsString((int)OverrideValue(id)) << ";\n"; }
+        { String id="metrics.frame_accent.color"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_accent.color = " << FamilyCppColor((Color)OverrideValue(id)) << ";\n"; }
         { String id="metrics.frame_width"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_width = " << AsString((int)OverrideValue(id)) << ";\n"; }
         { String id="metrics.face_enabled"; if(OverrideActive(id)) str_generated_code << "        style.metrics.face_enabled = " << FamilyBoolCode((bool)OverrideValue(id)) << ";\n"; }
         { String id="metrics.frame_enabled"; if(OverrideActive(id)) str_generated_code << "        style.metrics.frame_enabled = " << FamilyBoolCode((bool)OverrideValue(id)) << ";\n"; }

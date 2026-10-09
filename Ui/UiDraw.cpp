@@ -2,6 +2,166 @@
 #include <cmath>
 
 namespace Upp {
+
+// Accent ownership uses 45-degree corner bisectors. Combining adjacent sides
+// produces one clipping region, so translucent accents have no doubled seams.
+void UiPaintFrameAccent(Draw& w, const Rect& surface,
+                        const StyledPalette& palette, const StyledMetrics& metrics,
+                        StyledState state)
+{
+    const StyledFrameAccent& accent = metrics.frame_accent;
+    if(surface.IsEmpty() || !accent.IsVisible())
+        return;
+    Color color = IsNull(accent.color) ? palette.frame[state] : accent.color;
+    if(IsNull(color))
+        return;
+    const int edges = accent.edges & StyledFrameAccent::All;
+    const int alpha = clamp(accent.alpha, 0, 255);
+    const Size size = surface.GetSize();
+    const int fw = max(0, metrics.frame_width);
+    const bool frame = metrics.frame_enabled && fw > 0 && !IsNull(palette.frame[state]);
+    const int authored_radius = max(0, metrics.radius);
+    const double inset = authored_radius > 0 ? (fw > 0 ? max(0.5, fw * 0.5) : 0.5) : 0.0;
+    const double border_inset = authored_radius > 0 ? inset + (frame ? fw * 0.5 : 0.0)
+                                                    : (frame ? fw : 0.0);
+    const Rectf outer(border_inset, border_inset,
+                      size.cx - border_inset, size.cy - border_inset);
+    if(outer.IsEmpty())
+        return;
+    // Painter clamps the shared frame's centreline radius to its dimensions.
+    const double centre_radius = min<double>(authored_radius,
+        max(0.0, min(size.cx - 2 * inset, size.cy - 2 * inset) * 0.5));
+    const double radius = max(0.0, centre_radius - (frame ? fw * 0.5 : 0.0));
+    const double thickness = min<double>(accent.thickness,
+                                         min(outer.GetWidth(), outer.GetHeight()) * 0.5);
+    if(thickness <= 0)
+        return;
+    if(authored_radius == 0 && alpha == 255) {
+        const int x = surface.left + (int)outer.left, y = surface.top + (int)outer.top;
+        const int width = (int)outer.GetWidth(), height = (int)outer.GetHeight();
+        const int t = max(1, (int)thickness);
+        if(edges & StyledFrameAccent::Top) w.DrawRect(x, y, width, t, color);
+        if(edges & StyledFrameAccent::Bottom) w.DrawRect(x, y + height - t, width, t, color);
+        if(edges & StyledFrameAccent::Left) w.DrawRect(x, y, t, height, color);
+        if(edges & StyledFrameAccent::Right) w.DrawRect(x + width - t, y, t, height, color);
+        return;
+    }
+
+    // Rasterize only disjoint boundary bands, in bounded exact tiles. A large
+    // panel never allocates a full-panel accent buffer or an unbounded fallback.
+    Rect bounds((int)floor(outer.left), (int)floor(outer.top),
+                (int)ceil(outer.right), (int)ceil(outer.bottom));
+    const int depth = (int)ceil(radius + thickness) + 1;
+    const int top = min(depth, bounds.GetHeight());
+    const int bottom = min(depth, bounds.GetHeight() - top);
+    const int left = min(depth, bounds.GetWidth());
+    const int right = min(depth, bounds.GetWidth() - left);
+    const Rect bands[] = {
+        Rect(bounds.left, bounds.top, bounds.right, bounds.top + top),
+        Rect(bounds.left, bounds.bottom - bottom, bounds.right, bounds.bottom),
+        Rect(bounds.left, bounds.top + top, bounds.left + left, bounds.bottom - bottom),
+        Rect(bounds.right - right, bounds.top + top, bounds.right, bounds.bottom - bottom)
+    };
+    UiRasterCachePolicy policy = UiRasterPolicyAA("aa/frame-accent");
+    policy.allow_scale_from_bucket = false;
+    policy.max_axis = 128;
+    policy.max_single_image_bytes = 128 * 128 * 4;
+    for(const Rect& band : bands) {
+        for(int y = band.top; y < band.bottom; y += 128) {
+            for(int x = band.left; x < band.right; x += 128) {
+                const Rect tile(x, y, min(x + 128, band.right), min(y + 128, band.bottom));
+                if(!w.IsPainting(tile + surface.TopLeft()))
+                    continue;
+                // Cull tiles wholly outside the outer contour or inside the
+                // inner contour. Large radii must not rasterize transparent
+                // interior tiles merely because their boundary bands are deep.
+                auto Distance = [](Pointf point, const Rectf& rect, double rad) {
+                    double qx = fabs(point.x - (rect.left + rect.right) * 0.5)
+                              - (rect.GetWidth() * 0.5 - rad);
+                    double qy = fabs(point.y - (rect.top + rect.bottom) * 0.5)
+                              - (rect.GetHeight() * 0.5 - rad);
+                    return hypot(max(qx, 0.0), max(qy, 0.0))
+                         + min(max(qx, qy), 0.0) - rad;
+                };
+                Pointf centre((tile.left + tile.right) * 0.5,
+                              (tile.top + tile.bottom) * 0.5);
+                if(Distance(centre, outer, radius) >
+                   hypot(tile.GetWidth(), tile.GetHeight()) * 0.5 + 1.0)
+                    continue;
+                Rectf inner = outer;
+                inner.Deflate(thickness);
+                if(!inner.IsEmpty()) {
+                    double inner_radius = max(0.0, radius - thickness);
+                    if(Distance(Pointf(tile.left, tile.top), inner, inner_radius) < -1.0 &&
+                       Distance(Pointf(tile.right, tile.top), inner, inner_radius) < -1.0 &&
+                       Distance(Pointf(tile.left, tile.bottom), inner, inner_radius) < -1.0 &&
+                       Distance(Pointf(tile.right, tile.bottom), inner, inner_radius) < -1.0)
+                        continue;
+                }
+                // Painter's empty-path clip is not a drawable empty region.
+                // Reject disjoint tiles before clipping, including corner-only
+                // tiles outside a selected side's 45-degree ownership polygon.
+                const double l=outer.left, t=outer.top, r=outer.right, b=outer.bottom;
+                const double d=min(outer.GetWidth(),outer.GetHeight())*0.5;
+                const Pointf regions[4][4] = {
+                    {Pointf(l,t),Pointf(r,t),Pointf(r-d,t+d),Pointf(l+d,t+d)},
+                    {Pointf(r,b),Pointf(l,b),Pointf(l+d,b-d),Pointf(r-d,b-d)},
+                    {Pointf(l,b),Pointf(l,t),Pointf(l+d,t+d),Pointf(l+d,b-d)},
+                    {Pointf(r,t),Pointf(r,b),Pointf(r-d,b-d),Pointf(r-d,t+d)}
+                };
+                bool intersects=false;
+                for(int side=0;side<4 && !intersects;side++) {
+                    if(!(edges & (1 << side))) continue;
+                    bool separated=false;
+                    for(int i=0;i<4;i++) {
+                        Pointf a=regions[side][i], v=regions[side][(i+1)%4]-a;
+                        if(v.x==0 && v.y==0) continue;
+                        double px=v.y>=0 ? tile.left : tile.right;
+                        double py=v.x>=0 ? tile.bottom : tile.top;
+                        if(v.x*(py-a.y)-v.y*(px-a.x)<=0) { separated=true; break; }
+                    }
+                    intersects=!separated;
+                }
+                if(!intersects) continue;
+                UiRasterCacheKeyBuilder key("aa/frame-accent");
+                key.Add(size).Add(tile.left).Add(tile.top).Add(tile.GetSize())
+                   .Add(authored_radius).Add(fw).Add(frame).Add(edges)
+                   .Add(accent.thickness).Add(alpha).Add(color);
+                Image image = UiRasterCache::Get(key.Build(), policy, [=] {
+                    ImageBuffer buffer(tile.GetSize());
+                    buffer.SetKind(IMAGE_ALPHA);
+                    Fill(~buffer, RGBAZero(), buffer.GetLength());
+                    BufferPainter p(buffer, MODE_ANTIALIASED);
+                    p.Translate(-tile.left, -tile.top);
+                    p.Begin();
+                    const double l = outer.left, t = outer.top, r = outer.right, b = outer.bottom;
+                    const double d = min(outer.GetWidth(), outer.GetHeight()) * 0.5;
+                    if(edges & StyledFrameAccent::Top)
+                        p.Move(l,t).Line(r,t).Line(r-d,t+d).Line(l+d,t+d).Close();
+                    if(edges & StyledFrameAccent::Right)
+                        p.Move(r,t).Line(r,b).Line(r-d,b-d).Line(r-d,t+d).Close();
+                    if(edges & StyledFrameAccent::Bottom)
+                        p.Move(r,b).Line(l,b).Line(l+d,b-d).Line(r-d,b-d).Close();
+                    if(edges & StyledFrameAccent::Left)
+                        p.Move(l,b).Line(l,t).Line(l+d,t+d).Line(l+d,b-d).Close();
+                    p.Clip();
+                    p.RoundedRectangle(l, t, outer.GetWidth(), outer.GetHeight(), radius);
+                    const double iw = outer.GetWidth() - 2 * thickness;
+                    const double ih = outer.GetHeight() - 2 * thickness;
+                    if(iw > 0 && ih > 0)
+                        p.RoundedRectangle(l + thickness, t + thickness, iw, ih,
+                                           max(0.0, radius - thickness));
+                    p.EvenOdd().Opacity(alpha / 255.0).Fill(color);
+                    p.End();
+                    p.Finish();
+                    return Image(buffer);
+                });
+                w.DrawImage(surface.left + tile.left, surface.top + tile.top, image);
+            }
+        }
+    }
+}
+
 namespace {
 
 Pointf UiShapePathArcPoint(Pointf center, double rx, double ry, double angle)

@@ -7,6 +7,68 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 
 PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
 {
@@ -566,6 +628,8 @@ private:
     void BuildOverrides()
     {
         UiTagStyle base = UiResolveTagStyle(UiRole::Accent);
+        AddFrameAccentProperties(appearance_model_, "metrics.frame_accent.", base.metrics, "Frame Accent");
+
 
         MarkOverride(appearance_model_.AddBoolean(
             "face.enabled", "Background", base.metrics.face_enabled, "Background"));
@@ -829,6 +893,8 @@ private:
 
     void ApplyOverrides(UiTagStyle& style) const
     {
+        ApplyFrameAccentProperties(style.metrics, appearance_model_, "metrics.frame_accent.");
+
         if(OverrideActive("face.enabled"))
             style.metrics.face_enabled =
                 (bool)AppearanceValue("face.enabled");
@@ -1020,6 +1086,10 @@ private:
         emit_bool("frame.enabled", "style.metrics.frame_enabled");
         emit_int("frame.width", "style.metrics.frame_width");
         emit_int("radius", "style.metrics.radius");
+        { bool accent_authored = true;
+          EmitFrameAccentProperties(out, appearance_model_, "metrics.frame_accent.", "style.metrics", String(), accent_authored);
+        }
+
         for(int st = 0; st < 4; st++) {
             emit_color(StateProperty("frame", st, "color"),
                        String("style.palette.frame[") + StateEnum(st) + "]");

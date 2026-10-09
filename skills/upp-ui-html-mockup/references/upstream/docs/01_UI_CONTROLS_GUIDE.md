@@ -5,6 +5,10 @@ base/model/drawing helpers are listed separately. The [release inventory](../tes
 is the audit/validation register. A listed demo is a starting point for exploration,
 not a claim that its entire API or generated code has already passed release acceptance.
 
+Start with [Control usage recipes](CONTROL_USAGE.md) for a small public API
+example of every concrete catalogue entry. The sections below explain the shared
+contracts and the cases that need more than a constructor and a setter.
+
 ## Common contracts
 
 Include `<Ui/Ui.h>` for the full library or the narrower public header. Read the
@@ -42,12 +46,17 @@ and the production PropertyEditor instead.
 No dedicated demo is implied where the Example cell says "family coverage to accept".
 A shell using a control does not substitute for its behavioral/property coverage.
 
+The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md) share existing Ui children and delegate media work to their host.
+
 | Control | Purpose | Reference example |
 | --- | --- | --- |
+| [UiColorProbe](../Ui/UiColorProbe.h) | Raw RGB(A) probe readout, display swatch and sampling choices | [UiMediaControlsDemo](../examples/UiMediaControlsDemo) |
+| [UiPlaybackBar](../Ui/UiPlaybackBar.h) | Transport requests, frame scrubbing, range, markers and cache coverage | [UiMediaControlsDemo](../examples/UiMediaControlsDemo) |
 | [UiLabel](../Ui/UiLabel.h) | Styled text, selection, wrapping, icons and media. | [UiLabelDemo](../examples/UiLabelDemo) |
+| [UiTag](../Ui/UiTag.h) | Ultralight prepared semantic tag/status marker; optional host-routed interaction, text and/or icon. Not a Ctrl. | [UiTagDemo](../examples/UiTagDemo) |
 | [UiButton](../Ui/UiButton.h) | Primary stateful action. | [UiButtonDemo](../examples/UiButtonDemo) |
-| [UiToolButton](../Ui/UiToolButton.h) | Compact toolbar action; used in the reference shell. | [UiLabelDemo](../examples/UiLabelDemo) |
-| [UiSplitButton](../Ui/UiSplitButton.h) | Primary action plus a separate dropdown action. | [UiSplitButtonDemo](../examples/UiSplitButtonDemo) |
+| [UiToolButton](../Ui/UiToolButton.h) | Compact toolbar action, toggle and authored style demonstration. | [UiButtonDemo](../examples/UiButtonDemo) |
+| [UiSplitButton](../Ui/UiSplitButton.h) | Primary action plus a separate dropdown action. | [UiButtonDemo](../examples/UiButtonDemo) |
 | [UiCheckBox](../Ui/UiCheckBox.h) | Independent checked state and supported visual variants. | [UiCheckBoxDemo](../examples/UiCheckBoxDemo) |
 | [UiRadioButton](../Ui/UiRadioButton.h) | Exclusive-choice presentation and grouping behavior. | [UiRadioButtonDemo](../examples/UiRadioButtonDemo) |
 | [UiToggle](../Ui/UiToggle.h) | Boolean switch with track/thumb styling. | [UiToggleDemo](../examples/UiToggleDemo) |
@@ -60,48 +69,80 @@ A shell using a control does not substitute for its behavioral/property coverage
 | [UiMaskEdit](../Ui/UiMaskEdit.h) | Mask-driven entry, formatting and validation. | [UiEditDemo](../examples/UiEditDemo) |
 | [UiSlider](../Ui/UiSlider.h) | One scalar value within a domain. | [UiSliderDemo](../examples/UiSliderDemo) |
 | [UiRangeSlider](../Ui/UiRangeSlider.h) | Ordered interval; optional adjustable inner bounds. | [UiSliderDemo](../examples/UiSliderDemo) |
-| [UiSliderEdit](../Ui/UiSliderEdit.h) | Slider with a direct numeric editor. | family coverage to accept |
-| [UiRangeSliderEdit](../Ui/UiRangeSliderEdit.h) | Interval slider with lower/upper numeric editors. | family coverage to accept |
+| [UiSliderEdit](../Ui/UiSliderEdit.h) | Slider with a direct numeric editor. | [UiSliderDemo](../examples/UiSliderDemo) |
+| [UiRangeSliderEdit](../Ui/UiRangeSliderEdit.h) | Interval slider with lower/upper numeric editors. | [UiSliderDemo](../examples/UiSliderDemo) |
 | [UiRangeSegments](../Ui/UiRangeSegments.h) | Contiguous labeled segments over one fixed scalar domain. | [UiRangeSegmentsDemo](../examples/UiRangeSegmentsDemo) |
 | [UiScrollBar](../Ui/UiScrollBar.h) | Scroll position/extent and themed arrows/thumb. | [UiScrollBarDemo](../examples/UiScrollBarDemo) |
 | [UiProgressBar](../Ui/UiProgressBar.h) | Linear determinate/indeterminate progress. | [UiProgressBarDemo](../examples/UiProgressBarDemo) |
 | [UiProgressRing](../Ui/UiProgressRing.h) | One amount against a total, circular presentation. | [UiProgressRingDemo](../examples/UiProgressRingDemo) |
 | [UiChartRing](../Ui/UiChartRing.h) | Several proportional values composing one ring. | [UiChartRingDemo](../examples/UiChartRingDemo) |
 | [UiMatrixSelector](../Ui/UiMatrixSelector.h) | Spatial cell/ordered-pair choice with shared glyphs. | [UiMatrixSelectorDemo](../examples/UiMatrixSelectorDemo) |
-| [UiColorMatrix](../Ui/UiColorMatrix.h) | One to eight ordered color values with one shared picker. | family coverage to accept |
+| [UiColorMatrix](../Ui/UiColorMatrix.h) | One to eight ordered color values with one shared picker. | [UiColorMatrixDemo](../examples/UiColorMatrixDemo) |
 | [UiDateTime](../Ui/UiDateTime.h) | Local date/time/date-time input and picker. | [UiDateTimeDemo](../examples/UiDateTimeDemo) |
+| [UiColorPickerMicro](../Ui/UiColorPickerMicro.h) | Compact palette, Apply/hex footer, optional ramps and RGB sliders. [Contract](../Ui/UiColorPickerMicro.md). | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiColorPicker](../Ui/UiColorPicker/UiColorPicker.h) | Multi-slot color editing, palettes and image/screen picking. | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiDropdown](../Ui/UiDropdown.h) | Collapsed choice and model-backed popup. | [UiDropdownDemo](../examples/UiDropdownDemo) |
 | [UiMenu](../Ui/UiMenu.h) | Command/check/radio/submenu model presentation. | [UiMenuDemo](../examples/UiMenuDemo) |
 | [UiPanel](../Ui/UiPanel.h) | Styled surface with ordinary child parenting; use a layout child to arrange content. | [UiPanelDemo](../examples/UiPanelDemo) |
-| [UiDirectContentHost](../Ui/UiDirectContentHost.h) | Borrowed single child with independent Fit/Fixed/Expand axes. | family coverage to accept |
+| [UiDirectContentHost](../Ui/UiDirectContentHost.h) | Borrowed single child with independent Fit/Fixed/Expand axes. | [UiLayoutDemo](../examples/UiLayoutDemo) |
 | [UiGroupPanel](../Ui/UiGroupPanel.h) | Titled frame with separate header and body root slots. | [UiPanelDemo](../examples/UiPanelDemo) |
 | [UiTitleCard](../Ui/UiTitleCard.h) | Title/subtitle/media with an adjacent content cell. | [UiTitleCardDemo](../examples/UiTitleCardDemo) |
-| [UiStack](../Ui/UiStack.h) | Exclusive page hosting and measurement. | family coverage to accept |
+| [UiMediaCard](../Ui/UiMediaCard.h) | Optional header/footer around media with non-consuming tags/overlay; shared live/render presentation. | [UiMediaCardDemo](../examples/UiMediaCardDemo) |
+| [UiStack](../Ui/UiStack.h) | Exclusive page hosting and measurement. | [UiLayoutDemo](../examples/UiLayoutDemo) |
 | [UiAccordion](../Ui/UiAccordion.h) | Collapsible real-child sections with optional reorder. | [UiAccordionDemo](../examples/UiAccordionDemo) |
 | [UiScrollPanel](../Ui/UiScrollPanel.h) | Bounded viewport around one content root. | [UiScrollPanelDemo](../examples/UiScrollPanelDemo) |
 | [UiTab](../Ui/UiTab.h) | Tabbed page host with role-owned cap and strip fills. | [UiTabDemo](../examples/UiTabDemo) |
 | [UiSplitter](../Ui/UiSplitter.h) | Pane sizing with styled split handles. | [UiSplitterDemo](../examples/UiSplitterDemo) |
 | [UiQuadSplitter](../Ui/UiQuadSplitter.h) | Four-pane composition over ordinary splitters. | [UiSplitterDemo](../examples/UiSplitterDemo) |
-| [UiAbsoluteLayout](../Ui/UiAbsoluteLayout.h) | Exact local child rectangles without automatic reflow. | family coverage to accept |
-| [UiGridLayout](../Ui/UiGridLayout.h) | Logical rows and columns with stable placement. | family coverage to accept |
-| [UiBoxLayout](../Ui/UiBoxLayout.h) | Ordered row/column flow with Fit/Fixed/Expand. | family coverage to accept |
-| [UiList](../Ui/UiList.h) | Sequential model view and visible renderer pooling. | [UiListDemo](../examples/UiListDemo) |
+| [UiAbsoluteLayout](../Ui/UiAbsoluteLayout.h) | Exact local child rectangles without automatic reflow. | [UiLayoutDemo](../examples/UiLayoutDemo) |
+| [UiGridLayout](../Ui/UiGridLayout.h) | Logical rows and columns with stable placement. | [UiLayoutDemo](../examples/UiLayoutDemo) |
+| [UiBoxLayout](../Ui/UiBoxLayout.h) | Ordered row/column flow with Fit/Fixed/Expand. | [UiLayoutDemo](../examples/UiLayoutDemo) |
+| [UiList](../Ui/UiList.h) | Sequential model view and visible renderer pooling. | [UiCollectionDemo](../examples/UiCollectionDemo) |
 | [UiTree](../Ui/UiTree.h) | Stable hierarchical model identity and visible projection. | [UiTreeDemo](../examples/UiTreeDemo) |
 | [UiTable](../Ui/UiTable.h) | Coordinate/range model view with editing and headers. | [UiTableDemo](../examples/UiTableDemo) |
-| [UiGallery](../Ui/UiGallery.h) | Tile/image presentation of a list model. | [UiGalleryDemo](../examples/UiGalleryDemo) |
+| [UiGallery](../Ui/UiGallery.h) | Tile/image presentation of a list model. | [UiCollectionDemo](../examples/UiCollectionDemo) |
 | [UiDoc](../Ui/UiDoc/UiDoc.h) | Document view/editor over the authoritative UiDocCore. | [UiDocDemo](../examples/UiDocDemo) |
-| [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | family coverage to accept |
-| [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | family coverage to accept |
+| [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
+| [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
+| [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileBrowserDemo](../examples/UiFileBrowserDemo) |
+| [UiOsFileDialog](../Ui/UiOsFileDialog/UiOsFileDialog.h) | Native file/folder selection through a platform wrapper. | [UiOsFileDialogDemo](../examples/UiOsFileDialogDemo) |
+
+## Prepared presentation primitives
+
+UiTag is intentionally not a Ctrl. Use UiLabel for ordinary display UI and
+UiButton/UiToolButton for independently focusable commands. UiTag is the dense
+presentation path for semantic markers such as READY, ERROR, ACTOR, 4K, time
+codes, and icon-only information/status cues.
+
+UiTagData may contain text, an icon, or both. `interactive` means the owning
+control/view may include that prepared tag in its hit-test/action policy; the tag
+itself owns no Event, focus, capture, animation or child-control lifecycle. Stable
+`id` plus opaque `value` let the host route information/navigation/actions.
+
+Style uses the normal Ui `StyledPalette` and `StyledMetrics` vocabulary: role/state
+face, frame, ink and icon colours; face/frame alpha; frame width/radius; Font;
+content margin; one icon/text gap; explicit icon box; Left/Right icon placement;
+and `UiIconRenderMode` Auto/MonoTint/PreserveColor. Soft, Filled and Outline are
+the compact variants. UiTag deliberately does not carry a nine-slice StyledSkin;
+dense tag backgrounds use `UiFill` (solid or image) prepared into the shared
+raster cache.
+
+`UiPrepareTag` performs measurement, ellipsis, icon aspect-fit/rescale, state
+colour resolution and cached true-alpha face/frame decoration before Paint.
+`UiPaintTag` clips to the authored bounds and consumes only prepared resources.
+Passive tags share one prepared decoration across pointer states; interactive tags
+prepare the states they can enter. This is the intended path for renderer/Graph
+scale. UiGraph may adopt it for readable Tags/Actions only after its own LOD/Micro,
+bounded-item and 10k-node performance contracts are preserved.
 
 ## Edit family
 
 UiBaseEdit provides shared editing, selection, placeholder, caret, side/spin and
 style behavior. Concrete Line/Password/Multi/Mask/Int/Float types retain their own
 input policy; sharing a base is not proof that specialized validation is identical.
-UiEditDemo is the text-family direction; UiIntFloatDemo is its numeric companion.
-Older individual demos remain until capability/export coverage is reconciled.
+UiEditDemo is the maintained text-family demo; UiIntFloatDemo is its numeric
+companion. Their selectors show one concrete control and generate its actual API.
 
 UiFloatEdit supports decimal/scientific notation, signed exponents and temporarily
 incomplete text. Min/Max/MinMax constrain committed values; Step drives numeric
@@ -139,6 +180,11 @@ larger editing surface rather than a compact multi-color field.
 UiSlider owns one scalar value. UiRangeSlider reuses its style for an ordered
 lower/upper interval inside a hard range. SetRange sets the domain, SetStep sets
 snap units, SetValues sets the interval, GetLowerValue/GetUpperValue read it.
+UiSlider::SetTrackInset chooses a device-pixel end inset for compact composites;
+-1 restores automatic spacing, and half the thumb is always reserved. ExpandTrack
+uses the available width. GetTrackGeometry reports the painted track for aligned
+labels and interaction tests.
+
 Active handles are explicit keyboard/wheel targets. SetStart/End/StartEnd are
 established animation-friendly aliases over the same state, not another model.
 
@@ -247,10 +293,32 @@ All locale/ISO/12/24 formatting paths must honor ShowSeconds.
 
 ## Containers and layout
 
-UiPanel/UiScrollPanel/UiTitleCard each host one content root; UiTitleCard uses its
-adjacent SetContentCell. UiGroupPanel has independently replaceable header-content
-and body-content roots. Use a box/grid/absolute layout inside a root for several
-children. Parenting still does not imply deletion ownership.
+UiPanel parents ordinary children; UiScrollPanel supplies a Content() parent for
+scrolling children. Use one box/grid/absolute layout root to arrange several
+children automatically. UiTitleCard borrows an adjacent SetContentCell;
+UiGroupPanel has independently replaceable header-content and body-content roots.
+Parenting still does not imply deletion ownership.
+A derived UiPanel may override the protected ResolveThemeStyle hook to refine
+inherited metrics without freezing an explicit style. InvalidateStyleCache once
+after derived construction; explicit native style setters and ClearCustomStyle
+retain the normal panel contract (as exercised by UiColorPickerMicro).
+
+UiMediaCard is a media-centric presentation rather than a general child host. Header
+and Footer are optional prepared text bands; absent content reserves no geometry.
+The default card/header/footer surfaces are transparent and frameless, while the
+Media surface owns an independent face/frame/radius, so a common tile can show only
+a bordered image with free-standing footer text. Top/Bottom UiTag groups and the
+3x3-aligned Overlay paint over Media without consuming its layout. Prepared media is
+contained to the rounded Media surface, while Header/Footer/Tag paint is clipped to
+its authored region. Cover preparation preserves the original Image identity when
+using CachedRescale. UiMediaCardRender uses the same prepared UiMediaCardPresentation
+through UiItemRender for Gallery/List scale; it does not allocate a child-control
+tree per item.
+
+UiMediaCard does not own file, asset or project semantics. WhenDrop forwards a
+PasteClip to the host; the host decides what formats to accept and supplies resulting
+media. This lets application/demo code implement choose/drop behavior without turning
+the generic card into a file picker or viewer.
 
 GroupPanel header placement supports Top/Bottom/Left/Right, mode Outside/Center/
 Inside, identity alignment and separate header-child alignment. Opposite/trailing
@@ -273,6 +341,14 @@ reports a changed scroll origin after applying it, including programmatic change
 GetScrollBarAt accepts panel-local coordinates and returns a borrowed scrollbar
 for interaction routing. Wheel input uses the horizontal axis when it is the only
 available scrollbar, or with Shift when horizontal scrolling is available.
+
+Panel, GroupPanel and ScrollPanel consume the shared Frame Accent metrics:
+independent Top/Bottom/Left/Right edge selection, thickness, colour and alpha.
+It follows their rounded surface just inside the ordinary frame, preserves
+GroupPanel's centered header gaps, and stays fixed around ScrollPanel's viewport.
+It is off by default and adds no layout inset. See the
+[usage recipe](CONTROL_USAGE.md#frame-accent) and
+[theme contract](02_UI_THEME_GUIDE.md#frame-accent).
 
 ## Progress, rings and custom painting
 
@@ -305,6 +381,28 @@ Guide. Graph usage and retained development have their own two guides.
 UiList's natural height follows the active model's row count, with at least one
 row when empty, plus styling insets. It no longer reserves four placeholder rows.
 Constrain the containing layout or viewport when a large list must stay bounded.
+
+UiGallery is a uniform tile view, with a vertical UiItemRenderImage by default.
+Use Model().AddRange for bulk content, SetModel for a borrowed shared dataset,
+and SetItemRender for an owned clone of a presentation prototype. The model must
+outlive its active binding. SetItemSize sets the base size and resets zoom; SetGap,
+SetInset and SetOverscanRows configure the grid. Geometry and renderer preparation
+stay outside Paint; dirty-region candidates are computed from grid coordinates.
+Renderer slots retain overlapping data during scrolling and release surplus
+renderers/assets when the useful visible/overscan range shrinks.
+
+WhenVisibleRange(first,last) reports the inclusive overscan range, with (-1,-1)
+for an empty range. Prepare lazy assets on the GUI thread and publish edits with
+Model().Touch(first,count); external loading/caching belongs to the host. A data
+update preserves grid geometry and reconciles only affected selection indices.
+Structural edits remap selection and cancel an opening marquee safely. GetData
+uses item.data tokens, falling back to indices for Null data; duplicate data keys
+resolve to the first selectable match. Single-mode SetData(ValueArray) takes the
+first valid match; multi-mode additive Select toggles membership. Selection
+notifications are synchronous, including programmatic setters. Escape/capture
+loss restores the opening marquee selection and cursor. Null/non-finite zoom
+inputs and unrepresentable zoomed tile sizes are ignored. Native geometry uses
+32-bit pixel extents; total content height saturates at INT_MAX.
 
 Supporting public surfaces include UiBaseEdit and UiIndicatorBase, UiAxis,
 UiLayoutCursor/UiMeasure, UiStyle/UiTheme, UiGeometry/UiShapePath/UiShapes/UiDraw,

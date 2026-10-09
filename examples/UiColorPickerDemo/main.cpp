@@ -6,6 +6,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -210,6 +272,10 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = picker_.GetStyle();
+          AddFrameAccentProperties(override_model_, "metrics.frame_accent.", accent_base.metrics, "Frame Accent");
+        }
+
         inspector_model_.AddBoolean("micro","Use micro picker",false,"Micro picker").SetDefault(false);
         inspector_model_.AddBoolean("micro_rgb","RGB sliders",false,"Micro picker").SetDefault(false);
         inspector_model_.AddBoolean("micro_ramps","Colour ramps",true,"Micro picker").SetDefault(true);
@@ -260,14 +326,21 @@ private:
         picker_.SetSlot(cfg_.active_slot,cfg_.color,clamp(cfg_.opacity,0,255),false);
         picker_.SetPageMode((UiColorPicker::PageMode)cfg_.page).SetChannelMode((UiColorPicker::ChannelMode)cfg_.channels);
         picker_.ClearCustomStyle();
+        micro_.ClearCustomStyle();
         if(override_model_.Find("radius")->override_active) { UiColorPicker::Style s=picker_.GetStyle(); s.metrics.radius=cfg_.radius; picker_.SetCustomStyle(s); }
+        { auto style = picker_.GetStyle(); ApplyFrameAccentProperties(style.metrics, override_model_, "metrics.frame_accent."); picker_.SetCustomStyle(style); }
+        { auto style = micro_.GetStyle(); ApplyFrameAccentProperties(style.metrics, override_model_, "metrics.frame_accent."); micro_.SetCustomStyle(style); }
         SetUsageCode(BuildUsageCode()); LayoutPreviewContent();
     }
     String BuildUsageCode() const {
         if(cfg_.micro) {
-            return "UiColorPickerMicro picker;\n" + Format("picker.SetColor(%s).SetColumns(%d).ShowRamps(%s).SetRGBMode(%s);\n",
+            String code = "UiColorPickerMicro picker;\n" + Format("picker.SetColor(%s).SetColumns(%d).ShowRamps(%s).SetRGBMode(%s);\n",
                 ColorCpp(micro_.GetColor()),cfg_.micro_columns,cfg_.micro_ramps ? "true" : "false",cfg_.micro_rgb ? "true" : "false") +
                 Format("picker.SetPaletteMode((UiColorPickerMicro::PaletteMode)%d);\n",cfg_.micro_palette);
+            bool authored = false;
+            EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "style.metrics", "UiPanel::Style style = picker.GetStyle();\n", authored);
+            if(authored) code << "picker.SetCustomStyle(style);\n";
+            return code;
         }
         String code="UiColorPicker picker;\n";
         code << "picker.SetSlotCount(" << cfg_.slot_count << ").SetAlphaEnabled(" << (cfg_.alpha ? "true" : "false") << ");\n";
@@ -275,6 +348,7 @@ private:
         for(int i=0;i<slots.GetCount();i++) { const auto& slot=slots[i]; code << "picker.SetSlot(" << i << ", " << ColorCpp(slot.color) << ", " << slot.alpha << ", false);\n"; }
         code << "picker.SetActiveSlot(" << cfg_.active_slot << ").SetPageMode((UiColorPicker::PageMode)" << cfg_.page << ").SetChannelMode((UiColorPicker::ChannelMode)" << cfg_.channels << ");\n";
         if(override_model_.Find("radius")->override_active) code << "UiColorPicker::Style style=picker.GetStyle();\nstyle.metrics.radius=" << cfg_.radius << ";\npicker.SetCustomStyle(style);\n";
+        { bool authored = false; EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "accent_style.metrics", "UiColorPicker::Style accent_style = picker.GetStyle();\n", authored); if(authored) code << "picker.SetCustomStyle(accent_style);\n"; }
         return code;
     }
 

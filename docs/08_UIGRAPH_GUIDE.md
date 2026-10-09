@@ -32,6 +32,15 @@ Document, Database; Custom is the callback extension. Equal Rectangle dimensions
 make a square, radius/aspect make a capsule, equal Ellipse dimensions make a circle.
 Historical enum values remain compatible; do not multiply shape types for sizes.
 
+Rectangle nodes consume the shared `style.metrics.frame_accent` decoration:
+choose Top/Bottom/Left/Right edges, thickness, colour and alpha independently of
+the ordinary frame. Thickness scales with the graph camera alongside frame width
+and radius. The legacy Rectangle/RoundedRectangle/Square/Capsule surface paths
+also consume it; other silhouettes and custom painters do not acquire rectangular
+edge decoration automatically. UiGraphDemo exposes it only for supported shapes.
+See [Frame Accent styling](02_UI_THEME_GUIDE.md#frame-accent) and the
+[drawing seam](07_UI_DRAWING_GUIDE.md#frame-accent).
+
 Ordinary nodes/ports are painted geometry in one UiNodeGraph, not child Ctrl trees.
 SetNodeCtrl is the sparse explicit escape hatch. Registration and activation are
 separate: offscreen/out-of-scope/LOD-suppressed bindings can stay registered, but

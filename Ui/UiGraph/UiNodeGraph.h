@@ -714,6 +714,9 @@ private:
                 return Image(ib);
             });
             UiDrawCachedRaster(w, surface, cached);
+            StyledMetrics accent_metrics = metrics;
+            accent_metrics.frame_width = frame_width;
+            Upp::UiPaintFrameAccent(w, surface, palette, accent_metrics, st);
 
             // Highlight is an independent styled layer. Reuse the canonical
             // implementation only when it is actually authored; normal overview
@@ -723,6 +726,7 @@ private:
                 overlay.face_enabled = false;
                 overlay.frame_enabled = false;
                 overlay.shadow.enabled = false;
+                overlay.frame_accent.edges = StyledFrameAccent::None;
                 StyledSkin no_skin;
                 no_skin.enabled = false;
                 Upp::UiPaintStyledBackground(w, outer, palette, overlay, no_skin, st, focus);

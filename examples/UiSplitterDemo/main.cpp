@@ -6,6 +6,68 @@
 #include <plugin/png/png.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -364,6 +426,12 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = UiTheme::ResolveSplitter();
+          AddFrameAccentProperties(override_model_, "track_metrics.frame_accent.", accent_base.track_metrics, "Track / Frame Accent");
+          AddFrameAccentProperties(override_model_, "thumb_metrics.frame_accent.", accent_base.thumb_metrics, "Thumb / Frame Accent");
+          AddFrameAccentProperties(override_model_, "background_metrics.frame_accent.", accent_base.background_metrics, "Background / Frame Accent");
+        }
+
         inspector_model_.AddChoice("kind","Control",0,"Family").AddChoice(0,"UiSplitter").AddChoice(1,"UiQuadSplitter");
         inspector_model_.AddDouble("quad.row","Row split %",50.0,"Four panes").SetRange(0.0,100.0,1.0);
         inspector_model_.AddInteger("quad.min_c","Pane C minimum",DPI(140),"Four panes").SetRange(0,1000,1);
@@ -526,6 +594,9 @@ private:
         { if(override_model_.Find("thumb_face_color")->override_active || override_model_.Find("track")->override_active) s.thumb_palette.face[ST_PRESSED] = UiFill::Solid(Blend(cfg_.thumb_face_color, cfg_.track, 84)); }
         { if(override_model_.Find("track")->override_active || override_model_.Find("thumb_ink")->override_active) s.track_palette.face[ST_HOT] = UiFill::Solid(Blend(cfg_.track, cfg_.thumb_ink, 32)); }
         { if(override_model_.Find("track")->override_active || override_model_.Find("thumb_ink")->override_active) s.track_palette.face[ST_PRESSED] = UiFill::Solid(Blend(cfg_.track, cfg_.thumb_ink, 64)); }
+        ApplyFrameAccentProperties(s.track_metrics, override_model_, "track_metrics.frame_accent.");
+        ApplyFrameAccentProperties(s.thumb_metrics, override_model_, "thumb_metrics.frame_accent.");
+        ApplyFrameAccentProperties(s.background_metrics, override_model_, "background_metrics.frame_accent.");
         return s;
     }
     UiPanel::Style PaneStyle(Color face, const char* id) const
@@ -603,6 +674,9 @@ private:
             code << "UiSplitter::Style style = UiTheme::ResolveSplitter();\n";
             authored = true;
         }
+        EmitFrameAccentProperties(code, override_model_, "track_metrics.frame_accent.", "style.track_metrics", "UiSplitter::Style style = UiTheme::ResolveSplitter();\n", authored);
+        EmitFrameAccentProperties(code, override_model_, "thumb_metrics.frame_accent.", "style.thumb_metrics", "UiSplitter::Style style = UiTheme::ResolveSplitter();\n", authored);
+        EmitFrameAccentProperties(code, override_model_, "background_metrics.frame_accent.", "style.background_metrics", "UiSplitter::Style style = UiTheme::ResolveSplitter();\n", authored);
         if(authored) code << (use_quad ? "splitter.SetSplitterStyle(style);\n" : "splitter.SetCustomStyle(style);\n");
         code << "UiPanel pane_a,pane_b;\n";
         if(override_model_.Find("pane_a")->override_active) code << "{ UiPanel::Style panel_style=pane_a.GetStyle(); for(int state=0;state<4;state++) panel_style.palette.face[state]=UiFill::Solid(" << ColorCpp(cfg_.pane_a) << "); pane_a.SetCustomStyle(panel_style); }\n";

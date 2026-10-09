@@ -4,6 +4,22 @@ Fetch the applicable remote branch before publishing; preserve concurrent work
 and never force-push. This is a current recovery index, not a validation log.
 Contracts live in the reader guides; historical checkpoints live in Git.
 
+## Frame Accent and authoring coverage - 2026-10-09
+BASE: Ui `3adee3c` / `main`; Designer `416d6fe` / `main`.
+TASK: shared curved Top/Bottom/Left/Right accents; Designer and real demo exports.
+TOUCHED: StyledMetrics/drawing; GroupPanel, Tag, Graph and RangeSegments;
+32 maintained demos; Designer theme adapters/schema/skills; control usage docs.
+STATUS: implemented; focused validation recorded below, broader visual gates stay open.
+VALIDATION: Release controls 14/0 suites, including accent 1023/0; theme 2/0 suites.
+Debug no-BLITZ accent 1023/0 and five isolated public headers compile; 32 demos build.
+Designer Release and Debug no-BLITZ 2107/0 each; generated C++ 12/0.
+27 unchanged demo exports compile, 136/0 runtime checks; 57 catalogue entries
+covered by 26 compiled usage snippets; reader links and skill snapshots checked.
+PUBLISHED: containing main commits; recover with `git log -1 -- Ui/UiDraw.cpp`
+and Designer `git log -1 -- UiDesigner/Theme/UiDesignerFrameAccentThemeCommon.h`.
+NEXT: native interaction acceptance remains separate from pixel/build checks;
+use bin/windows-x64 demos and Designer bin/UiDesigner.exe for inspection.
+
 ## Splitter and repository polish — 2026-10-07
 BASE: `2cc2df0` / `codex/uitag-hardening`.
 TASK: softer Accent/Alert idle, hover and drag; one PropertyEditor registration path.

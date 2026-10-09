@@ -134,6 +134,17 @@ Margin, Focus, Shadow, Highlight and real subparts such as Track/Thumb or Popup.
 Do not present an unused style field just because it is in a struct. Preview and
 generated C++ must express the same authored behavior.
 
+Use the name **Frame Accent** for the shared edge decoration. Where a preview
+surface consumes it, expose independent Top/Bottom/Left/Right choices, thickness,
+colour (including inherited/state frame colour) and alpha. Keep its ordinary Frame
+settings separate. A bounded thickness slider should use a useful small domain
+(normally 0–20 DPI-scaled pixels), not a generic 0–1000 range. Verify curved corners,
+adjacent/opposite/all edges, hidden ordinary frame, disabled state and Light/Dark.
+For Panel/GroupPanel/ScrollPanel also check header gaps and fixed scroll chrome.
+Generated C++ emits the actual `metrics.frame_accent` fields or public setter;
+reset restores no authored edges. Never offer nonfunctional accent fields for a
+custom-painted subpart simply because its Style contains StyledMetrics.
+
 ## Generated C++ is part of acceptance
 
 Generate readable usage code, not the whole demo shell. With no overrides, use a

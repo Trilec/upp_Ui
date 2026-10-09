@@ -81,6 +81,16 @@ public:
             inspector_model_.SetValue("tick_side","RIGHT",false); inspector_model_.SetValue("field_align","LEFT",false);
         }
         if(variant=="overrides") {
+            for(int accent_index = 0; accent_index < override_model_.GetCount(); accent_index++) {
+                PropertyEditorItem& row = override_model_[accent_index];
+                if(row.id.Find("frame_accent.") < 0) continue;
+                row.override_active = true;
+                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
+                else if(row.id.EndsWith(".alpha")) row.value = 190;
+            }
+
             for(const char* id : {"track_metrics.radius","thumb_metrics.radius","metrics.radius"}) { auto* item=override_model_.Find(id); item->override_active=true; override_model_.SetValue(id,17,false); }
             auto* ink=override_model_.Find("track_palette.ink[ST_NORMAL]"); ink->override_active=true; override_model_.SetValue(ink->id,Color(98,45,187),false);
         }
@@ -349,6 +359,13 @@ private:
         MarkOverride(override_model_.AddColor("thumb_palette.icon[ST_DISABLED]","Icon",base.thumb_palette.icon[ST_DISABLED],"Slider thumb Disabled"));
         UiFloatEdit field_probe; UiFloatEdit::Style field_base=field_probe.GetStyle();
 MarkOverride(override_model_.AddNumericInt("track_metrics.radius","Radius",base.track_metrics.radius,0,60,1,"Slider track"));
+        MarkOverride(override_model_.AddBoolean("track_metrics.frame_accent.top","Top",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Top),"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("track_metrics.frame_accent.bottom","Bottom",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("track_metrics.frame_accent.left","Left",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Left),"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("track_metrics.frame_accent.right","Right",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Right),"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("track_metrics.frame_accent.thickness","Thickness",base.track_metrics.frame_accent.thickness,0,12,1,"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("track_metrics.frame_accent.alpha","Opacity",base.track_metrics.frame_accent.alpha,0,255,1,"Slider track / Frame Accent"));
+        MarkOverride(override_model_.AddColor("track_metrics.frame_accent.color","Colour",base.track_metrics.frame_accent.color,"Slider track / Frame Accent"));
         MarkOverride(override_model_.AddNumericInt("track_metrics.frame_width","Frame Width",base.track_metrics.frame_width,0,12,1,"Slider track"));
         MarkOverride(override_model_.AddBoolean("track_metrics.face_enabled","Face Enabled",base.track_metrics.face_enabled,"Slider track"));
         MarkOverride(override_model_.AddBoolean("track_metrics.frame_enabled","Frame Enabled",base.track_metrics.frame_enabled,"Slider track"));
@@ -388,6 +405,13 @@ MarkOverride(override_model_.AddNumericInt("track_metrics.radius","Radius",base.
         MarkOverride(override_model_.AddNumericDouble("track_metrics.shadow.curve.x2","X2",base.track_metrics.shadow.curve.x2,0,1,0.01,"Slider track Shadow curve"));
         MarkOverride(override_model_.AddNumericDouble("track_metrics.shadow.curve.y2","Y2",base.track_metrics.shadow.curve.y2,0,1,0.01,"Slider track Shadow curve"));
         MarkOverride(override_model_.AddNumericInt("thumb_metrics.radius","Radius",base.thumb_metrics.radius,0,60,1,"Slider thumb"));
+        MarkOverride(override_model_.AddBoolean("thumb_metrics.frame_accent.top","Top",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Top),"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("thumb_metrics.frame_accent.bottom","Bottom",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("thumb_metrics.frame_accent.left","Left",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Left),"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("thumb_metrics.frame_accent.right","Right",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Right),"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("thumb_metrics.frame_accent.thickness","Thickness",base.thumb_metrics.frame_accent.thickness,0,12,1,"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("thumb_metrics.frame_accent.alpha","Opacity",base.thumb_metrics.frame_accent.alpha,0,255,1,"Slider thumb / Frame Accent"));
+        MarkOverride(override_model_.AddColor("thumb_metrics.frame_accent.color","Colour",base.thumb_metrics.frame_accent.color,"Slider thumb / Frame Accent"));
         MarkOverride(override_model_.AddNumericInt("thumb_metrics.frame_width","Frame Width",base.thumb_metrics.frame_width,0,12,1,"Slider thumb"));
         MarkOverride(override_model_.AddBoolean("thumb_metrics.face_enabled","Face Enabled",base.thumb_metrics.face_enabled,"Slider thumb"));
         MarkOverride(override_model_.AddBoolean("thumb_metrics.frame_enabled","Frame Enabled",base.thumb_metrics.frame_enabled,"Slider thumb"));
@@ -437,6 +461,13 @@ MarkOverride(override_model_.AddNumericInt("track_metrics.radius","Radius",base.
         MarkOverride(override_model_.AddNumericInt("thumb_inner_ring_width","Thumb Inner Ring Width",base.thumb_inner_ring_width,0,20,1,"Ticks"));
         MarkOverride(override_model_.AddColor("thumb_inner_ring_color","Thumb Inner Ring Color",base.thumb_inner_ring_color,"Ticks"));
 MarkOverride(override_model_.AddNumericInt("metrics.radius","Radius",field_base.metrics.radius,0,60,1,"Numeric fields"));
+        MarkOverride(override_model_.AddBoolean("metrics.frame_accent.top","Top",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Top),"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("metrics.frame_accent.bottom","Bottom",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("metrics.frame_accent.left","Left",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Left),"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("metrics.frame_accent.right","Right",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Right),"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("metrics.frame_accent.thickness","Thickness",field_base.metrics.frame_accent.thickness,0,12,1,"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("metrics.frame_accent.alpha","Opacity",field_base.metrics.frame_accent.alpha,0,255,1,"Numeric fields / Frame Accent"));
+        MarkOverride(override_model_.AddColor("metrics.frame_accent.color","Colour",field_base.metrics.frame_accent.color,"Numeric fields / Frame Accent"));
         MarkOverride(override_model_.AddNumericInt("metrics.frame_width","Frame Width",field_base.metrics.frame_width,0,12,1,"Numeric fields"));
         MarkOverride(override_model_.AddBoolean("metrics.face_enabled","Face Enabled",field_base.metrics.face_enabled,"Numeric fields"));
         MarkOverride(override_model_.AddBoolean("metrics.frame_enabled","Frame Enabled",field_base.metrics.frame_enabled,"Numeric fields"));
@@ -536,6 +567,13 @@ MarkOverride(AddPropertyFont(override_model_,"font.face","Face",field_base.font.
         if(Active("thumb_palette.icon[ST_PRESSED]")) style.thumb_palette.icon[ST_PRESSED]=(Color)Override("thumb_palette.icon[ST_PRESSED]"); else override_model_.SetValue("thumb_palette.icon[ST_PRESSED]",base.thumb_palette.icon[ST_PRESSED],false);
         if(Active("thumb_palette.icon[ST_DISABLED]")) style.thumb_palette.icon[ST_DISABLED]=(Color)Override("thumb_palette.icon[ST_DISABLED]"); else override_model_.SetValue("thumb_palette.icon[ST_DISABLED]",base.thumb_palette.icon[ST_DISABLED],false);
         if(Active("track_metrics.radius")) style.track_metrics.radius = (int)Override("track_metrics.radius"); else override_model_.SetValue("track_metrics.radius",base.track_metrics.radius,false);
+        if(Active("track_metrics.frame_accent.top")) { if((bool)Override("track_metrics.frame_accent.top")) style.track_metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.track_metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else override_model_.SetValue("track_metrics.frame_accent.top",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(Active("track_metrics.frame_accent.bottom")) { if((bool)Override("track_metrics.frame_accent.bottom")) style.track_metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.track_metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else override_model_.SetValue("track_metrics.frame_accent.bottom",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(Active("track_metrics.frame_accent.left")) { if((bool)Override("track_metrics.frame_accent.left")) style.track_metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.track_metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else override_model_.SetValue("track_metrics.frame_accent.left",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(Active("track_metrics.frame_accent.right")) { if((bool)Override("track_metrics.frame_accent.right")) style.track_metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.track_metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else override_model_.SetValue("track_metrics.frame_accent.right",bool(base.track_metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(Active("track_metrics.frame_accent.thickness")) style.track_metrics.frame_accent.thickness = (int)Override("track_metrics.frame_accent.thickness"); else override_model_.SetValue("track_metrics.frame_accent.thickness",base.track_metrics.frame_accent.thickness,false);
+        if(Active("track_metrics.frame_accent.alpha")) style.track_metrics.frame_accent.alpha = (int)Override("track_metrics.frame_accent.alpha"); else override_model_.SetValue("track_metrics.frame_accent.alpha",base.track_metrics.frame_accent.alpha,false);
+        if(Active("track_metrics.frame_accent.color")) style.track_metrics.frame_accent.color = (Color)Override("track_metrics.frame_accent.color"); else override_model_.SetValue("track_metrics.frame_accent.color",base.track_metrics.frame_accent.color,false);
         if(Active("track_metrics.frame_width")) style.track_metrics.frame_width = (int)Override("track_metrics.frame_width"); else override_model_.SetValue("track_metrics.frame_width",base.track_metrics.frame_width,false);
         if(Active("track_metrics.face_enabled")) style.track_metrics.face_enabled = (bool)Override("track_metrics.face_enabled"); else override_model_.SetValue("track_metrics.face_enabled",base.track_metrics.face_enabled,false);
         if(Active("track_metrics.frame_enabled")) style.track_metrics.frame_enabled = (bool)Override("track_metrics.frame_enabled"); else override_model_.SetValue("track_metrics.frame_enabled",base.track_metrics.frame_enabled,false);
@@ -575,6 +613,13 @@ MarkOverride(AddPropertyFont(override_model_,"font.face","Face",field_base.font.
         if(Active("track_metrics.shadow.curve.x2")) style.track_metrics.shadow.curve.x2 = (double)Override("track_metrics.shadow.curve.x2"); else override_model_.SetValue("track_metrics.shadow.curve.x2",base.track_metrics.shadow.curve.x2,false);
         if(Active("track_metrics.shadow.curve.y2")) style.track_metrics.shadow.curve.y2 = (double)Override("track_metrics.shadow.curve.y2"); else override_model_.SetValue("track_metrics.shadow.curve.y2",base.track_metrics.shadow.curve.y2,false);
         if(Active("thumb_metrics.radius")) style.thumb_metrics.radius = (int)Override("thumb_metrics.radius"); else override_model_.SetValue("thumb_metrics.radius",base.thumb_metrics.radius,false);
+        if(Active("thumb_metrics.frame_accent.top")) { if((bool)Override("thumb_metrics.frame_accent.top")) style.thumb_metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.thumb_metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else override_model_.SetValue("thumb_metrics.frame_accent.top",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(Active("thumb_metrics.frame_accent.bottom")) { if((bool)Override("thumb_metrics.frame_accent.bottom")) style.thumb_metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.thumb_metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else override_model_.SetValue("thumb_metrics.frame_accent.bottom",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(Active("thumb_metrics.frame_accent.left")) { if((bool)Override("thumb_metrics.frame_accent.left")) style.thumb_metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.thumb_metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else override_model_.SetValue("thumb_metrics.frame_accent.left",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(Active("thumb_metrics.frame_accent.right")) { if((bool)Override("thumb_metrics.frame_accent.right")) style.thumb_metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.thumb_metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else override_model_.SetValue("thumb_metrics.frame_accent.right",bool(base.thumb_metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(Active("thumb_metrics.frame_accent.thickness")) style.thumb_metrics.frame_accent.thickness = (int)Override("thumb_metrics.frame_accent.thickness"); else override_model_.SetValue("thumb_metrics.frame_accent.thickness",base.thumb_metrics.frame_accent.thickness,false);
+        if(Active("thumb_metrics.frame_accent.alpha")) style.thumb_metrics.frame_accent.alpha = (int)Override("thumb_metrics.frame_accent.alpha"); else override_model_.SetValue("thumb_metrics.frame_accent.alpha",base.thumb_metrics.frame_accent.alpha,false);
+        if(Active("thumb_metrics.frame_accent.color")) style.thumb_metrics.frame_accent.color = (Color)Override("thumb_metrics.frame_accent.color"); else override_model_.SetValue("thumb_metrics.frame_accent.color",base.thumb_metrics.frame_accent.color,false);
         if(Active("thumb_metrics.frame_width")) style.thumb_metrics.frame_width = (int)Override("thumb_metrics.frame_width"); else override_model_.SetValue("thumb_metrics.frame_width",base.thumb_metrics.frame_width,false);
         if(Active("thumb_metrics.face_enabled")) style.thumb_metrics.face_enabled = (bool)Override("thumb_metrics.face_enabled"); else override_model_.SetValue("thumb_metrics.face_enabled",base.thumb_metrics.face_enabled,false);
         if(Active("thumb_metrics.frame_enabled")) style.thumb_metrics.frame_enabled = (bool)Override("thumb_metrics.frame_enabled"); else override_model_.SetValue("thumb_metrics.frame_enabled",base.thumb_metrics.frame_enabled,false);
@@ -624,6 +669,13 @@ MarkOverride(AddPropertyFont(override_model_,"font.face","Face",field_base.font.
         if(Active("thumb_inner_ring_width")) style.thumb_inner_ring_width = (int)Override("thumb_inner_ring_width"); else override_model_.SetValue("thumb_inner_ring_width",base.thumb_inner_ring_width,false);
         if(Active("thumb_inner_ring_color")) style.thumb_inner_ring_color = (Color)Override("thumb_inner_ring_color"); else override_model_.SetValue("thumb_inner_ring_color",base.thumb_inner_ring_color,false);
 if(Active("metrics.radius")) field_style.metrics.radius = (int)Override("metrics.radius"); else override_model_.SetValue("metrics.radius",field_base.metrics.radius,false);
+        if(Active("metrics.frame_accent.top")) { if((bool)Override("metrics.frame_accent.top")) field_style.metrics.frame_accent.edges |= StyledFrameAccent::Top; else field_style.metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else override_model_.SetValue("metrics.frame_accent.top",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(Active("metrics.frame_accent.bottom")) { if((bool)Override("metrics.frame_accent.bottom")) field_style.metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else field_style.metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else override_model_.SetValue("metrics.frame_accent.bottom",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(Active("metrics.frame_accent.left")) { if((bool)Override("metrics.frame_accent.left")) field_style.metrics.frame_accent.edges |= StyledFrameAccent::Left; else field_style.metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else override_model_.SetValue("metrics.frame_accent.left",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(Active("metrics.frame_accent.right")) { if((bool)Override("metrics.frame_accent.right")) field_style.metrics.frame_accent.edges |= StyledFrameAccent::Right; else field_style.metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else override_model_.SetValue("metrics.frame_accent.right",bool(field_base.metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(Active("metrics.frame_accent.thickness")) field_style.metrics.frame_accent.thickness = (int)Override("metrics.frame_accent.thickness"); else override_model_.SetValue("metrics.frame_accent.thickness",field_base.metrics.frame_accent.thickness,false);
+        if(Active("metrics.frame_accent.alpha")) field_style.metrics.frame_accent.alpha = (int)Override("metrics.frame_accent.alpha"); else override_model_.SetValue("metrics.frame_accent.alpha",field_base.metrics.frame_accent.alpha,false);
+        if(Active("metrics.frame_accent.color")) field_style.metrics.frame_accent.color = (Color)Override("metrics.frame_accent.color"); else override_model_.SetValue("metrics.frame_accent.color",field_base.metrics.frame_accent.color,false);
         if(Active("metrics.frame_width")) field_style.metrics.frame_width = (int)Override("metrics.frame_width"); else override_model_.SetValue("metrics.frame_width",field_base.metrics.frame_width,false);
         if(Active("metrics.face_enabled")) field_style.metrics.face_enabled = (bool)Override("metrics.face_enabled"); else override_model_.SetValue("metrics.face_enabled",field_base.metrics.face_enabled,false);
         if(Active("metrics.frame_enabled")) field_style.metrics.frame_enabled = (bool)Override("metrics.frame_enabled"); else override_model_.SetValue("metrics.frame_enabled",field_base.metrics.frame_enabled,false);
@@ -724,6 +776,13 @@ if(Active("font.face")) field_style.font.FaceName(AsString(Override("font.face")
         { String id="thumb_palette.icon[ST_PRESSED]"; if(Active(id)) generated_ << "        style.thumb_palette.icon[ST_PRESSED] = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="thumb_palette.icon[ST_DISABLED]"; if(Active(id)) generated_ << "        style.thumb_palette.icon[ST_DISABLED] = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="track_metrics.radius"; if(Active(id)) generated_ << "        style.track_metrics.radius = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="track_metrics.frame_accent.top"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="track_metrics.frame_accent.bottom"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="track_metrics.frame_accent.left"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="track_metrics.frame_accent.right"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="track_metrics.frame_accent.thickness"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.thickness = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="track_metrics.frame_accent.alpha"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.alpha = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="track_metrics.frame_accent.color"; if(Active(id)) generated_ << "        style.track_metrics.frame_accent.color = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="track_metrics.frame_width"; if(Active(id)) generated_ << "        style.track_metrics.frame_width = " << AsString((int)Override(id)) << ";\n"; }
         { String id="track_metrics.face_enabled"; if(Active(id)) generated_ << "        style.track_metrics.face_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
         { String id="track_metrics.frame_enabled"; if(Active(id)) generated_ << "        style.track_metrics.frame_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
@@ -763,6 +822,13 @@ if(Active("font.face")) field_style.font.FaceName(AsString(Override("font.face")
         { String id="track_metrics.shadow.curve.x2"; if(Active(id)) generated_ << "        style.track_metrics.shadow.curve.x2 = " << Format("%.17g",(double)Override(id)) << ";\n"; }
         { String id="track_metrics.shadow.curve.y2"; if(Active(id)) generated_ << "        style.track_metrics.shadow.curve.y2 = " << Format("%.17g",(double)Override(id)) << ";\n"; }
         { String id="thumb_metrics.radius"; if(Active(id)) generated_ << "        style.thumb_metrics.radius = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="thumb_metrics.frame_accent.top"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="thumb_metrics.frame_accent.bottom"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="thumb_metrics.frame_accent.left"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="thumb_metrics.frame_accent.right"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="thumb_metrics.frame_accent.thickness"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.thickness = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="thumb_metrics.frame_accent.alpha"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.alpha = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="thumb_metrics.frame_accent.color"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_accent.color = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="thumb_metrics.frame_width"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_width = " << AsString((int)Override(id)) << ";\n"; }
         { String id="thumb_metrics.face_enabled"; if(Active(id)) generated_ << "        style.thumb_metrics.face_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
         { String id="thumb_metrics.frame_enabled"; if(Active(id)) generated_ << "        style.thumb_metrics.frame_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
@@ -814,6 +880,13 @@ if(Active("font.face")) field_style.font.FaceName(AsString(Override("font.face")
         generated_ << "        control.Slider().SetCustomStyle(style);\n"; }
         if(fields && field_authored) { generated_ << "        auto field_style = control." << (range ? "LowerField" : "Field") << "().GetStyle();\n";
         { String id="metrics.radius"; if(Active(id)) generated_ << "        field_style.metrics.radius = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="metrics.frame_accent.top"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="metrics.frame_accent.bottom"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="metrics.frame_accent.left"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="metrics.frame_accent.right"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="metrics.frame_accent.thickness"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.thickness = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="metrics.frame_accent.alpha"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.alpha = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="metrics.frame_accent.color"; if(Active(id)) generated_ << "        field_style.metrics.frame_accent.color = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="metrics.frame_width"; if(Active(id)) generated_ << "        field_style.metrics.frame_width = " << AsString((int)Override(id)) << ";\n"; }
         { String id="metrics.face_enabled"; if(Active(id)) generated_ << "        field_style.metrics.face_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
         { String id="metrics.frame_enabled"; if(Active(id)) generated_ << "        field_style.metrics.frame_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }

@@ -16,6 +16,12 @@ machine paths or API summaries from an old session still apply.
 - For controls, use the [catalogue](references/upstream/docs/01_UI_CONTROLS_GUIDE.md)
   to locate the actual public header and maintained example. Verify setter names,
   return types, model binding and child-host APIs before writing calls.
+- Start small usage examples from [control recipes](references/upstream/docs/CONTROL_USAGE.md).
+  Frame Accent belongs to shared StyledMetrics, separate from the ordinary frame:
+  combinable Top/Bottom/Left/Right edges, thickness, colour and alpha. Shared
+  face/frame drawing consumes it; custom painters must opt in through
+  UiPaintFrameAccent. Expose only fields the actual drawing path consumes, and
+  preserve them through inspectors, Designer documents and generated C++.
 - Read [layout and interaction](references/composition.md) for application shells,
   scrolling, focus and control integration.
 - For appearance, read [themes](references/upstream/docs/02_UI_THEME_GUIDE.md);

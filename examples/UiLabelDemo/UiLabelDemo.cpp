@@ -2,6 +2,68 @@
 
 namespace Upp {
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 
 enum LabelStateIndex {
     LABEL_NORMAL,
@@ -280,6 +342,7 @@ void UiLabelDemo::BuildInspectorModel()
 void UiLabelDemo::BuildOverrideModel()
 {
     UiLabel::Style base = UiTheme::ResolveLabel(UiRole::Standard, UiTextSize::Body);
+    AddFrameAccentProperties(pe_model_override, "metrics.frame_accent.", base.metrics, "Frame Accent");
     static const char *labels[] = { "Normal", "Hot", "Pressed", "Disabled" };
     for(int i = 0; i < 4; i++) {
         MarkOverride(pe_model_override.Add("face." + String(StateId(i)), labels[i],
@@ -488,6 +551,7 @@ void UiLabelDemo::ApplyProjection()
 #undef APPLY_BOOL
 #undef APPLY_INT
 
+    ApplyFrameAccentProperties(style.metrics, pe_model_override, "metrics.frame_accent.");
     lbl_preview.SetCustomStyle(style);
     lbl_preview.Tip(AsString(InspectorValue("tooltip")));
     lbl_preview.Enable((bool)InspectorValue("enabled"));
@@ -570,6 +634,7 @@ void UiLabelDemo::UpdateGeneratedCode()
         auto emit_int = [&](const char *id, const char *field, bool dpi = false) { if(OverrideActive(id)) out << "        " << field << " = " << (dpi ? "DPI(" : "") << (int)OverrideValue(id) << (dpi ? ")" : "") << ";\n"; };
         emit_bool("face_enabled", "style.metrics.face_enabled"); emit_bool("frame_enabled", "style.metrics.frame_enabled");
         emit_int("frame_width", "style.metrics.frame_width", true); emit_int("radius", "style.metrics.radius", true);
+        { bool authored = true; EmitFrameAccentProperties(out, pe_model_override, "metrics.frame_accent.", "        style.metrics", String(), authored); }
         emit_bool("dashed", "style.metrics.dashed"); emit_bool("transparent", "style.transparent");
         if(OverrideActive("dash_pattern")) out << "        style.metrics.dash_pattern = " << CppString(AsString(OverrideValue("dash_pattern"))) << ";\n";
         if(OverrideActive("font_face")) out << "        style.font.FaceName(" << CppString(AsString(OverrideValue("font_face"))) << ");\n";

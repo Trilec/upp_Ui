@@ -5,6 +5,10 @@ base/model/drawing helpers are listed separately. The [release inventory](../tes
 is the audit/validation register. A listed demo is a starting point for exploration,
 not a claim that its entire API or generated code has already passed release acceptance.
 
+Start with [Control usage recipes](CONTROL_USAGE.md) for a small public API
+example of every concrete catalogue entry. The sections below explain the shared
+contracts and the cases that need more than a constructor and a setter.
+
 ## Common contracts
 
 Include `<Ui/Ui.h>` for the full library or the narrower public header. Read the
@@ -137,8 +141,8 @@ bounded-item and 10k-node performance contracts are preserved.
 UiBaseEdit provides shared editing, selection, placeholder, caret, side/spin and
 style behavior. Concrete Line/Password/Multi/Mask/Int/Float types retain their own
 input policy; sharing a base is not proof that specialized validation is identical.
-UiEditDemo is the text-family direction; UiIntFloatDemo is its numeric companion.
-Older individual demos remain until capability/export coverage is reconciled.
+UiEditDemo is the maintained text-family demo; UiIntFloatDemo is its numeric
+companion. Their selectors show one concrete control and generate its actual API.
 
 UiFloatEdit supports decimal/scientific notation, signed exponents and temporarily
 incomplete text. Min/Max/MinMax constrain committed values; Step drives numeric
@@ -289,10 +293,11 @@ All locale/ISO/12/24 formatting paths must honor ShowSeconds.
 
 ## Containers and layout
 
-UiPanel/UiScrollPanel/UiTitleCard each host one content root; UiTitleCard uses its
-adjacent SetContentCell. UiGroupPanel has independently replaceable header-content
-and body-content roots. Use a box/grid/absolute layout inside a root for several
-children. Parenting still does not imply deletion ownership.
+UiPanel parents ordinary children; UiScrollPanel supplies a Content() parent for
+scrolling children. Use one box/grid/absolute layout root to arrange several
+children automatically. UiTitleCard borrows an adjacent SetContentCell;
+UiGroupPanel has independently replaceable header-content and body-content roots.
+Parenting still does not imply deletion ownership.
 A derived UiPanel may override the protected ResolveThemeStyle hook to refine
 inherited metrics without freezing an explicit style. InvalidateStyleCache once
 after derived construction; explicit native style setters and ClearCustomStyle
@@ -336,6 +341,14 @@ reports a changed scroll origin after applying it, including programmatic change
 GetScrollBarAt accepts panel-local coordinates and returns a borrowed scrollbar
 for interaction routing. Wheel input uses the horizontal axis when it is the only
 available scrollbar, or with Shift when horizontal scrolling is available.
+
+Panel, GroupPanel and ScrollPanel consume the shared Frame Accent metrics:
+independent Top/Bottom/Left/Right edge selection, thickness, colour and alpha.
+It follows their rounded surface just inside the ordinary frame, preserves
+GroupPanel's centered header gaps, and stays fixed around ScrollPanel's viewport.
+It is off by default and adds no layout inset. See the
+[usage recipe](CONTROL_USAGE.md#frame-accent) and
+[theme contract](02_UI_THEME_GUIDE.md#frame-accent).
 
 ## Progress, rings and custom painting
 

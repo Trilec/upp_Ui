@@ -2,6 +2,68 @@
 
 namespace Upp {
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 
 PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
 {
@@ -225,6 +287,7 @@ void UiRangeSegmentsDemo::BuildOverrides()
 {
     UiRangeSegments probe;
     UiRangeSegments::Style base = probe.GetStyle();
+    AddFrameAccentProperties(override_model_, "track_metrics.frame_accent.", base.track_metrics, "Track / Frame Accent");
 
     MarkOverride(override_model_.AddColor("track.face", "Face", FaceColor(base.track_palette, ST_NORMAL, Color(241,245,249)), "Track"));
     MarkOverride(override_model_.AddColor("track.frame", "Frame", base.track_palette.frame[ST_NORMAL], "Track"));
@@ -434,6 +497,9 @@ void UiRangeSegmentsDemo::SyncInheritedOverrides(const UiRangeSegments::Style& s
 bool UiRangeSegmentsDemo::ApplyOverrides(UiRangeSegments::Style& style) const
 {
     bool any = false;
+    ApplyFrameAccentProperties(style.track_metrics, override_model_, "track_metrics.frame_accent.");
+    for(const PropertyEditorItem& item : override_model_.GetItems())
+        if(item.id.StartsWith("track_metrics.frame_accent.") && item.override_active) any = true;
     auto ColorOverride = [&](const char *id, Color& target) {
         if(OverrideActive(id)) {
             target = Color(OverrideValue(id));
@@ -648,6 +714,7 @@ void UiRangeSegmentsDemo::UpdateGeneratedCode()
     if(ranges_.HasCustomStyle()) {
         out << "\n// Active Theme Overrides\n";
         out << "UiRangeSegments::Style style = ranges.GetStyle();\n";
+        { bool authored = true; EmitFrameAccentProperties(out, override_model_, "track_metrics.frame_accent.", "style.track_metrics", String(), authored); }
         if(OverrideActive("track.face")) out << "style.track_palette.face[ST_NORMAL] = UiFill::Solid(" << CppColor(Color(OverrideValue("track.face"))) << ");\n";
         if(OverrideActive("track.frame")) out << "style.track_palette.frame[ST_NORMAL] = " << CppColor(Color(OverrideValue("track.frame"))) << ";\n";
         if(OverrideActive("track.height")) out << "style.track_size.cy = " << (int)OverrideValue("track.height") << ";\n";

@@ -61,7 +61,18 @@ public:
         Size rs=right_.GetSize(); tools_.SetRect(DPI(4),DPI(4),max(0,rs.cx-DPI(8)),DPI(36)); pages_.SetRect(DPI(4),DPI(44),max(0,rs.cx-DPI(8)),max(0,rs.cy-DPI(48)));
     }
     void Export(const String& path, bool authored=false) {
-        if(authored) { inspector_model_.SetValue("enabled",false); if(override_model_.GetCount()) { override_model_[0].override_active=true; if(override_model_[0].kind==PropertyEditorKind::NumericInt) override_model_.SetValue(override_model_[0].id,17); } if(auto* item=inspector_model_.Find("text")) inspector_model_.SetValue("text",String("Text with \\\"quotes\\\", \\\\path and\\nnew line")); ApplyProjection(); }
+        if(authored) {
+            for(int accent_index = 0; accent_index < override_model_.GetCount(); accent_index++) {
+                PropertyEditorItem& row = override_model_[accent_index];
+                if(row.id.Find("frame_accent.") < 0) continue;
+                row.override_active = true;
+                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
+                else if(row.id.EndsWith(".alpha")) row.value = 190;
+            }
+            inspector_model_.SetValue("enabled",false); if(override_model_.GetCount()) { override_model_[0].override_active=true; if(override_model_[0].kind==PropertyEditorKind::NumericInt) override_model_.SetValue(override_model_[0].id,17); } if(auto* item=inspector_model_.Find("text")) inspector_model_.SetValue("text",String("Text with \\\"quotes\\\", \\\\path and\\nnew line")); ApplyProjection();
+        }
         for(const String& arg:CommandLine()) if(arg=="dark" && UiTheme::GetContext().mode!=UiThemeMode::Dark) ToggleTheme();
         SaveFile(path,generated_);
     }
@@ -275,6 +286,13 @@ private:
         inspector_model_.AddText("label7","Slot 8 label","Color 8","Palette labels");
         UiColorMatrix probe; probe.SetRole(AsString(ValueOf("role"))=="Subtle" ? UiRole::Subtle : AsString(ValueOf("role"))=="Accent" ? UiRole::Accent : AsString(ValueOf("role"))=="Alert" ? UiRole::Alert : UiRole::Standard); probe.SetActiveRole(AsString(ValueOf("active_role"))=="Subtle" ? UiRole::Subtle : AsString(ValueOf("active_role"))=="Alert" ? UiRole::Alert : AsString(ValueOf("active_role"))=="Standard" ? UiRole::Standard : UiRole::Accent); UiColorMatrix::Style base=probe.GetStyle();
         MarkOverride(override_model_.AddNumericInt("surface_metrics.radius","Radius",base.surface_metrics.radius,0,80,1,"Surface"));
+        MarkOverride(override_model_.AddBoolean("surface_metrics.frame_accent.top","Top",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Top),"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("surface_metrics.frame_accent.bottom","Bottom",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("surface_metrics.frame_accent.left","Left",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Left),"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("surface_metrics.frame_accent.right","Right",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Right),"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("surface_metrics.frame_accent.thickness","Thickness",base.surface_metrics.frame_accent.thickness,0,12,1,"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("surface_metrics.frame_accent.alpha","Opacity",base.surface_metrics.frame_accent.alpha,0,255,1,"Surface / Frame Accent"));
+        MarkOverride(override_model_.AddColor("surface_metrics.frame_accent.color","Colour",base.surface_metrics.frame_accent.color,"Surface / Frame Accent"));
         MarkOverride(override_model_.AddNumericInt("surface_metrics.frame_width","Frame Width",base.surface_metrics.frame_width,0,12,1,"Surface"));
         MarkOverride(override_model_.AddBoolean("surface_metrics.face_enabled","Face Enabled",base.surface_metrics.face_enabled,"Surface"));
         MarkOverride(override_model_.AddBoolean("surface_metrics.frame_enabled","Frame Enabled",base.surface_metrics.frame_enabled,"Surface"));
@@ -314,6 +332,13 @@ private:
         MarkOverride(override_model_.AddNumericDouble("surface_metrics.shadow.curve.x2","X2",base.surface_metrics.shadow.curve.x2,0,1,0.01,"Surface Shadow curve"));
         MarkOverride(override_model_.AddNumericDouble("surface_metrics.shadow.curve.y2","Y2",base.surface_metrics.shadow.curve.y2,0,1,0.01,"Surface Shadow curve"));
         MarkOverride(override_model_.AddNumericInt("slot_metrics.radius","Radius",base.slot_metrics.radius,0,80,1,"Swatch frames"));
+        MarkOverride(override_model_.AddBoolean("slot_metrics.frame_accent.top","Top",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Top),"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("slot_metrics.frame_accent.bottom","Bottom",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Bottom),"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("slot_metrics.frame_accent.left","Left",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Left),"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddBoolean("slot_metrics.frame_accent.right","Right",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Right),"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("slot_metrics.frame_accent.thickness","Thickness",base.slot_metrics.frame_accent.thickness,0,12,1,"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddNumericInt("slot_metrics.frame_accent.alpha","Opacity",base.slot_metrics.frame_accent.alpha,0,255,1,"Swatch frames / Frame Accent"));
+        MarkOverride(override_model_.AddColor("slot_metrics.frame_accent.color","Colour",base.slot_metrics.frame_accent.color,"Swatch frames / Frame Accent"));
         MarkOverride(override_model_.AddNumericInt("slot_metrics.frame_width","Frame Width",base.slot_metrics.frame_width,0,12,1,"Swatch frames"));
         MarkOverride(override_model_.AddBoolean("slot_metrics.face_enabled","Face Enabled",base.slot_metrics.face_enabled,"Swatch frames"));
         MarkOverride(override_model_.AddBoolean("slot_metrics.frame_enabled","Frame Enabled",base.slot_metrics.frame_enabled,"Swatch frames"));
@@ -372,6 +397,13 @@ private:
         UiColorMatrix probe; probe.SetRole(AsString(ValueOf("role"))=="Subtle" ? UiRole::Subtle : AsString(ValueOf("role"))=="Accent" ? UiRole::Accent : AsString(ValueOf("role"))=="Alert" ? UiRole::Alert : UiRole::Standard); probe.SetActiveRole(AsString(ValueOf("active_role"))=="Subtle" ? UiRole::Subtle : AsString(ValueOf("active_role"))=="Alert" ? UiRole::Alert : AsString(ValueOf("active_role"))=="Standard" ? UiRole::Standard : UiRole::Accent); UiColorMatrix::Style base=probe.GetStyle();
         UiColorMatrix::Style style=base;
         if(Active("surface_metrics.radius")) style.surface_metrics.radius = (int)Override("surface_metrics.radius"); else override_model_.SetValue("surface_metrics.radius",base.surface_metrics.radius,false);
+        if(Active("surface_metrics.frame_accent.top")) { if((bool)Override("surface_metrics.frame_accent.top")) style.surface_metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.surface_metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else override_model_.SetValue("surface_metrics.frame_accent.top",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(Active("surface_metrics.frame_accent.bottom")) { if((bool)Override("surface_metrics.frame_accent.bottom")) style.surface_metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.surface_metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else override_model_.SetValue("surface_metrics.frame_accent.bottom",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(Active("surface_metrics.frame_accent.left")) { if((bool)Override("surface_metrics.frame_accent.left")) style.surface_metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.surface_metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else override_model_.SetValue("surface_metrics.frame_accent.left",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(Active("surface_metrics.frame_accent.right")) { if((bool)Override("surface_metrics.frame_accent.right")) style.surface_metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.surface_metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else override_model_.SetValue("surface_metrics.frame_accent.right",bool(base.surface_metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(Active("surface_metrics.frame_accent.thickness")) style.surface_metrics.frame_accent.thickness = (int)Override("surface_metrics.frame_accent.thickness"); else override_model_.SetValue("surface_metrics.frame_accent.thickness",base.surface_metrics.frame_accent.thickness,false);
+        if(Active("surface_metrics.frame_accent.alpha")) style.surface_metrics.frame_accent.alpha = (int)Override("surface_metrics.frame_accent.alpha"); else override_model_.SetValue("surface_metrics.frame_accent.alpha",base.surface_metrics.frame_accent.alpha,false);
+        if(Active("surface_metrics.frame_accent.color")) style.surface_metrics.frame_accent.color = (Color)Override("surface_metrics.frame_accent.color"); else override_model_.SetValue("surface_metrics.frame_accent.color",base.surface_metrics.frame_accent.color,false);
         if(Active("surface_metrics.frame_width")) style.surface_metrics.frame_width = (int)Override("surface_metrics.frame_width"); else override_model_.SetValue("surface_metrics.frame_width",base.surface_metrics.frame_width,false);
         if(Active("surface_metrics.face_enabled")) style.surface_metrics.face_enabled = (bool)Override("surface_metrics.face_enabled"); else override_model_.SetValue("surface_metrics.face_enabled",base.surface_metrics.face_enabled,false);
         if(Active("surface_metrics.frame_enabled")) style.surface_metrics.frame_enabled = (bool)Override("surface_metrics.frame_enabled"); else override_model_.SetValue("surface_metrics.frame_enabled",base.surface_metrics.frame_enabled,false);
@@ -411,6 +443,13 @@ private:
         if(Active("surface_metrics.shadow.curve.x2")) style.surface_metrics.shadow.curve.x2 = (double)Override("surface_metrics.shadow.curve.x2"); else override_model_.SetValue("surface_metrics.shadow.curve.x2",base.surface_metrics.shadow.curve.x2,false);
         if(Active("surface_metrics.shadow.curve.y2")) style.surface_metrics.shadow.curve.y2 = (double)Override("surface_metrics.shadow.curve.y2"); else override_model_.SetValue("surface_metrics.shadow.curve.y2",base.surface_metrics.shadow.curve.y2,false);
         if(Active("slot_metrics.radius")) style.slot_metrics.radius = (int)Override("slot_metrics.radius"); else override_model_.SetValue("slot_metrics.radius",base.slot_metrics.radius,false);
+        if(Active("slot_metrics.frame_accent.top")) { if((bool)Override("slot_metrics.frame_accent.top")) style.slot_metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.slot_metrics.frame_accent.edges &= ~StyledFrameAccent::Top; } else override_model_.SetValue("slot_metrics.frame_accent.top",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Top),false);
+        if(Active("slot_metrics.frame_accent.bottom")) { if((bool)Override("slot_metrics.frame_accent.bottom")) style.slot_metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.slot_metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; } else override_model_.SetValue("slot_metrics.frame_accent.bottom",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Bottom),false);
+        if(Active("slot_metrics.frame_accent.left")) { if((bool)Override("slot_metrics.frame_accent.left")) style.slot_metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.slot_metrics.frame_accent.edges &= ~StyledFrameAccent::Left; } else override_model_.SetValue("slot_metrics.frame_accent.left",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Left),false);
+        if(Active("slot_metrics.frame_accent.right")) { if((bool)Override("slot_metrics.frame_accent.right")) style.slot_metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.slot_metrics.frame_accent.edges &= ~StyledFrameAccent::Right; } else override_model_.SetValue("slot_metrics.frame_accent.right",bool(base.slot_metrics.frame_accent.edges & StyledFrameAccent::Right),false);
+        if(Active("slot_metrics.frame_accent.thickness")) style.slot_metrics.frame_accent.thickness = (int)Override("slot_metrics.frame_accent.thickness"); else override_model_.SetValue("slot_metrics.frame_accent.thickness",base.slot_metrics.frame_accent.thickness,false);
+        if(Active("slot_metrics.frame_accent.alpha")) style.slot_metrics.frame_accent.alpha = (int)Override("slot_metrics.frame_accent.alpha"); else override_model_.SetValue("slot_metrics.frame_accent.alpha",base.slot_metrics.frame_accent.alpha,false);
+        if(Active("slot_metrics.frame_accent.color")) style.slot_metrics.frame_accent.color = (Color)Override("slot_metrics.frame_accent.color"); else override_model_.SetValue("slot_metrics.frame_accent.color",base.slot_metrics.frame_accent.color,false);
         if(Active("slot_metrics.frame_width")) style.slot_metrics.frame_width = (int)Override("slot_metrics.frame_width"); else override_model_.SetValue("slot_metrics.frame_width",base.slot_metrics.frame_width,false);
         if(Active("slot_metrics.face_enabled")) style.slot_metrics.face_enabled = (bool)Override("slot_metrics.face_enabled"); else override_model_.SetValue("slot_metrics.face_enabled",base.slot_metrics.face_enabled,false);
         if(Active("slot_metrics.frame_enabled")) style.slot_metrics.frame_enabled = (bool)Override("slot_metrics.frame_enabled"); else override_model_.SetValue("slot_metrics.frame_enabled",base.slot_metrics.frame_enabled,false);
@@ -471,6 +510,13 @@ private:
         bool authored=false; for(int i=0;i<override_model_.GetCount();i++) authored |= override_model_[i].override_active;
         if(authored) { generated_ << "        auto style = control.GetStyle();\n";
         { String id="surface_metrics.radius"; if(Active(id)) generated_ << "        style.surface_metrics.radius = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="surface_metrics.frame_accent.top"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="surface_metrics.frame_accent.bottom"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="surface_metrics.frame_accent.left"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="surface_metrics.frame_accent.right"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="surface_metrics.frame_accent.thickness"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.thickness = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="surface_metrics.frame_accent.alpha"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.alpha = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="surface_metrics.frame_accent.color"; if(Active(id)) generated_ << "        style.surface_metrics.frame_accent.color = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="surface_metrics.frame_width"; if(Active(id)) generated_ << "        style.surface_metrics.frame_width = " << AsString((int)Override(id)) << ";\n"; }
         { String id="surface_metrics.face_enabled"; if(Active(id)) generated_ << "        style.surface_metrics.face_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
         { String id="surface_metrics.frame_enabled"; if(Active(id)) generated_ << "        style.surface_metrics.frame_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
@@ -510,6 +556,13 @@ private:
         { String id="surface_metrics.shadow.curve.x2"; if(Active(id)) generated_ << "        style.surface_metrics.shadow.curve.x2 = " << Format("%.17g",(double)Override(id)) << ";\n"; }
         { String id="surface_metrics.shadow.curve.y2"; if(Active(id)) generated_ << "        style.surface_metrics.shadow.curve.y2 = " << Format("%.17g",(double)Override(id)) << ";\n"; }
         { String id="slot_metrics.radius"; if(Active(id)) generated_ << "        style.slot_metrics.radius = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="slot_metrics.frame_accent.top"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Top;\n"; }
+        { String id="slot_metrics.frame_accent.bottom"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Bottom;\n"; }
+        { String id="slot_metrics.frame_accent.left"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Left;\n"; }
+        { String id="slot_metrics.frame_accent.right"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.edges " << ((bool)Override(id) ? "|= " : "&= ~") << "StyledFrameAccent::Right;\n"; }
+        { String id="slot_metrics.frame_accent.thickness"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.thickness = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="slot_metrics.frame_accent.alpha"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.alpha = " << AsString((int)Override(id)) << ";\n"; }
+        { String id="slot_metrics.frame_accent.color"; if(Active(id)) generated_ << "        style.slot_metrics.frame_accent.color = " << CppColor((Color)Override(id)) << ";\n"; }
         { String id="slot_metrics.frame_width"; if(Active(id)) generated_ << "        style.slot_metrics.frame_width = " << AsString((int)Override(id)) << ";\n"; }
         { String id="slot_metrics.face_enabled"; if(Active(id)) generated_ << "        style.slot_metrics.face_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }
         { String id="slot_metrics.frame_enabled"; if(Active(id)) generated_ << "        style.slot_metrics.frame_enabled = " << BoolCode((bool)Override(id)) << ";\n"; }

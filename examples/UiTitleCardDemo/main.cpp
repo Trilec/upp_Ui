@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -230,6 +292,10 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = UiTheme::ResolveTitleCard();
+          AddFrameAccentProperties(override_model_, "metrics.frame_accent.", accent_base.metrics, "Frame Accent");
+        }
+
         inspector_model_.AddBoolean("content.cell","Content cell",false,"Content");
         inspector_model_.AddText("title","Title",cfg_.title,"Control").SetDefault(cfg_.title);
         inspector_model_.AddText("subtitle","Subtitle",cfg_.subtitle,"Control").SetDefault(cfg_.subtitle);
@@ -328,6 +394,7 @@ private:
         { if(override_model_.Find("card_line_thickness")->override_active) style.card_line_thickness = cfg_.card_line_thickness; }
         style.hover_enabled = cfg_.hover;
 
+        ApplyFrameAccentProperties(style.metrics, override_model_, "metrics.frame_accent.");
         card_.SetCustomStyle(style)
              .SetTitle(cfg_.title)
              .SetSubTitle(cfg_.subtitle)
@@ -372,6 +439,7 @@ private:
         if(override_model_.Find("card_line")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line = " << String(cfg_.card_line ? "true" : "false") << ";\n"; }
         if(override_model_.Find("card_line_length")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line_length = " << String("(UiSpan)") << AsString((int)cfg_.card_line_length) << ";\n"; }
         if(override_model_.Find("card_line_thickness")->override_active) { if(!authored) code << "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n"; authored=true; code << "style.card_line_thickness = " << AsString((int)cfg_.card_line_thickness) << ";\n"; }
+        EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "style.metrics", "UiTitleCard::Style style = UiTheme::ResolveTitleCard();\n", authored);
         if(authored) code << "card.SetCustomStyle(style);\n";        code << "card.SetTitle(" << QuoteCpp(cfg_.title) << ").SetSubTitle(" << QuoteCpp(cfg_.subtitle) << ").SetCopyText(" << QuoteCpp(cfg_.copy) << ");\n";
         code << "card.SetMedia(ICON_EDITOR_NOTES_48(),Size(" << AsString((int)cfg_.media_size) << "," << AsString((int)cfg_.media_size) << ")).SetMediaSide((UiAlign)" << AsString((int)cfg_.media_side) << ").SetMediaSharePercent(" << AsString((int)cfg_.media_share) << ");\n";
         code << "card.EnableHover(" << String(cfg_.hover ? "true" : "false") << ").SetSelectable(" << String(cfg_.selectable ? "true" : "false") << ");\n";

@@ -1,4 +1,5 @@
-"""Refresh portable Ui skill references and deterministic upload ZIPs."""
+"""Refresh portable Ui references, optionally producing deterministic upload ZIPs."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -13,10 +14,13 @@ GUIDES = [
 ]
 
 
-def package(name, guides):
+def package(name, guides, references_only=False):
     source = SKILLS / name
     upstream = source / 'references/upstream'
-    paths = ['docs/' + guide for guide in guides] + ['LICENSE', 'GETTING_STARTED.md']
+    paths = ['docs/' + guide for guide in guides] + [
+        'docs/CONTROL_USAGE.md', 'docs/PROJECT_FONTS.md', 'docs/MEDIA_CONTROLS.md',
+        'LICENSE', 'GETTING_STARTED.md',
+    ]
     hashes = {}
     for relative in paths:
         data = (ROOT / relative).read_bytes()
@@ -30,6 +34,9 @@ def package(name, guides):
         'sha256': hashes,
         'note': 'Working-tree snapshots; headers and examples are resolved in the target checkout.',
     }, indent=2) + '\n', encoding='utf-8')
+    if references_only:
+        print(f'{upstream}: {len(paths)} reference files refreshed; no ZIP written')
+        return
     files = sorted(p for p in source.rglob('*') if p.is_file()
                    and '__pycache__' not in p.parts and p.suffix not in ('.zip', '.pyc'))
     target = SKILLS / (name + '.zip')
@@ -47,5 +54,9 @@ def package(name, guides):
 
 
 if __name__ == '__main__':
-    package('upp-ui-development', GUIDES)
-    package('upp-ui-html-mockup', GUIDES[1:3])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--references-only', action='store_true',
+                        help='Refresh references and provenance without creating upload ZIPs.')
+    args = parser.parse_args()
+    package('upp-ui-development', GUIDES, args.references_only)
+    package('upp-ui-html-mockup', GUIDES[1:3], args.references_only)

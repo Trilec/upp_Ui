@@ -6,6 +6,75 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->enabled && row->value != row->default_value) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->enabled || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->enabled || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
+bool HasFrameAccentChanges(const PropertyEditorModel& model)
+{
+    for(const PropertyEditorItem& item : model.GetItems())
+        if(item.id.Find(".frame_accent.") >= 0 && item.enabled && item.value != item.default_value) return true;
+    return false;
+}
+
 
 String CppBool(bool value) { return value ? "true" : "false"; }
 String CppColor(Color c)
@@ -273,6 +342,10 @@ private:
         model_.SetGroupSubtitle("Indicator", "active-tab emphasis");
         model_.SetGroupSubtitle("Body", "page container surface");
         model_.SetGroupSubtitle("Tab Surface", "individual tab surface");
+        { auto accent_base = UiTheme::ResolveTab();
+          AddFrameAccentProperties(model_, "metrics.frame_accent.", accent_base.metrics, "metrics / Frame Accent");
+          AddFrameAccentProperties(model_, "tab_metrics.frame_accent.", accent_base.tab_metrics, "tab_metrics / Frame Accent");
+        }
         model_.StructureChanged();
     }
 
@@ -303,10 +376,26 @@ private:
         };
     }
 
+    void UpdateFrameAccentAvailability()
+    {
+        const UiTabVisual visual = ParseVisual(AsString(Get("visual")));
+        for(int i = 0; i < model_.GetCount(); i++) {
+            PropertyEditorItem& row = model_[i];
+            bool supported = row.enabled;
+            if(row.id.StartsWith("tab_metrics.frame_accent.")) { supported = visual == UITAB_SEGMENTED; row.help = "Tab accents require closed caps; choose Segmented. Values are retained for the next supported visual."; }
+            if(row.enabled != supported) {
+                row.enabled = supported;
+                model_.ValueChanged(row.id);
+            }
+        }
+    }
+
     UiTab::Style MakeStyle() const
     {
         const UiTabVisual visual = ParseVisual(AsString(Get("visual")));
         UiTab::Style style = UiTheme::ResolveTab(UiRole::Standard, visual);
+        ApplyFrameAccentProperties(style.metrics, model_, "metrics.frame_accent.");
+        ApplyFrameAccentProperties(style.tab_metrics, model_, "tab_metrics.frame_accent.");
         style.visual = visual;
         if(Changed("tab_extent")) style.tab_extent = DPI((int)Get("tab_extent"));
         if(Changed("item_spacing")) style.item_spacing = DPI((int)Get("item_spacing"));
@@ -350,6 +439,7 @@ private:
 
     void ApplyProjection()
     {
+        UpdateFrameAccentAvailability();
         const int active = minmax((int)Get("active"), 0, max(0, tab_.GetCount() - 1));
         tab_.SetVisual(ParseVisual(AsString(Get("visual"))))
             .SetPlacement(ParseSide(AsString(Get("placement"))))
@@ -429,6 +519,10 @@ private:
                 << "    style.tab_palette.icon[state] = " << CppColor(Color(Get("tab_icon"))) << ";\n"
                 << "}\n";
         }
+        { bool authored = true;
+          EmitFrameAccentProperties(out, model_, "metrics.frame_accent.", "style.metrics", String(), authored);
+          EmitFrameAccentProperties(out, model_, "tab_metrics.frame_accent.", "style.tab_metrics", String(), authored);
+        }
         out << "tabs.SetCustomStyle(style);\n";
     }
 
@@ -506,7 +600,7 @@ private:
         if(mode == "changes") {
             bool any = false;
             for(int i = 0; i < model_.GetCount(); i++)
-                if(model_[i].value != model_[i].default_value && model_[i].group != "General") {
+                if(model_[i].enabled && model_[i].value != model_[i].default_value && model_[i].group != "General") {
                     any = true;
                     break;
                 }
@@ -552,6 +646,7 @@ private:
 
     bool IsStyleProperty(const String& id) const
     {
+        if(id.Find(".frame_accent.") >= 0) return true;
         static const char* ids[] = { "active_frame_color", "active_frame_width", "active_uses_body", "body_face", "body_face_enabled", "body_frame", "body_frame_enabled", "body_frame_width", "body_gap", "body_ink", "body_radius", "content_gap", "expand_tabs", "font_bold", "font_height", "icon_side", "icon_size", "indicator_thickness", "item_spacing", "min_tab_main", "open_corner_radius", "padding_x", "padding_y", "tab_extent", "tab_face", "tab_face_enabled", "tab_frame", "tab_frame_enabled", "tab_frame_width", "tab_icon", "tab_ink", "tab_radius" };
         for(const char* name : ids) if(id == name) return true;
         return false;

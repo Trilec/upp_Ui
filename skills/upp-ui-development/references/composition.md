@@ -45,6 +45,12 @@ style is an owned snapshot; ClearCustomStyle resumes inheritance. Transparent
 None is not a request for an OS-colored fallback. Use theme-aware icon/ink/focus
 colors, and account for shadows in layout instead of painting beyond allocation.
 
+Frame Accent is optional additional decoration in StyledMetrics: independently
+selected Top/Bottom/Left/Right edges, thickness, colour and alpha. It follows the
+rounded contour inside the existing frame without adding a layout inset. Panel,
+GroupPanel and ScrollPanel consume it; a custom surface painter must explicitly
+use UiPaintFrameAccent rather than promising support from the metrics alone.
+
 For legacy CtrlLib controls, inspect the actual typed Style and ChPaint/ChMargins
 contracts. SetStyle may borrow a style whose lifetime must cover use. Ui's
 SetCustomStyle owns a snapshot. There is no universal interchangeable

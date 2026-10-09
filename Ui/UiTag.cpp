@@ -153,7 +153,7 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
         && style.frame_alpha[state] > 0
         && !IsNull(style.palette.frame[state]);
 
-    if(!draw_face && !draw_frame)
+    if(!draw_face && !draw_frame && !metrics.frame_accent.IsVisible())
         return Image();
 
     UiRasterCachePolicy policy = UiRasterPolicyAA("tag/decoration");
@@ -170,6 +170,8 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
        .Add(metrics.face_enabled)
        .Add(metrics.dashed)
        .Add(metrics.dash_pattern)
+       .Add(metrics.frame_accent.edges).Add(metrics.frame_accent.thickness)
+       .Add(metrics.frame_accent.color).Add(metrics.frame_accent.alpha)
        .Add(style.face_alpha[state])
        .Add(style.frame_alpha[state])
        .Add((int)fill.kind);
@@ -241,6 +243,10 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
         }
 
         painter.End();
+        StyledMetrics accent_metrics = metrics;
+        accent_metrics.frame_width = frame_width;
+        accent_metrics.frame_enabled = draw_frame;
+        UiPaintFrameAccent(painter, surface, style.palette, accent_metrics, state);
         painter.Finish();
         return Image(buffer);
     };

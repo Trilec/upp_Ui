@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -223,6 +285,12 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = matrix_.GetStyle();
+          AddFrameAccentProperties(override_model_, "surface_metrics.frame_accent.", accent_base.surface_metrics, "Surface / Frame Accent");
+          AddFrameAccentProperties(override_model_, "cell_metrics.frame_accent.", accent_base.cell_metrics, "Cells / Frame Accent");
+          AddFrameAccentProperties(override_model_, "readout_metrics.frame_accent.", accent_base.readout_metrics, "Readout / Frame Accent");
+        }
+
         inspector_model_.AddChoice("preset","Preset",cfg_.preset,"Control").AddChoice(0,"Position 9").AddChoice(1,"Compass 8").AddChoice(2,"Region 5").AddChoice(3,"Quad Pair").AddChoice(4,"Cardinal 4").SetDefault(cfg_.preset);
         inspector_model_.AddChoice("mode","Mode",cfg_.mode,"Control").AddChoice(0,"Single cell").AddChoice(1,"Pair").SetDefault(cfg_.mode);
         inspector_model_.AddInteger("width","Width",cfg_.width,"Control").SetRange(80,1000,1).SetDefault(cfg_.width);
@@ -345,6 +413,11 @@ private:
             matrix_.SetCell(3, "D", "Concept D", "d");
         }
         ApplyStyle();
+        { auto style = matrix_.GetStyle();
+          ApplyFrameAccentProperties(style.surface_metrics, override_model_, "surface_metrics.frame_accent.");
+          ApplyFrameAccentProperties(style.cell_metrics, override_model_, "cell_metrics.frame_accent.");
+          ApplyFrameAccentProperties(style.readout_metrics, override_model_, "readout_metrics.frame_accent.");
+          matrix_.SetCustomStyle(style); }
         int max_index = matrix_.GetCellCount() - 1;
         cfg_.default_index = clamp(cfg_.default_index, 0, max(0, max_index));
         inspector_model_.Find("default_index")->SetRange(0,max(0,max_index),1);
@@ -383,6 +456,11 @@ private:
         if(override_model_.Find("default_dash")->override_active || override_model_.Find("default_gap")->override_active) code << "selector.SetDefaultDash(DPI(" << cfg_.default_dash << "),DPI(" << cfg_.default_gap << "));\n";
         if(cfg_.preset==3) code << "selector.SetCell(0,\"A\",\"Concept A\",\"a\").SetCell(1,\"B\",\"Concept B\",\"b\").SetCell(2,\"C\",\"Concept C\",\"c\").SetCell(3,\"D\",\"Concept D\",\"d\");\n";
 
+        { bool authored = false;
+          EmitFrameAccentProperties(code, override_model_, "surface_metrics.frame_accent.", "style.surface_metrics", "UiMatrixSelector::Style style = selector.GetStyle();\n", authored);
+          EmitFrameAccentProperties(code, override_model_, "cell_metrics.frame_accent.", "style.cell_metrics", "UiMatrixSelector::Style style = selector.GetStyle();\n", authored);
+          EmitFrameAccentProperties(code, override_model_, "readout_metrics.frame_accent.", "style.readout_metrics", "UiMatrixSelector::Style style = selector.GetStyle();\n", authored);
+          if(authored) code << "selector.SetCustomStyle(style);\n"; }
         return code;
     }
     void ApplyDemoTheme() {}

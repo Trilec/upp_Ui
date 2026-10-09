@@ -498,9 +498,11 @@ void UiGroupPanel::PaintGroupFrame(Draw& w, const Rect& frame_rect,
     metrics.content_margin = Rect(0, 0, 0, 0);
     StyledMetrics face_metrics = metrics;
     face_metrics.frame_enabled = false;
+    face_metrics.frame_accent.edges = StyledFrameAccent::None;
     UiPaintFaceFrameDash(w, frame_rect, s.palette, face_metrics, st);
 
-    if(!metrics.frame_enabled || metrics.frame_width <= 0 || IsNull(s.palette.frame[st]))
+    if((!metrics.frame_enabled || metrics.frame_width <= 0 || IsNull(s.palette.frame[st]))
+       && !metrics.frame_accent.IsVisible())
         return;
 
     StyledMetrics frame_metrics = metrics;
@@ -544,7 +546,9 @@ void UiGroupPanel::PaintGroupFrame(Draw& w, const Rect& frame_rect,
         gap_count = 1;
     }
 
-    int depth = max(1, metrics.frame_width) + max(0, metrics.radius) + DPI(2);
+    int depth = (int)min<int64>(max(frame_rect.GetWidth(), frame_rect.GetHeight()),
+        (int64)max(1, metrics.frame_width) + max(0, metrics.radius)
+        + max(0, metrics.frame_accent.thickness) + DPI(2));
     Rect remainder = frame_rect;
     switch(s.header_placement) {
     case UiAlign::BOTTOM: remainder.bottom = max(remainder.top, remainder.bottom - depth); break;

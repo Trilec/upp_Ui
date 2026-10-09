@@ -6,6 +6,75 @@
 using namespace Upp;
 
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->value != row->default_value) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->value != row->default_value) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->value != row->default_value) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || row->value == row->default_value) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
+bool HasFrameAccentChanges(const PropertyEditorModel& model)
+{
+    for(const PropertyEditorItem& item : model.GetItems())
+        if(item.id.Find(".frame_accent.") >= 0 && item.value != item.default_value) return true;
+    return false;
+}
+
 
 String CppBool(bool value) { return value ? "true" : "false"; }
 String CppColor(Color c)
@@ -214,6 +283,10 @@ private:
         model_.SetGroupSubtitle("Layout", "orientation and control placement");
         model_.SetGroupSubtitle("Track", "switch track surface");
         model_.SetGroupSubtitle("Thumb", "moving thumb surface");
+        { auto accent_base = UiTheme::ResolveToggle(UiRole::Accent);
+          AddFrameAccentProperties(model_, "track_metrics.frame_accent.", accent_base.track_metrics, "track_metrics / Frame Accent");
+          AddFrameAccentProperties(model_, "thumb_metrics.frame_accent.", accent_base.thumb_metrics, "thumb_metrics / Frame Accent");
+        }
         model_.StructureChanged();
     }
 
@@ -247,6 +320,8 @@ private:
     UiToggle::Style MakeStyle() const
     {
         UiToggle::Style style = UiTheme::ResolveToggle(UiRole::Accent);
+        ApplyFrameAccentProperties(style.track_metrics, model_, "track_metrics.frame_accent.");
+        ApplyFrameAccentProperties(style.thumb_metrics, model_, "thumb_metrics.frame_accent.");
         if(Changed("direction")) style.direction = ParseDirection(AsString(Get("direction")));
         if(Changed("track_side")) style.track_side = ParseSide(AsString(Get("track_side")));
         if(Changed("track_height") || Changed("track_width")) style.track_size = Size(DPI((int)Get("track_width")), DPI((int)Get("track_height")));
@@ -314,6 +389,7 @@ private:
                    Changed("track_radius") || Changed("track_frame_width") || Changed("track_face") || Changed("track_frame") ||
                    Changed("thumb_width") || Changed("thumb_height") || Changed("thumb_radius") || Changed("thumb_inset") ||
                    Changed("thumb_frame_width") || Changed("thumb_face") || Changed("thumb_frame");
+        any |= HasFrameAccentChanges(model_);
         if(!any) return;
         out << "\n// Optional local design changes relative to the current UiTheme.\n";
         out << "UiToggle::Style style = UiTheme::ResolveToggle(UiRole::Accent);\n";
@@ -333,6 +409,10 @@ private:
             if(use("thumb_face")) out << "    style.thumb_palette.face[state] = UiFill::Solid(" << CppColor(Color(Get("thumb_face"))) << ");\n";
             if(use("thumb_frame")) out << "    style.thumb_palette.frame[state] = " << CppColor(Color(Get("thumb_frame"))) << ";\n";
             out << "}\n";
+        }
+        { bool authored = true;
+          EmitFrameAccentProperties(out, model_, "track_metrics.frame_accent.", "style.track_metrics", String(), authored);
+          EmitFrameAccentProperties(out, model_, "thumb_metrics.frame_accent.", "style.thumb_metrics", String(), authored);
         }
         out << "toggle.SetCustomStyle(style);\n";
     }
@@ -425,6 +505,7 @@ private:
 
     bool IsStyleProperty(const String& id) const
     {
+        if(id.Find(".frame_accent.") >= 0) return true;
         static const char* ids[] = { "animate", "animation_ms", "direction", "thumb_face", "thumb_frame", "thumb_frame_width", "thumb_height", "thumb_inset", "thumb_radius", "thumb_width", "track_face", "track_frame", "track_frame_width", "track_height", "track_radius", "track_side", "track_width" };
         for(const char* name : ids) if(id == name) return true;
         return false;

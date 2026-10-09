@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -206,6 +268,12 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = scrollbar_.GetStyle();
+          AddFrameAccentProperties(override_model_, "track_metrics.frame_accent.", accent_base.track_metrics, "Track / Frame Accent");
+          AddFrameAccentProperties(override_model_, "thumb_metrics.frame_accent.", accent_base.thumb_metrics, "Thumb / Frame Accent");
+          AddFrameAccentProperties(override_model_, "arrow_metrics.frame_accent.", accent_base.arrow_metrics, "Arrow / Frame Accent");
+        }
+
         inspector_model_.AddChoice("direction","Direction",cfg_.direction,"Control").AddChoice(0,"Horizontal").AddChoice(1,"Vertical").SetDefault(cfg_.direction);
         inspector_model_.AddInteger("minimum","Minimum",cfg_.minimum,"Control").SetRange(-1000,999,1).SetDefault(cfg_.minimum);
         inspector_model_.AddInteger("maximum","Maximum",cfg_.maximum,"Control").SetRange(-999,1000,1).SetDefault(cfg_.maximum);
@@ -313,6 +381,9 @@ private:
             { if(override_model_.Find("track_face")->override_active) s.track_palette.face[i]=UiFill::Solid(cfg_.track_face); }
         }
         { if(override_model_.Find("grip_color")->override_active) s.grip_color=cfg_.grip_color; }
+        ApplyFrameAccentProperties(s.track_metrics, override_model_, "track_metrics.frame_accent.");
+        ApplyFrameAccentProperties(s.thumb_metrics, override_model_, "thumb_metrics.frame_accent.");
+        ApplyFrameAccentProperties(s.arrow_metrics, override_model_, "arrow_metrics.frame_accent.");
         scrollbar_.SetCustomStyle(s).SetDirection(cfg_.direction ? UiDirection::V : UiDirection::H)
           .SetRange(cfg_.minimum,cfg_.maximum,cfg_.page).SetPos(cfg_.position)
           .ShowArrows(cfg_.arrows).SetArrowsLayout((UiScrollArrowsLayout)cfg_.arrows_layout)
@@ -348,6 +419,9 @@ private:
         if(override_model_.Find("thumb_face")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.thumb_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.thumb_face) << ");\n"; }
         if(override_model_.Find("track_face")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.track_palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.track_face) << ");\n"; }
         if(override_model_.Find("grip_color")->override_active) { if(!authored) code << "UiScrollBar::Style style = scrollbar.GetStyle();\n"; authored=true; code << "style.grip_color = " << ColorCpp(cfg_.grip_color) << ";\n"; }
+        EmitFrameAccentProperties(code, override_model_, "track_metrics.frame_accent.", "style.track_metrics", "UiScrollBar::Style style = scrollbar.GetStyle();\n", authored);
+        EmitFrameAccentProperties(code, override_model_, "thumb_metrics.frame_accent.", "style.thumb_metrics", "UiScrollBar::Style style = scrollbar.GetStyle();\n", authored);
+        EmitFrameAccentProperties(code, override_model_, "arrow_metrics.frame_accent.", "style.arrow_metrics", "UiScrollBar::Style style = scrollbar.GetStyle();\n", authored);
         if(authored) code << "scrollbar.SetCustomStyle(style);\n";
         code << "scrollbar.SetDirection(" << AsString((int)cfg_.direction) << " ? UiDirection::V : UiDirection::H);\n";
         code << "scrollbar.SetRange(" << AsString((int)cfg_.minimum) << "," << AsString((int)cfg_.maximum) << "," << AsString((int)cfg_.page) << ").SetPos(" << AsString((int)cfg_.position) << ");\n";

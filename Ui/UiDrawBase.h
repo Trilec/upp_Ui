@@ -40,6 +40,12 @@
 
 namespace Upp {
 
+// Paints only the optional inner Frame Accent. Call with the actual surface
+// rectangle (already adjusted for shadows); never changes content geometry.
+void UiPaintFrameAccent(Draw& w, const Rect& surface,
+                        const StyledPalette& palette, const StyledMetrics& metrics,
+                        StyledState state);
+
 enum UiCapShape : byte {
     UICAP_FLAT_OPEN = 0,
     UICAP_FLAT_CLOSED,
@@ -1020,8 +1026,10 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
                                  const StyledMetrics& m,
                                  StyledState st)
 {
-    if(!m.face_enabled && !m.frame_enabled)
+    if(!m.face_enabled && !m.frame_enabled) {
+        UiPaintFrameAccent(w, outer, palette, m, st);
         return;
+    }
 
     const int fw     = max(m.frame_width, 0);
     const int radius = max(m.radius, 0);
@@ -1045,6 +1053,7 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
             w.DrawRect(fr.left,             fr.top,           fw,            fr.GetHeight(), fc);
             w.DrawRect(fr.right - fw,       fr.top,           fw,            fr.GetHeight(), fc);
         }
+        UiPaintFrameAccent(w, outer, palette, m, st);
         return;
     }
 
@@ -1097,6 +1106,7 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
     }
 
     w.DrawImage(outer.left, outer.top, ib);
+    UiPaintFrameAccent(w, outer, palette, m, st);
 }
 
 // -------------------------------------------------------------------------
@@ -1494,8 +1504,12 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
     if(alpha <= 0)
         return;
 
-    if(!m.face_enabled && !m.frame_enabled)
+    if(!m.face_enabled && !m.frame_enabled) {
+        StyledMetrics faded = m;
+        faded.frame_accent.alpha = (clamp(m.frame_accent.alpha, 0, 255) * alpha + 127) / 255;
+        UiPaintFrameAccent(w, outer, palette, faded, st);
         return;
+    }
 
     const int fw     = max(m.frame_width, 0);
     const int radius = max(m.radius, 0);
@@ -1553,6 +1567,9 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
     }
 
     w.DrawImage(outer.left, outer.top, ib);
+    StyledMetrics faded = m;
+    faded.frame_accent.alpha = (clamp(m.frame_accent.alpha, 0, 255) * alpha + 127) / 255;
+    UiPaintFrameAccent(w, outer, palette, faded, st);
 }
 
 template <class Factory>

@@ -520,6 +520,29 @@ struct StyledHighlight {
     }
 };
 
+// Optional decoration inside the normal frame; no content/layout inset.
+// Edge flags combine with |. Null color follows the resolved state frame color.
+struct StyledFrameAccent {
+    enum Edge { None = 0, Top = 1, Bottom = 2, Left = 4, Right = 8, All = 15 };
+    int edges = None;
+    int thickness = DPI(2);
+    Color color = Null;
+    int alpha = 255;
+
+    bool IsVisible() const { return (edges & All) && thickness > 0 && alpha > 0; }
+    bool IsDefault() const {
+        return edges == None && thickness == DPI(2) && IsNull(color) && alpha == 255;
+    }
+    void Serialize(Stream& s) {
+        s % edges % thickness % color % alpha;
+        if(s.IsLoading()) {
+            edges &= All;
+            thickness = max(0, thickness);
+            alpha = clamp(alpha, 0, 255);
+        }
+    }
+};
+
 struct StyledMetrics {
     Font text_font      = StdFont();
     bool use_text_font  = false;
@@ -552,9 +575,23 @@ struct StyledMetrics {
 
     StyledShadow   shadow;
     StyledHighlight highlight;
+    StyledFrameAccent frame_accent;
 
     void Serialize(Stream& s)
     {
+        // Legacy metrics begin with Font's packed version (0/1). A reserved
+        // marker introduces the extension only when authored; default streams
+        // remain byte-compatible. Peek keeps non-seekable readers supported.
+        bool extended = !frame_accent.IsDefault();
+        if(s.IsLoading()) {
+            extended = s.Peek() == 250;
+            frame_accent = StyledFrameAccent();
+            if(extended) {
+                s.Get();
+                if(s.Get() != 1) { s.LoadError(); return; }
+            }
+        }
+        else if(extended) { s.Put(250); s.Put(1); }
         s % text_font % use_text_font
           % content_margin
           % radius % frame_width
@@ -563,6 +600,8 @@ struct StyledMetrics {
           % high_contrast % focus_enabled
           % focus_margin % focus_alpha % focus_color
           % shadow % highlight;
+        if(extended)
+            s % frame_accent;
     }
 };
 
@@ -1205,6 +1244,27 @@ public:
     T& SetFocusMargin(int px) { StyledMetricsRef().focus_margin = max(px, 0); OnStyleChanged(); return Self(); }
     T& SetFocusColor(Color c) { StyledMetricsRef().focus_color = c; OnStyleChanged(); return Self(); }
     T& SetFocusAlpha(int a) { StyledMetricsRef().focus_alpha = clamp(a, 0, 255); OnStyleChanged(); return Self(); }
+
+    // Creates an explicit style snapshot, like the other styling setters.
+    // Shared face/frame renderers consume this; custom painters opt in through
+    // UiPaintFrameAccent. Thickness is in device pixels (apply DPI once).
+    T& SetFrameAccent(int edges, int thickness = DPI(2), Color color = Null, int alpha = 255)
+    {
+        StyledFrameAccent& accent = StyledMetricsRef().frame_accent;
+        accent.edges = edges & StyledFrameAccent::All;
+        accent.thickness = max(0, thickness);
+        accent.color = color;
+        accent.alpha = clamp(alpha, 0, 255);
+        OnStyleChanged();
+        return Self();
+    }
+
+    T& ClearFrameAccent()
+    {
+        StyledMetricsRef().frame_accent = StyledFrameAccent();
+        OnStyleChanged();
+        return Self();
+    }
 
     // Shadow convenience API -------------------------------------------------
     T& EnableShadow(bool on = true)

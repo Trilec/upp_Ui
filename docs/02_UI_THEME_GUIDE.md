@@ -81,7 +81,7 @@ face (UiFill), frame, ink and icon. ResolveStyledState selects the interaction s
 selection/focus/read-only semantics remain explicit for the control.
 
 StyledMetrics contains font/use-font, content margin, radius, frame width/visibility,
-face visibility, dashed frame/pattern, focus and shadow/highlight. StyledSkin describes
+face visibility, dashed frame/pattern, Frame Accent, focus and shadow/highlight. StyledSkin describes
 image-backed nine-slice drawing: `slice` affects painting; `content_inset` affects
 geometry. Use the actual family image-mode behavior, not an invented second fit mode.
 
@@ -93,6 +93,50 @@ cap/strip fix preserves that distinction and has a native pixel regression.
 The common geometry is outer -> shadow-adjusted surface -> frame/skin-adjusted face
 -> content margin. UiStyledInnerRect and UiStyledOuterSizeFromContent own that seam.
 Layout, hit testing and generated code must agree on it. Apply DPI exactly once.
+
+## Frame Accent
+
+`StyledMetrics::frame_accent` is an additional coloured edge decoration. The
+ordinary frame remains visible; accent thickness does not replace its width.
+`StyledFrameAccent::Top`, `Bottom`, `Left` and `Right` are combinable edge flags
+(1, 2, 4 and 8); `All` selects all four and `None` disables the accent. Defaults
+are no edges, thickness `DPI(2)`, colour `Null` and alpha 255. Null colour resolves
+to the current interaction state's frame colour; alpha is a true 0–255 opacity.
+
+```cpp
+UiPanel panel;
+UiPanel::Style style = panel.GetStyle();
+style.metrics.radius = DPI(8);
+style.metrics.frame_accent.edges = StyledFrameAccent::Top | StyledFrameAccent::Left;
+style.metrics.frame_accent.thickness = DPI(2);
+style.metrics.frame_accent.color = Color(70, 110, 170);
+style.metrics.frame_accent.alpha = 200;
+panel.SetCustomStyle(style);
+```
+
+CtrlStyled controls also offer
+`SetFrameAccent(edges, thickness, color, alpha)` and `ClearFrameAccent()`.
+Like other convenience setters they edit a custom style snapshot; they do not
+establish a new live per-field inheritance system. A host offering inheritable
+overrides reapplies its authored accent to a freshly resolved style.
+
+The accent follows the same rounded contour just inside the existing frame.
+Each selected side owns half of each neighboring rounded corner; adjacent selected
+sides join. It can paint when the ordinary frame is hidden. No selected edges,
+zero thickness or zero opacity paints nothing. It is decorative: no extra content
+inset, minimum size, hit area or scrolling extent is introduced.
+
+Shared face/frame drawing consumes these metrics. UiPanel, UiGroupPanel and
+UiScrollPanel support them, including centered group-header gaps and fixed scroll
+chrome. Custom/specialized painting must explicitly consume
+`UiPaintFrameAccent`; the presence of StyledMetrics alone does not make a
+part support it. See [Drawing](07_UI_DRAWING_GUIDE.md#frame-accent).
+
+StyledMetrics serialization keeps the legacy default representation unchanged;
+authored accents use a versioned extension. Current readers accept legacy styles,
+but older library versions cannot read the new authored accent extension. JSON
+authoring/export must retain edges, thickness, colour and alpha without changing
+the ordinary frame or padding.
 
 ## Colors, icons and decoration
 

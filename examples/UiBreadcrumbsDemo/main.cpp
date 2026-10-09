@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -265,6 +327,10 @@ private:
         Refresh();
     }
     void BuildProperties() {
+        { auto accent_base = crumbs_.GetStyle();
+          AddFrameAccentProperties(override_model_, "metrics.frame_accent.", accent_base.metrics, "Frame Accent");
+        }
+
         inspector_model_.AddChoice("path_kind","Path kind",cfg_.path_kind,"Control").AddChoice(0,"Files").AddChoice(1,"Search").AddChoice(2,"Design").SetDefault(cfg_.path_kind);
         inspector_model_.AddInteger("current","Current",cfg_.current,"Control").SetRange(0,4,1).SetDefault(cfg_.current);
         inspector_model_.AddInteger("visible_count","Visible count",cfg_.visible_count,"Control").SetRange(0,5,1).SetDefault(cfg_.visible_count);
@@ -456,6 +522,7 @@ private:
             s.divider_icon = Image();
             s.divider = DividerText(cfg_.divider);
         }
+        ApplyFrameAccentProperties(s.metrics, override_model_, "metrics.frame_accent.");
         crumbs_.SetCustomStyle(s).SetCurrentIndex(cfg_.current);
 
 
@@ -483,6 +550,7 @@ private:
         if(override_model_.Find("content_gap")->override_active) { if(!authored) code << "UiBreadcrumbs::Style style = crumbs.GetStyle();\n"; authored=true; code << "style.content_gap = DPI(" << AsString((int)cfg_.content_gap) << ");\n"; }
         if(override_model_.Find("face_color")->override_active) { if(!authored) code << "UiBreadcrumbs::Style style = crumbs.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.palette.face[i] = UiFill::Solid(" << ColorCpp(cfg_.face_color) << ");\n"; }
         if(override_model_.Find("frame_color")->override_active) { if(!authored) code << "UiBreadcrumbs::Style style = crumbs.GetStyle();\n"; authored=true; code << "for(int i=0;i<4;i++) style.palette.frame[i] = " << ColorCpp(cfg_.frame_color) << ";\n"; }
+        EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "style.metrics", "UiBreadcrumbs::Style style = crumbs.GetStyle();\n", authored);
         if(authored) code << "crumbs.SetCustomStyle(style);\n";
         Vector<CrumbSample> samples=GetSamples();
         for(int i=0;i<cfg_.visible_count;i++) code << "crumbs.AddCrumb(" << QuoteCpp(samples[i].text) << "," << QuoteCpp(AsString(samples[i].data)) << ");\n";

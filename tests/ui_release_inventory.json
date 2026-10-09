@@ -794,6 +794,7 @@
     }
   ],
   "reference_docs": [
+    "docs/CONTROL_USAGE.md",
     "docs/PROJECT_FONTS.md",
     "docs/MEDIA_CONTROLS.md"
   ]

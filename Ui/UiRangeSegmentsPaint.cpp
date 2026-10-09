@@ -334,12 +334,16 @@ void UiRangeSegments::Paint(Draw& w)
         return;
 
     StyledState base_state = !IsEnabled() || !IsShowEnabled() ? ST_DISABLED : ST_NORMAL;
-    UiPaintStyledBackground(w, g.track, style.track_palette, style.track_metrics,
+    StyledMetrics background = style.track_metrics;
+    background.frame_accent.edges = StyledFrameAccent::None;
+    UiPaintStyledBackground(w, g.track, style.track_palette, background,
                             style.track_skin, base_state, false);
 
     int radius = max(0, style.track_metrics.radius -
                          (style.track_metrics.frame_enabled ? style.track_metrics.frame_width : 0));
     PaintTrackContent(w, g, base_state, radius);
+    UiPaintFrameAccent(w, UiStyledSurfaceRect(g.track, style.track_metrics),
+                       style.track_palette, style.track_metrics, base_state);
 
     if(show_labels_) {
         for(const SegmentGeometry& sg : g.segments) {

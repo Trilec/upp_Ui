@@ -136,6 +136,13 @@ void UiButtonDemo::ApplyProjection()
 #define APPLY_INT(ID, FIELD)  if(OverrideActive(ID)) FIELD = (int)OverrideValue(ID)
 
     APPLY_INT("radius", style.metrics.radius);
+    if(OverrideActive("metrics.frame_accent.top")) { if((bool)OverrideValue("metrics.frame_accent.top")) style.metrics.frame_accent.edges |= StyledFrameAccent::Top; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Top; }
+    if(OverrideActive("metrics.frame_accent.bottom")) { if((bool)OverrideValue("metrics.frame_accent.bottom")) style.metrics.frame_accent.edges |= StyledFrameAccent::Bottom; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Bottom; }
+    if(OverrideActive("metrics.frame_accent.left")) { if((bool)OverrideValue("metrics.frame_accent.left")) style.metrics.frame_accent.edges |= StyledFrameAccent::Left; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Left; }
+    if(OverrideActive("metrics.frame_accent.right")) { if((bool)OverrideValue("metrics.frame_accent.right")) style.metrics.frame_accent.edges |= StyledFrameAccent::Right; else style.metrics.frame_accent.edges &= ~StyledFrameAccent::Right; }
+    if(OverrideActive("metrics.frame_accent.thickness")) style.metrics.frame_accent.thickness = (int)OverrideValue("metrics.frame_accent.thickness");
+    if(OverrideActive("metrics.frame_accent.alpha")) style.metrics.frame_accent.alpha = (int)OverrideValue("metrics.frame_accent.alpha");
+    if(OverrideActive("metrics.frame_accent.color")) style.metrics.frame_accent.color = (Color)OverrideValue("metrics.frame_accent.color");
     APPLY_BOOL("transparent", style.transparent);
     APPLY_BOOL("high_contrast", style.metrics.high_contrast);
     APPLY_BOOL("face_enabled", style.metrics.face_enabled);

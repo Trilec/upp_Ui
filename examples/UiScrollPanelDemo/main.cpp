@@ -5,6 +5,68 @@
 #include <Utilities/PropertyEditor/PropertyEditor.h>
 using namespace Upp;
 namespace {
+// Frame Accent is an authored addition to the ordinary frame, not layout padding.
+void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+                              const StyledMetrics& metrics, const String& group)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    for(int i = 0; i < 4; i++)
+        mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
+    mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
+    mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
+    mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
+}
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
+                         StyledFrameAccent::Left, StyledFrameAccent::Right };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(row && row->override_active) {
+            if((bool)row->value) metrics.frame_accent.edges |= mask[i];
+            else metrics.frame_accent.edges &= ~mask[i];
+        }
+    }
+    const auto* row = model.Find(prefix + "thickness");
+    if(row && row->override_active) metrics.frame_accent.thickness = (int)row->value;
+    row = model.Find(prefix + "alpha");
+    if(row && row->override_active) metrics.frame_accent.alpha = (int)row->value;
+    row = model.Find(prefix + "color");
+    if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
+}
+void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+                               const String& target, const String& declaration, bool& authored)
+{
+    const char* edge[] = { "top", "bottom", "left", "right" };
+    const char* label[] = { "Top", "Bottom", "Left", "Right" };
+    for(int i = 0; i < 4; i++) {
+        const auto* row = model.Find(prefix + edge[i]);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent.edges " << ((bool)row->value ? "|= " : "&= ~")
+             << "StyledFrameAccent::" << label[i] << ";\n";
+    }
+    for(const char* field : { "thickness", "alpha", "color" }) {
+        const auto* row = model.Find(prefix + field);
+        if(!row || !row->override_active) continue;
+        if(!authored) code << declaration;
+        authored = true;
+        code << target << ".frame_accent." << field << " = ";
+        if(String(field) == "color") {
+            Color color(row->value);
+            code << (IsNull(color) ? String("Null") : Format("Color(%d, %d, %d)", color.GetR(), color.GetG(), color.GetB()));
+        }
+        else code << (int)row->value;
+        code << ";\n";
+    }
+}
+
 String QuoteCpp(const String& s) {
     String out="\""; for(int i=0;i<s.GetCount();i++) {
         int c=s[i]; if(c=='\\') out<<"\\\\"; else if(c=='\"') out<<"\\\"";
@@ -197,6 +259,10 @@ private:
     }
 
     void BuildProperties() {
+        { auto accent_base = UiTheme::ResolvePanel(UiPanelRole::Surface);
+          AddFrameAccentProperties(override_model_, "metrics.frame_accent.", accent_base.metrics, "Frame Accent");
+        }
+
         inspector_model_.AddChoice("example.mode","Generate mode",0,"Example").AddChoice(0,"Automatic").AddChoice(1,"Vertical").AddChoice(2,"Horizontal").AddChoice(3,"No scrolling");
         override_model_.AddInteger("panel.radius","Panel radius",DPI(8),"Panel surface").SetRange(0,60,1).SetDefault(DPI(8));
         override_model_.Find("panel.radius")->overrideable=true;
@@ -235,6 +301,7 @@ private:
                 if(override_model_.Find("panel.face")->override_active) style.palette.face[state]=UiFill::Solid(Color(override_model_.Find("panel.face")->value));
                 if(override_model_.Find("panel.frame")->override_active) style.palette.frame[state]=Color(override_model_.Find("panel.frame")->value);
             }
+        ApplyFrameAccentProperties(style.metrics, override_model_, "metrics.frame_accent.");
             panel_[i].SetCustomStyle(style);
 
             for(int j = 0; j < rows_[i].GetCount(); j++)
@@ -340,6 +407,7 @@ private:
             if(String(field)=="panel.face") code << "for(int state=0;state<4;state++) style.palette.face[state]=UiFill::Solid(" << ColorCpp(Color(item->value)) << ");\n";
             if(String(field)=="panel.frame") code << "for(int state=0;state<4;state++) style.palette.frame[state]=" << ColorCpp(Color(item->value)) << ";\n";
         }
+        EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "style.metrics", "UiScrollPanel::Style style=scroll.GetStyle();\n", authored);
         if(authored) code << "scroll.SetCustomStyle(style);\n";
         code << "for(int i=0;i<" << cfg_.row_count << ";i++) {\n    UiButton& item=items.Add();\n    item.SetText(Format(" << QuoteCpp(String(labels[clamp(mode,0,3)])+" item %02d") << ",i+1));\n    item.SetCustomStyle(UiTheme::ResolveButton(i%4==0 ? UiRole::Accent : UiRole::Subtle));\n    scroll.Content().Add(item);\n";
         if(mode==2) code << "    item.SetRect(DPI(8)+i*DPI(136),DPI(8),DPI(128),DPI(32));\n";

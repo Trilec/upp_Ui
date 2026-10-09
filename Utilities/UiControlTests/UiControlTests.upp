@@ -11,6 +11,7 @@ uses
 
 file
     main.cpp,
+    FrameAccent.cpp,
     Button.cpp,
     ColorMatrix.cpp,
     DateTime.cpp,
