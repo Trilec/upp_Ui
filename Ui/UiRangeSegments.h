@@ -29,7 +29,16 @@
 
     Usage
     - SetRange() establishes the fixed domain, SetSegments() supplies proportional
-      spans, labels, optional colours and application payloads.
+      spans, labels/subtitles, optional colours and application payloads.
+    - ShowSegmentValues() adds each span's percentage (or domain length) beside
+      its title/subtitle. Style::value_side chooses LEFT/RIGHT; DEFAULT label_align
+      aligns the text to the opposite side. Text stays upright in vertical stacks.
+      A missing subtitle centres the title vertically. Small cells clip/ellipsize
+      text and drop a subtitle that cannot fit; they never overlap the readout.
+    - Style::thumb_shape selects Ellipse or RoundedRectangle. thumb_size supplies
+      independent width/height; thumb_rotate_with_direction swaps them vertically.
+      thumb_metrics controls face, frame and radius; thumb_hover_growth controls
+      visual expansion. Slim handles retain a separate minimum input target.
     - Drag an internal boundary to redistribute span only between its two neighbours.
     - Observe live edits with WhenChanging and committed edits with WhenAction.
       Programmatic setters are silent. Callbacks see committed state and may
@@ -41,6 +50,7 @@
       ClearCustomStyle restores current role/theme inheritance.
 
     Changelog
+    - 2026-10: card labels, mirrored per-span readouts and framed pill handles.
     - 2026-09: introduced the labelled multi-boundary range control.
 */
 
@@ -53,6 +63,7 @@ enum class UiRole : byte;
 struct UiRangeSegment : Moveable<UiRangeSegment> {
     double span = 1.0;
     String label;
+    String subtitle;
     Color  color = Null;
     Value  data;
 
@@ -61,10 +72,9 @@ struct UiRangeSegment : Moveable<UiRangeSegment> {
                    const Value& d = Value())
         : span(s), label(l), color(c), data(d) {}
 
-    void Serialize(Stream& s)
-    {
-        s % span % label % color % data;
-    }
+    // Empty subtitles retain the legacy binary representation. Authored
+    // subtitles use a versioned extension; GetData/SetData also preserve them.
+    void Serialize(Stream& s);
 };
 
 class UiRangeSegments : public Ctrl {
@@ -81,6 +91,8 @@ public:
         Domain,
         Percent
     };
+
+    enum class ThumbShape : byte { Ellipse, RoundedRectangle };
 
     struct Style : ChStyle<Style> {
         StyledPalette track_palette;
@@ -107,18 +119,22 @@ public:
         int  selected_frame_width = DPI(2);
         int  label_padding = DPI(4);
 
-        void Serialize(Stream& s)
-        {
-            s % track_palette % track_metrics % track_skin
-              % thumb_palette % thumb_metrics % thumb_skin
-              % value_palette;
-            for(int i = 0; i < MAX_SERIES_COLORS; i++)
-                s % series[i];
-            s % series_count % label_font % value_font
-              % track_size % thumb_size % thumb_dot_diameter
-              % divider_width % divider_color % selected_frame
-              % selected_frame_width % label_padding;
-        }
+        ThumbShape thumb_shape = ThumbShape::Ellipse;
+        bool thumb_rotate_with_direction = false;
+        int thumb_hover_growth = DPI(1);
+        Font subtitle_font = StdFontZ(9);
+        Font right_font = StdFontZ(11).Bold();
+        // DEFAULT centres legacy single labels, otherwise aligns the label
+        // block opposite the value. Explicit LEFT/CENTER/RIGHT override that.
+        UiAlign label_align = UiAlign::DEFAULT;
+        UiAlign value_side = UiAlign::RIGHT;
+        int label_gap = DPI(3);
+        int value_gap = DPI(8);
+        Color label_color = Null;
+        Color subtitle_color = Null;
+        Color value_color = Null;
+
+        void Serialize(Stream& s);
     };
 
     struct SegmentGeometry : Moveable<SegmentGeometry> {
@@ -126,6 +142,11 @@ public:
         double start = 0.0;
         double end = 0.0;
         Rect rect;
+        Rect label_rect;
+        Rect subtitle_rect;
+        Rect value_rect;
+        UiAlign label_align = UiAlign::CENTER;
+        String value_text;
         Color color = Null;
         bool visible = false;
     };
@@ -136,6 +157,7 @@ public:
         Rect content;
         Vector<SegmentGeometry> segments;
         Vector<Point> boundaries;
+        Vector<Rect> boundary_thumbs;
     };
 
     static const Style& StyleDefault();
@@ -202,6 +224,11 @@ public:
     UiRangeSegments& SetPalette(const Vector<Color>& colors);
 
     UiRangeSegments& ShowLabels(bool on = true);
+    // Per-segment span readouts, independent of boundary/endpoint values.
+    // ValueDisplay::Percent divides span by the whole fixed domain, not its end.
+    UiRangeSegments& ShowSegmentValues(bool on = true);
+    bool AreSegmentValuesShown() const { return show_segment_values_; }
+    String GetSegmentValueText(int index) const;
     UiRangeSegments& ShowBoundaryValues(bool on = true);
     UiRangeSegments& ShowEndpointValues(bool on = true);
     UiRangeSegments& ShowValuesOnInteraction(bool on = true);
@@ -260,6 +287,9 @@ private:
                                   bool fire_action, bool fire_changing);
 
     Geometry BuildGeometry(Size size) const;
+    void BuildLabelGeometry(SegmentGeometry& segment, const Geometry& geometry,
+                            const Style& style) const;
+    Size ResolveThumbSize(const Style& style) const;
     Rect BuildTrackRect(Size size, const Style& style) const;
     int  ValueToPos(double value, const Rect& track) const;
     double PosToValue(int pos, const Rect& track) const;
@@ -298,6 +328,7 @@ private:
     int value_precision_ = 0;
 
     bool show_labels_ = true;
+    bool show_segment_values_ = false;
     bool show_boundary_values_ = true;
     bool show_endpoint_values_ = true;
     bool show_values_on_interaction_ = false;

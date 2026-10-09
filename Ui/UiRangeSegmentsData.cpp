@@ -63,6 +63,28 @@ UiRangeSegments& UiRangeSegments::ShowBoundaryValues(bool on)
     return *this;
 }
 
+UiRangeSegments& UiRangeSegments::ShowSegmentValues(bool on)
+{
+    if(show_segment_values_ != on) {
+        show_segment_values_ = on;
+        RefreshLayout();
+        Refresh();
+    }
+    return *this;
+}
+
+String UiRangeSegments::GetSegmentValueText(int index) const
+{
+    if(index < 0 || index >= segments_.GetCount())
+        return String();
+    double span = segments_[index].span;
+    if(value_display_ == ValueDisplay::Percent) {
+        double percent = max_ > min_ ? span / (max_ - min_) * 100.0 : 0.0;
+        return FormatDoubleFix(percent, value_precision_) + "%";
+    }
+    return FormatDoubleFix(span, value_precision_);
+}
+
 UiRangeSegments& UiRangeSegments::ShowEndpointValues(bool on)
 {
     if(show_endpoint_values_ != on) {
@@ -123,7 +145,7 @@ UiRangeSegments& UiRangeSegments::SetTrackSize(Size sz)
 UiRangeSegments& UiRangeSegments::SetThumbSize(Size sz)
 {
     Style& s = StyleEdit();
-    s.thumb_size = Size(max(DPI(8), sz.cx), max(DPI(8), sz.cy));
+    s.thumb_size = Size(max(1, sz.cx), max(1, sz.cy));
     RefreshLayout();
     Refresh();
     return *this;
@@ -148,6 +170,9 @@ void UiRangeSegments::SetData(const Value& value)
             q = map.Find("label");
             if(q >= 0 && !IsNull(map.GetValue(q)))
                 segment.label = AsString(map.GetValue(q));
+            q = map.Find("subtitle");
+            if(q >= 0 && !IsNull(map.GetValue(q)))
+                segment.subtitle = AsString(map.GetValue(q));
             q = map.Find("color");
             if(q >= 0 && !IsNull(map.GetValue(q))) {
                 if(!map.GetValue(q).Is<Color>())
@@ -172,6 +197,8 @@ Value UiRangeSegments::GetData() const
         ValueMap map;
         map.Add("span", segment.span);
         map.Add("label", segment.label);
+        if(!segment.subtitle.IsEmpty())
+            map.Add("subtitle", segment.subtitle);
         if(!IsNull(segment.color))
             map.Add("color", segment.color);
         if(!IsNull(segment.data))

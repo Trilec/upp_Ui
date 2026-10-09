@@ -2,9 +2,9 @@
   "source_repository": "upp_Ui",
   "version_header": "#ifndef _Ui_UiVersion_h_\n#define _Ui_UiVersion_h_\n\n/*\n    Ui release identity\n    ===================\n    Author: C Edwards (dodobar)\n    License: Apache License 2.0 (see LICENSE).\n\n    One version for the Ui library, not a separate counter for each control.\n    An RC identifier does not certify platform/visual acceptance. Independently\n    versioned sibling packages and serialized-data schemas retain their versions.\n    No GUI dependency; safe to include in build and diagnostic tools.\n*/\n#define UPP_UI_VERSION \"1.0.0-rc.1\"\n\nnamespace Upp {\ninline const char* UiGetVersion() { return UPP_UI_VERSION; }\n}\n\n#endif\n",
   "sha256": {
-    "docs/01_UI_CONTROLS_GUIDE.md": "5c3c09449acdb2ad5d9467c2ed47ec6d8d40c0d08015ff38f7483141ccd9d408",
-    "docs/02_UI_THEME_GUIDE.md": "826dcb5787b0b20d7bc29bd3bd17fa3094e723e01d6b454397d3fa7b35b2f7d3",
-    "docs/CONTROL_USAGE.md": "43b6015ffe0887829bb3b90ca74595d00f6c9036c0cd39d1d4f4ee14e5587b08",
+    "docs/01_UI_CONTROLS_GUIDE.md": "5c114b47c57abd94299907c4e63a6514f47ff278c8286067ff72ba82ba76255f",
+    "docs/02_UI_THEME_GUIDE.md": "920678dc5077da4129516265acf7eac57fc0bc457a3e1802de53196b30181e38",
+    "docs/CONTROL_USAGE.md": "12d5d6e04f7e0f6a5d6e1986fe3ae73560e8c571e25f37d39fef58a412edc1fa",
     "docs/PROJECT_FONTS.md": "8aee057cbd0a38d4bcc07052f05950685e40296a98cbfc73679742ee729acded",
     "docs/MEDIA_CONTROLS.md": "23cd8ace7106305f134a39ac442425504fa85b60037cde3481d698f7f20a9cec",
     "LICENSE": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",

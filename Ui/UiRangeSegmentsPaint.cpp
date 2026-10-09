@@ -176,8 +176,6 @@ void UiRangeSegments::PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
     Rect r = BoundaryThumbRect(index, g);
     if(r.IsEmpty())
         return;
-    if(state != ST_DISABLED && (index == hot_boundary_ || index == active_boundary_))
-        r.Inflate(DPI(1));
     const Style& style = GetEffectiveStyle();
     Color face = style.thumb_metrics.face_enabled ? FaceColor(style.thumb_palette, state, Null) : Null;
     Color frame = style.thumb_palette.frame[state];
@@ -189,15 +187,21 @@ void UiRangeSegments::PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
                           max(0, min(r.GetWidth(), r.GetHeight()) - 2 * fw));
     Color ink = RangeSegmentsPaletteInk(style.thumb_palette, state, frame);
     const Size size = r.GetSize();
+    const bool rounded = style.thumb_shape == ThumbShape::RoundedRectangle;
+    const int radius = clamp(style.thumb_metrics.radius, 0, min(size.cx, size.cy) / 2);
     auto paint = [=](Painter& p) {
-        const double inset = max(0.5, fw * 0.5);
+        const double inset = fw * 0.5;
         const double cx = r.left + size.cx * 0.5;
         const double cy = r.top + size.cy * 0.5;
         const double rx = max(0.0, size.cx * 0.5 - inset);
         const double ry = max(0.0, size.cy * 0.5 - inset);
         if(rx > 0.0 && ry > 0.0) {
             p.Begin();
-            p.Ellipse(cx, cy, rx, ry);
+            if(rounded)
+                p.RoundedRectangle(r.left + inset, r.top + inset, 2 * rx, 2 * ry,
+                                   min<double>(radius, min(rx, ry)));
+            else
+                p.Ellipse(cx, cy, rx, ry);
             if(!IsNull(face))
                 p.Fill(face);
             if(fw > 0 && !IsNull(frame))
@@ -214,7 +218,7 @@ void UiRangeSegments::PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
         return;
     }
     UiRasterCacheKeyBuilder key("aa/ui-range-segments/thumb");
-    key.Add(size).Add(face).Add(frame).Add(fw).Add(dot).Add(ink);
+    key.Add(size).Add(face).Add(frame).Add(fw).Add(dot).Add(ink).Add(rounded).Add(radius);
     Image raster = UiRasterCache::Get(key.Build(), policy, [=] {
         return RenderRangeRaster(size, Point(r.left, r.top), paint);
     });
@@ -324,6 +328,20 @@ Color ContrastInk(Color c)
     return luminance >= 150000 ? Color(17, 24, 39) : White();
 }
 
+void PaintSegmentText(Draw& draw, const Rect& rect, const String& text,
+                      Font font, Color ink, UiAlign align)
+{
+    if(rect.IsEmpty() || text.IsEmpty() || IsNull(ink)) return;
+    Size size = GetTextSize(text, font);
+    int width = min(rect.GetWidth(), size.cx);
+    int x = align == UiAlign::RIGHT ? rect.right - width : align == UiAlign::CENTER ?
+            rect.left + (rect.GetWidth() - width) / 2 : rect.left;
+    draw.Clip(rect);
+    DrawTextEllipsis(draw, x, rect.top + (rect.GetHeight() - size.cy) / 2,
+                     width, text, "...", font, ink);
+    draw.End();
+}
+
 } // namespace
 
 void UiRangeSegments::Paint(Draw& w)
@@ -345,23 +363,22 @@ void UiRangeSegments::Paint(Draw& w)
     UiPaintFrameAccent(w, UiStyledSurfaceRect(g.track, style.track_metrics),
                        style.track_palette, style.track_metrics, base_state);
 
-    if(show_labels_) {
+    if(show_labels_ || show_segment_values_) {
         for(const SegmentGeometry& sg : g.segments) {
             if(!sg.visible || sg.index < 0 || sg.index >= segments_.GetCount())
                 continue;
-            const String& label = segments_[sg.index].label;
-            if(label.IsEmpty())
-                continue;
-            Size ts = GetTextSize(label, style.label_font);
-            if(ts.cx + 2 * style.label_padding > sg.rect.GetWidth() ||
-               ts.cy + 2 * style.label_padding > sg.rect.GetHeight())
-                continue;
-            Color ink = ContrastInk(sg.color);
-            if(base_state == ST_DISABLED)
-                ink = DisabledColor(ink);
-            w.DrawText(sg.rect.left + (sg.rect.GetWidth() - ts.cx) / 2,
-                       sg.rect.top + (sg.rect.GetHeight() - ts.cy) / 2,
-                       label, style.label_font, ink);
+            const UiRangeSegment& segment = segments_[sg.index];
+            Color automatic = ContrastInk(sg.color);
+            auto color = [&](Color authored, bool secondary) {
+                Color ink = IsNull(authored) ? (secondary ? Blend(automatic, sg.color, 60) : automatic) : authored;
+                return base_state == ST_DISABLED ? DisabledColor(ink) : ink;
+            };
+            PaintSegmentText(w, sg.label_rect, segment.label, style.label_font,
+                             color(style.label_color, false), sg.label_align);
+            PaintSegmentText(w, sg.subtitle_rect, segment.subtitle, style.subtitle_font,
+                             color(style.subtitle_color, true), sg.label_align);
+            PaintSegmentText(w, sg.value_rect, sg.value_text, style.right_font,
+                             color(style.value_color, false), style.value_side);
         }
     }
 

@@ -1,6 +1,7 @@
 #include <Core/Core.h>
 #include <Ui/Ui.h>
 #include <cmath>
+#include <limits>
 
 using namespace Upp;
 
@@ -266,6 +267,174 @@ static void TestSelectionAndPaint(TestCtx& t)
     t.Expect(true, "vertical paint completes without assertions");
 }
 
+static void TestCardPresentation(TestCtx& t)
+{
+    t.Section("Card presentation and mirrored stacks");
+    UiRangeSegments r;
+    Vector<UiRangeSegment> rows;
+    for(int i=0;i<4;i++) {
+        UiRangeSegment row(1,Format("Act %d",i+1));
+        row.subtitle="28 pages - 12 scenes";
+        rows.Add(row);
+    }
+    r.SetSegments(rows).ShowSegmentValues().ShowBoundaryValues(false).ShowEndpointValues(false);
+    auto style=r.GetStyle();
+    style.thumb_size=Size(6,28); style.thumb_rotate_with_direction=true;
+    style.thumb_shape=UiRangeSegments::ThumbShape::RoundedRectangle;
+    style.thumb_metrics.radius=3; style.thumb_hover_growth=0;
+    style.label_padding=10; style.label_gap=4;
+    for(UiDirection dir : {UiDirection::H,UiDirection::V})
+    for(bool reverse : {false,true}) for(UiAlign side : {UiAlign::LEFT,UiAlign::RIGHT}) {
+        style.track_size.cy=dir==UiDirection::H ? 64 : 240; style.value_side=side;
+        r.SetCustomStyle(style).SetDirection(dir).SetReverse(reverse);
+        r.SetRect(0,0,dir==UiDirection::H ? 880 : 300,dir==UiDirection::H ? 110 : 480);
+        auto g=r.GetGeometry(r.GetSize());
+        t.Expect(g.boundary_thumbs.GetCount()==3,"geometry exposes actual boundary handle bounds");
+        for(int i=0;i<3;i++) {
+            t.Expect(g.boundary_thumbs[i].GetSize()==(dir==UiDirection::H ? Size(6,28) : Size(28,6)),
+                     "pill handles rotate with vertical stacks without inflating their visual width");
+            t.Expect(g.boundary_thumbs[i].CenterPoint()==g.boundaries[i],"handles stay centred on their shared boundary");
+        }
+        for(const auto& sg : g.segments) {
+            t.Expect(sg.value_text=="25%","card value is its span percentage, not its boundary value");
+            t.Expect(!sg.label_rect.IsEmpty() && !sg.subtitle_rect.IsEmpty(),"roomy cards expose both title and subtitle");
+            t.Expect(sg.label_rect.bottom<=sg.subtitle_rect.top,"title and subtitle never overlap");
+            t.Expect(sg.label_align==(side==UiAlign::LEFT ? UiAlign::RIGHT : UiAlign::LEFT),
+                     "automatic text alignment mirrors opposite the percentage");
+            t.Expect(side==UiAlign::LEFT ? sg.value_rect.right<=sg.label_rect.left :
+                                         sg.value_rect.left>=sg.label_rect.right,
+                     "percentage and text occupy disjoint columns in both orientations");
+            t.Expect(sg.rect.Contains(sg.label_rect) && sg.rect.Contains(sg.subtitle_rect) && sg.rect.Contains(sg.value_rect),
+                     "all text rectangles stay inside their own segment");
+        }
+        ImageDraw draw(r.GetSize()); draw.DrawRect(r.GetSize(),White()); r.Paint(draw);
+        t.Expect(Image(draw).GetSize()==r.GetSize(),"mirrored horizontal and vertical cards paint natively");
+        r.SetActiveBoundary(1);
+        r.Key(dir==UiDirection::H ? (reverse ? K_LEFT : K_RIGHT) : (reverse ? K_UP : K_DOWN),1);
+        t.Expect(r.GetSegmentValueText(1)=="26%" && r.GetSegmentValueText(2)=="24%",
+                 "editing in either orientation updates the neighbouring percentages from the scalar model");
+        t.Expect(r.GetSegment(1).subtitle==rows[1].subtitle && r.GetSegment(2).label==rows[2].label,
+                 "boundary edits preserve segment titles and subtitles");
+        r.SetBoundaryValue(1,50).SetActiveBoundary(-1);
+    }
+    r.SetDirection(UiDirection::H).SetReverse(false);
+    style.track_size.cy=64; style.value_side=UiAlign::RIGHT;
+    r.SetCustomStyle(style).SetRect(0,0,880,110);
+    UiRangeSegment single=r.GetSegment(1); single.subtitle.Clear(); r.SetSegment(1,single);
+    auto g=r.GetGeometry(r.GetSize());
+    t.Expect(g.segments[1].subtitle_rect.IsEmpty(),"absent subtitle does not reserve a second line");
+    t.Expect(abs(g.segments[1].label_rect.CenterPoint().y-g.segments[1].rect.CenterPoint().y)<=1,
+             "title without subtitle centres vertically");
+    r.SetRange(-20,80);
+    t.Expect(r.GetSegmentValueText(0)=="25%","percentage is independent of the domain origin");
+    r.SetRange(10000000000000000.0,10000000000000004.0);
+    t.Expect(r.GetSegmentValueText(0)=="25%","percentage does not lose precision by adding the domain origin");
+    r.SetRange(1000,1200).SetValueDisplay(UiRangeSegments::ValueDisplay::Domain);
+    t.Expect(r.GetSegmentValueText(0)=="50","domain readouts display span length");
+    t.Expect(r.GetSegmentValueText(-1).IsEmpty() && r.GetSegmentValueText(4).IsEmpty(),"invalid readout indexes are harmless");
+    r.ShowSegmentValues(false); g=r.GetGeometry(r.GetSize());
+    t.Expect(g.segments[0].value_rect.IsEmpty(),"segment readouts can be hidden independently");
+    r.ShowSegmentValues().ShowLabels(false); g=r.GetGeometry(r.GetSize());
+    t.Expect(g.segments[0].label_rect.IsEmpty() && !g.segments[0].value_rect.IsEmpty(),"value-only cards do not require labels");
+    r.ShowLabels().SetRect(0,0,90,50); g=r.GetGeometry(r.GetSize());
+    for(const auto& sg:g.segments)
+        t.Expect(sg.label_rect.IsEmpty() || (sg.label_rect & sg.value_rect).IsEmpty(),"narrow cards clip instead of overlapping columns");
+    r.SetRect(0,0,880,110);
+    Point handle=r.GetGeometry(r.GetSize()).boundaries[0]; handle.x+=6;
+    t.Expect(r.CursorImage(handle,0)==Image::SizeHorz(),"slim handles retain a usable minimum hit target");
+}
+
+static void TestPresentationPersistence(TestCtx& t)
+{
+    t.Section("Presentation persistence compatibility");
+    UiRangeSegment old(25,"Act 1",Color(2,3,4),String("payload"));
+    Event<Stream&> legacy=[&](Stream& s){s % old.span % old.label % old.color % old.data;};
+    t.Expect(StoreAsString(old)==StoreAsString(legacy),"empty subtitle preserves legacy record bytes");
+    UiRangeSegment copy; copy.subtitle="stale";
+    t.Expect(LoadFromString(copy,StoreAsString(legacy)) && copy.subtitle.IsEmpty(),"legacy record loads and resets reused subtitle state");
+    old.subtitle="28 pages - 12 scenes";
+    t.Expect(LoadFromString(copy,StoreAsString(old)) && copy.subtitle==old.subtitle && copy.data==old.data,
+             "authored subtitle and application payload round-trip together");
+    UiRangeSegments r; Vector<UiRangeSegment> rows; rows.Add(old); r.SetSegments(rows);
+    UiRangeSegments bound; bound.SetData(r.GetData());
+    t.Expect(bound.GetSegment(0).subtitle==old.subtitle,"Value binding retains subtitles");
+    UiRangeSegments::Style style=UiRangeSegments::StyleDefault();
+    Event<Stream&> legacy_style=[&](Stream& s){
+        s % style.track_palette % style.track_metrics % style.track_skin
+          % style.thumb_palette % style.thumb_metrics % style.thumb_skin % style.value_palette;
+        for(int i=0;i<UiRangeSegments::MAX_SERIES_COLORS;i++) s % style.series[i];
+        s % style.series_count % style.label_font % style.value_font % style.track_size % style.thumb_size
+          % style.thumb_dot_diameter % style.divider_width % style.divider_color % style.selected_frame
+          % style.selected_frame_width % style.label_padding;
+    };
+    String legacy_bytes=StoreAsString(legacy_style);
+    t.Expect(StoreAsString(style)==legacy_bytes,"default presentation preserves legacy style bytes");
+    style.value_side=UiAlign::LEFT; style.thumb_shape=UiRangeSegments::ThumbShape::RoundedRectangle;
+    style.thumb_rotate_with_direction=true; style.thumb_hover_growth=0;
+    style.label_color=Color(2,3,4); style.subtitle_color=Color(5,6,7); style.value_color=Color(8,9,10);
+    style.label_gap=5; style.value_gap=11; style.right_font=StdFontZ(15).Bold();
+    UiRangeSegments::Style restored;
+    t.Expect(LoadFromString(restored,StoreAsString(style)) && restored.value_side==UiAlign::LEFT &&
+             restored.thumb_shape==style.thumb_shape && restored.thumb_rotate_with_direction &&
+             restored.label_color==style.label_color && restored.subtitle_color==style.subtitle_color &&
+             restored.value_color==style.value_color && restored.right_font==style.right_font &&
+             restored.label_gap==5 && restored.value_gap==11,"authored card style fields round-trip");
+    t.Expect(LoadFromString(restored,legacy_bytes) && restored.value_side==UiAlign::RIGHT &&
+             restored.thumb_shape==UiRangeSegments::ThumbShape::Ellipse,"legacy style loads and clears presentation extensions");
+    String bad_style=StoreAsString(style); bad_style.Set(1,2);
+    t.Expect(!LoadFromString(restored,bad_style),"unknown presentation versions fail without misreading following fields");
+    String bad_row=StoreAsString(old); bad_row.Set(sizeof(double),2);
+    t.Expect(!LoadFromString(copy,bad_row),"unknown segment versions fail explicitly");
+    Vector<UiRangeSegment> records; records.Add(old); records.Add(UiRangeSegment(75,"Act 2"));
+    Vector<UiRangeSegment> loaded;
+    t.Expect(LoadFromString(loaded,StoreAsString(records)) && loaded.GetCount()==2 &&
+             loaded[0].subtitle==old.subtitle && loaded[1].label=="Act 2" && loaded[1].subtitle.IsEmpty(),
+             "mixed extended and legacy records preserve the next record boundary");
+}
+
+static void TestThumbRasterAndBounds(TestCtx& t)
+{
+    t.Section("Handle shape, exact raster reuse and bounded layout");
+    UiRangeSegments r;
+    r.SetSegmentCount(2).ShowLabels(false).ShowBoundaryValues(false).ShowEndpointValues(false).ShowDividers(false);
+    r.SetRect(0,0,240,90);
+    auto style=r.GetStyle();
+    style.track_size.cy=64; style.series_count=1; style.series[0]=White();
+    style.thumb_size=Size(20,40); style.thumb_dot_diameter=0;
+    style.thumb_metrics.face_enabled=true; style.thumb_metrics.frame_enabled=false;
+    style.thumb_metrics.radius=0; style.thumb_hover_growth=0;
+    for(int st=0;st<4;st++) style.thumb_palette.face[st]=UiFill::Solid(Black());
+    auto render=[&]() -> Image { ImageDraw draw(r.GetSize()); draw.DrawRect(r.GetSize(),White()); r.Paint(draw); return draw; };
+    r.SetCustomStyle(style);
+    UiRasterCache::Clear();
+    Image ellipse=render();
+    auto first=UiRasterCache::GetStats(); render(); auto second=UiRasterCache::GetStats();
+    t.Expect(second.hits>first.hits && second.misses==first.misses,"identical handle and strip paints reuse exact cached rasters");
+    style.thumb_shape=UiRangeSegments::ThumbShape::RoundedRectangle; r.SetCustomStyle(style);
+    Image square=render(); auto changed=UiRasterCache::GetStats();
+    Rect thumb=r.GetGeometry(r.GetSize()).boundary_thumbs[0];
+    Point sample(thumb.left+2,thumb.top+2);
+    t.Expect(ellipse[sample.y][sample.x].r>240 && square[sample.y][sample.x].r<15,
+             "rounded-rectangle selection changes the actual silhouette rather than reusing an ellipse");
+    t.Expect(changed.misses>second.misses,"handle shape participates in the raster cache key");
+    style.thumb_metrics.radius=8; r.SetCustomStyle(style); Image rounded=render();
+    t.Expect(rounded[sample.y][sample.x].r>square[sample.y][sample.x].r,
+             "authored handle radius rounds the painted corners");
+    style.thumb_size=Size(1,28); style.thumb_metrics.radius=0;
+    r.SetCustomStyle(style); Image slim=render();
+    Point centre=r.GetGeometry(r.GetSize()).boundary_thumbs[0].CenterPoint();
+    t.Expect(slim[centre.y][centre.x].r<15,"a one-pixel frameless handle still paints its authored face");
+    style.thumb_size=Size(INT_MAX,INT_MAX); style.track_size=Size(INT_MAX,INT_MAX);
+    style.thumb_hover_growth=INT_MAX; style.label_padding=INT_MAX;
+    r.SetCustomStyle(style).SetActiveBoundary(0).SetRect(0,0,17,19);
+    auto g=r.GetGeometry(r.GetSize());
+    t.Expect(g.track.IsEmpty() || Rect(r.GetSize()).Contains(g.track),"oversized authored geometry stays inside a tiny control");
+    for(const auto& handle:g.boundary_thumbs)
+        t.Expect(Rect(r.GetSize()).Contains(handle),"oversized hot handles are clipped to available bounds");
+    Size minimum=r.GetMinSize();
+    t.Expect(minimum.cx>0 && minimum.cy>0,"oversized minimum dimensions saturate instead of integer wrapping");
+}
+
 CONSOLE_APP_MAIN
 {
     TestCtx t;
@@ -276,6 +445,9 @@ CONSOLE_APP_MAIN
     TestGeometry(t);
     TestPaletteThemeAndOverrides(t);
     TestSelectionAndPaint(t);
+    TestCardPresentation(t);
+    TestPresentationPersistence(t);
+    TestThumbRasterAndBounds(t);
 
     Cout() << "\nUIRANGESEGMENTS_SUMMARY checks=" << t.checks
            << " failed=" << t.fails << "\n";

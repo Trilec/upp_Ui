@@ -207,26 +207,45 @@ ranges.SetBoundaryValues(thresholds);
 Vector<double> current = ranges.GetBoundaryValues();
 ```
 
-UiRangeSegment stores span, label, optional color (Null means automatic), and Value
-data. SetSegments normalizes proportional weights; invalid/negative weights count
-as zero and all-zero weights become equal. The domain endpoints must be finite
+UiRangeSegment stores span, label, subtitle, optional color (Null means automatic),
+and Value data. SetSegments normalizes proportional weights; invalid/negative
+weights count as zero and all-zero weights become equal. Domain endpoints must be finite
 and have a finite difference. Invalid scalar setters leave state unchanged.
 MinimumSegmentSpan enforces feasible minima; boundary i changes only spans i/i+1.
 SetBoundaryValues validates the whole vector before changing structure. Split inserts
 a boundary; Remove merges into a neighbor. Endpoints never move during a drag.
 
 Direction/reverse/resize changes only projection, never scalar ordering or payloads.
-Percent versus Domain labels are presentation. ShowLabels, ShowBoundaryValues,
-ShowEndpointValues, ShowValuesOnInteraction and ShowDividers control presentation.
-Selection of a segment is independent from the active boundary. Labels are omitted
-when they cannot fit; a narrow vertical track is not a promise of readable long text.
+Percent versus Domain labels are presentation. ShowLabels, ShowSegmentValues,
+ShowBoundaryValues, ShowEndpointValues, ShowValuesOnInteraction and ShowDividers
+control presentation. ShowValuesOnInteraction gates boundary/endpoint readouts;
+internal span readouts remain governed by ShowSegmentValues.
+Selection of a segment is independent from the active boundary. ShowSegmentValues
+adds each span's percentage or domain length inside its cell; GetSegmentValueText
+returns the same formatted readout. It is independent of labels and boundary values.
+Style::value_side chooses LEFT/RIGHT. With label_align DEFAULT, the title/subtitle
+align to the opposite side; LEFT/CENTER/RIGHT explicitly override text alignment.
+Horizontal and vertical stacks keep text upright. Without a subtitle, the title
+centres vertically. Text is clipped/ellipsized within its own column; insufficient
+height drops the subtitle first. Allocate sufficient track cross-size for cards
+(track_size.cy is the cross-size in both directions).
+
+Style::subtitle_font/right_font and label_color/subtitle_color/value_color style
+the internal text; Null inks derive contrast from each cell. label_gap/value_gap
+and label_padding control spacing. thumb_shape RoundedRectangle, independent
+thumb_size, thumb_metrics face/frame/radius, and thumb_hover_growth support slim
+framed pills. thumb_rotate_with_direction swaps width/height in vertical stacks;
+the input target remains usable even when the visible handle is narrow.
 
 WhenChanging reports live user edits and WhenAction committed edits; programmatic
 setters are silent. WhenSegmentSelect/WhenBoundarySelect report user selection.
 Capture loss/disable/Escape ends a live drag without another commit and retains its
 last live value. Callbacks see committed state and may rebuild/destroy the control.
-GetData returns ValueArray of maps (span/label/optional color/data); SetData accepts
-that representation. There is no second mutable model.
+GetData returns ValueArray of maps (span/label/optional subtitle/color/data);
+SetData accepts that representation. There is no second mutable model.
+Binary readers accept legacy finite-span records/styles. Empty subtitles and
+default new style fields preserve the old byte layout; authored new fields use
+versioned extensions, which require the updated reader. Mixed records round-trip.
 
 Up to eight palette anchors form deterministic Series or sampled Gradient colors.
 Extra authored Series entries cycle with predictable light/dark variants. Inherited

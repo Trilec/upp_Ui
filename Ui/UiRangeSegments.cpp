@@ -1,9 +1,95 @@
 #include <Ui/UiRangeSegments.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDraw.h>
+#include <Ui/UiFonts.h>
 #include <cmath>
+#include <limits>
 
 namespace Upp {
+
+void UiRangeSegment::Serialize(Stream& stream)
+{
+    // A valid span is finite. Reserve -infinity as an extension marker rather
+    // than peeking at arbitrary bytes of a legacy double (which can collide).
+    const double marker = -std::numeric_limits<double>::infinity();
+    bool extended = !subtitle.IsEmpty();
+    if(stream.IsLoading()) {
+        stream % span;
+        extended = span == marker;
+        subtitle.Clear();
+        if(extended) {
+            if(stream.Get() != 1) { stream.LoadError(); return; }
+            stream % span;
+        }
+    }
+    else {
+        if(extended) {
+            double prefix = marker;
+            stream % prefix;
+            stream.Put(1);
+        }
+        stream % span;
+    }
+    stream % label % color % data;
+    if(extended)
+        stream % subtitle;
+}
+
+void UiRangeSegments::Style::Serialize(Stream& stream)
+{
+    Style defaults;
+    bool extended = thumb_shape != defaults.thumb_shape ||
+        thumb_rotate_with_direction != defaults.thumb_rotate_with_direction ||
+        thumb_hover_growth != defaults.thumb_hover_growth ||
+        subtitle_font != defaults.subtitle_font || right_font != defaults.right_font ||
+        label_align != defaults.label_align || value_side != defaults.value_side ||
+        label_gap != defaults.label_gap || value_gap != defaults.value_gap ||
+        label_color != defaults.label_color || subtitle_color != defaults.subtitle_color ||
+        value_color != defaults.value_color;
+    if(stream.IsLoading()) {
+        // A legacy palette starts with a UiFill kind (0..2), never 250.
+        extended = stream.Peek() == 250;
+        if(extended) {
+            stream.Get();
+            if(stream.Get() != 1) { stream.LoadError(); return; }
+        }
+        thumb_shape = defaults.thumb_shape;
+        thumb_rotate_with_direction = defaults.thumb_rotate_with_direction;
+        thumb_hover_growth = defaults.thumb_hover_growth;
+        subtitle_font = defaults.subtitle_font;
+        right_font = defaults.right_font;
+        label_align = defaults.label_align; value_side = defaults.value_side;
+        label_gap = defaults.label_gap; value_gap = defaults.value_gap;
+        label_color = defaults.label_color; subtitle_color = defaults.subtitle_color;
+        value_color = defaults.value_color;
+    }
+    else if(extended) { stream.Put(250); stream.Put(1); }
+    stream % track_palette % track_metrics % track_skin
+           % thumb_palette % thumb_metrics % thumb_skin % value_palette;
+    for(int i = 0; i < MAX_SERIES_COLORS; i++)
+        stream % series[i];
+    stream % series_count % label_font % value_font
+           % track_size % thumb_size % thumb_dot_diameter
+           % divider_width % divider_color % selected_frame
+           % selected_frame_width % label_padding;
+    if(extended) {
+        byte shape = (byte)thumb_shape;
+        stream % shape % thumb_rotate_with_direction % thumb_hover_growth
+               % subtitle_font % right_font % label_align % value_side
+               % label_gap % value_gap % label_color % subtitle_color % value_color;
+        if(stream.IsLoading()) {
+            thumb_shape = shape == (byte)ThumbShape::RoundedRectangle ?
+                          ThumbShape::RoundedRectangle : ThumbShape::Ellipse;
+            thumb_hover_growth = max(0, thumb_hover_growth);
+            label_gap = max(0, label_gap); value_gap = max(0, value_gap);
+            if(label_align != UiAlign::LEFT && label_align != UiAlign::CENTER &&
+               label_align != UiAlign::RIGHT)
+                label_align = UiAlign::DEFAULT;
+            if(value_side != UiAlign::LEFT)
+                value_side = UiAlign::RIGHT;
+        }
+    }
+}
 
 const UiRangeSegments::Style& UiRangeSegments::StyleDefault()
 {
@@ -153,6 +239,8 @@ UiRangeSegments::Style UiRangeSegments::ResolveThemeStyle() const
         s.thumb_size = Size(DPI(14), DPI(14));
         s.label_font = StdFontZ(10).Bold();
         s.value_font = StdFontZ(8).Bold();
+        s.subtitle_font = StdFontZ(8);
+        s.right_font = StdFontZ(10).Bold();
     }
     else {
         s.track_size.cy = DPI(28);
@@ -164,6 +252,8 @@ UiRangeSegments::Style UiRangeSegments::ResolveThemeStyle() const
     Color selected = UiTheme::ResolveSlider(UiRole::Accent).track_palette.ink[ST_NORMAL];
     if(!IsNull(selected))
         s.selected_frame = selected;
+    UiApplyTypography(s);
+    s.value_font = UiFonts::Inherit(s.value_font);
     return s;
 }
 

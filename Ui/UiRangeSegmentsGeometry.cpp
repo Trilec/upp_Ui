@@ -13,6 +13,14 @@ double ClampRangeGeometryValue(double v, double lo, double hi)
 
 } // namespace
 
+Size UiRangeSegments::ResolveThumbSize(const Style& style) const
+{
+    Size size(max(1, style.thumb_size.cx), max(1, style.thumb_size.cy));
+    if(dir_ == UiDirection::V && style.thumb_rotate_with_direction)
+        Swap(size.cx, size.cy);
+    return size;
+}
+
 Rect UiRangeSegments::BuildTrackRect(Size size, const Style& style) const
 {
     Rect outer(size);
@@ -20,8 +28,10 @@ Rect UiRangeSegments::BuildTrackRect(Size size, const Style& style) const
         return outer;
 
     int cross = max(DPI(6), style.track_size.cy);
-    int thumb_major = dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy;
-    int edge_pad = max(DPI(8), thumb_major / 2 + DPI(2));
+    Size thumb = ResolveThumbSize(style);
+    int thumb_major = dir_ == UiDirection::H ? thumb.cx : thumb.cy;
+    int major = dir_ == UiDirection::H ? size.cx : size.cy;
+    int edge_pad = min(max(DPI(8), thumb_major / 2 + DPI(2)), major / 2);
 
     if(dir_ == UiDirection::H) {
         int top_reserve = show_boundary_values_ ? DPI(24) : DPI(4);
@@ -105,7 +115,83 @@ UiRangeSegments::Geometry UiRangeSegments::BuildGeometry(Size size) const
         start = sg.end;
         p0 = p1;
     }
+    Size thumb = ResolveThumbSize(style);
+    // Bound authored thumbs to the available control, independently of their
+    // hit target. Painting and input consume these same projected rectangles.
+    thumb.cx = min(thumb.cx, max(1, size.cx));
+    thumb.cy = min(thumb.cy, max(1, size.cy));
+    for(int i = 0; i < g.boundaries.GetCount(); i++) {
+        Point centre = g.boundaries[i];
+        Rect rect = RectC(centre.x - thumb.cx / 2, centre.y - thumb.cy / 2,
+                          thumb.cx, thumb.cy);
+        if(IsEnabled() && IsShowEnabled() && (i == hot_boundary_ || i == active_boundary_)) {
+            int growth = min(max(0, style.thumb_hover_growth), min(size.cx, size.cy) / 2);
+            rect.Inflate(growth);
+        }
+        g.boundary_thumbs.Add(rect & g.outer);
+    }
+    for(SegmentGeometry& segment : g.segments)
+        BuildLabelGeometry(segment, g, style);
     return g;
+}
+
+void UiRangeSegments::BuildLabelGeometry(SegmentGeometry& sg, const Geometry& g,
+                                        const Style& style) const
+{
+    if(!sg.visible || (!show_labels_ && !show_segment_values_))
+        return;
+    Rect area = sg.rect;
+    int padding = clamp(style.label_padding, 0, min(area.GetWidth(), area.GetHeight()) / 2);
+    area.Deflate(padding);
+    // Text must clear adjacent boundary handles, including a tall horizontal
+    // handle in a vertical stack. Never reserve an unrelated row's handle.
+    for(int i : {sg.index - 1, sg.index}) {
+        if(i < 0 || i >= g.boundary_thumbs.GetCount()) continue;
+        const Rect& thumb = g.boundary_thumbs[i];
+        if(dir_ == UiDirection::H) {
+            if(thumb.CenterPoint().x <= sg.rect.left)
+                area.left = max(area.left, thumb.right + DPI(2));
+            else area.right = min(area.right, thumb.left - DPI(2));
+        }
+        else {
+            if(thumb.CenterPoint().y <= sg.rect.top)
+                area.top = max(area.top, thumb.bottom + DPI(2));
+            else area.bottom = min(area.bottom, thumb.top - DPI(2));
+        }
+    }
+    if(area.IsEmpty()) return;
+    const UiRangeSegment& segment = segments_[sg.index];
+    bool title = show_labels_ && !segment.label.IsEmpty();
+    bool subtitle = show_labels_ && !segment.subtitle.IsEmpty();
+    int title_height = title ? GetTextSize(segment.label, style.label_font).cy : 0;
+    int subtitle_height = subtitle ? GetTextSize(segment.subtitle, style.subtitle_font).cy : 0;
+    int gap = clamp(style.label_gap, 0, area.GetHeight());
+    if(title && subtitle && (int64)title_height + subtitle_height + gap > area.GetHeight())
+        subtitle = false; // Small rows keep the heading readable first.
+    int height = title_height + (subtitle ? subtitle_height : 0) + (title && subtitle ? gap : 0);
+    int y = area.top + max(0, (area.GetHeight() - height) / 2);
+    UiAlign side = style.value_side == UiAlign::LEFT ? UiAlign::LEFT : UiAlign::RIGHT;
+    sg.label_align = style.label_align;
+    if(sg.label_align != UiAlign::LEFT && sg.label_align != UiAlign::RIGHT && sg.label_align != UiAlign::CENTER)
+        sg.label_align = show_segment_values_ ? (side == UiAlign::RIGHT ? UiAlign::LEFT : UiAlign::RIGHT)
+                       : subtitle ? UiAlign::LEFT : UiAlign::CENTER;
+    Rect text = area;
+    if(show_segment_values_) {
+        sg.value_text = GetSegmentValueText(sg.index);
+        Size value_size = GetTextSize(sg.value_text, style.right_font);
+        int width = min(value_size.cx, area.GetWidth());
+        int value_y = title && subtitle ? y + (title_height - value_size.cy) / 2
+                                       : area.top + (area.GetHeight() - value_size.cy) / 2;
+        int x = side == UiAlign::LEFT ? area.left : area.right - width;
+        sg.value_rect = RectC(x, value_y, width, value_size.cy) & area;
+        int space = clamp(style.value_gap, 0, area.GetWidth());
+        if(side == UiAlign::LEFT) text.left = min(text.right, sg.value_rect.right + space);
+        else text.right = max(text.left, sg.value_rect.left - space);
+    }
+    if(text.IsEmpty()) return;
+    if(title) sg.label_rect = RectC(text.left, y, text.GetWidth(), title_height) & area;
+    if(subtitle) sg.subtitle_rect = RectC(text.left, y + (title ? title_height + gap : 0),
+                                        text.GetWidth(), subtitle_height) & area;
 }
 
 UiRangeSegments::Geometry UiRangeSegments::GetGeometry(Size size) const
@@ -115,12 +201,9 @@ UiRangeSegments::Geometry UiRangeSegments::GetGeometry(Size size) const
 
 Rect UiRangeSegments::BoundaryThumbRect(int index, const Geometry& geometry) const
 {
-    if(index < 0 || index >= geometry.boundaries.GetCount())
+    if(index < 0 || index >= geometry.boundary_thumbs.GetCount())
         return Rect();
-    const Style& style = GetEffectiveStyle();
-    Size sz(max(DPI(8), style.thumb_size.cx), max(DPI(8), style.thumb_size.cy));
-    Point c = geometry.boundaries[index];
-    return RectC(c.x - sz.cx / 2, c.y - sz.cy / 2, sz.cx, sz.cy);
+    return geometry.boundary_thumbs[index];
 }
 
 int UiRangeSegments::HitBoundary(Point p, const Geometry& geometry) const
@@ -129,6 +212,8 @@ int UiRangeSegments::HitBoundary(Point p, const Geometry& geometry) const
     int best_distance = INT_MAX;
     for(int i = 0; i < geometry.boundaries.GetCount(); i++) {
         Rect r = BoundaryThumbRect(i, geometry).Inflated(DPI(3));
+        r.Inflate(max(0, (DPI(14) - r.GetWidth() + 1) / 2),
+                  max(0, (DPI(14) - r.GetHeight() + 1) / 2));
         if(!r.Contains(p))
             continue;
         Point c = geometry.boundaries[i];
@@ -154,18 +239,19 @@ int UiRangeSegments::HitSegment(Point p, const Geometry& geometry) const
 Size UiRangeSegments::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    int major = max(DPI(60), style.track_size.cx) +
-                (dir_ == UiDirection::H ? style.thumb_size.cx : style.thumb_size.cy) + DPI(8);
-    int cross = max(style.track_size.cy,
-                    dir_ == UiDirection::H ? style.thumb_size.cy : style.thumb_size.cx);
+    Size thumb = ResolveThumbSize(style);
+    int major = (int)min<int64>(INT_MAX, (int64)max(DPI(60), style.track_size.cx) +
+                (dir_ == UiDirection::H ? thumb.cx : thumb.cy) + DPI(8));
+    int64 cross = max(style.track_size.cy,
+                      dir_ == UiDirection::H ? thumb.cy : thumb.cx);
     if(dir_ == UiDirection::H) {
         cross += (show_boundary_values_ ? DPI(24) : DPI(4));
         cross += (show_endpoint_values_ ? DPI(20) : DPI(4));
-        return Size(max(major, user_min_size_.cx), max(cross, user_min_size_.cy));
+        return Size(max(major, user_min_size_.cx), max((int)min<int64>(INT_MAX,cross), user_min_size_.cy));
     }
 
     cross += (show_boundary_values_ || show_endpoint_values_) ? DPI(60) : DPI(8);
-    return Size(max(cross, user_min_size_.cx), max(major, user_min_size_.cy));
+    return Size(max((int)min<int64>(INT_MAX,cross), user_min_size_.cx), max(major, user_min_size_.cy));
 }
 
 void UiRangeSegments::SetMinSize(Size sz)

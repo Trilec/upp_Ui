@@ -20,6 +20,9 @@ private:
     Color window_face_ = SColorFace();
     void BuildHeader();
     void BuildPreview();
+    void SelectPreview(bool cards);
+    void ApplyCardPreset(UiRangeSegments::Style& style) const;
+    void EmitCardPreset(String& code) const;
     void BuildRightRail();
     void BuildInspector();
     void BuildOverrides();
@@ -57,6 +60,9 @@ private:
     UiToolButton exit_;
 
     UiPanel preview_;
+    UiBoxLayout preview_modes_;
+    UiButton range_mode_;
+    UiButton cards_mode_;
     UiRangeSegments ranges_;
     UiLabel caption_;
 
@@ -80,6 +86,7 @@ private:
     String generated_;
     int data_segment_count_ = 0;
     bool syncing_projection_ = false;
+    bool cards_preview_ = true;
 };
 
 } // namespace Upp

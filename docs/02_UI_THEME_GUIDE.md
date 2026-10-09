@@ -51,6 +51,16 @@ segment count. Explicit segment colors win; an authored Series palette retains
 its deterministic cycle/tint behavior. These are range defaults, not a demand that
 all controls have orange endpoints.
 
+RangeSegments card presentation uses the same resolved style and model as its
+compact range. subtitle_font and right_font join label_font/value_font in project
+typography inheritance; explicit custom styles remain authored snapshots. Null
+label_color/subtitle_color/value_color derive readable cell contrast. value_side
+LEFT/RIGHT mirrors DEFAULT label_align; explicit text alignment remains independent.
+thumb_shape, thumb_size, thumb_metrics and thumb_rotate_with_direction provide
+framed pill handles in both orientations without introducing child controls or a
+second drawing system. See the [card usage recipe](CONTROL_USAGE.md) and the
+Range/Cards selector in UiRangeSegmentsDemo for complete generated C++.
+
 ## Theme context and lifecycle
 
 UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered.

@@ -52,7 +52,7 @@
       "package": "Utilities/UiRangeSegmentsRunTests",
       "run": true,
       "summary": "UIRANGESEGMENTS_SUMMARY",
-      "minimum_checks": 60
+      "minimum_checks": 363
     },
     {
       "package": "examples/UiRangeSegmentsDemo",

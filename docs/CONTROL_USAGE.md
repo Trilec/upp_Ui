@@ -126,6 +126,37 @@ boundaries << 25 << 70;
 phases.SetBoundaryValues(boundaries);
 ```
 
+The same control can show editable cards with a heading, subtitle and percentage.
+The percentage is the span's share of the domain, rather than the boundary value.
+
+```cpp
+UiRangeSegments acts;
+Vector<UiRangeSegment> rows;
+for(int i = 0; i < 4; ++i) {
+    UiRangeSegment row(1, Format("Act %d", i + 1));
+    row.subtitle = "28 pages - 12 scenes";
+    rows.Add(row);
+}
+acts.SetSegments(rows).ShowSegmentValues()
+    .ShowBoundaryValues(false).ShowEndpointValues(false);
+auto style = acts.GetStyle();
+style.track_size.cy = DPI(64);
+style.value_side = UiAlign::RIGHT; // LEFT mirrors the default text alignment.
+style.thumb_shape = UiRangeSegments::ThumbShape::RoundedRectangle;
+style.thumb_size = Size(DPI(6), DPI(28));
+style.thumb_metrics.radius = DPI(3);
+style.thumb_dot_diameter = 0;
+style.thumb_rotate_with_direction = true;
+acts.SetCustomStyle(style);
+```
+
+For an upright vertical stack, use SetDirection(UiDirection::V), give the control
+enough height for its rows, and set track_size.cy to the desired card width.
+Removing a row's subtitle centres its heading vertically. SetValueDisplay(Domain)
+shows span lengths; SetValuePrecision controls both internal and boundary readouts.
+An explicit style is a snapshot: re-resolve GetStyle after ClearCustomStyle when
+following a new role/theme, then reapply your authored overrides.
+
 UiScrollBar exposes a position, total range and visible page extent. It does not
 scroll a child automatically; connect its changes to the host, or use UiScrollPanel.
 
