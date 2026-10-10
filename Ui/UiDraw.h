@@ -23,7 +23,8 @@
 
     Rendering policy
     - Flat/non-AA surfaces remain direct Draw.
-    - Repeated solid rounded face/frame surfaces use an exact-size shared cache.
+    - GPUUI receivers can record resolved solid rounded faces/frames directly.
+    - Other receivers use the exact-size shared raster cache.
     - Shadows retain their existing cached implementation and are composed in
       the same outer/body/inset order.
     - Image skins, dashed borders and unusual paths keep the established base
@@ -41,6 +42,10 @@
       to this header so the cache seam can be evaluated without rewriting the
       large shared drawing implementation from partial edits.
 */
+
+#ifdef flagGPUUI
+#include <RenderCore/GpuDrawTarget.h>
+#endif
 
 #include <Ui/UiGeometry.h>
 #include <Ui/UiShapePath.h>
@@ -147,6 +152,16 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
         UiPaintFrameAccent(w, outer, palette, metrics, st);
         return;
     }
+
+#ifdef flagGPUUI
+    if(auto *target = dynamic_cast<GpuDrawTarget *>(&w))
+        if(target->DrawRoundedFaceFrame(outer, metrics.radius, max(0, metrics.frame_width),
+                                       draws_face ? fill.color : Color(Null),
+                                       draws_frame ? palette.frame[st] : Color(Null))) {
+            UiPaintFrameAccent(w, outer, palette, metrics, st);
+            return;
+        }
+#endif
 
     Image cached = UiGetCachedStyledFaceFrame(outer.GetSize(), palette, metrics, st);
     if(IsNull(cached)) {

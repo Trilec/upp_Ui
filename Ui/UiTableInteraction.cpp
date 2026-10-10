@@ -475,7 +475,9 @@ void UiTable::GotFocus()
 
 void UiTable::LostFocus()
 {
-    if(editing_)
+    // Moving focus into our inline editor must keep the edit transaction open.
+    // The editor's blur handler commits when focus leaves that child.
+    if(editing_ && !HasFocusDeep())
         CommitEdit();
     Refresh();
 }

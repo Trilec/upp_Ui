@@ -1,5 +1,8 @@
 description "U++ Ui Control library system\377";
 
+acceptflags
+	GPUUI;
+
 uses
 	Core,
 	Draw,
