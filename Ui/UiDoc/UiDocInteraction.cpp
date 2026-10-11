@@ -49,6 +49,7 @@ bool InteractionInlineImage(const UiDocEmbedBlock& embed)
 
 void UiDoc::LeftDown(Point p, dword keyflags)
 {
+    ViewGuard view_guard(*this);
     SetFocus();
 
     String annotation_id;
@@ -63,7 +64,8 @@ void UiDoc::LeftDown(Point p, dword keyflags)
             }
         if(toggle_metadata)
             SetMetadataExpanded(annotation_id, next_expanded);
-        WhenAnnotation(annotation_id);
+            if(!view_guard) return;
+        if(!Emit(WhenAnnotation, annotation_id)) return;
         return;
     }
 
@@ -79,7 +81,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
             Rect rc = RectC(top_left.x, top_left.y, width, height);
             int handle = DPI(10);
             Rect resize = RectC(rc.right - handle / 2, rc.bottom - handle / 2, handle, handle);
-            if(resize.Contains(p)) {
+            if(!readonly_ && resize.Contains(p)) {
                 image_resizing_ = true;
                 image_dragging_ = false;
                 image_drag_moved_ = false;
@@ -113,7 +115,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.from);
                 break;
             }
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
         Refresh();
         return;
     }
@@ -139,7 +141,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.from);
                 break;
             }
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
         Refresh();
         return;
     }
@@ -153,14 +155,14 @@ void UiDoc::LeftDown(Point p, dword keyflags)
             if(embed.id == embed_id) {
                 if(InteractionInlineImage(embed)) {
                     anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
-                    image_dragging_ = true;
+                    image_dragging_ = !readonly_;
                     image_drag_start_ = p;
                     image_interaction_current_ = p;
                     image_drag_moved_ = false;
                 }
                 break;
             }
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
         Refresh();
         return;
     }
@@ -173,12 +175,13 @@ void UiDoc::LeftDown(Point p, dword keyflags)
         anchor_pos_ = caret_pos_ = pos;
     drag_selecting_ = true;
     preferred_x_ = -1;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     Refresh();
 }
 
 void UiDoc::LeftUp(Point p, dword)
 {
+    ViewGuard view_guard(*this);
     if(image_resizing_ && !active_embed_id_.IsEmpty()) {
         String id = active_embed_id_;
         int dx = p.x - image_drag_start_.x;
@@ -268,9 +271,10 @@ void UiDoc::LeftUp(Point p, dword)
                         tx.changes.Add(pick(add));
 
                         if(Model().Apply(tx).ok) {
+                            if(!view_guard) return;
                             anchor_pos_ = caret_pos_ = ClampPos(target + 1);
                             active_embed_id_ = id;
-                            WhenSelection();
+                            if(!Emit(WhenSelection)) return;
                         }
                     }
                 }
@@ -290,6 +294,7 @@ void UiDoc::LeftUp(Point p, dword)
 
 void UiDoc::MouseMove(Point p, dword)
 {
+    ViewGuard view_guard(*this);
     if(image_resizing_) {
         image_interaction_current_ = p;
         Refresh();
@@ -310,7 +315,7 @@ void UiDoc::MouseMove(Point p, dword)
         if(HitTestTable(p, table_id, row, column, cell_pos) &&
            table_id == active_table_id_ && row == active_table_row_ && column == active_table_column_) {
             active_table_pos_ = cell_pos;
-            WhenSelection();
+            if(!Emit(WhenSelection)) return;
             ScrollCaretIntoView();
             Refresh();
         }
@@ -320,13 +325,14 @@ void UiDoc::MouseMove(Point p, dword)
     if(!drag_selecting_)
         return;
     caret_pos_ = PosAtDocumentPoint(p);
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     ScrollCaretIntoView();
     Refresh();
 }
 
 void UiDoc::LeftDouble(Point p, dword)
 {
+    ViewGuard view_guard(*this);
     String table_id;
     int row = -1, column = -1, cell_pos = 0;
     if(HitTestTable(p, table_id, row, column, cell_pos)) {
@@ -355,7 +361,7 @@ void UiDoc::LeftDouble(Point p, dword)
         if(!InteractionCellCharAt(cell, probe, ch)) {
             active_table_anchor_pos_ = probe;
             active_table_pos_ = min(units, probe + 1);
-            WhenSelection();
+            if(!Emit(WhenSelection)) return;
             Refresh();
             return;
         }
@@ -373,7 +379,7 @@ void UiDoc::LeftDouble(Point p, dword)
 
         active_table_anchor_pos_ = from;
         active_table_pos_ = to;
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
         Refresh();
         return;
     }
@@ -387,7 +393,7 @@ void UiDoc::LeftDouble(Point p, dword)
                 anchor_pos_ = caret_pos_ = ClampPos(embed.range.to);
                 break;
             }
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
         Refresh();
         return;
     }
@@ -404,6 +410,7 @@ void UiDoc::LeftDouble(Point p, dword)
     while(from > 0 && IsWordChar(text[from - 1]) == word && !IsSpace((int)text[from - 1])) from--;
     while(to < text.GetCount() && IsWordChar(text[to]) == word && !IsSpace((int)text[to])) to++;
     SetSelection(UiDocRange(from, to));
+    if(!view_guard) return;
 }
 
 void UiDoc::MouseWheel(Point, int zdelta, dword)
@@ -418,11 +425,17 @@ void UiDoc::MouseWheel(Point, int zdelta, dword)
 
 bool UiDoc::Key(dword key, int count)
 {
+    ViewGuard view_guard(*this);
     bool shift = (key & K_SHIFT) != 0;
     bool ctrl = (key & K_CTRL) != 0;
     bool alt = (key & K_ALT) != 0;
     dword base = key & ~(K_SHIFT | K_CTRL | K_ALT);
 
+    if(readonly_ && (key == K_CTRL_X || key == K_CTRL_V || key == K_CTRL_Z || key == K_CTRL_Y ||
+                     key == K_CTRL_B || key == K_CTRL_I || key == K_CTRL_U ||
+                     base == K_BACKSPACE || base == K_DELETE || base == K_ENTER ||
+                     (!ctrl && !alt && base >= 32 && base < 0x110000)))
+        return true;
     switch(key) {
     case K_CTRL_B: ToggleBold(); return true;
     case K_CTRL_I: ToggleItalic(); return true;
@@ -453,13 +466,13 @@ bool UiDoc::Key(dword key, int count)
             int pos = image.range.from;
             ClearActiveObject();
             anchor_pos_ = caret_pos_ = ClampPos(pos);
-            WhenSelection(); Refresh(); return true;
+            if(!Emit(WhenSelection)) return false; Refresh(); return true;
         }
         if(inline_image && base == K_RIGHT) {
             int pos = image.range.to;
             ClearActiveObject();
             anchor_pos_ = caret_pos_ = ClampPos(pos);
-            WhenSelection(); Refresh(); return true;
+            if(!Emit(WhenSelection)) return false; Refresh(); return true;
         }
     }
 
@@ -476,9 +489,10 @@ bool UiDoc::Key(dword key, int count)
                 if(!extend)
                     active_table_anchor_pos_ = next;
                 active_table_pos_ = next;
-                WhenSelection();
+                if(!Emit(WhenSelection)) return false;
                 ScrollCaretIntoView();
                 Refresh();
+                return true;
             };
 
             switch(base) {
@@ -499,13 +513,13 @@ bool UiDoc::Key(dword key, int count)
                     active_table_row_--;
                 active_table_pos_ = min(active_table_pos_, InteractionCellUnits(table.rows[active_table_row_].cells[active_table_column_]));
                 active_table_anchor_pos_ = active_table_pos_;
-                WhenSelection(); ScrollCaretIntoView(); Refresh(); return true;
+                if(!Emit(WhenSelection)) return false; ScrollCaretIntoView(); Refresh(); return true;
             case K_DOWN:
                 if(active_table_row_ + 1 < table.rows.GetCount())
                     active_table_row_++;
                 active_table_pos_ = min(active_table_pos_, InteractionCellUnits(table.rows[active_table_row_].cells[active_table_column_]));
                 active_table_anchor_pos_ = active_table_pos_;
-                WhenSelection(); ScrollCaretIntoView(); Refresh(); return true;
+                if(!Emit(WhenSelection)) return false; ScrollCaretIntoView(); Refresh(); return true;
             case K_TAB: {
                 int next_row = active_table_row_;
                 int next_col = active_table_column_;
@@ -524,7 +538,7 @@ bool UiDoc::Key(dword key, int count)
                 int next_units = InteractionCellUnits(table.rows[next_row].cells[next_col]);
                 active_table_anchor_pos_ = 0;
                 active_table_pos_ = next_units;
-                WhenSelection(); ScrollCaretIntoView(); Refresh(); return true;
+                if(!Emit(WhenSelection)) return false; ScrollCaretIntoView(); Refresh(); return true;
             }
             case K_BACKSPACE: return DeleteActiveTableCell(false);
             case K_DELETE: return DeleteActiveTableCell(true);
@@ -538,18 +552,19 @@ bool UiDoc::Key(dword key, int count)
         switch(base) {
         case K_LEFT: return MoveWord(-1, shift);
         case K_RIGHT: return MoveWord(1, shift);
-        case K_HOME: MoveCaret(0, shift); ScrollCaretIntoView(); return true;
-        case K_END: MoveCaret(Model().GetLength(), shift); ScrollCaretIntoView(); return true;
+        case K_HOME: MoveCaret(0, shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
+        case K_END: MoveCaret(Model().GetLength(), shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
         case K_BACKSPACE: {
             int old = caret_pos_;
-            if(!MoveWord(-1, false))
+            if(!MoveWord(-1, false) || !view_guard)
                 return false;
             int from = caret_pos_;
             caret_pos_ = anchor_pos_ = old;
             if(from < old) {
                 Replace(UiDocRange(from, old), WString());
+                if(!view_guard) return false;
                 anchor_pos_ = caret_pos_ = from;
-                WhenSelection();
+                if(!Emit(WhenSelection)) return false;
                 return true;
             }
             return false;
@@ -559,21 +574,23 @@ bool UiDoc::Key(dword key, int count)
     }
 
     switch(base) {
-    case K_LEFT: MoveCaret(caret_pos_ - 1, shift); ScrollCaretIntoView(); return true;
-    case K_RIGHT: MoveCaret(caret_pos_ + 1, shift); ScrollCaretIntoView(); return true;
+    case K_LEFT: MoveCaret(caret_pos_ - 1, shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
+    case K_RIGHT: MoveCaret(caret_pos_ + 1, shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
     case K_UP: return MoveVertical(-1, shift);
     case K_DOWN: return MoveVertical(1, shift);
     case K_HOME: {
         const WString& text = Model().GetText();
         int pos = caret_pos_;
         while(pos > 0 && text[pos - 1] != '\n') pos--;
-        MoveCaret(pos, shift); ScrollCaretIntoView(); return true;
+        MoveCaret(pos, shift);
+        if(!view_guard) return false; ScrollCaretIntoView(); return true;
     }
     case K_END: {
         const WString& text = Model().GetText();
         int pos = caret_pos_;
         while(pos < text.GetCount() && text[pos] != '\n') pos++;
-        MoveCaret(pos, shift); ScrollCaretIntoView(); return true;
+        MoveCaret(pos, shift);
+        if(!view_guard) return false; ScrollCaretIntoView(); return true;
     }
     case K_PAGEUP:
         scroll_y_ = max(0, scroll_y_ - page_rect_.GetHeight()); sb_.Set(scroll_y_); Refresh(); return true;

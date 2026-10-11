@@ -303,96 +303,107 @@ bool UiDocCore::FromJson(const String& data, String* error)
         return false;
     };
 
-    Value root_value = ParseJSON(data);
-    if(root_value.IsError() || !IsValueMap(root_value))
-        return Fail("invalid UiDoc JSON");
-    ValueMap root = root_value;
-    if(root.Find("kind") < 0 || AsString(root["kind"]) != "UiDoc")
-        return Fail("not a UiDoc document");
-    if(root.Find("version") < 0 || (int)root["version"] != UIDOC_JSON_VERSION)
-        return Fail("unsupported UiDoc version");
-    if(root.Find("text") < 0)
-        return Fail("UiDoc text is missing");
-
     UiDocCore next;
-    next.history_limit_ = history_limit_;
-    next.text_ = ToUnicode(AsString(root["text"]), CHARSET_UTF8);
-    next.styles_.Clear();
-    next.blocks_.Clear();
-    next.annotations_.Clear();
-    next.resources_.Clear();
-    next.embeds_.Clear();
-    next.anchors_.Clear();
-    next.meta_.Clear();
-    next.undo_.Clear();
-    next.redo_.Clear();
-    if(root.Find("meta") >= 0 && !UnpackMap(root["meta"], next.meta_))
-        return Fail("invalid document metadata");
+    try {
+        Value root_value = ParseJSON(data);
+        if(root_value.IsError() || !IsValueMap(root_value))
+            return Fail("invalid UiDoc JSON");
+        ValueMap root = root_value;
+        if(root.Find("kind") < 0 || AsString(root["kind"]) != "UiDoc")
+            return Fail("not a UiDoc document");
+        if(root.Find("version") < 0 || (int)root["version"] != UIDOC_JSON_VERSION)
+            return Fail("unsupported UiDoc version");
+        if(root.Find("text") < 0 || !root["text"].Is<String>())
+            return Fail("UiDoc text is missing");
 
-    ValueArray array;
-    if(!ReadArray(root, "styles", array))
-        return Fail("invalid styles array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        UiDocStyleRun run;
-        if(!StyleRunFromValue(array[i], run))
-            return Fail("invalid style run");
-        next.styles_.Add(pick(run));
+        next.history_limit_ = history_limit_;
+        next.text_ = ToUnicode(AsString(root["text"]), CHARSET_UTF8);
+        next.styles_.Clear();
+        next.blocks_.Clear();
+        next.annotations_.Clear();
+        next.resources_.Clear();
+        next.embeds_.Clear();
+        next.anchors_.Clear();
+        next.meta_.Clear();
+        next.undo_.Clear();
+        next.redo_.Clear();
+        if(root.Find("meta") >= 0 && !UnpackMap(root["meta"], next.meta_))
+            return Fail("invalid document metadata");
+
+        ValueArray array;
+        if(!ReadArray(root, "styles", array))
+            return Fail("invalid styles array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            UiDocStyleRun run;
+            if(!StyleRunFromValue(array[i], run))
+                return Fail("invalid style run");
+            next.styles_.Add(pick(run));
+        }
+        // Validate incoming ranges before normalization; clipping corrupt imports
+        // would silently move comments and story metadata.
+        for(const auto& run : next.styles_)
+            if(run.from < 0 || run.to > next.GetLength() || run.from >= run.to)
+                return Fail("invalid style range");
+        next.NormalizeStyles();
+
+        if(!ReadArray(root, "blocks", array))
+            return Fail("invalid blocks array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            UiDocBlock block;
+            if(!BlockFromValue(array[i], block))
+                return Fail("invalid block");
+            next.blocks_.Add(pick(block));
+        }
+
+        if(!ReadArray(root, "annotations", array))
+            return Fail("invalid annotations array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            UiDocAnnotation annotation;
+            if(!AnnotationFromValue(array[i], annotation))
+                return Fail("invalid annotation");
+            next.annotations_.Add(pick(annotation));
+        }
+
+        if(!ReadArray(root, "resources", array))
+            return Fail("invalid resources array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            UiDocResource resource;
+            if(!ResourceFromValue(array[i], resource))
+                return Fail("invalid resource");
+            next.resources_.Add(pick(resource));
+        }
+
+        if(!ReadArray(root, "embeds", array))
+            return Fail("invalid embeds array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            UiDocEmbedBlock embed;
+            if(!EmbedFromValue(array[i], embed))
+                return Fail("invalid embed");
+            next.embeds_.Add(pick(embed));
+        }
+
+        if(!ReadArray(root, "anchors", array))
+            return Fail("invalid anchors array");
+        for(int i = 0; i < array.GetCount(); i++) {
+            if(!array[i].Is<ValueMap>())
+                return Fail("invalid anchor");
+            ValueMap anchor = array[i];
+            if(anchor.Find("id") < 0 || anchor.Find("pos") < 0)
+                return Fail("invalid anchor");
+            String id = AsString(anchor["id"]);
+            if(id.IsEmpty() || next.anchors_.Find(id) >= 0)
+                return Fail("invalid anchor id");
+            next.anchors_.Add(id, (int)anchor["pos"]);
+        }
+
+        String validation;
+        if(!next.Validate(&validation))
+            return Fail(validation);
+
     }
-    next.NormalizeStyles();
-
-    if(!ReadArray(root, "blocks", array))
-        return Fail("invalid blocks array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        UiDocBlock block;
-        if(!BlockFromValue(array[i], block))
-            return Fail("invalid block");
-        next.blocks_.Add(pick(block));
+    catch(const Exc& e) {
+        return Fail("invalid UiDoc field: " + String(e));
     }
-
-    if(!ReadArray(root, "annotations", array))
-        return Fail("invalid annotations array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        UiDocAnnotation annotation;
-        if(!AnnotationFromValue(array[i], annotation))
-            return Fail("invalid annotation");
-        next.annotations_.Add(pick(annotation));
-    }
-
-    if(!ReadArray(root, "resources", array))
-        return Fail("invalid resources array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        UiDocResource resource;
-        if(!ResourceFromValue(array[i], resource))
-            return Fail("invalid resource");
-        next.resources_.Add(pick(resource));
-    }
-
-    if(!ReadArray(root, "embeds", array))
-        return Fail("invalid embeds array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        UiDocEmbedBlock embed;
-        if(!EmbedFromValue(array[i], embed))
-            return Fail("invalid embed");
-        next.embeds_.Add(pick(embed));
-    }
-
-    if(!ReadArray(root, "anchors", array))
-        return Fail("invalid anchors array");
-    for(int i = 0; i < array.GetCount(); i++) {
-        if(!array[i].Is<ValueMap>())
-            return Fail("invalid anchor");
-        ValueMap anchor = array[i];
-        if(anchor.Find("id") < 0 || anchor.Find("pos") < 0)
-            return Fail("invalid anchor");
-        String id = AsString(anchor["id"]);
-        if(id.IsEmpty() || next.anchors_.Find(id) >= 0)
-            return Fail("invalid anchor id");
-        next.anchors_.Add(id, (int)anchor["pos"]);
-    }
-
-    String validation;
-    if(!next.Validate(&validation))
-        return Fail(validation);
 
     int old_length = text_.GetCount();
     uint64 before = revision_;
@@ -414,9 +425,13 @@ bool UiDocCore::FromJson(const String& data, String* error)
     result.revision_before = before;
     result.revision_after = revision_;
     result.changed_range = UiDocRange(0, max(old_length, text_.GetCount()));
-    WhenChange(result);
+    auto& edit = result.positions.edits.Add();
+    edit.at = 0;
+    edit.old_len = old_length;
+    edit.new_len = text_.GetCount();
     if(error)
         error->Clear();
+    Notify(result);
     return true;
 }
 
@@ -427,7 +442,17 @@ bool UiDocCore::Save(const String& path, String* error) const
             *error = "empty UiDoc path";
         return false;
     }
-    if(!Upp::SaveFile(path, ToJson(true))) {
+    String temporary = path + ".tmp-" + AsString(Uuid::Create());
+    bool saved = Upp::SaveFile(temporary, ToJson(true));
+#ifdef PLATFORM_WIN32
+    if(saved)
+        saved = !!MoveFileExW(ToSystemCharsetW(temporary), ToSystemCharsetW(path),
+                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+#else
+    if(saved) saved = FileMove(temporary, path);
+#endif
+    if(!saved) {
+        FileDelete(temporary);
         if(error)
             *error = "unable to save UiDoc file";
         return false;

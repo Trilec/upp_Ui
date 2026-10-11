@@ -4,19 +4,22 @@ Fetch the applicable remote branch before publishing; preserve concurrent work
 and never force-push. This is a current recovery index, not a validation log.
 Contracts live in the reader guides; historical checkpoints live in Git.
 
+## UiDoc and UiScreenplay — 2026-10-11
+BASE: Ui `b09b06f` / `main`.
+TASK: audit/harden the document foundation, add a shared-core screenplay editor.
+TOUCHED: document model/history/callback/layout/input; UiScreenplay; demo/tests/docs.
+STATUS: implemented; focused checks in [audit](UIDOC_AUDIT.md), API/limits in [Screenplay](SCREENPLAY.md).
+VALIDATION: exact Debug/Release summaries and generated-code/header checks in audit.
+PUBLISHED: containing main commit; recover with `git log -1 -- Ui/UiScreenplay.cpp`.
+NEXT: hands-on native authoring/file/resize acceptance and platform/font/print checks;
+dual dialogue, FDX and production revision workflows are outside this initial control.
+
 ## RangeSegments cards — 2026-10-10
-BASE: Ui `2e8c1c4` / `main`.
-TASK: title/subtitle cards, mirrored span percentages, upright vertical stacks.
-TOUCHED: RangeSegments model binding/style/geometry/paint; canonical demo; usage/skills.
-STATUS: implemented on the existing scalar model; compact defaults remain supported.
-VALIDATION: Release BLITZ and Debug no-BLITZ range 363/0 each; native smoke 73/0 each.
-Standalone public header Debug/no-BLITZ compiles; demo editor/state checks 46/0.
-11 actual generated exports compile unchanged and pass Light/Dark 470/0, including
-fractional scalar round-trips. All 27 documented usage recipes compile; skill hashes match.
-Native raster checks cover handle shapes/cache reuse, small bounds and legacy streams;
-H/V mirrored previews inspected. Range demo and GraphComponentStudio rebuilt in bin/windows-x64.
-PUBLISHED: containing main commit; recover with `git log -1 -- Ui/UiRangeSegmentsGeometry.cpp`.
-NEXT: use the Range/Cards demo for hands-on pointer/resize acceptance; broader gates below remain open.
+PUBLISHED: recover with `git log -1 -- Ui/UiRangeSegmentsGeometry.cpp`.
+VALIDATION: Debug/Release range 363/0 and native smoke 73/0; demo 46/0;
+11 unchanged exports 470/0; 27 usage recipes/header/skill checks pass.
+STATUS: shared scalar model supports mirrored H/V cards; binaries refreshed.
+NEXT: hands-on pointer/resize acceptance remains separate from focused raster checks.
 
 ## Frame Accent and authoring coverage - 2026-10-09
 BASE: Ui `3adee3c` / `main`; Designer `416d6fe` / `main`.

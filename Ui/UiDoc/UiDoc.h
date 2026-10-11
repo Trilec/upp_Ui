@@ -121,6 +121,25 @@ public:
         Image marker_comment_icon;
     };
 
+    // Logical view pixels, scaled once by the caller. These reusable layout
+    // policies share geometry with painting, hit-testing and caret navigation.
+    struct ParagraphFormat {
+        int left = 0, right = 0, before = 0, after = 0, line_height = 0;
+        int align = ALIGN_LEFT;
+        int continuation_top = 0, continuation_bottom = 0;
+        bool word_wrap = false;
+        bool hidden = false;
+        bool keep_with_next = false;
+        bool keep_together = false;
+        bool break_before = false;
+    };
+    struct PageFormat {
+        bool enabled = false;
+        Size size = Size(816, 1056);
+        Rect margins = Rect(144, 96, 96, 96); // left / top / right / bottom
+        int gap = 24;
+    };
+
 private:
     struct VisualGlyph : Moveable<VisualGlyph> {
         int pos = 0;
@@ -137,6 +156,8 @@ private:
         int y = 0;
         int height = 0;
         int baseline = 0;
+        int left = 0;
+        int flow_y = 0;
         Vector<VisualGlyph> glyphs;
     };
 
@@ -170,6 +191,7 @@ private:
         String type;
         Rect rect;
         TableVisual table;
+        Rect flow_rect;
     };
 
     struct ParagraphCache : Moveable<ParagraphCache> {
@@ -181,13 +203,30 @@ private:
         int width = -1;
         uint64 revision = 0;
         bool valid = false;
+        int flow_height = 0;
+        ParagraphFormat format;
+        String role;
         Vector<VisualLine> lines;
         Vector<EmbedVisual> embeds;
     };
 
     UiDocCore internal_model_;
     UiDocCore* model_ = &internal_model_;
-    Vector<Ptr<UiDocCore>> bound_models_;
+    Ptr<UiDocCore> observed_model_;
+    int model_connection_ = 0;
+    struct ViewGuard {
+        Ptr<UiDoc> view;
+        Ptr<UiDocCore> model;
+        ViewGuard(UiDoc& doc) : view(&doc), model(doc.model_) {}
+        operator bool() const { return view && model && view->model_ == model; }
+    };
+    template<class Callback, class... Args>
+    bool Emit(Callback callback, Args&&... args)
+    {
+        ViewGuard alive(*this);
+        callback(std::forward<Args>(args)...);
+        return alive;
+    }
     Style style_;
     bool custom_font_style_ = false;
     mutable uint64 font_revision_ = 0;
@@ -213,6 +252,11 @@ private:
     ScrollBar sb_;
     int scroll_y_ = 0;
     Rect page_rect_;
+    PageFormat page_format_;
+    mutable int page_count_ = 1;
+    bool show_metadata_cards_ = true;
+    bool print_paint_ = false;
+    bool readonly_ = false;
 
     mutable bool paragraph_index_dirty_ = true;
     mutable bool layout_positions_dirty_ = true;
@@ -220,6 +264,7 @@ private:
     mutable Vector<ParagraphCache> paragraphs_;
     mutable Vector<int> paragraph_tops_;
     mutable VectorMap<int64, int> glyph_width_cache_;
+    mutable uint64 paragraph_build_count_ = 0;
 
     String active_table_id_;
     int active_table_row_ = -1;
@@ -251,7 +296,9 @@ private:
     void OnCoreChange(const UiDocApplyResult& result);
 
     Font BaseFont() const;
-    Font ResolveFont(const UiDocTextStyle& style, const String& block_role = String()) const;
+protected:
+    virtual Font ResolveFont(const UiDocTextStyle& style, const String& block_role = String()) const;
+private:
     Color ResolveInk(const UiDocTextStyle& style) const;
     UiDocTextStyle StyleAt(int pos) const;
     String BlockRoleAt(int pos) const;
@@ -261,7 +308,9 @@ private:
     void InvalidateAllLayout();
     void InvalidateChangedRange(UiDocRange range);
     void RebuildParagraphIndex() const;
+    void MapParagraphCaches(const UiDocPositionMap& positions);
     void RebuildParagraphTops() const;
+    void RebuildPagedTops() const;
     void EnsureLayout() const;
     void EnsureVisibleLayout() const;
     void LayoutParagraph(int index, int width) const;
@@ -309,9 +358,37 @@ private:
     void RegisterBuiltinCommands();
     UiDocCommandState QueryBuiltinCommandState(const String& id) const;
 
+protected:
+    virtual ParagraphFormat FormatParagraph(int from, const String& role) const;
+    virtual void OnDocumentChanged() {}
+    virtual int LeadingPageCount() const { return 0; }
+    virtual void PaintLeadingPage(Draw& w, int page) {}
+    virtual void PaintPageDecoration(Draw& w, int body_page, const Rect& paper) {}
+    void InvalidateDocumentLayout() { InvalidateAllLayout(); RefreshLayout(); Refresh(); }
+
 public:
     UiDoc();
-    virtual ~UiDoc() {}
+    ~UiDoc();
+
+    UiDoc& SetPageFormat(const PageFormat& format);
+    const PageFormat& GetPageFormat() const { return page_format_; }
+    struct LayoutLine : Moveable<LayoutLine> {
+        UiDocRange range;
+        Rect rect;
+        String role;
+        int paragraph = 0;
+    };
+    Vector<LayoutLine> GetLayoutLines() const;
+    uint64 GetParagraphBuildCount() const { return paragraph_build_count_; }
+    int GetPageCount() const;
+    Rect GetPageRect(int page) const;
+    int GetPageAtPos(int pos) const;
+    void PaintPage(Draw& w, int page);
+    void ShowMetadataCards(bool show);
+    bool IsMetadataCardsShown() const { return show_metadata_cards_; }
+    UiDoc& ReadOnly(bool readonly = true);
+    bool IsReadOnly() const { return readonly_; }
+    void CancelMode() override;
 
     static const Style& StyleDefault();
     UiDoc& SetCustomStyle(const Style& style);

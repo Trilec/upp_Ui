@@ -262,7 +262,7 @@ static void TestMetadataEditAndReviewSelection(MetadataTestCtx& t)
              "stacked gutter cycling exposes both metadata records and the comment individually");
 }
 
-CONSOLE_APP_MAIN
+GUI_APP_MAIN
 {
     MetadataTestCtx t;
     Cout() << "UiDoc metadata regression suite\n";

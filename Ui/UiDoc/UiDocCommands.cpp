@@ -40,7 +40,8 @@ Vector<UiDocRange> CommandParagraphRanges(const UiDoc& doc)
 bool ApplyParagraphRole(UiDoc& doc, const String& role)
 {
     Vector<UiDocRange> paragraphs = CommandParagraphRanges(doc);
-    bool changed = false;
+    UiDocCoreTransaction tx;
+    tx.label = "Paragraph format";
 
     for(const UiDocRange& paragraph : paragraphs) {
         Vector<UiDocBlock> blocks = doc.Model().QueryBlocks(&paragraph);
@@ -50,20 +51,27 @@ bool ApplyParagraphRole(UiDoc& doc, const String& role)
                 found_exact = true;
                 if(block.role != role) {
                     block.role = role;
-                    changed = doc.Model().UpdateBlock(block) || changed;
+                    auto& change = tx.changes.Add();
+                    change.type = UiDocCoreChange::UpdateBlock;
+                    change.block = pick(block);
                 }
             }
         }
-        if(!found_exact)
-            changed = !doc.Model().AddBlock(paragraph, role).IsEmpty() || changed;
+        if(!found_exact) {
+            auto& change = tx.changes.Add();
+            change.type = UiDocCoreChange::AddBlock;
+            change.block.range = paragraph;
+            change.block.role = role;
+        }
     }
-    return changed || !paragraphs.IsEmpty();
+    return tx.changes.IsEmpty() ? !paragraphs.IsEmpty() : doc.Model().Apply(tx).ok;
 }
 
 bool AdjustParagraphIndent(UiDoc& doc, int delta)
 {
     Vector<UiDocRange> paragraphs = CommandParagraphRanges(doc);
-    bool changed = false;
+    UiDocCoreTransaction tx;
+    tx.label = "Paragraph format";
 
     for(const UiDocRange& paragraph : paragraphs) {
         Vector<UiDocBlock> blocks = doc.Model().QueryBlocks(&paragraph);
@@ -82,14 +90,20 @@ bool AdjustParagraphIndent(UiDoc& doc, int delta)
         if(found_exact) {
             if(exact.indent != next) {
                 exact.indent = next;
-                changed = doc.Model().UpdateBlock(exact) || changed;
+                auto& change = tx.changes.Add();
+                change.type = UiDocCoreChange::UpdateBlock;
+                change.block = pick(exact);
             }
         }
-        else if(next > 0)
-            changed = !doc.Model().AddBlock(paragraph, String(), next).IsEmpty() || changed;
+        else if(next > 0) {
+            auto& change = tx.changes.Add();
+            change.type = UiDocCoreChange::AddBlock;
+            change.block.range = paragraph;
+            change.block.indent = next;
+        }
     }
 
-    return changed || !paragraphs.IsEmpty();
+    return tx.changes.IsEmpty() ? !paragraphs.IsEmpty() : doc.Model().Apply(tx).ok;
 }
 
 }
@@ -109,13 +123,17 @@ bool UiDoc::ExecuteCommand(const String& id, const Value& args)
     UiDocCommandState state = QueryCommandState(id);
     if(!state.enabled)
         return false;
-    return commands_[q](*this, args);
+    auto command = commands_[q];
+    return command(*this, args);
 }
 
 UiDocCommandState UiDoc::QueryBuiltinCommandState(const String& id) const
 {
     UiDocCommandState state;
     state.enabled = IsEnabled();
+    if(readonly_ && id != "edit.copy" && id != "edit.select_all" &&
+       !id.StartsWith("search."))
+        state.enabled = false;
     if(!state.enabled)
         return state;
 

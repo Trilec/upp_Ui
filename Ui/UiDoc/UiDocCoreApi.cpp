@@ -15,7 +15,7 @@ String UiDocCore::AddBlock(UiDocRange range, const String& role, int indent, con
 {
     UiDocCoreChange change;
     change.type = UiDocCoreChange::AddBlock;
-    change.block.id = Format("block_%d", next_block_id_++);
+    do { change.block.id = (next_block_id_ < INT_MAX ? Format("block_%d", next_block_id_++) : "block_" + AsString(Uuid::Create())); } while(FindBlock(change.block.id) >= 0);
     change.block.range = range;
     change.block.role = role;
     change.block.indent = max(0, indent);
@@ -74,7 +74,7 @@ String UiDocCore::AddAnnotation(UiDocRange range, const String& type,
         return String();
     UiDocCoreChange change;
     change.type = UiDocCoreChange::AddAnnotation;
-    change.annotation.id = Format("ann_%d", next_annotation_id_++);
+    do { change.annotation.id = (next_annotation_id_ < INT_MAX ? Format("ann_%d", next_annotation_id_++) : "ann_" + AsString(Uuid::Create())); } while(FindAnnotation(change.annotation.id) >= 0);
     change.annotation.range = range;
     change.annotation.type = type;
     change.annotation.payload = clone(payload);
@@ -157,7 +157,7 @@ String UiDocCore::AddResource(const UiDocResource& resource, bool dedupe)
     change.type = UiDocCoreChange::AddResource;
     change.resource = resource;
     if(change.resource.key.IsEmpty())
-        change.resource.key = Format("res_%d", next_resource_id_++);
+        do { change.resource.key = (next_resource_id_ < INT_MAX ? Format("res_%d", next_resource_id_++) : "res_" + AsString(Uuid::Create())); } while(FindResource(change.resource.key) >= 0);
     String key = change.resource.key;
     UiDocCoreTransaction tx;
     tx.changes.Add(pick(change));
@@ -192,7 +192,7 @@ String UiDocCore::AddEmbed(int pos, const String& type,
         return String();
     UiDocCoreChange change;
     change.type = UiDocCoreChange::AddEmbed;
-    change.embed.id = Format("embed_%d", next_embed_id_++);
+    do { change.embed.id = (next_embed_id_ < INT_MAX ? Format("embed_%d", next_embed_id_++) : "embed_" + AsString(Uuid::Create())); } while(FindEmbed(change.embed.id) >= 0);
     change.embed.type = type;
     int at = ClampPos(pos);
     change.embed.range = UiDocRange(at, at);
@@ -289,14 +289,24 @@ bool UiDocCore::Undo()
     undo_.Drop();
     ApplyHistoryRecord(record, true);
     RebuildIds();
+    UiDocPositionMap positions;
+    for(int i = record.steps.GetCount() - 1; i >= 0; i--) {
+        const auto& step = record.steps[i];
+        auto& edit = positions.edits.Add();
+        edit.at = step.at;
+        edit.old_len = step.after_text.GetCount();
+        edit.new_len = step.before_text.GetCount();
+    }
     redo_.Add(pick(record));
     Touch();
 
     UiDocApplyResult result;
     result.ok = true;
+    result.reset_layout = true;
     result.revision_before = before;
     result.revision_after = revision_;
-    WhenChange(result);
+    result.positions = pick(positions);
+    Notify(result);
     return true;
 }
 
@@ -309,14 +319,23 @@ bool UiDocCore::Redo()
     redo_.Drop();
     ApplyHistoryRecord(record, false);
     RebuildIds();
+    UiDocPositionMap positions;
+    for(const auto& step : record.steps) {
+        auto& edit = positions.edits.Add();
+        edit.at = step.at;
+        edit.old_len = step.before_text.GetCount();
+        edit.new_len = step.after_text.GetCount();
+    }
     undo_.Add(pick(record));
     Touch();
 
     UiDocApplyResult result;
     result.ok = true;
+    result.reset_layout = true;
     result.revision_before = before;
     result.revision_after = revision_;
-    WhenChange(result);
+    result.positions = pick(positions);
+    Notify(result);
     return true;
 }
 

@@ -115,13 +115,13 @@ const UiDoc::AnnotationLane* LaneFor(const Vector<UiDoc::AnnotationLane>& lanes,
 void UiDoc::PaintText(Draw& w)
 {
     EnsureLayout();
-    UiDocRange selection = SelectionRange();
+    UiDocRange selection = print_paint_ ? UiDocRange() : SelectionRange();
     const Vector<UiDocAnnotation>& annotations = Model().GetAnnotations();
     int origin_x = page_rect_.left + style_.page_padding;
     int viewport_top = page_rect_.top;
     int viewport_bottom = page_rect_.bottom;
 
-    for(int paragraph_index = 0; paragraph_index < paragraphs_.GetCount(); paragraph_index++) {
+    for(int paragraph_index = FindParagraphAtY(scroll_y_); paragraph_index < paragraphs_.GetCount(); paragraph_index++) {
         const ParagraphCache& paragraph = paragraphs_[paragraph_index];
         int paragraph_y = page_rect_.top + paragraph.top - scroll_y_;
         if(paragraph_y > viewport_bottom)
@@ -129,7 +129,7 @@ void UiDoc::PaintText(Draw& w)
         if(paragraph_y + paragraph.height < viewport_top)
             continue;
 
-        String role = BlockRoleAt(paragraph.from);
+        const String& role = paragraph.role;
         int indent_px = PaintBlockIndentAt(Model(), paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
 
         if(role == "list.bullet" || role == "list.numbered") {
@@ -172,6 +172,7 @@ void UiDoc::PaintText(Draw& w)
                 bool searched = AnyRangeContains(search_matches_, glyph.pos);
                 bool annotated = false;
                 for(const UiDocAnnotation& annotation : annotations) {
+                    if(print_paint_ || annotation.resolved) continue;
                     if(RangeContains(annotation.range, glyph.pos)) {
                         annotated = true;
                         break;

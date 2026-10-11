@@ -31,6 +31,7 @@ int UiDoc::MeasureGlyph(wchar ch, const Font& font) const
     if(q >= 0)
         return glyph_width_cache_[q];
     int width = max(1, font[ch]);
+    if(glyph_width_cache_.GetCount() >= 8192) glyph_width_cache_.Clear();
     glyph_width_cache_.Add(key, width);
     return width;
 }
@@ -85,21 +86,51 @@ void UiDoc::InvalidateChangedRange(UiDocRange range)
     if(paragraph_index_dirty_)
         return;
     for(ParagraphCache& paragraph : paragraphs_) {
-        if(range.from <= paragraph.to && range.to >= paragraph.from)
+        if(range.from <= paragraph.to && range.to >= paragraph.from) {
             paragraph.valid = false;
+            layout_positions_dirty_ = true;
+        }
+    }
+}
+
+void UiDoc::MapParagraphCaches(const UiDocPositionMap& positions)
+{
+    for(const auto& edit : positions.edits) {
+        int delta = edit.new_len - edit.old_len;
+        UiDocPositionMap one;
+        one.edits.Add(edit);
+        for(auto& paragraph : paragraphs_) {
+            bool touched = edit.at <= paragraph.to && edit.at + edit.old_len >= paragraph.from;
+            if(touched) paragraph.valid = false;
+            if(paragraph.from > edit.at + edit.old_len) {
+                for(auto& line : paragraph.lines) {
+                    line.from += delta; line.to += delta;
+                    for(auto& glyph : line.glyphs) glyph.pos += delta;
+                }
+            }
+            paragraph.from = one.Map(paragraph.from, UiDocPositionMap::Right);
+            paragraph.to = one.Map(paragraph.to, UiDocPositionMap::Right);
+        }
     }
 }
 
 void UiDoc::RebuildParagraphIndex() const
 {
-    paragraphs_.Clear();
+    Vector<ParagraphCache> previous = pick(paragraphs_);
     paragraph_tops_.Clear();
+    int reuse = 0;
 
     const WString& text = Model().GetText();
     int start = 0;
     for(int i = 0; i <= text.GetCount(); i++) {
         if(i < text.GetCount() && text[i] != '\n')
             continue;
+        while(reuse < previous.GetCount() && previous[reuse].from < start) reuse++;
+        if(reuse < previous.GetCount() && previous[reuse].valid && previous[reuse].from == start && previous[reuse].to == i) {
+            paragraphs_.Add(pick(previous[reuse++]));
+            start = i + 1;
+            continue;
+        }
         ParagraphCache& paragraph = paragraphs_.Add();
         paragraph.from = start;
         paragraph.to = i;
@@ -125,6 +156,10 @@ void UiDoc::RebuildParagraphTops() const
 {
     if(paragraph_index_dirty_)
         RebuildParagraphIndex();
+    if(page_format_.enabled) {
+        RebuildPagedTops();
+        return;
+    }
     paragraph_tops_.SetCount(paragraphs_.GetCount());
     int y = max(0, style_.page_padding);
     for(int i = 0; i < paragraphs_.GetCount(); i++) {
@@ -143,6 +178,8 @@ int UiDoc::DocumentHeight() const
         RebuildParagraphTops();
     if(paragraphs_.IsEmpty())
         return 0;
+    if(page_format_.enabled)
+        return page_count_ * (page_format_.size.cy + page_format_.gap) - page_format_.gap;
     return paragraphs_.Top().top + paragraphs_.Top().height + max(0, style_.page_padding);
 }
 

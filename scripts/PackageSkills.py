@@ -19,6 +19,7 @@ def package(name, guides, references_only=False):
     upstream = source / 'references/upstream'
     paths = ['docs/' + guide for guide in guides] + [
         'docs/CONTROL_USAGE.md', 'docs/PROJECT_FONTS.md', 'docs/MEDIA_CONTROLS.md',
+        'docs/SCREENPLAY.md', 'docs/UIDOC_AUDIT.md',
         'LICENSE', 'GETTING_STARTED.md',
     ]
     hashes = {}

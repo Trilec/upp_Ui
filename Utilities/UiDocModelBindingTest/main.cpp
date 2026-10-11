@@ -26,7 +26,7 @@ void Seed(UiDocCore& model, const char *text)
 
 }
 
-CONSOLE_APP_MAIN
+GUI_APP_MAIN
 {
     TestCtx t;
 

@@ -5,28 +5,6 @@ namespace Upp {
 
 namespace {
 
-int GeometryParagraphIndentAt(const UiDocCore& core, int pos)
-{
-    UiDocRange probe(pos, pos);
-    int indent = 0;
-    for(const UiDocBlock& block : core.QueryBlocks(&probe))
-        indent = max(indent, block.indent);
-    return indent;
-}
-
-int GeometryRoleIndent(const String& role)
-{
-    if(role == "list.bullet" || role == "list.numbered" || role == "quote")
-        return DPI(24);
-    if(role == "screenplay.character")
-        return DPI(120);
-    if(role == "screenplay.dialogue")
-        return DPI(72);
-    if(role == "screenplay.transition")
-        return DPI(150);
-    return 0;
-}
-
 bool IsInlineImageGeometry(const UiDocEmbedBlock& embed)
 {
     return embed.type == "image" && embed.layout.Find("mode") >= 0 &&
@@ -73,7 +51,8 @@ void UiDoc::EnsureLayout() const
     }
     if(layout_positions_dirty_)
         RebuildParagraphTops();
-    EnsureVisibleLayout();
+    if(!page_format_.enabled)
+        EnsureVisibleLayout();
     if(layout_positions_dirty_)
         RebuildParagraphTops();
 }
@@ -133,8 +112,14 @@ void UiDoc::Layout()
             face.right -= gutter;
     }
 
+    if(page_format_.enabled) {
+        int paper_left = face.left + max(0, (face.GetWidth() - page_format_.size.cx) / 2);
+        face.left = paper_left + page_format_.margins.left - style_.page_padding;
+        face.right = paper_left + page_format_.size.cx - page_format_.margins.right + style_.page_padding;
+    }
+    if(face.GetWidth() != page_rect_.GetWidth())
+        InvalidateAllLayout();
     page_rect_ = face;
-    InvalidateAllLayout();
     EnsureLayout();
     SyncScrollBar();
 }
@@ -148,8 +133,10 @@ int UiDoc::PosAtDocumentPoint(Point point) const
     int y = point.y - page_rect_.top + scroll_y_;
     int index = FindParagraphAtY(y);
     index = minmax(index, 0, paragraphs_.GetCount() - 1);
-    const ParagraphCache& paragraph = paragraphs_[index];
     LayoutParagraph(index, ContentWidth());
+    while(paragraphs_[index].format.hidden && index + 1 < paragraphs_.GetCount())
+        LayoutParagraph(++index, ContentWidth());
+    const ParagraphCache& paragraph = paragraphs_[index];
 
     int local_y = y - paragraph.top;
     int local_x = point.x - page_rect_.left - style_.page_padding;
@@ -213,9 +200,7 @@ Point UiDoc::DocumentPointAtPos(int pos) const
         bool last = i + 1 == paragraph.lines.GetCount();
         if(pos < line.to || (last && pos <= line.to)) {
             if(line.glyphs.IsEmpty()) {
-                String role = BlockRoleAt(paragraph.from);
-                int indent_px = GeometryParagraphIndentAt(Model(), paragraph.from) * max(DPI(8), style_.margin_step * DPI(1));
-                local_x = indent_px + GeometryRoleIndent(role);
+                local_x = line.left;
             }
             else {
                 local_x = line.glyphs.Top().x + line.glyphs.Top().width;

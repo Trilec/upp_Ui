@@ -111,23 +111,28 @@ UiDoc::UiDoc()
     RegisterBuiltinCommands();
 }
 
+UiDoc::~UiDoc()
+{
+    if(observed_model_)
+        observed_model_->Unobserve(model_connection_);
+}
+
 void UiDoc::BindModel(UiDocCore& model)
 {
-    for(UiDocCore* bound : bound_models_)
-        if(bound == &model)
-            return;
-
-    bound_models_.Add(&model);
+    if(observed_model_)
+        observed_model_->Unobserve(model_connection_);
+    observed_model_ = &model;
     Ptr<UiDoc> self = this;
-    UiDocCore* observed = &model;
-    model.WhenChange << [self, observed](const UiDocApplyResult& result) {
-        if(self && self->model_ == observed)
+    Ptr<UiDocCore> observed = &model;
+    model_connection_ = model.Observe([self, observed](const UiDocApplyResult& result) {
+        if(self && observed && self->model_ == observed)
             self->OnCoreChange(result);
-    };
+    });
 }
 
 void UiDoc::ResetViewForModel()
 {
+    ViewGuard view_guard(*this);
     anchor_pos_ = caret_pos_ = 0;
     preferred_x_ = -1;
     typing_style_ = UiDocTextStyle();
@@ -139,12 +144,15 @@ void UiDoc::ResetViewForModel()
     scroll_y_ = 0;
     sb_.Set(0);
     glyph_width_cache_.Clear();
+    OnDocumentChanged();
+    if(!view_guard) return;
     InvalidateAllLayout();
     if(!search_query_.IsEmpty())
         RecomputeSearch();
+    if(!view_guard) return;
     RefreshLayout();
     Refresh();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
 }
 
 UiDoc& UiDoc::SetModel(UiDocCore& model)
@@ -194,13 +202,14 @@ UiDocRange UiDoc::SelectionRange() const
 
 void UiDoc::MoveCaret(int pos, bool keep_selection)
 {
+    ViewGuard view_guard(*this);
     int next = ClampPos(pos);
     if(!keep_selection)
         anchor_pos_ = next;
     caret_pos_ = next;
     preferred_x_ = -1;
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     Refresh();
 }
 
@@ -214,6 +223,9 @@ void UiDoc::MapViewState(const UiDocPositionMap& map)
 
 void UiDoc::OnCoreChange(const UiDocApplyResult& result)
 {
+    ViewGuard view_guard(*this);
+    OnDocumentChanged();
+    if(!view_guard) return;
     if(!result.ok)
         return;
 
@@ -254,7 +266,11 @@ void UiDoc::OnCoreChange(const UiDocApplyResult& result)
             ClearActiveObject();
     }
 
-    if(!result.positions.IsEmpty()) {
+    if(result.reset_layout)
+        InvalidateAllLayout();
+    else if(!result.positions.IsEmpty()) {
+        MapParagraphCaches(result.positions);
+        InvalidateChangedRange(result.changed_range);
         paragraph_index_dirty_ = true;
         layout_positions_dirty_ = true;
     }
@@ -265,13 +281,15 @@ void UiDoc::OnCoreChange(const UiDocApplyResult& result)
 
     if(!search_query_.IsEmpty())
         RecomputeSearch();
+    if(!view_guard) return;
+    EnsureLayout();
     SyncScrollBar();
     RefreshLayout();
     Refresh();
 
     if(!result.positions.IsEmpty())
-        WhenMapped(result.positions);
-    WhenChange();
+        if(!Emit(WhenMapped, result.positions)) return;
+    if(!Emit(WhenChange)) return;
 }
 
 Font UiDoc::BaseFont() const
@@ -322,7 +340,9 @@ Font UiDoc::ResolveFont(const UiDocTextStyle& style, const String& block_role) c
             mono.Italic();
         font = mono;
     }
-    else if(block_role == "screenplay.scene" || block_role == "screenplay.character" || block_role == "screenplay.transition")
+
+
+    if(block_role == "screenplay.scene" || block_role == "screenplay.character" || block_role == "screenplay.transition")
         font.Bold();
 
     if(style.font_face.IsEmpty() && block_role.StartsWith("heading.")) {
@@ -340,25 +360,25 @@ Color UiDoc::ResolveInk(const UiDocTextStyle& text_style) const
 
 UiDocTextStyle UiDoc::StyleAt(int pos) const
 {
-    pos = ClampPos(pos);
-    for(const UiDocStyleRun& run : Model().GetStyles()) {
-        if(pos < run.from)
-            break;
-        if(pos >= run.from && pos < run.to)
-            return run.style;
+    const auto& runs = Model().GetStyles();
+    int lo = 0, hi = runs.GetCount();
+    while(lo < hi) {
+        int mid = (lo + hi) / 2;
+        if(runs[mid].to <= pos) lo = mid + 1;
+        else hi = mid;
     }
-    return UiDocTextStyle();
+    return lo < runs.GetCount() && runs[lo].from <= pos ? runs[lo].style : UiDocTextStyle();
 }
 
 String UiDoc::BlockRoleAt(int pos) const
 {
     UiDocRange probe(ClampPos(pos), ClampPos(pos));
-    Vector<UiDocBlock> blocks = Model().QueryBlocks(&probe);
+    const auto& blocks = Model().GetBlocks();
     String role;
     int best = INT_MAX;
     for(const UiDocBlock& block : blocks) {
         int length = block.range.GetLength();
-        if(!block.role.IsEmpty() && length <= best) {
+        if(block.range.from <= probe.from && block.range.to >= probe.from && !block.role.IsEmpty() && length <= best) {
             role = block.role;
             best = length;
         }
@@ -368,7 +388,9 @@ String UiDoc::BlockRoleAt(int pos) const
 
 void UiDoc::NewDocument()
 {
+    ViewGuard view_guard(*this);
     Model().Clear();
+    if(!view_guard) return;
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
     ClearActiveObject();
@@ -377,7 +399,7 @@ void UiDoc::NewDocument()
     search_match_index_ = -1;
     scroll_y_ = 0;
     sb_.Set(0);
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
 }
 
 bool UiDoc::Save(const String& path, String* error) const
@@ -387,20 +409,23 @@ bool UiDoc::Save(const String& path, String* error) const
 
 bool UiDoc::Load(const String& path, String* error)
 {
-    if(!Model().Load(path, error))
+    ViewGuard view_guard(*this);
+    if(!Model().Load(path, error) || !view_guard)
         return false;
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
     ClearActiveObject();
     scroll_y_ = 0;
     sb_.Set(0);
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     return true;
 }
 
 void UiDoc::SetText(const String& text)
 {
+    ViewGuard view_guard(*this);
     Model().Clear();
+    if(!view_guard) return;
     UiDocCoreTransaction tx;
     tx.add_to_history = false;
     UiDocCoreChange change;
@@ -409,10 +434,11 @@ void UiDoc::SetText(const String& text)
     change.text = ToUnicode(text, CHARSET_UTF8);
     tx.changes.Add(pick(change));
     Model().Apply(tx);
+    if(!view_guard) return;
     anchor_pos_ = caret_pos_ = 0;
     typing_style_ = UiDocTextStyle();
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
 }
 
 void UiDoc::SetData(const Value& value)
@@ -427,6 +453,7 @@ Value UiDoc::GetData() const
 
 void UiDoc::Replace(UiDocRange range, const WString& text)
 {
+    ViewGuard view_guard(*this);
     range = NormalizeRange(range);
     UiDocCoreTransaction tx;
     tx.label = "Replace";
@@ -447,10 +474,12 @@ void UiDoc::Replace(UiDocRange range, const WString& text)
     tx.changes.Add(pick(replace));
 
     UiDocApplyResult result = Model().Apply(tx);
+
+    if(!view_guard) return;
     if(result.ok) {
         int pos = ClampPos(range.from + text.GetCount());
         anchor_pos_ = caret_pos_ = pos;
-        WhenSelection();
+        if(!Emit(WhenSelection)) return;
     }
 }
 
@@ -464,32 +493,35 @@ UiDocSelection UiDoc::GetSelection() const
 
 void UiDoc::SetSelection(const UiDocSelection& selection)
 {
+    ViewGuard view_guard(*this);
     anchor_pos_ = ClampPos(selection.anchor);
     caret_pos_ = ClampPos(selection.caret);
     preferred_x_ = -1;
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     Refresh();
 }
 
 void UiDoc::SetSelection(UiDocRange range)
 {
+    ViewGuard view_guard(*this);
     range = NormalizeRange(range);
     anchor_pos_ = range.from;
     caret_pos_ = range.to;
     preferred_x_ = -1;
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     Refresh();
 }
 
 void UiDoc::SelectAll()
 {
+    ViewGuard view_guard(*this);
     anchor_pos_ = 0;
     caret_pos_ = Model().GetLength();
     preferred_x_ = -1;
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return;
     Refresh();
 }
 
@@ -687,6 +719,7 @@ Vector<UiDocAnnotation> UiDoc::GetComments(UiDocRange* range) const
 
 String UiDoc::InsertImage(const String& resource_key, int width, int height, const String& align)
 {
+    ViewGuard view_guard(*this);
     UiDocResource resource;
     if(!Model().GetResource(resource_key, resource))
         return String();
@@ -731,12 +764,12 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
         add.embed.layout = clone(layout);
         tx.changes.Add(pick(add));
 
-        if(!Model().Apply(tx).ok)
+        if(!Model().Apply(tx).ok || !view_guard)
             return String();
 
         anchor_pos_ = caret_pos_ = ClampPos(at + 1);
         active_embed_id_ = id;
-        WhenSelection();
+        if(!Emit(WhenSelection)) return String();
         Refresh();
         return id;
     }
@@ -744,6 +777,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
     layout.Add("mode", "block");
     layout.Add("align", align);
     String id = Model().AddEmbed(caret_pos_, "image", payload, layout);
+    if(!view_guard) return String();
     if(!id.IsEmpty()) {
         ClearActiveObject();
         active_embed_id_ = id;
@@ -754,6 +788,7 @@ String UiDoc::InsertImage(const String& resource_key, int width, int height, con
 
 bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
 {
+    ViewGuard view_guard(*this);
     for(const UiDocEmbedBlock& current : Model().GetEmbeds()) {
         if(current.id != embed_id || current.type != "image")
             continue;
@@ -794,6 +829,7 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
         tx.changes.Add(pick(update));
 
         bool ok = Model().Apply(tx).ok;
+        if(!view_guard) return false;
         if(ok) {
             active_embed_id_ = embed_id;
             Refresh();
@@ -805,6 +841,7 @@ bool UiDoc::SetImageAlign(const String& embed_id, const String& align)
 
 bool UiDoc::RemoveEmbed(const String& id)
 {
+    ViewGuard view_guard(*this);
     const UiDocEmbedBlock* found = nullptr;
     for(const UiDocEmbedBlock& embed : Model().GetEmbeds())
         if(embed.id == id) {
@@ -837,7 +874,7 @@ bool UiDoc::RemoveEmbed(const String& id)
     else
         ok = Model().RemoveEmbed(id);
 
-    if(!ok)
+    if(!ok || !view_guard)
         return false;
     if(active_embed_id_ == id || active_table_id_ == id)
         ClearActiveObject();
@@ -875,10 +912,11 @@ bool UiDoc::IsWordChar(wchar ch) const
 
 void UiDoc::RecomputeSearch()
 {
+    ViewGuard view_guard(*this);
     search_matches_.Clear();
     search_match_index_ = -1;
     if(search_query_.IsEmpty()) {
-        WhenSearch(search_query_);
+        if(!Emit(WhenSearch, String(search_query_))) return;
         Refresh();
         return;
     }
@@ -902,7 +940,7 @@ void UiDoc::RecomputeSearch()
             search_matches_.Add(UiDocRange(at, to));
         from = max(at + 1, to);
     }
-    WhenSearch(search_query_);
+    if(!Emit(WhenSearch, String(search_query_))) return;
     Refresh();
 }
 
@@ -942,16 +980,21 @@ bool UiDoc::FindPrev()
 
 bool UiDoc::ReplaceCurrentSearch(const WString& replacement)
 {
+    ViewGuard view_guard(*this);
+    if(readonly_) return false;
     if(search_match_index_ < 0 || search_match_index_ >= search_matches_.GetCount())
         return false;
     UiDocRange range = search_matches_[search_match_index_];
     Replace(range, replacement);
+    if(!view_guard) return false;
     RecomputeSearch();
     return true;
 }
 
 int UiDoc::ReplaceAllSearch(const WString& replacement)
 {
+    if(readonly_) return 0;
+    ViewGuard view_guard(*this);
     if(search_matches_.IsEmpty())
         return 0;
     UiDocCoreTransaction tx;
@@ -964,9 +1007,10 @@ int UiDoc::ReplaceAllSearch(const WString& replacement)
         tx.changes.Add(pick(change));
     }
     int count = search_matches_.GetCount();
-    if(!Model().Apply(tx).ok)
+    if(!Model().Apply(tx).ok || !view_guard)
         return 0;
     RecomputeSearch();
+    if(!view_guard) return 0;
     return count;
 }
 
@@ -1052,21 +1096,23 @@ void UiDoc::ShowMetadataMarkers(bool show)
 
 bool UiDoc::Undo()
 {
-    if(!Model().Undo())
+    ViewGuard view_guard(*this);
+    if(!Model().Undo() || !view_guard)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     return true;
 }
 
 bool UiDoc::Redo()
 {
-    if(!Model().Redo())
+    ViewGuard view_guard(*this);
+    if(!Model().Redo() || !view_guard)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
     ClearActiveObject();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     return true;
 }
 

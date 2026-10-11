@@ -379,7 +379,7 @@ static void TestRoundTrip(ImageTestCtx& t)
              "round-trip preserves resource-backed image bytes");
 }
 
-CONSOLE_APP_MAIN
+GUI_APP_MAIN
 {
     ImageTestCtx t;
     Cout() << "UiDoc image regression suite\n";

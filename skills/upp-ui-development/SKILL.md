@@ -26,6 +26,9 @@ machine paths or API summaries from an old session still apply.
   scrolling, focus and control integration.
 - For appearance, read [themes](references/upstream/docs/02_UI_THEME_GUIDE.md);
   for a custom renderer, read [drawing](references/upstream/docs/07_UI_DRAWING_GUIDE.md).
+- For screenplay/script authoring, read [UiScreenplay](references/upstream/docs/SCREENPLAY.md)
+  for the shared UiDocCore model, cover QTF/resources, revision-safe metadata edits,
+  native/Fountain/PDF boundaries and explicit initial-control limitations.
 - For data-backed views, read [models](references/upstream/docs/03_UI_MODEL_GUIDE.md).
   For inspectors, also read [PropertyEditor](references/upstream/docs/05_UI_PROPERTY_EDITOR_GUIDE.md).
 - For control demos, read the [demo contract](references/upstream/docs/04_UI_DEMO_GUIDE.md).

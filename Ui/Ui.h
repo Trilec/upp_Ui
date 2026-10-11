@@ -116,6 +116,7 @@
 #include <Ui/UiQuadSplitter.h>
 #include <Ui/UiTable.h>
 #include <Ui/UiDoc.h>
+#include <Ui/UiScreenplay.h>
 #include <Ui/UiTree.h>
 #include <Ui/UiList.h>
 #include <Ui/UiGallery.h>

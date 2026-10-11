@@ -37,9 +37,10 @@ void UiDoc::LayoutParagraph(int index, int width) const
         return;
 
     ParagraphCache& paragraph = paragraphs_[index];
-    if(paragraph.valid && paragraph.width == width && paragraph.revision == Model().GetRevision())
+    if(paragraph.valid && paragraph.width == width)
         return;
 
+    paragraph_build_count_++;
     paragraph.lines.Clear();
     paragraph.embeds.Clear();
     paragraph.width = width;
@@ -50,28 +51,24 @@ void UiDoc::LayoutParagraph(int index, int width) const
     int from = paragraph.from;
     int to = paragraph.to;
     int indent_px = ParagraphBlockIndentAt(Model(), from) * max(DPI(8), style_.margin_step * DPI(1));
-    String role = BlockRoleAt(from);
+    String role = paragraph.role = BlockRoleAt(from);
 
-    int role_indent_px = 0;
-    if(role == "list.bullet" || role == "list.numbered")
-        role_indent_px = DPI(22);
-    else if(role == "quote")
-        role_indent_px = DPI(24);
-    else if(role == "screenplay.character")
-        role_indent_px = DPI(120);
-    else if(role == "screenplay.dialogue")
-        role_indent_px = DPI(72);
-    else if(role == "screenplay.transition")
-        role_indent_px = DPI(150);
-
-    int text_left = indent_px + role_indent_px;
-    int available = max(DPI(40), width - text_left);
+    paragraph.format = FormatParagraph(from, role);
+    const auto& format = paragraph.format;
+    if(format.hidden) {
+        paragraph.height = paragraph.flow_height = 0;
+        layout_positions_dirty_ = true;
+        return;
+    }
+    int text_left = indent_px + format.left;
+    int available = max(DPI(16), width - text_left - format.right);
 
     VisualLine current;
     current.from = from;
     current.to = from;
     current.y = 0;
     current.height = max(DPI(14), ResolveFont(UiDocTextStyle(), role).GetHeight() + style_.line_gap);
+    current.left = text_left;
     current.baseline = ResolveFont(UiDocTextStyle(), role).GetAscent();
     int x = text_left;
 
@@ -83,6 +80,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
         next.to = next.from;
         next.y = paragraph.lines.Top().y + paragraph.lines.Top().height;
         next.height = max(DPI(14), ResolveFont(UiDocTextStyle(), role).GetHeight() + style_.line_gap);
+        next.left = text_left;
         next.baseline = ResolveFont(UiDocTextStyle(), role).GetAscent();
         current = pick(next);
         x = text_left;
@@ -128,13 +126,31 @@ void UiDoc::LayoutParagraph(int index, int width) const
         int glyph_width = MeasureGlyph(text[pos], font) + text_style.tracking_delta;
         int glyph_height = max(DPI(12), font.GetHeight() + style_.line_gap + max(0, text_style.leading_delta));
 
-        if(x > text_left && x + glyph_width > text_left + available)
+        if(format.word_wrap && text[pos] != ' ' && text[pos] != '\t' &&
+           (pos == from || IsSpace((int)text[pos - 1]))) {
+            int word_width = 0;
+            for(int q = pos; q < to && !IsSpace((int)text[q]); q++) {
+                auto word_style = StyleAt(q);
+                word_width += max(1, MeasureGlyph(text[q], ResolveFont(word_style, role)) + word_style.tracking_delta);
+                if(word_width > available) break;
+            }
+            if(x > text_left && word_width <= available && x + word_width > text_left + available)
+                EndLine();
+        }
+        if(text[pos] == '\t') {
+            int stop = max(1, MeasureGlyph(' ', font) * max(1, style_.tab_size));
+            glyph_width = stop - (x - text_left) % stop;
+        }
+        bool trailing_space = format.word_wrap && text[pos] == ' ' && x > text_left &&
+                              x + glyph_width > text_left + available;
+        if(trailing_space) glyph_width = 0;
+        else if(x > text_left && x + glyph_width > text_left + available)
             EndLine();
 
         VisualGlyph glyph;
         glyph.pos = pos;
         glyph.x = x;
-        glyph.width = max(1, glyph_width);
+        glyph.width = trailing_space ? 0 : max(1, glyph_width);
         glyph.font = font;
         glyph.ink = ResolveInk(text_style);
         glyph.ch = text[pos];
@@ -142,15 +158,24 @@ void UiDoc::LayoutParagraph(int index, int width) const
         current.to = pos + 1;
         current.height = max(current.height, glyph_height);
         current.baseline = max(current.baseline, font.GetAscent());
-        x += max(1, glyph_width);
+        x += trailing_space ? 0 : max(1, glyph_width);
     }
 
     if(current.from < to || paragraph.lines.IsEmpty())
         paragraph.lines.Add(pick(current));
 
-    int y = 0;
+    int y = max(0, format.before);
     for(VisualLine& line : paragraph.lines) {
-        line.y = y;
+        if(format.line_height > 0)
+            line.height = max(format.line_height, line.height);
+        int used = line.glyphs.IsEmpty() ? 0 : line.glyphs.Top().x + line.glyphs.Top().width - text_left;
+        int shift = format.align == ALIGN_RIGHT ? available - used :
+                    format.align == ALIGN_CENTER ? (available - used) / 2 : 0;
+        shift = max(0, shift);
+        line.left = text_left + shift;
+        for(auto& glyph : line.glyphs)
+            glyph.x += shift;
+        line.flow_y = line.y = y;
         y += max(1, line.height);
     }
 
@@ -373,7 +398,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
         paragraph.embeds.Add(pick(visual));
     }
 
-    if(show_metadata_markers_) {
+    if(show_metadata_markers_ && show_metadata_cards_) {
         int side_inset = min(DPI(8), max(0, available / 8));
         int card_width = max(DPI(40), available - 2 * side_inset);
         for(const UiDocAnnotation& annotation : Model().GetAnnotations()) {
@@ -393,7 +418,8 @@ void UiDoc::LayoutParagraph(int index, int width) const
         }
     }
 
-    paragraph.height = max(1, embed_y + style_.paragraph_gap);
+    paragraph.flow_height = paragraph.height = max(1, embed_y + style_.paragraph_gap + format.after);
+    for(auto& embed : paragraph.embeds) embed.flow_rect = embed.rect;
     paragraph.estimate = paragraph.height;
     layout_positions_dirty_ = true;
 }

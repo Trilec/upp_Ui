@@ -98,7 +98,14 @@ static int UiDocNumericSuffix(const String& id, const char *prefix)
     String p(prefix);
     if(!id.StartsWith(p))
         return 0;
-    return max(0, StrInt(id.Mid(p.GetCount())));
+    int value = 0;
+    for(int i = p.GetCount(); i < id.GetCount(); i++) {
+        if(!IsDigit(id[i])) return 0;
+        int digit = id[i] - '0';
+        if(value > (INT_MAX - 1 - digit) / 10) return INT_MAX - 1;
+        value = value * 10 + digit;
+    }
+    return value;
 }
 
 int UiDocPositionMap::Map(int pos, Bias bias) const
@@ -134,6 +141,52 @@ UiDocCore::UiDocCore()
     Clear();
 }
 
+int UiDocCore::Observe(Event<const UiDocApplyResult&> callback)
+{
+    int id = next_observer_id_++;
+    observers_.Add(id, pick(callback));
+    return id;
+}
+
+void UiDocCore::Unobserve(int connection)
+{
+    int q = observers_.Find(connection);
+    if(q >= 0)
+        observers_.Remove(q);
+}
+
+void UiDocCore::Notify(const UiDocApplyResult& result)
+{
+    auto& queued = notifications_.Add();
+    queued.ok = result.ok;
+    queued.revision_before = result.revision_before;
+    queued.revision_after = result.revision_after;
+    queued.positions.edits = clone(result.positions.edits);
+    queued.changed_range = result.changed_range;
+    queued.error = result.error;
+    queued.reset_layout = result.reset_layout;
+    if(notifying_)
+        return;
+    notifying_ = true;
+    Ptr<UiDocCore> alive = this;
+    while(!notifications_.IsEmpty()) {
+        UiDocApplyResult current = pick(notifications_[0]);
+        notifications_.Remove(0);
+        auto callbacks = clone(observers_);
+        auto event = WhenChange;
+        for(int i = 0; i < callbacks.GetCount(); i++) {
+            if(observers_.Find(callbacks.GetKey(i)) >= 0)
+                callbacks[i](current);
+            if(!alive)
+                return;
+        }
+        event(current);
+        if(!alive)
+            return;
+    }
+    notifying_ = false;
+}
+
 int UiDocCore::ClampPos(int pos) const
 {
     return clamp(pos, 0, text_.GetCount());
@@ -147,43 +200,34 @@ UiDocRange UiDocCore::NormalizeRange(UiDocRange range) const
     return range;
 }
 
+void UiDocCore::CaptureHistoryState(HistoryState& state, bool before) const
+{
+    if(before) {
+        state.before_styles <<= styles_;
+        state.before_blocks <<= blocks_;
+        state.before_annotations <<= annotations_;
+        state.before_resources <<= resources_;
+        state.before_embeds <<= embeds_;
+        state.before_anchors <<= anchors_;
+        state.before_meta = clone(meta_);
+    }
+    else {
+        state.after_styles <<= styles_;
+        state.after_blocks <<= blocks_;
+        state.after_annotations <<= annotations_;
+        state.after_resources <<= resources_;
+        state.after_embeds <<= embeds_;
+        state.after_anchors <<= anchors_;
+        state.after_meta = clone(meta_);
+    }
+}
+
 void UiDocCore::ApplyHistoryStep(const HistoryStep& step, bool before)
 {
-    switch(step.kind) {
-    case HistoryStep::Text: {
-        const WString& remove = before ? step.after_text : step.before_text;
-        const WString& insert = before ? step.before_text : step.after_text;
-        text_.Remove(step.at, remove.GetCount());
-        text_.Insert(step.at, insert);
-        styles_ <<= (before ? step.before_styles : step.after_styles);
-        blocks_ <<= (before ? step.before_blocks : step.after_blocks);
-        annotations_ <<= (before ? step.before_annotations : step.after_annotations);
-        embeds_ <<= (before ? step.before_embeds : step.after_embeds);
-        anchors_ <<= (before ? step.before_anchors : step.after_anchors);
-        break;
-    }
-    case HistoryStep::Styles:
-        styles_ <<= (before ? step.before_styles : step.after_styles);
-        break;
-    case HistoryStep::Blocks:
-        blocks_ <<= (before ? step.before_blocks : step.after_blocks);
-        break;
-    case HistoryStep::Annotations:
-        annotations_ <<= (before ? step.before_annotations : step.after_annotations);
-        break;
-    case HistoryStep::Resources:
-        resources_ <<= (before ? step.before_resources : step.after_resources);
-        break;
-    case HistoryStep::Embeds:
-        embeds_ <<= (before ? step.before_embeds : step.after_embeds);
-        break;
-    case HistoryStep::Meta:
-        meta_ = clone(before ? step.before_meta : step.after_meta);
-        break;
-    case HistoryStep::Anchors:
-        anchors_ <<= (before ? step.before_anchors : step.after_anchors);
-        break;
-    }
+    const WString& remove = before ? step.after_text : step.before_text;
+    const WString& insert = before ? step.before_text : step.after_text;
+    text_.Remove(step.at, remove.GetCount());
+    text_.Insert(step.at, insert);
 }
 
 void UiDocCore::ApplyHistoryRecord(const HistoryRecord& record, bool before)
@@ -196,6 +240,14 @@ void UiDocCore::ApplyHistoryRecord(const HistoryRecord& record, bool before)
         for(const HistoryStep& step : record.steps)
             ApplyHistoryStep(step, false);
     }
+    const auto& state = record.state;
+    styles_ <<= (before ? state.before_styles : state.after_styles);
+    blocks_ <<= (before ? state.before_blocks : state.after_blocks);
+    annotations_ <<= (before ? state.before_annotations : state.after_annotations);
+    resources_ <<= (before ? state.before_resources : state.after_resources);
+    embeds_ <<= (before ? state.before_embeds : state.after_embeds);
+    anchors_ <<= (before ? state.before_anchors : state.after_anchors);
+    meta_ = clone(before ? state.before_meta : state.after_meta);
 }
 
 void UiDocCore::Touch()
@@ -243,7 +295,10 @@ void UiDocCore::Clear()
     result.revision_before = before;
     result.revision_after = revision_;
     result.changed_range = UiDocRange(0, old_length);
-    WhenChange(result);
+    result.reset_layout = true;
+    auto& edit = result.positions.edits.Add();
+    edit.at = 0; edit.old_len = old_length; edit.new_len = 0;
+    Notify(result);
 }
 
 bool UiDocCore::Validate(String* error) const
@@ -262,45 +317,54 @@ bool UiDocCore::Validate(String* error) const
             return Fail("overlapping style runs");
         if(run.style.IsDefault())
             return Fail("default style stored as sparse run");
+        if((run.style.flags & ~15) || run.style.font_height < 0 || run.style.font_height > 4096 ||
+           abs((int64)run.style.size_delta) > 4096 || abs((int64)run.style.leading_delta) > 4096 ||
+           abs((int64)run.style.tracking_delta) > 4096)
+            return Fail("invalid text style metrics");
         last_to = run.to;
     }
 
+    Index<String> blocks_ids;
     for(int i = 0; i < blocks_.GetCount(); i++) {
         const UiDocBlock& block = blocks_[i];
         if(block.id.IsEmpty() || block.range.from < 0 || block.range.to > text_.GetCount() || block.range.from > block.range.to)
             return Fail("invalid block");
-        for(int j = i + 1; j < blocks_.GetCount(); j++)
-            if(blocks_[j].id == block.id)
-                return Fail("duplicate block id");
+        if(blocks_ids.Find(block.id) >= 0)
+            return Fail("duplicate block id");
+        blocks_ids.Add(block.id);
     }
 
+    Index<String> annotations_ids;
     for(int i = 0; i < annotations_.GetCount(); i++) {
         const UiDocAnnotation& annotation = annotations_[i];
         if(annotation.id.IsEmpty() || annotation.type.IsEmpty() || annotation.range.from < 0 ||
            annotation.range.to > text_.GetCount() || annotation.range.from > annotation.range.to)
             return Fail("invalid annotation");
-        for(int j = i + 1; j < annotations_.GetCount(); j++)
-            if(annotations_[j].id == annotation.id)
-                return Fail("duplicate annotation id");
+        if(annotations_ids.Find(annotation.id) >= 0)
+            return Fail("duplicate annotation id");
+        annotations_ids.Add(annotation.id);
     }
 
+    Index<String> resources_ids;
     for(int i = 0; i < resources_.GetCount(); i++) {
         const UiDocResource& resource = resources_[i];
-        if(resource.key.IsEmpty() || resource.resource_type.IsEmpty())
+        if(resource.key.IsEmpty() || resource.resource_type.IsEmpty() || resource.width < 0 || resource.width > 32768 ||
+           resource.height < 0 || resource.height > 32768)
             return Fail("invalid resource");
-        for(int j = i + 1; j < resources_.GetCount(); j++)
-            if(resources_[j].key == resource.key)
-                return Fail("duplicate resource key");
+        if(resources_ids.Find(resource.key) >= 0)
+            return Fail("duplicate resource key");
+        resources_ids.Add(resource.key);
     }
 
+    Index<String> embeds_ids;
     for(int i = 0; i < embeds_.GetCount(); i++) {
         const UiDocEmbedBlock& embed = embeds_[i];
         if(embed.id.IsEmpty() || embed.type.IsEmpty() || embed.range.from < 0 ||
            embed.range.to > text_.GetCount() || embed.range.from > embed.range.to)
             return Fail("invalid embed");
-        for(int j = i + 1; j < embeds_.GetCount(); j++)
-            if(embeds_[j].id == embed.id)
-                return Fail("duplicate embed id");
+        if(embeds_ids.Find(embed.id) >= 0)
+            return Fail("duplicate embed id");
+        embeds_ids.Add(embed.id);
     }
 
     if(!UiDocResourceRefsValid(meta_, resources_))
@@ -317,6 +381,15 @@ bool UiDocCore::Validate(String* error) const
            !UiDocResourceRefsValid(embed.layout, resources_) ||
            !UiDocResourceRefsValid(embed.meta, resources_))
             return Fail("dangling embed resource reference");
+        if(embed.type == "image")
+            for(const char* field : {"width", "height"}) {
+                int q = embed.payload.Find(field);
+                if(q >= 0) {
+                    Value value = embed.payload.GetValue(q);
+                    if(IsNull(value) || !IsNumber(value) || !((double)value >= 0 && (double)value <= 32768))
+                        return Fail("invalid image dimensions");
+                }
+            }
         if(embed.type == "table") {
             UiDocTable table;
             if(!GetTable(embed.id, table))

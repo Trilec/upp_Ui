@@ -23,8 +23,8 @@ inline bool UiDocIsMetadataAnnotation(const UiDocAnnotation& annotation)
 inline String UiDocMetadataTitle(const UiDocAnnotation& annotation)
 {
     int q = annotation.payload.Find("title");
-    if(q >= 0 && !IsNull(annotation.payload[q])) {
-        String title = AsString(annotation.payload[q]);
+    if(q >= 0 && !IsNull(annotation.payload.GetValue(q))) {
+        String title = AsString(annotation.payload.GetValue(q));
         if(!title.IsEmpty())
             return title;
     }
@@ -39,7 +39,7 @@ inline String UiDocMetadataTitle(const UiDocAnnotation& annotation)
 inline String UiDocMetadataBody(const UiDocAnnotation& annotation)
 {
     int q = annotation.payload.Find("text");
-    return q >= 0 && !IsNull(annotation.payload[q]) ? AsString(annotation.payload[q]) : String();
+    return q >= 0 && !IsNull(annotation.payload.GetValue(q)) ? AsString(annotation.payload.GetValue(q)) : String();
 }
 
 inline Vector<String> UiDocMetadataWrapLines(const String& text, const Font& font, int width)

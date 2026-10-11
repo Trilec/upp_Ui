@@ -129,6 +129,34 @@ view geometry, not durable document identity. Resources remain model/provider
 semantics rather than a second editor-owned store. Preserve the current sparse,
 paragraph-cached/viewport-driven implementation; do not allocate a Ctrl per character.
 
+`Observe` returns a removable connection token; pair it with `Unobserve` when
+borrowing a model. UiDoc does this automatically on rebinding/destruction.
+Notifications are queued in transaction order, view observers run before the
+public `WhenChange`, and reentrant edits append to the queue. Callbacks may delete
+or rebind a view; they must not throw exceptions. All model/view access is on the
+GUI thread. The owner must keep an external core alive longer than its views.
+
+Transactions validate the resulting document before publication and roll back
+text and collections together on refusal. Undo/redo emit inverse/forward position
+maps. Whole-document imports emit replacement maps, replace state atomically and
+clear history. Non-history structural changes clear positional history; annotation
+presentation-flag changes instead rebase those flags in retained history snapshots.
+History stores one collection snapshot before/after each transaction, rather than
+repeated collection copies for every operation. History depth is bounded; core
+text remains a WString and edits/remapping are linear rather than a rope engine.
+
+`ReadOnly` blocks user mutation while allowing selection/copy and explicit host
+model updates. `CancelMode` ends selection/image/table gestures and releases
+capture. Metadata titles/bodies are ordinary ValueMap values. Native save uses
+an adjacent temporary file and replacement, preserving the old file on failure.
+Native `.uidoc` version 2 retains typed payloads and resources, not undo history.
+
+UiDoc supplies overridable paragraph/font/page decoration hooks and optional
+paged geometry. [UiScreenplay](SCREENPLAY.md) uses them on this same core;
+inline reference cards can be hidden independently of metadata gutter markers.
+It owns no competing document model. Its optional cover QTF uses U++ RichText
+for that composition only.
+
 The existing engine is not U++ RichText. A **future**, separately authorized
 extraction may separate UiDocView (layout/geometry/mapping), UiDocRenderer (painting)
 and UiDocEditSession (caret/semantic commands) from UiDoc's platform input/focus/

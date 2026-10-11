@@ -57,7 +57,7 @@ ValueMap UiDocMetadataMergedPayload(const ValueMap& existing, const ValueMap& ch
 {
     ValueMap merged = clone(existing);
     for(int i = 0; i < changes.GetCount(); i++)
-        merged.GetAdd(changes.GetKey(i)) = clone(changes[i]);
+        merged.GetAdd(changes.GetKey(i)) = clone(changes.GetValue(i));
     return merged;
 }
 
@@ -82,6 +82,7 @@ String UiDoc::AddMetadata(UiDocRange anchor, const String& type,
                           const String& title, const String& text,
                           const ValueMap& payload, const ValueMap& meta)
 {
+    ViewGuard view_guard(*this);
     anchor = NormalizeRange(anchor);
 
     UiDocAnnotation annotation;
@@ -121,6 +122,7 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
                            const String& title, const String& text,
                            const ValueMap& payload)
 {
+    ViewGuard view_guard(*this);
     const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;
@@ -143,16 +145,9 @@ bool UiDoc::UpdateMetadata(const String& id, const String& type,
     tx.label = "Update metadata";
     tx.changes.Add(pick(remove));
     tx.changes.Add(pick(add));
-    if(!Model().Apply(tx).ok)
+    if(!Model().Apply(tx).ok || !view_guard)
         return false;
 
-    // Core change observers run synchronously. Rebuild once more after they
-    // return so an expanded card cannot retain pre-edit geometry or paint data.
-    InvalidateAllLayout();
-    EnsureLayout();
-    SyncScrollBar();
-    RefreshLayout();
-    Refresh();
     return true;
 }
 
@@ -164,6 +159,7 @@ bool UiDoc::RemoveMetadata(const String& id)
 
 bool UiDoc::SetMetadataExpanded(const String& id, bool expanded)
 {
+    ViewGuard view_guard(*this);
     const UiDocAnnotation* annotation = UiDocMetadataById(Model(), id);
     if(!annotation || !UiDocIsMetadataAnnotation(*annotation))
         return false;

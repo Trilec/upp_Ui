@@ -542,7 +542,7 @@ static void Case17_LayoutGeometry(TestCtx& t)
     t.EndCase();
 }
 
-CONSOLE_APP_MAIN
+GUI_APP_MAIN
 {
     TestCtx t;
     Cout() << "UiDoc v2 editor/model regression suite\n";

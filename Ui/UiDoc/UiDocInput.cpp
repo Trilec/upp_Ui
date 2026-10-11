@@ -292,6 +292,8 @@ void UiDoc::ScrollCaretIntoView()
 
 bool UiDoc::DeleteSelection()
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     UiDocRange range = SelectionRange();
     if(range.IsEmpty())
         return false;
@@ -305,24 +307,28 @@ bool UiDoc::DeleteSelection()
     tx.changes.Add(pick(replace));
 
     UiDocApplyResult result = Model().Apply(tx);
+
+    if(!view_guard) return false;
     if(!result.ok)
         return false;
     anchor_pos_ = caret_pos_ = range.from;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     return true;
 }
 
 bool UiDoc::InsertText(const WString& text)
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     if(!active_table_id_.IsEmpty())
         return EditActiveTableCell(text, true);
 
     UiDocRange range = SelectionRange();
     int from = range.from;
 
-    bool extend_empty_block = false;
-    UiDocBlock empty_block;
+    bool extend_block = false;
+    UiDocBlock current_block;
     if(range.IsEmpty() && !text.IsEmpty() && text.Find('\n') < 0) {
         const WString& before = Model().GetText();
         int paragraph_from = from;
@@ -331,17 +337,17 @@ bool UiDoc::InsertText(const WString& text)
             --paragraph_from;
         while(paragraph_to < before.GetCount() && before[paragraph_to] != '\n')
             ++paragraph_to;
-        if(paragraph_from == paragraph_to) {
+        if(from == paragraph_from) {
             UiDocRange point(paragraph_from, paragraph_to);
             for(const UiDocBlock& block : Model().QueryBlocks(&point)) {
                 if(block.range.from == paragraph_from && block.range.to == paragraph_to &&
                    (!block.role.IsEmpty() || block.indent > 0)) {
-                    empty_block.id = block.id;
-                    empty_block.range = block.range;
-                    empty_block.role = block.role;
-                    empty_block.indent = block.indent;
-                    empty_block.meta = clone(block.meta);
-                    extend_empty_block = true;
+                    current_block.id = block.id;
+                    current_block.range = block.range;
+                    current_block.role = block.role;
+                    current_block.indent = block.indent;
+                    current_block.meta = clone(block.meta);
+                    extend_block = true;
                     break;
                 }
             }
@@ -367,32 +373,36 @@ bool UiDoc::InsertText(const WString& text)
         tx.changes.Add(pick(style));
     }
 
-    if(extend_empty_block) {
+    if(extend_block) {
         UiDocCoreChange block;
         block.type = UiDocCoreChange::UpdateBlock;
-        block.block_id = empty_block.id;
-        block.block.id = empty_block.id;
-        block.block.range = UiDocRange(from, from + text.GetCount());
-        block.block.role = empty_block.role;
-        block.block.indent = empty_block.indent;
-        block.block.meta = clone(empty_block.meta);
+        block.block_id = current_block.id;
+        block.block.id = current_block.id;
+        block.block.range = UiDocRange(from, current_block.range.to + text.GetCount());
+        block.block.role = current_block.role;
+        block.block.indent = current_block.indent;
+        block.block.meta = clone(current_block.meta);
         tx.changes.Add(pick(block));
     }
 
     UiDocApplyResult result = Model().Apply(tx);
+
+    if(!view_guard) return false;
     if(!result.ok)
         return false;
     anchor_pos_ = caret_pos_ = ClampPos(from + text.GetCount());
     preferred_x_ = -1;
     if(!active_embed_id_.IsEmpty())
         active_embed_id_.Clear();
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     return true;
 }
 
 bool UiDoc::InsertParagraphBreak()
 {
+    ViewGuard view_guard(*this);
+    if(readonly_) return false;
     if(!active_table_id_.IsEmpty())
         return EditActiveTableCell(WString("\n"), true);
 
@@ -419,16 +429,18 @@ bool UiDoc::InsertParagraphBreak()
             }
         if(empty) {
             SetBlockRole("paragraph");
+            if(!view_guard) return false;
             SetBlockIndent(0);
             return true;
         }
     }
 
-    if(!InsertText(WString("\n")))
+    if(!InsertText(WString("\n")) || !view_guard)
         return false;
 
     if(list_role) {
         SetBlockRole(role);
+        if(!view_guard) return false;
         SetBlockIndent(indent);
     }
     return true;
@@ -436,12 +448,15 @@ bool UiDoc::InsertParagraphBreak()
 
 bool UiDoc::DeleteBackward()
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     if(!active_table_id_.IsEmpty())
         return DeleteActiveTableCell(false);
     if(!active_embed_id_.IsEmpty())
         return RemoveEmbed(active_embed_id_);
     if(DeleteSelection())
         return true;
+    if(!view_guard) return false;
     if(caret_pos_ <= 0)
         return false;
 
@@ -454,23 +469,26 @@ bool UiDoc::DeleteBackward()
     replace.type = UiDocCoreChange::ReplaceText;
     replace.range = range;
     tx.changes.Add(pick(replace));
-    if(!Model().Apply(tx).ok)
+    if(!Model().Apply(tx).ok || !view_guard)
         return false;
 
     anchor_pos_ = caret_pos_ = from;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     return true;
 }
 
 bool UiDoc::DeleteForward()
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     if(!active_table_id_.IsEmpty())
         return DeleteActiveTableCell(true);
     if(!active_embed_id_.IsEmpty())
         return RemoveEmbed(active_embed_id_);
     if(DeleteSelection())
         return true;
+    if(!view_guard) return false;
     if(caret_pos_ >= Model().GetLength())
         return false;
 
@@ -482,17 +500,18 @@ bool UiDoc::DeleteForward()
     replace.type = UiDocCoreChange::ReplaceText;
     replace.range = range;
     tx.changes.Add(pick(replace));
-    if(!Model().Apply(tx).ok)
+    if(!Model().Apply(tx).ok || !view_guard)
         return false;
 
     anchor_pos_ = caret_pos_ = ClampPos(caret_pos_);
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     return true;
 }
 
 bool UiDoc::MoveWord(int direction, bool keep_selection)
 {
+    ViewGuard view_guard(*this);
     const WString& text = Model().GetText();
     int pos = caret_pos_;
     if(direction < 0) {
@@ -511,12 +530,14 @@ bool UiDoc::MoveWord(int direction, bool keep_selection)
         while(pos < text.GetCount() && IsSpace((int)text[pos])) pos++;
     }
     MoveCaret(pos, keep_selection);
+    if(!view_guard) return false;
     ScrollCaretIntoView();
     return true;
 }
 
 bool UiDoc::MoveVertical(int direction, bool keep_selection)
 {
+    ViewGuard view_guard(*this);
     EnsureLayout();
     if(paragraphs_.IsEmpty() || direction == 0)
         return false;
@@ -580,6 +601,7 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
 
     int keep_x = preferred_x_;
     MoveCaret(next, keep_selection);
+    if(!view_guard) return false;
     preferred_x_ = keep_x;
     ScrollCaretIntoView();
     return true;
@@ -587,6 +609,8 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
 
 bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     UiDocTable table;
     if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
@@ -607,7 +631,7 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
         return false;
     active_table_pos_ = pos + text.GetCount();
     active_table_anchor_pos_ = active_table_pos_;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     Refresh();
     return true;
@@ -615,6 +639,8 @@ bool UiDoc::EditActiveTableCell(const WString& text, bool replace_selection)
 
 bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int height)
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     UiDocTable table;
     if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
@@ -634,7 +660,7 @@ bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int he
     if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     active_table_anchor_pos_ = active_table_pos_ = pos + 1;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     Refresh();
     return true;
@@ -642,6 +668,8 @@ bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int he
 
 bool UiDoc::DeleteActiveTableCell(bool forward)
 {
+    if(readonly_) return false;
+    ViewGuard view_guard(*this);
     UiDocTable table;
     if(active_table_id_.IsEmpty() || !Model().GetTable(active_table_id_, table) ||
        active_table_row_ < 0 || active_table_row_ >= table.rows.GetCount() ||
@@ -659,7 +687,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
         scroll_y_ = preserved_scroll;
         sb_.Set(scroll_y_);
         active_table_anchor_pos_ = active_table_pos_ = selected.from;
-        WhenSelection();
+        if(!Emit(WhenSelection)) return false;
         ScrollCaretIntoView();
         Refresh();
         return true;
@@ -679,7 +707,7 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
     if(!forward)
         active_table_pos_ = max(0, pos - 1);
     active_table_anchor_pos_ = active_table_pos_;
-    WhenSelection();
+    if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();
     Refresh();
     return true;

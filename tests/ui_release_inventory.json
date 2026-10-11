@@ -63,6 +63,18 @@
       "package": "examples/UiLabelDemo",
       "run": false,
       "minimum_checks": 1
+    },
+    {
+      "package": "Utilities/UiDocHygieneTest",
+      "run": true,
+      "summary": "UIDOC_HYGIENE_SUMMARY",
+      "minimum_checks": 50
+    },
+    {
+      "package": "Utilities/UiScreenplayTest",
+      "run": true,
+      "summary": "UISCREENPLAY_SUMMARY",
+      "minimum_checks": 1486
     }
   ],
   "retirement_policy": "Delete only after replacement source/behavior/generated-code coverage and build/run are verified. No test is retired by filename or age.",
@@ -460,7 +472,14 @@
       "family": "documents",
       "header": "Ui/UiDoc/UiDoc.h",
       "example": "examples/UiDocDemo",
-      "source_review": "pending"
+      "source_review": "focused document audit; see docs/UIDOC_AUDIT.md; native and cross-platform acceptance pending"
+    },
+    {
+      "type": "UiScreenplay",
+      "family": "documents",
+      "header": "Ui/UiScreenplay.h",
+      "example": "examples/UiScreenplayDemo",
+      "source_review": "focused audit; see docs/UIDOC_AUDIT.md; native and cross-platform acceptance pending"
     },
     {
       "type": "UiBezierCurveEditor",
@@ -796,6 +815,8 @@
   "reference_docs": [
     "docs/CONTROL_USAGE.md",
     "docs/PROJECT_FONTS.md",
-    "docs/MEDIA_CONTROLS.md"
+    "docs/MEDIA_CONTROLS.md",
+    "docs/SCREENPLAY.md",
+    "docs/UIDOC_AUDIT.md"
   ]
 }

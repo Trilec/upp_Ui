@@ -439,6 +439,25 @@ graph.Model().AddNode("Output", Pointf(240, 0));
 graph.SetEditable(true);
 ```
 
+## Screenplay writing
+
+UiScreenplay reuses UiDocCore comments, metadata, transactions and undo. Its
+semantic paragraphs add screenplay page formatting and a native designable cover.
+Declare package `Ui`; include `<Ui/UiScreenplay.h>`. Complete setup, title-page
+QTF/artwork, revision-safe AI edits, paper output and interchange limits are in
+[Screenplay](SCREENPLAY.md). The canonical builder is UiScreenplayDemo.
+
+```cpp
+UiScreenplay script;
+String error;
+script.ImportFountain("INT. ARCHIVE - NIGHT\n\nA lamp comes on.\n", &error);
+UiScreenplayTitlePage cover;
+cover.enabled = true;
+cover.title = "THE LAST LIGHT";
+cover.author = "Example Writer";
+script.SetTitlePage(cover);
+```
+
 ## Optional file selection packages
 
 UiFileBrowser is an embeddable browser with asynchronous scanning and host-driven

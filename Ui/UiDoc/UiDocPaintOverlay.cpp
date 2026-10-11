@@ -315,7 +315,7 @@ void UiDoc::PaintGutter(Draw& w)
 
 void UiDoc::PaintCaret(Draw& w)
 {
-    if(!HasFocus() || HasSelection() || !active_table_id_.IsEmpty() || !active_embed_id_.IsEmpty())
+    if(readonly_ || !HasFocus() || HasSelection() || !active_table_id_.IsEmpty() || !active_embed_id_.IsEmpty())
         return;
     Rect caret = CaretRectInternal();
     if(caret.bottom < page_rect_.top || caret.top > page_rect_.bottom)
@@ -329,7 +329,21 @@ void UiDoc::Paint(Draw& w)
     StyledState state = IsEnabled() ? (HasFocus() ? ST_HOT : ST_NORMAL) : ST_DISABLED;
     UiPaintFaceFrameDash(w, Rect(Point(0, 0), GetSize()), style_.palette, style_.metrics, state);
 
-    if(!page_rect_.IsEmpty()) {
+    if(page_format_.enabled) {
+        for(int page = max(0, scroll_y_ / (page_format_.size.cy + page_format_.gap)); page < page_count_; page++) {
+            Rect paper = GetPageRect(page);
+            if(paper.top > GetSize().cy) break;
+            w.DrawRect(paper, style_.page_face);
+            if(page < LeadingPageCount()) {
+                w.Clipoff(paper);
+                PaintLeadingPage(w, page);
+                w.End();
+            }
+            else
+                PaintPageDecoration(w, page - LeadingPageCount(), paper);
+        }
+    }
+    else if(!page_rect_.IsEmpty()) {
         w.DrawRect(page_rect_, style_.page_face);
         Color frame = IsNull(style_.page_frame) ? SColorShadow() : style_.page_frame;
         w.DrawRect(page_rect_.left, page_rect_.top, page_rect_.GetWidth(), 1, frame);

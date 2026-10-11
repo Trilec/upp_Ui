@@ -217,6 +217,7 @@ struct UiDocApplyResult : Moveable<UiDocApplyResult> {
     UiDocPositionMap positions;
     UiDocRange changed_range;
     String error;
+    bool reset_layout = false;
 };
 
 class UiDocCore : public Pte<UiDocCore> {
@@ -240,13 +241,13 @@ public:
 
 private:
     struct HistoryStep : Moveable<HistoryStep> {
-        enum Kind : byte {
-            Text, Styles, Blocks, Annotations, Resources, Embeds, Meta, Anchors
-        } kind = Text;
-
+        bool text_edit = false;
         int at = 0;
         WString before_text;
         WString after_text;
+    };
+
+    struct HistoryState : Moveable<HistoryState> {
         Vector<UiDocStyleRun> before_styles;
         Vector<UiDocStyleRun> after_styles;
         Vector<UiDocBlock> before_blocks;
@@ -265,6 +266,7 @@ private:
 
     struct HistoryRecord : Moveable<HistoryRecord> {
         Vector<HistoryStep> steps;
+        HistoryState state;
     };
 
     WString text_;
@@ -284,12 +286,18 @@ private:
     int next_annotation_id_ = 1;
     int next_resource_id_ = 1;
     int next_embed_id_ = 1;
+    VectorMap<int, Event<const UiDocApplyResult&>> observers_;
+    int next_observer_id_ = 1;
+    Vector<UiDocApplyResult> notifications_;
+    bool notifying_ = false;
 
     int ClampPos(int pos) const;
     UiDocRange NormalizeRange(UiDocRange range) const;
     void ApplyHistoryStep(const HistoryStep& step, bool before);
     void ApplyHistoryRecord(const HistoryRecord& record, bool before);
+    void CaptureHistoryState(HistoryState& state, bool before) const;
     void Touch();
+    void Notify(const UiDocApplyResult& result);
     void RebuildIds();
     void NormalizeStyles();
     void ReplaceStyleRange(UiDocRange range, const UiDocTextStyle& style, dword mask);
@@ -303,6 +311,11 @@ private:
 
 public:
     UiDocCore();
+
+    // Views disconnect their subscription on rebinding/destruction. Notifications
+    // are ordered even when an observer submits another transaction synchronously.
+    int Observe(Event<const UiDocApplyResult&> callback);
+    void Unobserve(int connection);
 
     void Clear();
     bool Validate(String* error = nullptr) const;

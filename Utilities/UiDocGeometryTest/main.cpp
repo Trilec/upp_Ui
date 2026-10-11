@@ -303,7 +303,7 @@ static void TestMetadataGutterToggle(GeometryTestCtx& t)
              "second metadata gutter click collapses its reference card");
 }
 
-CONSOLE_APP_MAIN
+GUI_APP_MAIN
 {
     GeometryTestCtx t;
     Cout() << "UiDoc geometry regression suite\n";

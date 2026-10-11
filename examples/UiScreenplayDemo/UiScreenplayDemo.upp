@@ -1,0 +1,12 @@
+description "UiScreenplay: document-backed screenplay authoring, story metadata and clean C++";
+uses
+    Ui,
+    Utilities/PropertyEditor,
+    PdfDraw,
+    plugin/png;
+file
+    main.cpp,
+    Code.cpp,
+    Demo.h;
+mainconfig
+    "" = "";
