@@ -102,7 +102,6 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiTable](../Ui/UiTable.h) | Coordinate/range model view with editing and headers. | [UiTableDemo](../examples/UiTableDemo) |
 | [UiGallery](../Ui/UiGallery.h) | Tile/image presentation of a list model. | [UiCollectionDemo](../examples/UiCollectionDemo) |
 | [UiDoc](../Ui/UiDoc/UiDoc.h) | Document view/editor over the authoritative UiDocCore. | [UiDocDemo](../examples/UiDocDemo) |
-| [UiScreenplay](../Ui/UiScreenplay.h) | Screenplay authoring, page layout and cover on UiDocCore; [API and limits](SCREENPLAY.md). | [UiScreenplayDemo](../examples/UiScreenplayDemo) |
 | [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |

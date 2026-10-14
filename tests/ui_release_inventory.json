@@ -69,12 +69,6 @@
       "run": true,
       "summary": "UIDOC_HYGIENE_SUMMARY",
       "minimum_checks": 50
-    },
-    {
-      "package": "Utilities/UiScreenplayTest",
-      "run": true,
-      "summary": "UISCREENPLAY_SUMMARY",
-      "minimum_checks": 1486
     }
   ],
   "retirement_policy": "Delete only after replacement source/behavior/generated-code coverage and build/run are verified. No test is retired by filename or age.",
@@ -475,13 +469,6 @@
       "source_review": "focused document audit; see docs/UIDOC_AUDIT.md; native and cross-platform acceptance pending"
     },
     {
-      "type": "UiScreenplay",
-      "family": "documents",
-      "header": "Ui/UiScreenplay.h",
-      "example": "examples/UiScreenplayDemo",
-      "source_review": "focused audit; see docs/UIDOC_AUDIT.md; native and cross-platform acceptance pending"
-    },
-    {
       "type": "UiBezierCurveEditor",
       "family": "curves",
       "header": "Ui/UiBezierCurveEditor.h",
@@ -816,7 +803,6 @@
     "docs/CONTROL_USAGE.md",
     "docs/PROJECT_FONTS.md",
     "docs/MEDIA_CONTROLS.md",
-    "docs/SCREENPLAY.md",
     "docs/UIDOC_AUDIT.md"
   ]
 }

@@ -7,8 +7,7 @@ UiDoc::ParagraphFormat UiDoc::FormatParagraph(int, const String& role) const
     ParagraphFormat format;
     if(role == "list.bullet" || role == "list.numbered") format.left = DPI(22);
     if(role == "quote") format.left = DPI(24);
-    // Preserve the original document roles; UiScreenplay overrides the full
-    // paragraph policy with physical screenplay columns and pagination.
+    // Preserve the original semantic document roles for existing callers.
     if(role == "screenplay.character") format.left = DPI(120);
     if(role == "screenplay.dialogue") format.left = DPI(72);
     if(role == "screenplay.transition") format.left = DPI(150);

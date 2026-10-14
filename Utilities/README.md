@@ -45,6 +45,4 @@ it is a developer benchmark, separate from the retired display demo.
 UiDocCore/Model/ModelBinding/Geometry/Metadata/Interaction/Image tests retain their
 independent coverage. `UiDocHygieneTest` exercises atomic rollback, shared-view
 history maps, callback destruction/rebinding, read-only input and safe native saves.
-`UiScreenplayTest` covers semantic editing, Fountain/native interchange, pagination,
-cover separation, hit testing and paragraph-cache reuse. See the
-[document audit](../docs/UIDOC_AUDIT.md) for commands and remaining acceptance.
+See the [document audit](../docs/UIDOC_AUDIT.md) for commands and remaining acceptance.

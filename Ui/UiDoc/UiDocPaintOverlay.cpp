@@ -110,7 +110,9 @@ void UiDoc::PaintAnnotations(Draw& w)
         Point from = DocumentPointAtPos(annotation.range.from);
         Point to = DocumentPointAtPos(annotation.range.to);
         const AnnotationLane* lane = ResolveAnnotationLane(annotation);
-        Color color = lane ? lane->color : style_.marker_annotation;
+        if(!lane)
+            continue;
+        Color color = lane->color;
         if(from.y == to.y && annotation.range.from != annotation.range.to) {
             int thickness = annotation.id == active_annotation_id_ ? DPI(3) : DPI(1);
             int y = from.y + BaseFont().GetHeight() + 1;

@@ -4,15 +4,14 @@ Fetch the applicable remote branch before publishing; preserve concurrent work
 and never force-push. This is a current recovery index, not a validation log.
 Contracts live in the reader guides; historical checkpoints live in Git.
 
-## UiDoc and UiScreenplay — 2026-10-11
-BASE: Ui `b09b06f` / `main`.
-TASK: audit/harden the document foundation, add a shared-core screenplay editor.
-TOUCHED: document model/history/callback/layout/input; UiScreenplay; demo/tests/docs.
-STATUS: implemented; focused checks in [audit](UIDOC_AUDIT.md), API/limits in [Screenplay](SCREENPLAY.md).
-VALIDATION: exact Debug/Release summaries and generated-code/header checks in audit.
-PUBLISHED: containing main commit; recover with `git log -1 -- Ui/UiScreenplay.cpp`.
-NEXT: hands-on native authoring/file/resize acceptance and platform/font/print checks;
-dual dialogue, FDX and production revision workflows are outside this initial control.
+## UiDoc foundation — 2026-10-11
+BASE: Ui `b09b06f`; foundation published in `ecadb12` on main.
+TASK: audit/harden the reusable document foundation.
+TOUCHED: model/history/callback/layout/input; focused Doc tests and docs.
+STATUS: implemented; findings and reproducible checks in [audit](UIDOC_AUDIT.md).
+VALIDATION: all eight Doc suites pass in Release BLITZ and Debug without BLITZ.
+BOUNDARY: application-specific authoring controls are maintained outside Ui.
+NEXT: native authoring, capture/focus/resize and platform/font/print acceptance.
 
 ## RangeSegments cards — 2026-10-10
 PUBLISHED: recover with `git log -1 -- Ui/UiRangeSegmentsGeometry.cpp`.

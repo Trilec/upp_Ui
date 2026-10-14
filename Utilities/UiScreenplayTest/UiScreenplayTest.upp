@@ -1,7 +1,0 @@
-uses
-    Ui,
-    plugin/png;
-file
-    main.cpp;
-mainconfig
-    "" = "";

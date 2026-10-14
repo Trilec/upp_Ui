@@ -152,10 +152,8 @@ an adjacent temporary file and replacement, preserving the old file on failure.
 Native `.uidoc` version 2 retains typed payloads and resources, not undo history.
 
 UiDoc supplies overridable paragraph/font/page decoration hooks and optional
-paged geometry. [UiScreenplay](SCREENPLAY.md) uses them on this same core;
-inline reference cards can be hidden independently of metadata gutter markers.
-It owns no competing document model. Its optional cover QTF uses U++ RichText
-for that composition only.
+paged geometry for application-specific document views on the same core.
+Inline reference cards can be hidden independently of metadata gutter markers.
 
 The existing engine is not U++ RichText. A **future**, separately authorized
 extraction may separate UiDocView (layout/geometry/mapping), UiDocRenderer (painting)

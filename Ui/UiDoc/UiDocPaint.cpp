@@ -172,7 +172,7 @@ void UiDoc::PaintText(Draw& w)
                 bool searched = AnyRangeContains(search_matches_, glyph.pos);
                 bool annotated = false;
                 for(const UiDocAnnotation& annotation : annotations) {
-                    if(print_paint_ || annotation.resolved) continue;
+                    if(print_paint_ || annotation.resolved || !ResolveAnnotationLane(annotation)) continue;
                     if(RangeContains(annotation.range, glyph.pos)) {
                         annotated = true;
                         break;

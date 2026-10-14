@@ -1,10 +1,10 @@
-# UiDoc audit and screenplay acceptance
+# UiDoc foundation audit
 
-Audit date: 2026-10-11. Source baseline: `b09b06f` on main. This is a focused
-Windows document/screenplay audit, not whole-library or cross-platform certification.
-Implementation: [UiDocCore](../Ui/UiDoc/UiDocCore.h),
-[UiDoc](../Ui/UiDoc/UiDoc.h), [UiScreenplay](../Ui/UiScreenplay.h).
-Public contracts: [Models](03_UI_MODEL_GUIDE.md), [Screenplay](SCREENPLAY.md).
+Audit date: 2026-10-11. Repairs were published in `ecadb12` from baseline `b09b06f`
+on main. This is focused Windows document validation, not whole-library or
+cross-platform certification. Application-specific authoring controls are not
+part of the Ui library. Implementation: [core](../Ui/UiDoc/UiDocCore.h),
+[view](../Ui/UiDoc/UiDoc.h). Public contracts: [Models](03_UI_MODEL_GUIDE.md).
 
 ## Findings and implemented repairs
 
@@ -24,19 +24,16 @@ Public contracts: [Models](03_UI_MODEL_GUIDE.md), [Screenplay](SCREENPLAY.md).
 | Explicit/imported numeric IDs could collide or overflow later allocation | Bounded suffix parsing, UUID fallback at counter exhaustion, collision checks; allocation regressions |
 | Typed image dimensions could fail inside view layout | Validate numeric dimension envelopes before publishing; malformed embed rollback test |
 | All paragraph measurements were discarded after ordinary text edits | Map and reuse unaffected caches, binary style lookup and bounded glyph cache; one rebuild for an edit in 1,000 paragraphs |
-| Screenplay Enter across mixed elements depended on selection direction | Use the first selected paragraph's element, identity and metadata; forward/reverse selection and exact native undo regressions |
-| Refused bulk screenplay loads returned no explanation | Propagate the candidate transaction error; duplicate-ID refusal preserves the live document |
 
-No parallel document model, permanent timer, character Ctrl tree or full-control
-raster cache was added. The existing positional/sparse model remains authoritative.
-History separates compact text-edit records from one transaction snapshot pair.
-History still clones collections at transaction boundaries, WString text editing
-and range remapping are linear, and paginated layout walks document lines.
-These are explicit costs, not claims of constant-time editing at arbitrary scale.
+No parallel document store, permanent timer, character Ctrl tree or full-control
+raster cache was added. History separates compact text-edit records from one
+collection snapshot pair per transaction. Collection cloning at transaction
+boundaries, WString editing and positional remapping remain linear costs.
+Paginated layout walks lines while retaining unaffected paragraph measurements.
 
 ## Automated validation
 
-The retained seven suites pass in Release BLITZ and Debug without BLITZ:
+All eight suites pass in Release BLITZ and Debug without BLITZ:
 
 | Suite | Checks per configuration | Failures |
 | --- | ---: | ---: |
@@ -48,35 +45,23 @@ The retained seven suites pass in Release BLITZ and Debug without BLITZ:
 | UiDocInteractionTest | 41 | 0 |
 | UiDocImageTest | 75 | 0 |
 | UiDocHygieneTest | 50 | 0 |
-| UiScreenplayTest, including three page renders | 1489 | 0 |
-| UiScreenplayDemo editor checks | 20 | 0 |
 
-Screenplay coverage includes semantic Enter/join/page-break undo, stable paragraph
-IDs/metadata, common Fountain roles/emphasis/notes, atomic refused imports, native
-cover QTF/artwork, missing-resource refusal, columns/hit testing, a 14-page dialogue,
-minimum split fragments, metadata-independent pagination and a shared-model print
-view. The large fixture reports `rebuilt=1 paragraphs=1000` after a text insertion.
-Without the optional render directory, UiScreenplayTest executes 1486 checks.
-
-Four actual demo exports (default, dark overrides, rich metadata/QTF/artwork and
-native extensions/anchors) compile unchanged in Debug and Release. A separate
-harness includes the untouched recipe, calls its ConfigureScreenplay function,
-and compares native JSON plus the live view/style signature with demo fixtures.
-Generated code contains no test harness, PropertyEditor or demo-shell dependency.
-The isolated public header and the complete application recipe in SCREENPLAY.md
-also compile in both configurations. Test artifacts/logs stay under build.
+The hygiene suite retains rollback, stale-revision, shared-view history,
+callback destruction/rebinding/reentrancy, read-only, metadata, clear/search
+geometry, imported IDs, image-dimension and safe-save regressions. Existing
+UiDocDemo/UiDocEditorDemo builds and the 73-check release smoke pass in both
+configurations. Build artifacts remain under build; binaries under bin.
 
 ## Reproduction on the audited Windows toolchain
 
-The audited setup is U++ `E:/upp-18468`, method `CLANGx64`, jobs 2. Resolve the
-local U++ installation/nests before adapting these commands on another machine.
-Use latest main containing this change; preserve local work before updating.
+Use the actual local U++ nests and method when adapting these commands. This
+machine uses U++ E:/upp-18468 and CLANGx64. Stop on failed builds, assertions,
+missing/empty summaries or any regression; never remove a check to pass a gate.
 
 ```powershell
 $umk = 'E:/upp-18468/umk.exe'
 $assembly = 'E:/apps/github/upp_Ui,E:/apps/github/upp_Ui/examples,E:/apps/github/upp_animation,E:/apps/github/upp_statemachine,E:/upp-18468/uppsrc'
 $packages = @('Core','Model','ModelBinding','Geometry','Metadata','Interaction','Image','Hygiene') | ForEach-Object { "Utilities/UiDoc$($_)Test" }
-$packages += 'Utilities/UiScreenplayTest'
 foreach ($flags in @('-brH2','-H2')) {
     foreach ($package in $packages) {
         $exe = Join-Path $PWD "build/doc-validation/$($package.Split('/')[-1]).exe"
@@ -92,30 +77,16 @@ foreach ($flags in @('-brH2','-H2')) {
 }
 ```
 
-Build UiScreenplayDemo with the same assembly/flags; run `--self-test` and
-`--export-generated <evidence-directory>`. Compile the four exported .cpp files
-as ordinary Ui applications. `UiDocHygieneTest` and `UiScreenplayTest` are also
-registered focused targets in the maintained release inventory. Their execution
-must return zero with a positive mandatory summary. Stop on failed builds,
-assertions, absent/empty summaries or any changed native round-trip content.
-Never remove a regression to make the gate pass.
+
+UiDocHygieneTest is registered as a focused target in the maintained release
+inventory. All model/view access runs on the GUI thread. External model owners
+must keep models alive longer than their views; callbacks must not throw.
 
 ## Remaining acceptance
 
-Native off-screen page PNGs were inspected for cover emphasis, body columns,
-page numbers and MORE/CONT'D continuation placement. The demo exports a PDF
-through its exact print-view/PdfDraw path; physical page dimensions and rendered
-PDF pages are checked separately from PNG output. Poppler renders the two-page
-Letter fixture and pdfplumber extracts its text. The bundled pypdf parser raises
-a font-map extraction error on this PdfDraw output; acceptance in other PDF
-readers remains an explicit output-compatibility gate.
-
-Opening Final Draft 12 and the demo through the native UI automation tool timed
-out awaiting app approval. No successful interactive reference inspection is
-claimed. The executable is available for the writer's acceptance: edit in each
-element, drag-select and cancel capture, switch light/dark and inspector pages,
-resize, review/resolve guidance, save/reopen and compare exported PDF pages.
-These hands-on gates remain open, as do other platforms/fonts/printers/DPI
-transitions and the advanced features listed in SCREENPLAY.md. The control is a
-reviewable initial implementation; this audit cannot provide a 100% defect-free
-or Final Draft feature-parity guarantee.
+Native typing/selection, focus and capture cancellation, light/dark, resizing,
+save/reopen and platform/font/DPI/printer acceptance remain hands-on gates.
+Native automation launch approval timed out during the source audit; no
+successful interactive inspection is claimed. Generic print/paging hooks are
+available for host policy, not a guarantee of every application's output format.
+This audit cannot provide a 100% defect-free guarantee.
