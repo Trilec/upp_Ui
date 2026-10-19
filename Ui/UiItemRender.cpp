@@ -320,39 +320,61 @@ Size UiItemRenderBasic::GetContentSize() const
     const UiItemRenderData& data = Data();
     const UiItemRenderStyle& style = GetStyle();
     Font title_font = ResolveItemFont(data, style);
-    Size title = GetTextSize(data.title, title_font);
-    Size subtitle = data.subtitle.IsEmpty() ? Size(0, 0) : GetTextSize(data.subtitle, style.subtitle_font);
-    Size description = data.description.IsEmpty() ? Size(0, 0) : GetTextSize(data.description, style.description_font);
-    Size right = data.right_text.IsEmpty() ? Size(0, 0) : GetTextSize(data.right_text, style.right_font);
-    int media = (!IsNull(data.icon) && style.show_icon) ? style.icon_size : 0;
-    if(data.has_check)
-        media += style.check_size + (media ? style.content_gap : 0);
-    if(data.has_metadata)
-        media += style.metadata_size + (media ? style.metadata_gap : 0);
+    auto TextSize = [](const String& text, Font font, int minimum) {
+        Size size = GetTextSize(text.IsEmpty() ? String(" ") : text, font);
+        if(text.IsEmpty()) size.cx = 0;
+        size.cy = max(size.cy, DPI(minimum));
+        return size;
+    };
+    // Natural measurement and prepared parts use the same native glyph height
+    // and existing line minima, including the reserved empty title line.
+    Size title = TextSize(data.title, title_font, 14);
+    Size subtitle = style.show_subtitle && !data.subtitle.IsEmpty()
+                  ? TextSize(data.subtitle, style.subtitle_font, 12) : Size(0, 0);
+    Size description = style.show_description && !data.description.IsEmpty()
+                     ? TextSize(data.description, style.description_font, 12) : Size(0, 0);
+    Size right = style.show_right_text && !data.right_text.IsEmpty()
+               ? TextSize(data.right_text, style.right_font, 12) : Size(0, 0);
+    int icon = style.show_icon && !IsNull(data.icon) ? style.icon_size : 0;
+    int check = data.has_check ? style.check_size : 0;
+    int metadata = style.show_metadata && data.has_metadata ? style.metadata_size : 0;
+    int media = max(max(icon, check), metadata);
+    int text_h = title.cy;
+    if(subtitle.cy) text_h += style.text_gap + subtitle.cy;
+    if(description.cy) text_h += style.text_gap + description.cy;
+    int text_w = max(title.cx, max(subtitle.cx, description.cx));
 
     if(Direction() == UiDirection::V) {
-        int w = max(max(title.cx, subtitle.cx), max(description.cx, right.cx));
-        int h = title.cy;
-        if(subtitle.cy) h += style.text_gap + subtitle.cy;
-        if(description.cy) h += style.text_gap + description.cy;
-        if(right.cy) h += style.text_gap + right.cy;
+        int h = text_h + (right.cy ? style.text_gap + right.cy : 0);
         if(media) h += media + style.content_gap;
-        return UiStyledOuterSizeFromContent(Size(max(w, media), h), style.metrics, style.skin);
+        return UiStyledOuterSizeFromContent(Size(max(max(text_w, right.cx), media), h),
+                                            style.metrics, style.skin);
     }
 
-    int text_h = title.cy + (subtitle.cy ? style.text_gap + subtitle.cy : 0)
-                           + (description.cy ? style.text_gap + description.cy : 0);
-    int w = media + (media && title.cx ? style.content_gap : 0) + title.cx;
-    if(right.cx)
-        w += style.content_gap + right.cx;
-    return UiStyledOuterSizeFromContent(Size(w, max(media, text_h)), style.metrics, style.skin);
+    // Horizontal decorations reserve their actual trailing gaps in Layout.
+    int leading = 0;
+    if(check) leading += check + style.content_gap;
+    if(icon) leading += icon + style.content_gap;
+    if(metadata) leading += metadata + style.metadata_gap;
+    int w = text_w;
+    if(right.cx) {
+        int rw = right.cx + DPI(4);
+        // Layout caps the right lane at half the remaining width.
+        w = max(text_w + style.content_gap + rw, 2 * rw);
+    }
+    return UiStyledOuterSizeFromContent(Size(leading + w, max(media, max(text_h, right.cy))),
+                                        style.metrics, style.skin);
 }
 
 Size UiItemRenderBasic::GetMinSize() const
 {
     const UiItemRenderStyle& style = GetStyle();
     int h = max(style.title_font.GetHeight() + DPI(4), max(style.icon_size, style.check_size));
-    return UiStyledOuterSizeFromContent(Size(DPI(48), h), style.metrics, style.skin);
+    Size minimum = UiStyledOuterSizeFromContent(Size(DPI(48), h), style.metrics, style.skin);
+    // Retain the established width/decoration floor; visible text determines
+    // the required height even for emphasized or per-item custom fonts.
+    minimum.cy = max(minimum.cy, GetContentSize().cy);
+    return minimum;
 }
 
 void UiItemRenderBasic::Layout()
@@ -365,11 +387,11 @@ void UiItemRenderBasic::Layout()
         return;
 
     Font title_font = ResolveItemFont(data, style);
-    int title_h = max(title_font.GetHeight() + DPI(2), DPI(14));
+    int title_h = max(GetTextSize(data.title.IsEmpty() ? String(" ") : data.title, title_font).cy, DPI(14));
     int subtitle_h = !data.subtitle.IsEmpty() && style.show_subtitle
-                   ? max(style.subtitle_font.GetHeight() + DPI(2), DPI(12)) : 0;
+                   ? max(GetTextSize(data.subtitle, style.subtitle_font).cy, DPI(12)) : 0;
     int description_h = !data.description.IsEmpty() && style.show_description
-                      ? max(style.description_font.GetHeight() + DPI(2), DPI(12)) : 0;
+                      ? max(GetTextSize(data.description, style.description_font).cy, DPI(12)) : 0;
 
     if(Direction() == UiDirection::V) {
         int top = content_.top;
@@ -402,7 +424,7 @@ void UiItemRenderBasic::Layout()
             description_ = Rect(content_.left, top, content_.right, min(content_.bottom, top + description_h));
         }
         if(style.show_right_text && !data.right_text.IsEmpty()) {
-            int rh = max(style.right_font.GetHeight() + DPI(2), DPI(12));
+            int rh = max(GetTextSize(data.right_text, style.right_font).cy, DPI(12));
             right_text_ = Rect(content_.left, max(content_.top, content_.bottom - rh),
                                content_.right, content_.bottom);
         }

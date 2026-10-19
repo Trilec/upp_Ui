@@ -20,6 +20,18 @@
     Thread context
     - GUI thread only.
 
+    Managed visibility
+    - ItemRef::Visible() / SetItemVisible() own layout participation. Hidden
+      items contribute no size, gap, weight, wrap slot or separator. Controls
+      remain parented and owned by the caller; showing restores their content.
+    - Raw Ctrl::Show/Hide is temporary under managed layout. A zero allocation
+      may hide a logically visible child; growing the layout shows it again.
+      IsItemLogicallyVisible() reports the request, IsItemVisible() the last
+      nonempty layout allocation. During PauseLayout they can differ.
+    - Visibility changes emit no semantic action and do not choose focus; normal
+      Ctrl hide/capture teardown still applies. ItemRef indices follow the same
+      lifetime rules as the other item setters (reacquire after removal).
+
     Usage
     - Use Add(...), gap/inset controls, and direction/wrap settings to build
       row, column, or flowing child layouts.
@@ -91,7 +103,8 @@
 //     UiBoxLayout fb(UiDirection::H);
 //     fb.SetWrap(true).SetFixedColumn(DPI(180)).SetGap(DPI(8)).SetInset(DPI(8));
 //     fb.Add(myTileA).Fit();
-//     fb.Add(myTileB).Expand(2).MinMaxHeight(DPI(80), INT_MAX);
+//     auto optional = fb.Add(myTileB).Expand(2).MinMaxHeight(DPI(80), INT_MAX);
+//     optional.Visible(show_optional); // no ghost gap or minimum-size contribution
 //     fb.AddBreak(); // new row
 //
 //     // Add UiBoxLayout into a TopWindow / UiCard / etc. as a normal Ctrl.
@@ -151,6 +164,7 @@ public:
         int    maxh            = INT_MAX;     // max cross-axis size
         Align  align_self      = Align::Auto; // per-item cross-axis alignment
         bool   is_break        = false;       // true => row/column break marker
+        bool   logical_visible = true;        // requested participation, not Ctrl::IsShown()
         bool   line_enabled    = false;      // draw a separator line in this spacer
         UiSpacerLineOrientation line_orientation = UiSpacerLineOrientation::Auto;
         Align  line_align      = Align::Center; // line position on cross axis
@@ -186,6 +200,14 @@ public:
     struct ItemRef {
         ItemRef() = default;
         ItemRef(UiBoxLayout* owner, int index) : owner(owner), index(index) {}
+
+        // Include/exclude this item without detaching or deleting its child.
+        // An invalid/default handle is harmless. Layout is deferred while paused.
+        ItemRef& Visible(bool visible = true) {
+            if(owner)
+                owner->SetItemVisible(index, visible);
+            return *this;
+        }
 
         // Set this item to use a fixed main-axis size.
         ItemRef& Fixed(int px) {
@@ -599,6 +621,14 @@ public:
         return ItemRef(this, items.GetCount() - 1);
     }
 
+    // Returns false for an invalid index; true for a valid request, including
+    // an unchanged value. Changed requests invalidate size/layout and paint;
+    // PauseLayout defers child visibility and parent notification until Layout.
+    bool SetItemVisible(int index, bool visible);
+    bool IsItemLogicallyVisible(int index) const {
+        return index >= 0 && index < items.GetCount() && items[index].logical_visible;
+    }
+
     int  GetItemCount() const { return items.GetCount(); }
     Rect GetItemRect(int index) const {
         return index >= 0 && index < items.GetCount() ? items[index].cl.rect : Rect(0, 0, 0, 0);
@@ -708,6 +738,7 @@ private:
     mutable int  used_w       = 0;                 // used size (last layout)
     mutable int  used_h       = 0;
     int          layout_pause = 0;                 // PauseLayout nesting counter
+    bool         visibility_refresh_pending = false; // coalesce parent/paint invalidation
     Rect         last_layout_irc_ = Rect(0, 0, -1, -1);
     mutable int  measure_cache_width_[4] = { INT_MIN, INT_MIN, INT_MIN, INT_MIN };
     mutable int  measure_cache_result_[4] = { INT_MIN, INT_MIN, INT_MIN, INT_MIN };

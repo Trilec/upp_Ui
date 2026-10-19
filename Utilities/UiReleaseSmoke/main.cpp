@@ -215,6 +215,171 @@ void RasterContract(Checks& t)
     }
 }
 
+struct ScrollPixelProbe : Ctrl {
+    Color color;
+    explicit ScrollPixelProbe(Color value) : color(value) {}
+    Size GetMinSize() const override { return Size(0, 0); }
+    void Paint(Draw& w) override { w.DrawRect(GetSize(), color); }
+};
+
+void PrepareScrollProbe(UiScrollPanel& scroll, int inset)
+{
+    auto style = scroll.GetStyle();
+    style.metrics.frame_width = 0;
+    style.metrics.frame_enabled = false;
+    style.metrics.radius = 0;
+    style.metrics.content_margin = Rect(inset, inset, inset, inset);
+    style.metrics.shadow.enabled = false;
+    style.skin.enabled = false;
+    scroll.SetCustomStyle(style).SetScrollMode(UIPANELSCROLL_AUTO);
+}
+
+void ScrollLastPixel(Checks& t, UiScrollPanel& scroll, ScrollPixelProbe& tail, Color expected)
+{
+    Rect screen = tail.GetScreenRect();
+    Point last(screen.right - 1, screen.bottom - 1);
+    Rect visible = screen;
+    for(const Ctrl* p = &tail; p; p = p->GetParent())
+        visible &= p->GetScreenView();
+    t.Expect(Rect(scroll.Content().GetSize()).Contains(tail.GetRect()) && visible.Contains(last),
+             "positive-offset final pixel is contained by every native ancestor");
+    Rect viewport = scroll.GetViewportRect();
+    viewport.Offset(scroll.GetScreenRect().TopLeft());
+    t.Expect(viewport.Contains(last) && last == Point(viewport.right - 1, viewport.bottom - 1),
+             "both maximum scroll positions reveal the complete final pixel");
+    ImageDraw draw(scroll.GetSize());
+    draw.DrawRect(scroll.GetSize(), Magenta());
+    scroll.DrawCtrl(draw);
+    Image image = draw;
+    Point local = last - scroll.GetScreenRect().TopLeft();
+    t.Expect(Rect(image.GetSize()).Contains(local) && image[local.y][local.x] == expected,
+             "actual composed raster contains the expected opaque final pixel");
+}
+
+void ScrollContract(Checks& t)
+{
+    const Size sizes[] = { Size(DPI(180), DPI(100)), Size(DPI(160), DPI(90)),
+                           Size(DPI(220), DPI(140)), Size(DPI(180), DPI(100)) };
+    const int x = DPI(13), y = DPI(17);
+    const Rect raw = RectC(x, y, DPI(300), DPI(400));
+    const Point beyond(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
+    for(bool anchored : {false, true}) {
+        UiScrollPanel scroll;
+        ScrollPixelProbe fixed(Color(17, 83, 149)), fill(Color(67, 89, 101)), corner(Color(23, 181, 79));
+        PrepareScrollProbe(scroll, DPI(8));
+        scroll.Content().Add(fixed);
+        fixed.SetRect(raw);
+        if(anchored) {
+            scroll.Content().Add(fill.HSizePos(x, DPI(7)).VSizePos(y, DPI(11)));
+            scroll.Content().Add(corner.RightPos(0, DPI(20)).BottomPos(0, DPI(20)));
+        }
+        const Ctrl::LogPos fixed_pos = fixed.GetPos(), fill_pos = fill.GetPos(), corner_pos = corner.GetPos();
+        int notifications = 0;
+        Point observed(0, 0);
+        scroll.WhenScroll = [&] { ++notifications; observed = scroll.GetScrollPos(); };
+        for(Size size : sizes) {
+            int before = notifications;
+            Point previous = scroll.GetScrollPos();
+            scroll.SetRect(0, 0, size.cx, size.cy);
+            scroll.Layout();
+            t.Expect(scroll.GetContentSize() == raw.GetSize() && fixed.GetRect() == raw &&
+                     fixed.GetPos() == fixed_pos &&
+                     scroll.Content().GetRect().TopLeft() ==
+                         Point(-scroll.GetScrollPos().x - raw.left, -scroll.GetScrollPos().y - raw.top),
+                     "offset content keeps its logical span, raw position and normalized origin");
+            t.Expect(notifications == before + (scroll.GetScrollPos() != previous ? 1 : 0) &&
+                     observed == scroll.GetScrollPos(),
+                     "resize reports only an actual committed scroll-position change");
+            if(anchored) {
+                Size host = scroll.Content().GetSize();
+                t.Expect(fill.GetRect() == Rect(x, y, host.cx - DPI(7), host.cy - DPI(11)) &&
+                         corner.GetRect() == RectC(host.cx - DPI(20), host.cy - DPI(20), DPI(20), DPI(20)) &&
+                         fill.GetPos() == fill_pos && corner.GetPos() == corner_pos,
+                         "fill and right/bottom anchors retain their native logical positions");
+            }
+            Size page = scroll.GetViewportRect().GetSize();
+            Point maximum(max(0, raw.GetWidth() - page.cx), max(0, raw.GetHeight() - page.cy));
+            before = notifications;
+            previous = scroll.GetScrollPos();
+            scroll.SetScrollPos(beyond);
+            const Rect public_view = scroll.GetViewportRect();
+            const Ctrl* clip = scroll.Content().GetParent();
+            const Rect native_view = clip ? clip->GetRect() : Rect(0, 0, 0, 0);
+            const Rect host_rect = scroll.Content().GetRect();
+            Cout() << "UI_SCROLL_GEOMETRY anchored=" << int(anchored)
+                   << " size=" << size.cx << ',' << size.cy
+                   << " logical=" << scroll.GetContentSize().cx << ',' << scroll.GetContentSize().cy
+                   << " public_view=" << public_view.left << ',' << public_view.top << ','
+                   << public_view.GetWidth() << ',' << public_view.GetHeight()
+                   << " native_view=" << native_view.left << ',' << native_view.top << ','
+                   << native_view.GetWidth() << ',' << native_view.GetHeight()
+                   << " content_rect=" << host_rect.left << ',' << host_rect.top << ','
+                   << host_rect.GetWidth() << ',' << host_rect.GetHeight()
+                   << " expected_max=" << maximum.x << ',' << maximum.y
+                   << " actual_pos=" << scroll.GetScrollPos().x << ',' << scroll.GetScrollPos().y
+                   << " notification_delta=" << notifications - before
+                   << " observed_pos=" << observed.x << ',' << observed.y;
+            Cout() << '\n';
+            t.Expect(scroll.GetScrollPos() == maximum &&
+                     notifications == before + (maximum != previous ? 1 : 0) && observed == maximum,
+                     "explicit scrolling clamps to logical ranges and notifies once after commitment");
+            ScrollLastPixel(t, scroll, fixed, anchored ? corner.color : fixed.color);
+            before = notifications;
+            scroll.SetScrollPos(maximum).SetScrollPos(beyond);
+            t.Expect(notifications == before && scroll.GetScrollPos() == maximum,
+                     "unchanged and repeatedly clamped positions emit no duplicate scroll event");
+            const Rect host = scroll.Content().GetRect(), filled = fill.GetRect(), marked = corner.GetRect();
+            for(int repeat = 0; repeat < 3; ++repeat) {
+                scroll.Layout();
+                t.Expect(scroll.Content().GetRect() == host && scroll.GetContentSize() == raw.GetSize() &&
+                         fixed.GetRect() == raw && fixed.GetPos() == fixed_pos &&
+                         (!anchored || (fill.GetRect() == filled && corner.GetRect() == marked &&
+                                        fill.GetPos() == fill_pos && corner.GetPos() == corner_pos)) &&
+                         scroll.GetScrollPos() == maximum && notifications == before,
+                         "repeated layout neither grows geometry nor moves or renotifies the scroll origin");
+            }
+        }
+        int before = notifications;
+        Point previous = scroll.GetScrollPos();
+        scroll.SetScrollPos(Point(-DPI(1000), -DPI(1000)));
+        t.Expect(scroll.GetScrollPos() == Point(0, 0) &&
+                 notifications == before + (previous != Point(0, 0) ? 1 : 0) && observed == Point(0, 0),
+                 "negative requested scroll positions clamp to zero and notify only on change");
+    }
+    {
+        UiScrollPanel scroll;
+        ScrollPixelProbe fill(Color(31, 97, 157));
+        PrepareScrollProbe(scroll, 0);
+        scroll.Content().Add(fill.SizePos());
+        const Ctrl::LogPos position = fill.GetPos();
+        int notifications = 0;
+        scroll.WhenScroll = [&] { ++notifications; };
+        const Size fill_sizes[] = { Size(DPI(180), DPI(100)), Size(DPI(120), DPI(80)),
+                                    Size(DPI(240), DPI(160)), Size(DPI(180), DPI(100)) };
+        for(Size size : fill_sizes) {
+            scroll.SetRect(0, 0, size.cx, size.cy);
+            scroll.Layout();
+            Rect viewport = scroll.GetViewportRect();
+            t.Expect(viewport.GetSize() == size && scroll.GetContentSize() == size &&
+                     scroll.Content().GetSize() == size && fill.GetRect() == Rect(size) && fill.GetPos() == position,
+                     "zero-origin fill follows the bounded viewport across shrink and grow");
+            t.Expect(scroll.GetScrollPos() == Point(0, 0) && notifications == 0,
+                     "nonoverflowing zero-origin fill has no scroll change");
+            scroll.SetScrollPos(beyond).SetScrollPos(Point(-DPI(1000), -DPI(1000)));
+            t.Expect(scroll.GetScrollPos() == Point(0, 0) && notifications == 0,
+                     "clamped zero-origin fill emits no scroll event");
+            const Rect host = scroll.Content().GetRect();
+            for(int repeat = 0; repeat < 3; ++repeat) {
+                scroll.Layout();
+                t.Expect(scroll.Content().GetRect() == host && scroll.GetContentSize() == size &&
+                         fill.GetRect() == Rect(size) && fill.GetPos() == position &&
+                         scroll.GetScrollPos() == Point(0, 0) && notifications == 0,
+                         "repeated zero-origin fill layout preserves extent, anchors and notifications");
+            }
+        }
+    }
+}
+
 void BorrowedHostContract(Checks& t)
 {
     UiDirectContentHost host;
@@ -254,6 +419,19 @@ void BorrowedHostContract(Checks& t)
 GUI_APP_MAIN
 {
     Checks t;
+    const auto& args = CommandLine();
+    const bool scroll_only = args.GetCount() == 1 && args[0] == "--scroll-only";
+    if(!args.IsEmpty() && !scroll_only) {
+        Cout() << "UI_RELEASE_SMOKE invalid arguments; use --scroll-only or no arguments\n";
+        SetExitCode(2);
+        return;
+    }
+    ScrollContract(t);
+    if(scroll_only) {
+        Cout() << "UI_SCROLL_PANEL_SMOKE checks=" << t.count << " failed=" << t.failed << '\n';
+        SetExitCode(t.failed ? 1 : 0);
+        return;
+    }
     {
         struct EditProbe : UiMultiEdit {
             const ScrollBar::Style& ScrollStyle() const { return scrollbar_style_; }

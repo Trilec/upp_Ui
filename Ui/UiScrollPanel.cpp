@@ -217,9 +217,9 @@ Rect UiScrollPanel::GetViewportRect() const
 {
     Rect face = GetFaceRect();
     if(sby_.IsShown())
-        face.right -= sby_.GetRect().GetWidth();
+        face.right -= max(DPI(12), sby_.GetMinSize().cx);
     if(sbx_.IsShown())
-        face.bottom -= sbx_.GetRect().GetHeight();
+        face.bottom -= max(DPI(12), sbx_.GetMinSize().cy);
     const Rect cp = UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin);
     if(!UiIsZeroThicknessRect(cp))
         face = UiApplyThicknessRect(face, cp);
@@ -327,12 +327,7 @@ void UiScrollPanel::UpdateScrollbars()
 
 void UiScrollPanel::ApplyScroll()
 {
-    Rect view = GetFaceRect();
-    if(sby_.IsShown())
-        view.right -= sby_.GetRect().GetWidth();
-    if(sbx_.IsShown())
-        view.bottom -= sbx_.GetRect().GetHeight();
-    view = UiApplyThicknessRect(view, UiNonNegativeThickness(GetEffectiveStyle().metrics.content_margin));
+    Rect view = GetViewportRect();
 
     int minx = content_bounds_.left;
     int miny = content_bounds_.top;
@@ -341,8 +336,8 @@ void UiScrollPanel::ApplyScroll()
     viewport_.SetRect(view);
     content_.SetRect(-origin_.x - minx,
                      -origin_.y - miny,
-                     content_size_.cx,
-                     content_size_.cy);
+                     max(content_size_.cx, content_bounds_.right),
+                     max(content_size_.cy, content_bounds_.bottom));
     if(origin_ != notified_origin_) {
         notified_origin_ = origin_;
         WhenScroll();

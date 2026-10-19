@@ -63,10 +63,33 @@ Range/Cards selector in UiRangeSegmentsDemo for complete generated C++.
 
 ## Theme context and lifecycle
 
-UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered.
+UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered, Olive.
 UiThemeMode: Light, Dark, System. System currently resolves to Light where the
 platform-following policy is not wired; do not advertise universal OS-mode tracking.
 UiThemeContext stores preset/mode and supports serialization.
+Olive is an opt-in Light/Dark preset (serialized ID 7; existing IDs 0..6 and
+the Minimal default are unchanged). It uses neutral layered surfaces, green
+emphasis (Dark #b5d7a5, Light #456d3a), amber alerts, unboxed action glyphs,
+36px control and 33px collection-row metrics. These are logical pixels, scaled
+once by DPI. Family-specific metrics still apply: Table rows/headers use 32px.
+Select it with `UiTheme::Set(UiThemePreset::Olive, UiThemeMode::Dark)`.
+Use `UiThemeContext` with existing `Resolve...(context, role)` APIs to obtain
+styles without changing the global theme; Table and RangeSegments also expose
+context overloads. `UiTheme::GetOliveTokens(mode)` returns a value snapshot for
+application shells. `ResolveOlivePalette(mode, role, face, selected)` provides
+the same shared state recipe for host-owned selection. Wash colors are solid
+approximations on the panel surface; blend against the actual host when needed.
+
+Olive's single token/family authority is `Ui/UiThemeOlive.h` (included by
+UiTheme; do not include the recipe header directly). It has no application
+dependency or profile selector. Authored tab visuals, range direction/card
+layout, explicit series colors and other structure remain control/host data.
+Fonts participate in UiFonts typography selection; the recipe preserves the
+existing binary weight mapping (600+ becomes Bold). It does not invoke native
+static-weight discovery during resolution. Numeric font-weight verification,
+native visual acceptance and selecting Olive as a library-wide default are
+separate decisions.
+
 
 The theme revision invalidates cached inherited styles. Theme-driven controls
 re-resolve when context changes; explicit custom styles are not overwritten.

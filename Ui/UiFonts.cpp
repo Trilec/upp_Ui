@@ -169,6 +169,86 @@ int SystemFace(String selection) {
     return -1;
 }
 
+// Native table inspection is explicit setup work, never a Paint operation.
+// Bounds apply even to installed fonts. Names prefer Windows English records.
+String WeightName(const String& table, int wanted) {
+    if(table.GetCount() < 6 || U16(table, 0) > 1) return String();
+    unsigned count = U16(table, 2), at = U16(table, 4);
+    if(count > 1024 || !Span(table, 6, count * 12) || at < 6 + count * 12)
+        return String();
+    String best; int score = -1;
+    for(unsigned i = 0; i < count; ++i) {
+        int p = 6 + 12 * i;
+        unsigned platform = U16(table, p), language = U16(table, p + 4);
+        unsigned length = U16(table, p + 8), offset = U16(table, p + 10);
+        if(U16(table, p + 6) != wanted || (platform != 0 && platform != 3) ||
+           (length & 1) || !Span(table, at + offset, length)) continue;
+        int priority = platform == 3 ? (language == 0x0409 ? 3 : 2) : 1;
+        if(priority > score) { best = Name(table, at + offset, length, true); score = priority; }
+    }
+    return best;
+}
+bool SameWeightName(const String& a, const String& b) {
+    return ToLower(ToUnicode(a, CHARSET_UTF8)) == ToLower(ToUnicode(b, CHARSET_UTF8));
+}
+struct StaticWeightInfo {
+    String family, legacy_family, face;
+    int weight = 0;
+    bool bold = false, italic = false;
+};
+bool ReadStaticWeight(Font font, StaticWeightInfo& out, bool require_traits = true) {
+    if(IsNull(font) || !font.GetData("fvar", 0, 16).IsEmpty()) return false;
+    String os2 = font.GetData("OS/2", 0, 64), names = font.GetData("name", 0, 65536);
+    if(os2.GetCount() < 64) return false;
+    out.weight = U16(os2, 4);
+    unsigned traits = U16(os2, 62);
+    out.bold = (traits & 32) != 0; out.italic = (traits & 1) != 0;
+    out.legacy_family = WeightName(names, 1);
+    out.family = WeightName(names, 16);
+    if(out.family.IsEmpty()) out.family = out.legacy_family;
+    out.face = WeightName(names, 4);
+    if(out.weight < 1 || out.weight > 1000 || (traits & 512) ||
+       out.family.IsEmpty() || out.face.IsEmpty()) return false;
+    if(font.GetFace() > Font::MONOSPACE &&
+       !SameWeightName(font.GetFaceName(), out.legacy_family) &&
+       !SameWeightName(font.GetFaceName(), out.family)) return false;
+    return !require_traits || (out.bold == font.IsBold() && out.italic == font.IsItalic());
+}
+// CSS Fonts missing-weight ordering, not absolute-distance rounding.
+int WeightRank(int actual, int requested) {
+    if(requested >= 400 && requested <= 500) {
+        if(actual >= requested && actual <= 500) return actual - requested;
+        if(actual < requested) return 101 + requested - actual;
+        return 2000 + actual - 500;
+    }
+    if(requested < 400)
+        return actual <= requested ? requested - actual : 1000 + actual - requested;
+    return actual >= requested ? actual - requested : 1000 + requested - actual;
+}
+
+struct SystemWeightIdentity : Moveable<SystemWeightIdentity> {
+    int face = -1;
+    String family, legacy_family;
+};
+const Vector<SystemWeightIdentity>& SystemWeightIndex() {
+    static Vector<SystemWeightIdentity> index;
+    static int count = -1;
+    static uint64 revision = 0;
+    int current_count = Font::GetFaceCount();
+    uint64 current_revision = UiFonts::GetRevision();
+    if(count == current_count && revision == current_revision) return index;
+    index.Clear(); count = current_count; revision = current_revision;
+    // The caller rejects larger inventories before requesting this bounded index.
+    for(int i = Font::MONOSPACE + 1; i < current_count; ++i) {
+        if(Font::GetFaceName(i).StartsWith("UiP")) continue;
+        StaticWeightInfo info;
+        if(!ReadStaticWeight(Font(i, 16), info, false)) continue;
+        auto& item = index.Add(); item.face = i;
+        item.family = info.family; item.legacy_family = info.legacy_family;
+    }
+    return index;
+}
+
 }
 
 const char *UiFontStatusName(UiFontStatus s) {
@@ -306,6 +386,91 @@ UiFontResolution UiFontCatalog::Resolve(const String& selection, Font prototype,
     }
     return out;
 }
+UiFontWeightResolution UiFontCatalog::ResolveWeight(const String& selection, Font prototype,
+                                                    int weight, const String& fallback) const {
+    UiFontWeightResolution out;
+    out.requested = selection; out.requested_weight = weight; out.font = Null;
+    if(weight < 1 || weight > 1000) {
+        out.status = UiFontStatus::Invalid; out.diagnostic = "Static weight must be 1..1000"; return out;
+    }
+    if(IsNull(prototype)) prototype = StdFont();
+#ifndef PLATFORM_WIN32
+    out.status = UiFontStatus::Unsupported;
+    out.diagnostic = "Verified static-weight adapter is Windows only";
+    return out;
+#else
+    int best = INT_MAX;
+    UiFontStatus unavailable = UiFontStatus::Missing;
+    auto Consider = [&](Font candidate, const String& asset, const String& family) {
+        StaticWeightInfo info;
+        if(!ReadStaticWeight(candidate, info)) { unavailable = UiFontStatus::Unsupported; return; }
+        int rank = (info.italic != prototype.IsItalic() ? 10000 : 0) + WeightRank(info.weight, weight);
+        if(rank >= best) return;
+        best = rank; out.font = candidate; out.asset_id = asset;
+        out.resolved_family = family.IsEmpty() ? info.family : family;
+        out.resolved_face = info.face; out.actual_weight = info.weight;
+        out.verified_static = true; out.style_fallback = info.italic != prototype.IsItalic();
+        out.weight_fallback = info.weight != weight;
+    };
+    if(selection.StartsWith("project:")) {
+        for(const UiFontAsset& a : assets_) if(a.family_id == selection.Mid(8)) {
+            if(a.status != UiFontStatus::Loaded) {
+                if(unavailable == UiFontStatus::Missing) unavailable = a.status;
+                continue;
+            }
+            Consider(Font(prototype).Face(a.runtime_face).Bold(a.bold).Italic(a.italic), a.id, a.family);
+        }
+    }
+    else {
+        int face = SystemFace(selection);
+        if(face >= 0) {
+            StaticWeightInfo target;
+            if(Font::GetFaceCount() > 1024) unavailable = UiFontStatus::ResourceLimit;
+            else if(!ReadStaticWeight(Font(prototype).Face(face).NoBold().Italic(false), target, false))
+                unavailable = UiFontStatus::Unsupported;
+            else {
+                // First inspect family identity, then genuine trait variants.
+                // No name-prefix guesses, font registration or synthetic fallback.
+                const bool legacy_only = !SameWeightName(target.family, target.legacy_family);
+                for(const auto& face : SystemWeightIndex()) {
+                    if(!SameWeightName(face.family, target.family) ||
+                       (legacy_only && !SameWeightName(face.legacy_family, target.legacy_family))) continue;
+                    for(int italic = 0; italic < 2; ++italic)
+                        for(int bold = 0; bold < 2; ++bold) {
+                            Font candidate = Font(prototype).Face(face.face).Bold(bold).Italic(italic);
+                            StaticWeightInfo native;
+                            if(ReadStaticWeight(candidate, native) && SameWeightName(native.family, target.family) &&
+                               (!legacy_only || SameWeightName(native.legacy_family, target.legacy_family)))
+                                Consider(candidate, String(), legacy_only ? native.legacy_family : native.family);
+                        }
+                }
+                if(!out.verified_static) unavailable = UiFontStatus::Unsupported;
+            }
+        }
+    }
+    if(out.verified_static) {
+        out.status = out.style_fallback || out.weight_fallback ? UiFontStatus::Fallback : UiFontStatus::Loaded;
+        if(out.status == UiFontStatus::Fallback)
+            out.diagnostic = Format("Requested weight %d; verified static weight %d%s",
+                                    weight, out.actual_weight, out.style_fallback ? "; style fallback" : "");
+        return out;
+    }
+    if(!fallback.IsEmpty() && fallback != selection) {
+        auto next = ResolveWeight(fallback, prototype, weight, String());
+        if(next.verified_static) {
+            next.requested = selection; next.family_fallback = true; next.status = UiFontStatus::Fallback;
+            next.diagnostic = "Requested family has no verified static face (" + String(UiFontStatusName(unavailable)) +
+                              "); using " + next.resolved_family +
+                              Format(" at static weight %d", next.actual_weight);
+            return next;
+        }
+    }
+    out.status = unavailable;
+    out.diagnostic = "No verified static face for " + selection + "; no simulated Font returned";
+    return out;
+#endif
+}
+
 bool UiFontCatalog::HasSelection(const String& selection) const {
     if(!selection.StartsWith("project:")) return SystemFace(selection) >= 0;
     for(const UiFontAsset& a : assets_) if(selection.Mid(8) == a.family_id) return true;
@@ -344,6 +509,9 @@ void UiFonts::SetTypography(const UiTypography& t) {
 UiTypography UiFonts::GetTypography() { return Typography(); }
 uint64 UiFonts::GetRevision() { return Revision(); }
 UiFontResolution UiFonts::Resolve(const String& selection, Font font) { return Active().Resolve(selection, font, Typography().fallback); }
+UiFontWeightResolution UiFonts::ResolveWeight(const String& selection, Font font, int weight) {
+    return Active().ResolveWeight(selection, font, weight, Typography().fallback);
+}
 void UiFonts::ApplySelection(Font& font, const String& selection) { font = Resolve(selection, font).font; }
 String UiFonts::Selection(Font font) {
     for(const UiFontAsset& a : Active().GetAssets()) if(a.runtime_face == font.GetFace()) return "project:" + a.family_id;

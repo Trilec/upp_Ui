@@ -145,6 +145,21 @@ bool UiBoxLayout::RemoveItem(int index)
     return true;
 }
 
+bool UiBoxLayout::SetItemVisible(int index, bool visible)
+{
+    if(index < 0 || index >= items.GetCount())
+        return false;
+    Item& it = items[index];
+    if(it.logical_visible == visible)
+        return true;
+    it.logical_visible = visible;
+    ++cur_gen;
+    visibility_refresh_pending = true;
+    if(layout_pause == 0)
+        Layout();
+    return true;
+}
+
 Size UiBoxLayout::GetCtrlMinSize(Item& it)
 {
     if(!it.c)
@@ -161,6 +176,9 @@ uint64 UiBoxLayout::MeasureCacheSignature() const
     for(int i = 0; i < wrap_snap_sizes.GetCount(); i++)
         h << wrap_snap_sizes[i];
     for(const Item& it : items) {
+        h << it.logical_visible;
+        if(!it.logical_visible)
+            continue;
         h << it.fixed << it.fit << it.expandingWeight << it.minw << it.maxw << it.minh << it.maxh
           << it.align_self << it.is_break << it.line_enabled << it.line_orientation << it.line_align
           << it.line_thickness << it.line_dash << it.line_inset << it.line_color_enabled << it.line_color;
@@ -201,7 +219,7 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
 
     for(Item& it : items) {
         it.cl = Item::TransientLayoutCache();
-        it.cl.visible = true;
+        it.cl.visible = it.logical_visible;
     }
 
     used_w = used_h = 0;
@@ -570,6 +588,12 @@ void UiBoxLayout::Layout()
         it.c->SetRect(it.cl.rect);
     }
     last_layout_duration_ms = -1;
+    if(visibility_refresh_pending && layout_pause == 0) {
+        // Clear before notifying the parent: its layout can re-enter this one.
+        visibility_refresh_pending = false;
+        RefreshParentLayout();
+        Refresh();
+    }
 }
 
 void UiBoxLayout::Paint(Draw& w)
@@ -577,7 +601,7 @@ void UiBoxLayout::Paint(Draw& w)
     Rect r = GetSize();
     bool has_separator = false;
     for(const Item& it : items) {
-        if(it.line_enabled) {
+        if(it.logical_visible && it.line_enabled) {
             has_separator = true;
             break;
         }
@@ -635,7 +659,7 @@ void UiBoxLayout::Paint(Draw& w)
 
     if(has_separator) {
         for(const Item& it : items) {
-            if(!it.line_enabled || it.cl.rect.IsEmpty())
+            if(!it.logical_visible || !it.line_enabled || it.cl.rect.IsEmpty())
                 continue;
             PaintSpacerLine(w, it.cl.rect, it);
         }
@@ -730,7 +754,7 @@ Size UiBoxLayout::GetPreferredSize() const
 
     for(int i = 0; i < items.GetCount(); i++) {
         Item& it = const_cast<Item&>(items[i]);
-        if(it.is_break)
+        if(!it.logical_visible || it.is_break)
             continue;
         Size ms = const_cast<UiBoxLayout*>(this)->GetCtrlMinSize(it);
 
@@ -774,8 +798,12 @@ int UiBoxLayout::GetMinWrapWidth() const
         return GetMinSize().cx;
 
     int max_main = 0;
+    int logical_index = 0;
     for(int i = 0; i < items.GetCount(); i++) {
         Item& it = const_cast<Item&>(items[i]);
+        if(!it.logical_visible)
+            continue;
+        int snap_index = logical_index++;
         if(it.is_break)
             continue;
         Size ms = const_cast<UiBoxLayout*>(this)->GetCtrlMinSize(it);
@@ -790,7 +818,7 @@ int UiBoxLayout::GetMinWrapWidth() const
             w = min(w, fixed_column);
         w = min(max(w, it.minw), it.maxw);
         if(wrap == UiBoxWrap::Snap)
-            w = GetSnapMainSize(i, w);
+            w = GetSnapMainSize(snap_index, w);
         max_main = max(max_main, max(0, w));
     }
     return max_main + inset.left + inset.right;

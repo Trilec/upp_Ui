@@ -28,6 +28,16 @@ struct UiFontResolution {
 
 // GUI-thread catalogue mutations. Original bytes are shared by U++ String;
 // registered faces/handles live in a bounded, immutable process registry.
+// Runtime-only verified static-face result. Zero actual_weight means unknown;
+// unverified results carry a Null Font. Never persist native/private face names.
+struct UiFontWeightResolution : UiFontResolution {
+    int requested_weight = 400, actual_weight = 0;
+    String resolved_face;
+    bool verified_static = false;
+    bool weight_fallback = false, family_fallback = false;
+    UiFontWeightResolution() { font = Null; }
+};
+
 class UiFontCatalog {
 public:
     UiFontCatalog() {}
@@ -46,6 +56,13 @@ public:
     uint64 GetRevision() const { return revision_; }
     UiFontResolution Resolve(const String& selection, Font prototype,
                              const String& fallback = "STDFONT") const;
+    // GUI-thread explicit setup only: inspect static native faces, never call in Paint.
+    // Numeric weight overrides prototype.Bold; size/decorations stay, style fallback is explicit.
+    // CSS integer weights 1..1000; fallback is at most one verified family hop.
+    // Intermediate project weights may be reselected by legacy Normalize;
+    // that separate integration is deferred pending a genuine fixture.
+    UiFontWeightResolution ResolveWeight(const String& selection, Font prototype, int weight,
+                                          const String& fallback = "STDFONT") const;
     bool HasSelection(const String& selection) const;
     VectorMap<String, String> Choices(bool include_system = true) const;
 private:
@@ -68,6 +85,7 @@ public:
     static UiTypography GetTypography();
     static uint64 GetRevision();
     static UiFontResolution Resolve(const String& selection, Font prototype);
+    static UiFontWeightResolution ResolveWeight(const String& selection, Font prototype, int weight);
     static Font Inherit(Font prototype, UiTypographyRole role = UiTypographyRole::Body);
     static Font Normalize(Font font); // Resolve genuine traits after Bold/Italic edits.
     static void ApplySelection(Font& font, const String& selection);

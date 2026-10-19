@@ -1,0 +1,9 @@
+description "Native Basic renderer text-fit regression";
+uses
+    Ui,
+    plugin/png;
+file
+    main.cpp,
+    README.md;
+mainconfig
+    "" = "GUI";

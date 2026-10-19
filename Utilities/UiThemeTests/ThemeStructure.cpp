@@ -87,7 +87,7 @@ int RunThemeStructureSuite()
     const UiThemePreset presets[] = {
         UiThemePreset::Minimal, UiThemePreset::Pill, UiThemePreset::Linear,
         UiThemePreset::Solid, UiThemePreset::Outline, UiThemePreset::Compact,
-        UiThemePreset::Layered
+        UiThemePreset::Layered, UiThemePreset::Olive
     };
     const UiThemeMode modes[] = {UiThemeMode::Light, UiThemeMode::Dark};
 

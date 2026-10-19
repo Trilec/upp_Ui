@@ -100,6 +100,130 @@ private:
     bool serif_ = false;
 };
 
+static int VerifyWeights() {
+    int checks = 0, failed = 0;
+    auto Check = [&](bool ok, const char* name) {
+        ++checks; if(!ok) { ++failed; Cout() << "FAIL: " << name << '\n'; }
+    };
+    UiFontCatalog catalog; LoadSans(catalog); LoadSerif(catalog);
+    for(const auto& a : catalog.GetAssets())
+        Check(a.status == UiFontStatus::Loaded, "bundled static face loads");
+    struct WeightCase { int requested, actual; };
+    const WeightCase cases[] = { {1,400}, {300,400}, {400,400}, {450,400}, {500,400},
+                                {550,700}, {600,700}, {650,700}, {700,700}, {800,700}, {1000,700} };
+    for(const char* family_text : { "project:pt-sans", "project:pt-serif" })
+        for(bool italic : {false, true}) for(const WeightCase& item : cases) {
+            String family = family_text;
+            Font prototype = SansSerifZ(18).Bold().Italic(italic).Underline();
+            auto r = catalog.ResolveWeight(family, prototype, item.requested, String());
+            Check(r.verified_static && r.requested == family && r.requested_weight == item.requested &&
+                  r.actual_weight == item.actual && r.weight_fallback == (item.requested != item.actual) &&
+                  r.status == (item.requested == item.actual ? UiFontStatus::Loaded : UiFontStatus::Fallback),
+                  "CSS matching reports requested and genuine static weights separately");
+            Check(r.verified_static && !r.style_fallback && !r.family_fallback &&
+                  r.font.IsItalic() == italic && r.font.IsUnderline() &&
+                  r.font.GetHeight() == prototype.GetHeight() && r.font.GetWidth() == prototype.GetWidth(),
+                  "size decoration and genuine italic style survive numerical weight selection");
+            String id = family.Mid(8) + (item.actual == 400 ? (italic ? "-italic" : "-regular")
+                                                           : (italic ? "-bolditalic" : "-bold"));
+            String alias;
+            for(const auto& a : catalog.GetAssets()) if(a.id == id) alias = "UiP" + a.content_hash.Left(26);
+            Check(r.verified_static && r.asset_id == id && !alias.IsEmpty() &&
+                  r.font.GetFaceName() == alias && r.resolved_face == alias,
+                  "chosen native name is the exact bundled face, not an installed substitute");
+            String os2 = r.verified_static ? r.font.GetData("OS/2", 0, 64) : String();
+            unsigned weight = os2.GetCount() >= 64 ? ((byte)os2[4] << 8) | (byte)os2[5] : 0;
+            unsigned traits = os2.GetCount() >= 64 ? ((byte)os2[62] << 8) | (byte)os2[63] : 0;
+            Check(os2.GetCount() >= 64 && weight == item.actual &&
+                  bool(traits & 32) == r.font.IsBold() && bool(traits & 1) == italic,
+                  "returned Font realizes the expected native weight and unsimulated traits");
+        }
+    for(int invalid : {0, 1001}) {
+        auto r = catalog.ResolveWeight("project:pt-sans", StdFont(), invalid, String());
+        Check(r.status == UiFontStatus::Invalid && r.requested_weight == invalid &&
+              r.actual_weight == 0 && !r.verified_static && IsNull(r.font),
+              "invalid numerical weights return no unverified Font");
+    }
+    auto fallback = catalog.ResolveWeight("project:absent", StdFont(), 550, "project:pt-sans");
+    Check(fallback.verified_static && fallback.requested == "project:absent" &&
+          fallback.family_fallback && fallback.weight_fallback && fallback.actual_weight == 700 &&
+          fallback.status == UiFontStatus::Fallback, "verified family fallback preserves missing request");
+    auto missing = catalog.ResolveWeight("project:absent", StdFont(), 550, String());
+    Check(missing.status == UiFontStatus::Missing && !missing.verified_static &&
+          missing.actual_weight == 0 && IsNull(missing.font), "no family fallback means no fabricated Font");
+    UiFontCatalog only_regular;
+    only_regular.Import("only-regular", "regular-only", Bytes(pt_sans_regular, pt_sans_regular_length));
+    auto genuine = only_regular.ResolveWeight("project:regular-only", StdFont().Italic(), 700, String());
+    Check(genuine.verified_static && genuine.actual_weight == 400 && genuine.weight_fallback &&
+          genuine.style_fallback && !genuine.font.IsItalic() && !genuine.font.IsBold(),
+          "missing bold italic uses a reported genuine regular fallback instead of simulations");
+    UiFontCatalog unsupported;
+    unsupported.Import("unsupported", "unsupported", "OTTO00000000");
+    auto rejected = unsupported.ResolveWeight("project:unsupported", StdFont(), 600, String());
+    Check(rejected.status == UiFontStatus::Unsupported && !rejected.verified_static && IsNull(rejected.font),
+          "unsupported asset remains unsupported without a synthetic native result");
+    UiFonts::SetCatalog(catalog);
+    auto shared = UiFonts::ResolveWeight("project:pt-sans", StdFont(), 650);
+    Check(shared.verified_static && shared.actual_weight == 700 && shared.weight_fallback,
+          "shared entry uses the same active catalogue resolver");
+    Check(catalog.Resolve("project:pt-sans", StdFont().Bold()).font ==
+          catalog.ResolveWeight("project:pt-sans", StdFont(), 700, String()).font,
+          "legacy genuine-bold resolver remains unchanged");
+    int registrations = UiFonts::RegisteredFaceCount(); int64 retained = UiFonts::RetainedBytes();
+    for(int i = 0; i < 32; ++i) catalog.ResolveWeight("project:pt-sans", StdFont(), 550, String());
+    Check(UiFonts::RegisteredFaceCount() == registrations && UiFonts::RetainedBytes() == retained,
+          "weight resolution never registers or retains another font asset");
+    Cout() << "UI_FONT_WEIGHT_SUMMARY checks=" << checks << " failed=" << failed << '\n';
+    return failed ? 1 : 0;
+}
+
+static int ObserveSystemWeights() {
+    int checks = 0, failed = 0, unavailable = 0;
+    auto Check = [&](bool ok, const char* name) {
+        ++checks; if(!ok) { ++failed; Cout() << "FAIL: " << name << '\n'; }
+    };
+    UiFontCatalog catalog;
+    Font prototype = SansSerifZ(18);
+    for(int requested : {550, 600, 650}) {
+        auto r = catalog.ResolveWeight("system:Segoe UI", prototype, requested);
+        bool readable = r.verified_static && !IsNull(r.font);
+        String os2 = readable ? r.font.GetData("OS/2", 0, 64) : String();
+        String names = readable ? r.font.GetData("name", 0, 65536) : String();
+        unsigned actual = os2.GetCount() >= 64 ? ((byte)os2[4] << 8) | (byte)os2[5] : 0;
+        unsigned traits = os2.GetCount() >= 64 ? ((byte)os2[62] << 8) | (byte)os2[63] : 0;
+        if(!readable || r.family_fallback) ++unavailable;
+        ValueMap record;
+        record.Add("requested_family", r.requested); record.Add("requested_weight", requested);
+        record.Add("status", UiFontStatusName(r.status)); record.Add("diagnostic", r.diagnostic);
+        record.Add("verified_static", r.verified_static); record.Add("actual_weight", r.actual_weight);
+        record.Add("weight_fallback", r.weight_fallback); record.Add("family_fallback", r.family_fallback);
+        record.Add("style_fallback", r.style_fallback); record.Add("resolved_family", r.resolved_family);
+        record.Add("native_full_name", r.resolved_face);
+        record.Add("native_face_selection", readable ? r.font.GetFaceName() : String());
+        record.Add("native_os2_weight", int(actual)); record.Add("native_os2_traits", int(traits));
+        record.Add("native_os2_prefix_bytes", os2.GetCount());
+        record.Add("native_os2_prefix_sha256", ToLower(SHA256String(os2)));
+        record.Add("native_name_prefix_bytes", names.GetCount());
+        record.Add("native_name_prefix_sha256", ToLower(SHA256String(names)));
+        record.Add("native_name_scope", "bounded65536bytes; full name is native table ID4");
+        record.Add("font_height", readable ? r.font.GetHeight() : 0);
+        Cout() << "UI_FONT_WEIGHT_OBSERVATION " << AsJSON(record) << '\n';
+        Check(readable && r.requested == "system:Segoe UI" && r.requested_weight == requested,
+              "observation retains request and reports whether a genuine static face is available");
+        Check(readable && os2.GetCount() == 64 && actual >= 1 && actual <= 1000 &&
+              actual == unsigned(r.actual_weight) && bool(traits & 32) == r.font.IsBold() &&
+              bool(traits & 1) == r.font.IsItalic(), "observation weight and traits come from actual native OS2");
+        Check(readable && names.GetCount() >= 6 && !r.resolved_face.IsEmpty() &&
+              r.weight_fallback == (r.actual_weight != requested) &&
+              r.status == (r.weight_fallback || r.style_fallback || r.family_fallback
+                           ? UiFontStatus::Fallback : UiFontStatus::Loaded),
+              "observation records native name and explicit fallback without an assumed weight");
+    }
+    Cout() << "UI_FONT_WEIGHT_OBSERVATION_SUMMARY records=3 checks=" << checks
+           << " failed=" << failed << " unavailable=" << unavailable << '\n';
+    return unavailable ? 2 : failed ? 1 : 0;
+}
+
 static int Verify(const String& path) {
     int checks = 0, failures = 0;
     String report;
@@ -242,6 +366,11 @@ static int Verify(const String& path) {
 }
 
 GUI_APP_MAIN {
+    for(const String& arg : CommandLine())
+        if(arg == "--verify-weights" || arg == "--observe-segoe-weights") {
+            if(CommandLine().GetCount() != 1) { SetExitCode(2); return; }
+            SetExitCode(arg == "--verify-weights" ? VerifyWeights() : ObserveSystemWeights()); return;
+        }
     for(const String& arg : CommandLine()) if(arg.StartsWith("--verify=")) { SetExitCode(Verify(arg.Mid(9))); return; }
     UiFontCatalog catalog; LoadSans(catalog); LoadSerif(catalog);
     UiFonts::SetCatalog(catalog); UiFonts::SetTypography(Profile());

@@ -54,6 +54,7 @@
 #include <Ui/UiRadioButton.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiSlider.h>
+#include <Ui/UiRangeSegments.h>
 #include <Ui/UiScrollPanel.h>
 #include <Ui/UiScrollBar.h>
 #include <Ui/UiSplitter.h>
@@ -74,7 +75,8 @@ enum class UiThemePreset : byte {
     Solid,
     Outline,
     Compact,
-    Layered
+    Layered,
+    Olive = 7 // Append-only serialized ID; existing presets remain 0..6.
 };
 
 enum class UiThemeMode : byte {
@@ -253,7 +255,7 @@ inline Stream& operator%(Stream& s, UiLabelRole& v)
 
 inline bool UiIsValid(UiThemePreset v)
 {
-    return v >= UiThemePreset::Minimal && v <= UiThemePreset::Layered;
+    return v >= UiThemePreset::Minimal && v <= UiThemePreset::Olive;
 }
 
 inline bool UiIsValid(UiThemeMode v)
@@ -743,6 +745,7 @@ inline UiToolButton::Style ResolveToolButtonBase(UiThemePreset preset)
 {
     UiToolButton::Style s = UiToolButton::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -758,6 +761,7 @@ inline UiButton::Style ResolveButtonBase(UiThemePreset preset)
     UiButton::Style s = UiButton::StyleDefault();
 
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -853,6 +857,7 @@ inline UiBaseEdit::Style ResolveEditBase(UiThemePreset preset)
     UiBaseEdit::Style s = UiBaseEdit::StyleDefault();
 
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -914,6 +919,7 @@ inline UiToggle::Style ResolveToggleBase(UiThemePreset preset)
 {
     UiToggle::Style s = UiToggle::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -933,6 +939,7 @@ inline UiCheckBox::Style ResolveCheckBoxBase(UiThemePreset preset)
 {
     UiCheckBox::Style s = UiCheckBox::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1009,6 +1016,7 @@ inline UiRadioButton::Style ResolveRadioButtonBase(UiThemePreset preset)
 {
     UiRadioButton::Style s = UiRadioButton::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1083,6 +1091,7 @@ inline UiProgressBar::Style ResolveProgressBarBase(UiThemePreset preset)
 {
     UiProgressBar::Style s = UiProgressBar::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1163,6 +1172,7 @@ inline UiSlider::Style ResolveSliderBase(UiThemePreset preset)
 {
     UiSlider::Style s = UiSlider::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1230,6 +1240,7 @@ inline UiScrollBar::Style ResolveScrollBarBase(UiThemePreset preset)
 {
     UiScrollBar::Style s = UiScrollBar::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1293,6 +1304,7 @@ inline UiSplitter::Style ResolveSplitterBase(UiThemePreset preset)
 {
     UiSplitter::Style s = UiSplitter::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1334,6 +1346,7 @@ inline UiPanel::Style ResolvePanelBase(UiThemePreset preset)
 {
     UiPanel::Style s = UiPanel::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1440,6 +1453,7 @@ inline UiGroupPanel::Style ResolveGroupPanelBase(UiThemePreset preset)
         s.metrics.shadow.alpha = 48;
         s.metrics.shadow.color = Color(148, 163, 184);
         return UiApplyTypography(s);
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
     default:
         return UiApplyTypography(s);
@@ -1572,6 +1586,7 @@ inline UiDropdown::Style ResolveDropdownBase(UiThemePreset preset)
     UiDropdown::Style s = UiDropdown::StyleDefault();
     s.popup_item_style = UiLabel::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1613,6 +1628,7 @@ inline UiTab::Style ResolveTabBase(UiThemePreset preset)
 {
     UiTab::Style s = UiTab::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1701,6 +1717,7 @@ inline UiTitleCard::Style ResolveTitleCardBase(UiThemePreset preset)
 {
     UiTitleCard::Style s = UiTitleCard::StyleDefault();
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         return UiApplyTypography(s);
     case UiThemePreset::Pill:
@@ -1757,6 +1774,7 @@ inline UiLabel::Style ResolveLabelBase(UiThemePreset preset)
     s.metrics.content_margin = Rect(0, 0, 0, 0);
     s.content_gap = 0;
     switch(preset) {
+    case UiThemePreset::Olive:
     case UiThemePreset::Minimal:
         break;
     case UiThemePreset::Pill:
@@ -2501,9 +2519,27 @@ inline void TuneMinimalLabel(UiLabel::Style& s, UiThemeMode mode, UiLabelRole ro
     }
 }
 } // namespace UiThemeDetail
+} // namespace Upp
 
+#include <Ui/UiThemeOlive.h>
+
+namespace Upp {
 class UiTheme {
 public:
+    // Value snapshots in the current DPI; System follows the existing Light fallback.
+    static UiOliveTokens GetOliveTokens(UiThemeMode mode)
+    {
+        return UiOliveDetail::Tokens(UiThemeDetail::ResolveEffectiveMode(mode));
+    }
+    static StyledPalette ResolveOlivePalette(UiThemeMode mode, UiRole role,
+                                             Color face, bool selected = false)
+    {
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        StyledPalette p;
+        UiOliveDetail::Palette(p, GetOliveTokens(mode), role, face, selected);
+        return p;
+    }
+
     static UiThemeContext NormalizeContext(const UiThemeContext& ctx)
     {
         return UiThemeDetail::NormalizeContext(ctx);
@@ -2574,6 +2610,95 @@ public:
     static UiRadioButton::Style ResolveRadioButton(UiRadioVisual visual = UIRADIOVIS_CLASSIC) { return ResolveRadioButton(GetContext(), visual); }
     static UiProgressBar::Style ResolveProgressBar(UiRole role) { return ResolveProgressBar(GetContext(), role); }
     static UiProgressBar::Style ResolveProgressBar() { return ResolveProgressBar(GetContext(), UiRole::Standard); }
+    static UiRangeSegments::Style ResolveRangeSegments(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
+    {
+        const UiThemeContext normalized = NormalizeContext(ctx);
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        UiRangeSegments::Style s = UiRangeSegments::StyleDefault();
+        if(normalized.preset == UiThemePreset::Olive)
+            return UiOliveDetail::RangeSegments(s, GetOliveTokens(normalized.mode));
+        UiSlider::Style slider = ResolveSlider(normalized, role);
+        s.track_palette = slider.track_palette;
+        s.track_metrics = slider.track_metrics;
+        s.track_skin = slider.track_skin;
+        s.thumb_palette = slider.thumb_palette;
+        s.thumb_metrics = slider.thumb_metrics;
+        s.thumb_skin = slider.thumb_skin;
+
+        s.track_metrics.radius = max(s.track_metrics.radius, DPI(7));
+        s.track_metrics.frame_enabled = true;
+        s.track_metrics.frame_width = max(1, s.track_metrics.frame_width);
+        s.thumb_metrics.radius = max(s.thumb_metrics.radius, DPI(8));
+        s.thumb_metrics.frame_enabled = true;
+        s.thumb_metrics.frame_width = max(1, s.thumb_metrics.frame_width);
+
+        const bool dark = normalized.mode == UiThemeMode::Dark;
+        const Color value_face = dark ? Color(31, 41, 55) : White();
+        const Color value_frame = dark ? Color(75, 85, 99) : Color(203, 213, 225);
+        const Color value_ink = dark ? Color(229, 231, 235) : Color(17, 24, 39);
+        for(int st = 0; st < 4; st++) {
+            s.value_palette.face[st] = UiFill::Solid(value_face);
+            s.value_palette.frame[st] = value_frame;
+            s.value_palette.ink[st] = value_ink;
+        }
+        s.value_palette.face[ST_DISABLED] = UiFill::Solid(dark ? Color(55, 65, 81) : Color(241, 245, 249));
+        s.value_palette.ink[ST_DISABLED] = dark ? Color(156, 163, 175) : Color(148, 163, 184);
+
+        Color primary = slider.track_palette.ink[ST_NORMAL];
+        if(IsNull(primary))
+            primary = s.series[0];
+        UiThemeContext context = normalized;
+
+        if(role != UiRole::Standard) {
+            // The semantic families are deliberately distinct. Blend takes 0..255,
+            // not a percentage; both ends of a tonal range must actually be reached.
+            Color first = primary;
+            Color last = Blend(primary, White(), dark ? 112 : 180);
+            if(role == UiRole::Alert)
+                last = dark ? Color(251, 146, 60) : Color(234, 88, 12);
+            else if(role == UiRole::Subtle) {
+                first = dark ? Color(190, 190, 190) : Color(220, 220, 220);
+                last = Color(88, 88, 88);
+            }
+            for(int i = 0; i < UiRangeSegments::MAX_SERIES_COLORS; i++)
+                s.series[i] = Blend(first, last, i * 255 / (UiRangeSegments::MAX_SERIES_COLORS - 1));
+            s.series_count = UiRangeSegments::MAX_SERIES_COLORS;
+        }
+        else {
+            s.series[0] = primary;
+            if(context.mode == UiThemeMode::Dark)
+                for(int i = 1; i < UiRangeSegments::MAX_SERIES_COLORS; i++)
+                    s.series[i] = LtColor(s.series[i], 12);
+        }
+
+        if(context.preset == UiThemePreset::Compact) {
+            s.track_size.cy = DPI(24);
+            s.thumb_size = Size(DPI(14), DPI(14));
+            s.label_font = StdFontZ(10).Bold();
+            s.value_font = StdFontZ(8).Bold();
+            s.subtitle_font = StdFontZ(8);
+            s.right_font = StdFontZ(10).Bold();
+        }
+        else {
+            s.track_size.cy = DPI(28);
+            s.thumb_size = Size(DPI(16), DPI(16));
+            s.label_font = StdFontZ(11).Bold();
+            s.value_font = StdFontZ(9).Bold();
+        }
+
+        Color selected = ResolveSlider(normalized, UiRole::Accent).track_palette.ink[ST_NORMAL];
+        if(!IsNull(selected))
+            s.selected_frame = selected;
+        UiApplyTypography(s);
+        s.value_font = UiFonts::Inherit(s.value_font);
+        return s;
+    }
+
+    static UiRangeSegments::Style ResolveRangeSegments(UiRole role = UiRole::Standard)
+    {
+        return ResolveRangeSegments(GetContext(), role);
+    }
+
     static UiSlider::Style ResolveSlider(UiRole role) { return ResolveSlider(GetContext(), role); }
     static UiSlider::Style ResolveSlider() { return ResolveSlider(GetContext(), UiRole::Standard); }
     static UiScrollBar::Style ResolveScrollBar() { return ResolveScrollBar(GetContext()); }
@@ -2595,13 +2720,16 @@ public:
     static UiMenu::Style ResolveMenu() { return ResolveMenu(GetContext()); }
     static UiLabel::Style ResolveLabel(UiRole role, UiTextSize size = UiTextSize::Body) { return ResolveLabel(GetContext(), role, size); }
     static UiLabel::Style ResolveLabel(UiLabelRole role = UiLabelRole::Body) { return ResolveLabel(GetContext(), role); }
-    static UiTable::Style ResolveTable()
+    static UiTable::Style ResolveTable() { return ResolveTable(GetContext()); }
+    static UiTable::Style ResolveTable(const UiThemeContext& context)
     {
-        UiThemeContext ctx = GetContext();
+        UiThemeContext ctx = NormalizeContext(context);
+        if(ctx.preset == UiThemePreset::Olive)
+            return UiOliveDetail::Table(UiTable::StyleDefault(), GetOliveTokens(ctx.mode), UiRole::Standard);
         UiTable::Style s = UiTable::StyleDefault();
-        const UiPanel::Style surface = ResolvePanel(UiPanelRole::Surface);
-        const UiPanel::Style subtle = ResolvePanel(UiPanelRole::Subtle);
-        const UiList::Style list = ResolveList();
+        const UiPanel::Style surface = ResolvePanel(ctx, UiPanelRole::Surface);
+        const UiPanel::Style subtle = ResolvePanel(ctx, UiPanelRole::Subtle);
+        const UiList::Style list = ResolveList(ctx);
         const auto face = [](const StyledPalette& palette, int state,
                              Color fallback) {
             return palette.face[state].IsSolid() &&
@@ -2633,13 +2761,17 @@ public:
         s.resize_guide = s.active_border;
         return UiApplyTypography(s);
     }
-    static UiTable::Style ResolveTable(UiRole role)
+    static UiTable::Style ResolveTable(UiRole role) { return ResolveTable(GetContext(), role); }
+    static UiTable::Style ResolveTable(const UiThemeContext& ctx, UiRole role)
     {
-        UiTable::Style s = ResolveTable();
-        const auto surface = ResolvePanel(role);
-        const auto text = ResolveLabel(role);
-        const auto selection = ResolveList(role);
-        const auto edge = ResolveDropdown(role);
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        if(NormalizeContext(ctx).preset == UiThemePreset::Olive)
+            return UiOliveDetail::Table(UiTable::StyleDefault(), GetOliveTokens(ctx.mode), role);
+        UiTable::Style s = ResolveTable(ctx);
+        const auto surface = ResolvePanel(ctx, role);
+        const auto text = ResolveLabel(ctx, role);
+        const auto selection = ResolveList(ctx, role);
+        const auto edge = ResolveDropdown(ctx, role);
         s.palette = surface.palette;
         s.metrics = surface.metrics;
         if(surface.palette.face[ST_NORMAL].IsSolid()) s.table_bg = surface.palette.face[ST_NORMAL].color;
@@ -2656,6 +2788,15 @@ public:
     {
         UiThemeContext ctx = GetContext();
         UiDoc::Style s = UiDoc::StyleDefault();
+        if(ctx.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(ctx.mode);
+            UiOliveDetail::Base(s, t, UiRole::Standard, t.panel);
+            s.page_face = t.panel; s.page_frame = t.line; s.table_grid = t.line_soft;
+            s.caret_ink = t.text; s.selection_fill = t.active;
+            s.search_fill = s.annotation_fill = t.alert_face;
+            s.font = t.body;
+            return UiApplyTypography(s);
+        }
         UiThemeDetail::ApplyMode(s.palette, ctx.mode);
         if(UiThemeDetail::ResolveEffectiveMode(ctx.mode) == UiThemeMode::Dark) {
             s.page_face = UiThemeDetail::ForceDarkFace(s.page_face);
@@ -2673,6 +2814,12 @@ public:
     {
         UiThemeContext ctx = GetContext();
         UiBezierCurveEditor::Style s = UiBezierCurveEditor::StyleDefault();
+        if(ctx.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(ctx.mode);
+            s.background = t.panel; s.axis = t.line; s.curve = t.accent;
+            s.handle_fill = t.accent; s.handle_selected = t.focus; s.handle_ring = t.panel;
+            return UiApplyTypography(s);
+        }
         UiThemeDetail::MinimalRoleColors shell = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Subtle);
         UiThemeDetail::MinimalRoleColors accent = UiThemeDetail::MinimalRole(ctx.mode, UiRole::Accent);
         s.background = shell.face;
@@ -2694,6 +2841,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiButtonRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Button(ResolveButton(normalized, role), t, role == UiButtonRole::Subtle || role == UiButtonRole::Icon ? UiRole::Subtle : role == UiButtonRole::Accent ? UiRole::Accent : role == UiButtonRole::Danger ? UiRole::Alert : UiRole::Standard);
+        }
         UiButton::Style s = UiThemeDetail::ResolveButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyButtonRole(s, role);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2718,6 +2870,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiToolButtonRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::ToolButton(ResolveToolButton(normalized, role), t, role == UiToolButtonRole::Subtle ? UiRole::Subtle : role == UiToolButtonRole::Accent ? UiRole::Accent : role == UiToolButtonRole::Alert ? UiRole::Alert : UiRole::Standard);
+        }
         UiToolButton::Style s = UiThemeDetail::ResolveToolButtonBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalToolButton(s, normalized.mode, role);
@@ -2733,6 +2890,11 @@ public:
     {
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Edit(ResolveEdit(normalized, role), t, role);
+        }
         UiBaseEdit::Style s = UiThemeDetail::ResolveEditBase(normalized.preset);
         s = UiThemeDetail::ApplyEditRole(s, UiThemeDetail::ToEditRole(role));
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2749,6 +2911,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiEditRole::Field;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Edit(ResolveEdit(normalized, role), t, role == UiEditRole::Subtle ? UiRole::Subtle : role == UiEditRole::Strong ? UiRole::Accent : UiRole::Standard);
+        }
         UiBaseEdit::Style s = UiThemeDetail::ResolveEditBase(normalized.preset);
         s = UiThemeDetail::ApplyEditRole(s, role);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2767,6 +2934,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::CheckBox(ResolveCheckBox(normalized, role, visual), t, role);
+        }
         UiCheckBox::Style s = UiThemeDetail::ResolveCheckBoxBase(normalized.preset);
         s = UiThemeDetail::ApplyCheckBoxVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2783,6 +2955,11 @@ public:
     static UiCheckBox::Style ResolveCheckBox(const UiThemeContext& ctx, UiCheckVisual visual = UICHECKVIS_CLASSIC)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::CheckBox(ResolveCheckBox(normalized, visual), t, UiRole::Standard);
+        }
         UiCheckBox::Style s = UiThemeDetail::ResolveCheckBoxBase(normalized.preset);
         s = UiThemeDetail::ApplyCheckBoxVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2805,6 +2982,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Accent;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Toggle(ResolveToggle(normalized, role), t, role);
+        }
         UiToggle::Style s = UiThemeDetail::ResolveToggleBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalToggle(s, normalized.mode, role);
@@ -2835,6 +3017,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::RadioButton(ResolveRadioButton(normalized, role, visual), t, role);
+        }
         UiRadioButton::Style s = UiThemeDetail::ResolveRadioButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyRadioButtonVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2851,6 +3038,11 @@ public:
     static UiRadioButton::Style ResolveRadioButton(const UiThemeContext& ctx, UiRadioVisual visual = UIRADIOVIS_CLASSIC)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::RadioButton(ResolveRadioButton(normalized, visual), t, UiRole::Standard);
+        }
         UiRadioButton::Style s = UiThemeDetail::ResolveRadioButtonBase(normalized.preset);
         s = UiThemeDetail::ApplyRadioButtonVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2868,6 +3060,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::ProgressBar(ResolveProgressBar(normalized, role), t, role);
+        }
         UiProgressBar::Style s = UiThemeDetail::ResolveProgressBarBase(normalized.preset);
         UiThemeDetail::TuneProgressBarRole(s, normalized.mode, role);
         if(UiThemeDetail::IsPillPreset(normalized.preset)) {
@@ -2880,6 +3077,11 @@ public:
     static UiSlider::Style ResolveSlider(const UiThemeContext& ctx, UiRole role = UiRole::Standard)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Slider(ResolveSlider(normalized, role), t, role);
+        }
         UiSlider::Style s = UiThemeDetail::ResolveSliderBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalSlider(s, normalized.mode, role);
@@ -2897,6 +3099,11 @@ public:
     static UiScrollBar::Style ResolveScrollBar(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::ScrollBar(ResolveScrollBar(normalized), t);
+        }
         UiScrollBar::Style s = UiThemeDetail::ResolveScrollBarBase(normalized.preset);
         if(UiThemeDetail::IsPillPreset(normalized.preset))
             UiThemeDetail::ApplyPillGeometry(s);
@@ -2910,6 +3117,11 @@ public:
     {
         if(!UiIsValid(role)) role = UiRole::Accent;
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Splitter(ResolveSplitter(normalized, role), t, role);
+        }
         UiSplitter::Style s = UiThemeDetail::ResolveSplitterBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalSplitter(s, normalized.mode, role);
@@ -2934,6 +3146,11 @@ public:
     {
         if(!UiIsValid(role)) role = UiRole::Standard;
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Panel(ResolvePanel(normalized, role), t, role);
+        }
         UiPanel::Style s = UiThemeDetail::ResolvePanelBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalPanel(s, normalized.mode, role);
@@ -2948,6 +3165,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiPanelRole::Surface;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Panel(ResolvePanel(normalized, role), t, role == UiPanelRole::Subtle ? UiRole::Subtle : role == UiPanelRole::Strong ? UiRole::Accent : UiRole::Standard);
+        }
         UiPanel::Style s = UiThemeDetail::ResolvePanelBase(normalized.preset);
         s = UiThemeDetail::ApplyPanelRole(s, role);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -2975,6 +3197,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::GroupPanel(ResolveGroupPanel(normalized, role), t, role);
+        }
         UiGroupPanel::Style s = UiThemeDetail::ResolveGroupPanelBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalGroupPanel(s, normalized.mode, role);
@@ -2995,6 +3222,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Dropdown(ResolveDropdown(normalized, role), t, role);
+        }
         UiDropdown::Style s = UiThemeDetail::ResolveDropdownBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, role);
@@ -3010,6 +3242,11 @@ public:
     static UiDropdown::Style ResolveDropdown(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Dropdown(ResolveDropdown(normalized), t, UiRole::Standard);
+        }
         UiDropdown::Style s = UiThemeDetail::ResolveDropdownBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             UiThemeDetail::TuneMinimalDropdown(s, normalized.mode, UiRole::Standard);
@@ -3026,6 +3263,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Tab(ResolveTab(normalized, role, visual), t, role);
+        }
         UiTab::Style s = UiThemeDetail::ResolveTabBase(normalized.preset);
         s = UiThemeDetail::ApplyTabVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -3048,6 +3290,11 @@ public:
     static UiTab::Style ResolveTab(const UiThemeContext& ctx, UiTabVisual visual = UITAB_CLASSIC)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Tab(ResolveTab(normalized, visual), t, UiRole::Standard);
+        }
         UiTab::Style s = UiThemeDetail::ResolveTabBase(normalized.preset);
         s = UiThemeDetail::ApplyTabVisual(s, visual);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -3063,7 +3310,7 @@ public:
     static UiTitleCard::Style ResolveTitleCard(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
-        if(UiThemeDetail::IsRoleTunedPreset(normalized.preset))
+        if(normalized.preset == UiThemePreset::Olive || UiThemeDetail::IsRoleTunedPreset(normalized.preset))
             return ResolveTitleCard(normalized, UiRole::Standard);
         UiTitleCard::Style s = UiThemeDetail::ResolveTitleCardBase(normalized.preset);
         UiThemeDetail::ApplyMode(s.palette, normalized.mode);
@@ -3074,6 +3321,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::TitleCard(ResolveTitleCard(normalized, role), t, role);
+        }
         UiTitleCard::Style s = UiThemeDetail::ResolveTitleCardBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
@@ -3179,6 +3431,13 @@ public:
 
     static UiTree::Style ResolveTree(const UiThemeContext& ctx, UiRole role)
     {
+        UiThemeContext normalized = NormalizeContext(ctx);
+        if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Tree(ResolveTree(normalized, role), t, role);
+        }
         UiTree::Style s = ResolveTreeBase(ctx);
         // Collection roles share colour defaults; tree geometry and authored
         // styles stay independent. Apply overrides after resolving this base.
@@ -3263,6 +3522,11 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::List(ResolveList(normalized, role), t, role);
+        }
         UiList::Style s = UiList::StyleDefault();
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
@@ -3456,6 +3720,7 @@ public:
             s.metrics.shadow.color = Color(148, 163, 184);
             s.row_radius = DPI(12);
             break;
+        case UiThemePreset::Olive:
         case UiThemePreset::Minimal:
             break;
         }
@@ -3494,6 +3759,11 @@ public:
     static UiMenu::Style ResolveMenu(const UiThemeContext& ctx)
     {
         UiThemeContext normalized = NormalizeContext(ctx);
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            return UiOliveDetail::Menu(ResolveMenu(normalized), t);
+        }
         UiMenu::Style s = UiMenu::StyleDefault();
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
             bool dark = UiThemeDetail::ResolveEffectiveMode(normalized.mode) == UiThemeMode::Dark;
@@ -3563,6 +3833,7 @@ public:
             s.metrics.shadow.alpha = 38;
             s.metrics.shadow.color = Color(148, 163, 184);
             break;
+        case UiThemePreset::Olive:
         case UiThemePreset::Minimal:
             break;
         }
@@ -3589,6 +3860,14 @@ public:
     {
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiLabelRole::Body;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            UiLabel::Style s = UiOliveDetail::Label(ResolveLabel(normalized, role), t, UiRole::Standard);
+            s.font = role == UiLabelRole::Title || role == UiLabelRole::Headline ? t.title :
+                role == UiLabelRole::Caption || role == UiLabelRole::Footnote || role == UiLabelRole::Badge ? t.caption : t.body;
+            return UiApplyTypography(s);
+        }
         UiLabel::Style s = UiThemeDetail::ResolveLabelBase(normalized.preset);
         s = UiThemeDetail::ApplyLabelRole(s, role);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset)) {
@@ -3606,6 +3885,13 @@ public:
         UiThemeContext normalized = NormalizeContext(ctx);
         if(!UiIsValid(role)) role = UiRole::Standard;
         if(!UiIsValid(size)) size = UiTextSize::Body;
+        if(normalized.preset == UiThemePreset::Olive) {
+            const UiOliveTokens t = GetOliveTokens(normalized.mode);
+            normalized.preset = UiThemePreset::Minimal;
+            UiLabel::Style s = UiOliveDetail::Label(ResolveLabel(normalized, role, size), t, role);
+            if(size != UiTextSize::Body) UiThemeDetail::ApplyLabelTextSize(s, size);
+            return UiApplyTypography(s);
+        }
         UiLabel::Style s = UiThemeDetail::ResolveLabelBase(normalized.preset);
         if(UiThemeDetail::IsRoleTunedPreset(normalized.preset))
             UiThemeDetail::TuneMinimalLabel(s, normalized.mode, UiLabelRole::Body);

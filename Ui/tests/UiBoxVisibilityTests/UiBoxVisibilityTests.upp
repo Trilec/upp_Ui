@@ -1,0 +1,8 @@
+description "Public UiBoxLayout logical visibility regressions";
+uses
+    Ui;
+file
+    main.cpp,
+    README.md;
+mainconfig
+    "" = "GUI";
