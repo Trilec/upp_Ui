@@ -50,6 +50,9 @@ UiDoc& UiDoc::ReadOnly(bool readonly)
 
 void UiDoc::CancelMode()
 {
+#ifdef flagGPUUI
+    gpu_composition_.Clear();
+#endif
     drag_selecting_ = table_drag_selecting_ = false;
     image_dragging_ = image_resizing_ = image_drag_moved_ = false;
     if(HasCapture()) ReleaseCapture();

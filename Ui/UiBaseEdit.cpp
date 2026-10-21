@@ -274,6 +274,9 @@ void UiBaseEdit::Clear()
 void UiBaseEdit::SetText(const WString& s)
 {
     Ptr<UiBaseEdit> alive(this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!alive) return; }
+#endif
     Clear();
     if(!alive) return;
     Insert0(0, s);
@@ -1505,6 +1508,9 @@ void UiBaseEdit::PlaceCaret(int64 new_cursor, bool sel, bool upstream)
 {
     LTIMING("UiBaseEdit::PlaceCaret(pos, sel)");
     Ptr<UiBaseEdit> alive(this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!alive) return; }
+#endif
     new_cursor = minmax(new_cursor, (int64)0, total_wchars_);
     const int64 old_anchor=anchor_;
     if(!sel) anchor_=-1;
@@ -1752,9 +1758,47 @@ Rect UiBaseEdit::GetCaretRect(int64 pos) const
 }
 
 
+#ifdef flagGPUUI
+void UiBaseEdit::State(int reason)
+{
+    Ctrl::State(reason);
+    if(!AcceptsGpuIme() || reason==CLOSE) gpu_composition_.Clear();
+}
+bool UiBaseEdit::AcceptsGpuIme() const { return !IsReadOnly() && IsEnabled(); }
+bool UiBaseEdit::UpdateGpuComposition(const GpuImeComposition& value)
+{
+    if(!AcceptsGpuIme() || !gpu_composition_.Update(value)) return false;
+    gpu_composition_.Bind(*this);
+    Refresh(); return true;
+}
+void UiBaseEdit::CancelGpuComposition() { gpu_composition_.Clear(); Refresh(); }
+bool UiBaseEdit::CommitGpuComposition(const WString& text)
+{
+    GpuImeComposition value; value.text=text; value.caret=text.GetCount();
+    if(!AcceptsGpuIme() || !value.IsValid()) return false;
+    Ptr<UiBaseEdit> alive(this);
+    gpu_composition_.Clear();
+    // Preserve derived edit filters and formatting. Contiguous typing stays
+    // in the existing undo record, with barriers around the IME transaction.
+    if(!undo_.IsEmpty()) undo_.Tail().typing=false;
+    for(int scalar:text) {
+        Key((dword)scalar,1);
+        if(!alive) return true;
+    }
+    if(!undo_.IsEmpty()) undo_.Tail().typing=false;
+    Refresh(); return true;
+}
+#endif
+
 Rect UiBaseEdit::GetCaret() const
 {
-    return GetCaretRect(cursor_);
+    Rect anchor=GetCaretRect(cursor_);
+#ifdef flagGPUUI
+    const auto& style=GetEffectiveStyle();
+    Font font=style.metrics.use_text_font?style.metrics.text_font:style.font;
+    if(gpu_composition_.IsActive()) return gpu_composition_.GetCaret(anchor,GetTextRect(),font);
+#endif
+    return anchor;
 }
 
 // --------------------------------------------------------------------
@@ -1918,6 +1962,10 @@ void UiBaseEdit::Paint(Draw& w)
         w.DrawRect(cr, SColorHighlight());
     }
 
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive())
+        gpu_composition_.Paint(w,GetCaretRect(cursor_),text_r,fnt,paint_palette.ink[st],IsNull(text_bg)?SColorPaper():text_bg);
+#endif
     if(WhenPaintForeground)
         WhenPaintForeground(w, outer, paint_palette, m, skin, st, has_focus);
     else
@@ -2113,6 +2161,9 @@ bool UiBaseEdit::MoveVerticalCaret(int delta,bool select)
 // --------------------------------------------------------------------
 void UiBaseEdit::CancelMode()
 {
+#ifdef flagGPUUI
+    gpu_composition_.Clear();
+#endif
     pressed_     = false;
     drop_cursor_ = -1;
 
@@ -2154,6 +2205,9 @@ void UiBaseEdit::GotFocus()
 
 void UiBaseEdit::LostFocus()
 {
+#ifdef flagGPUUI
+    gpu_composition_.Clear();
+#endif
     has_focus_ = false;
     UpdateVisualState();
     Refresh();

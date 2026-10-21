@@ -109,8 +109,23 @@ private:
 //  UiBaseEdit
 // ============================================================================
 
-class UiBaseEdit : public Ctrl, public CtrlStyled<UiBaseEdit> {
+class UiBaseEdit : public Ctrl, public CtrlStyled<UiBaseEdit>
+#ifdef flagGPUUI
+    , public GpuImeClient
+#endif
+{
+#ifdef flagGPUUI
+    UiTextComposition gpu_composition_;
+#endif
 public:
+#ifdef flagGPUUI
+    void State(int reason) override;
+    bool AcceptsGpuIme() const override;
+    bool UpdateGpuComposition(const GpuImeComposition& value) override;
+    bool CommitGpuComposition(const WString& text) override;
+    void CancelGpuComposition() override;
+    Point GetPreedit() override { return AcceptsGpuIme()?Ctrl::GetPreedit():Point(Null); }
+#endif
     typedef UiBaseEdit CLASSNAME;
     friend class SideHandle;
 

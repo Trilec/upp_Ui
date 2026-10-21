@@ -348,6 +348,12 @@ void UiDoc::Paint(Draw& w)
     PaintEmbeds(w);
     PaintAnnotations(w);
     PaintCaret(w);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) {
+        Font font=ResolveFont(typing_style_.IsDefault()?StyleAt(caret_pos_):typing_style_,BlockRoleAt(caret_pos_));
+        gpu_composition_.Paint(w,GetCaretRect(),page_rect_,font,style_.palette.ink[ST_NORMAL],style_.page_face);
+    }
+#endif
     w.End();
     PaintGutter(w);
 }

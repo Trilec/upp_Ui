@@ -81,6 +81,9 @@ public:
     static Image EyeVisibleIcon();
     static Image EyeHiddenIcon();
 
+#ifdef flagGPUUI
+    bool AcceptsGpuIme() const override { return false; }
+#endif
 protected:
     virtual WString GetDisplayLine(int i) const override;
 

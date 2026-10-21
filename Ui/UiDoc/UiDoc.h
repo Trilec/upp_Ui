@@ -38,8 +38,23 @@ struct UiDocCommandState {
     Value meta;
 };
 
-class UiDoc : public Ctrl, public CtrlStyled<UiDoc> {
+class UiDoc : public Ctrl, public CtrlStyled<UiDoc>
+#ifdef flagGPUUI
+    , public GpuImeClient
+#endif
+{
+#ifdef flagGPUUI
+    UiTextComposition gpu_composition_;
+#endif
 public:
+#ifdef flagGPUUI
+    void State(int reason) override;
+    bool AcceptsGpuIme() const override;
+    bool UpdateGpuComposition(const GpuImeComposition& value) override;
+    bool CommitGpuComposition(const WString& text) override;
+    void CancelGpuComposition() override;
+    Point GetPreedit() override { return AcceptsGpuIme()?Ctrl::GetPreedit():Point(Null); }
+#endif
     typedef UiDoc CLASSNAME;
 
     enum GutterSide : byte {
@@ -536,7 +551,7 @@ public:
     void Copy() const;
     void Paste();
 
-    Rect GetCaret() const override { return GetCaretRect(); }
+    Rect GetCaret() const override;
     Rect GetCaretRect() const { return active_table_id_.IsEmpty() ? CaretRectInternal() : TableCaretRectInternal(); }
     int PosAtPoint(Point point) const;
     Point PointAtPos(int pos) const;

@@ -50,6 +50,9 @@ bool InteractionInlineImage(const UiDocEmbedBlock& embed)
 void UiDoc::LeftDown(Point p, dword keyflags)
 {
     ViewGuard view_guard(*this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!view_guard) return; }
+#endif
     SetFocus();
 
     String annotation_id;

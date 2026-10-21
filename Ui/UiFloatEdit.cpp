@@ -204,7 +204,7 @@ bool UiFloatEdit::Key(dword key, int count)
     }
     
     // Manual Filtering
-    if(key >= 32 && key < 65536) {
+    if(key >= 32 && key < 0x110000) {
         if(!IsDigit(key) && key != '.' && key != '-' && key != '+' &&
            key != 'e' && key != 'E')
             return true;

@@ -1,6 +1,9 @@
 #include "UiTextLayout.h"
 #include "UiTextLayoutInternal.h"
 #include <Painter/Painter.h>
+#ifdef flagGPUUI
+#include <CtrlCore/CtrlCore.h>
+#endif
 #include <cmath>
 #ifdef flagGPUUI
 #include <RenderCore/GpuDrawTarget.h>
@@ -770,6 +773,122 @@ bool UiTextLayout::DrawLine(Upp::Draw& draw,int line,Pointf origin,Color ink,boo
 	return false;
 #endif
 }
+#ifdef flagGPUUI
+struct UiTextComposition::State {
+	WString text;
+	Vector<byte> attributes;
+	int cursor=0;
+	mutable Font font_key=Null;
+	mutable UiTextLayout layout;
+	Ptr<Ctrl> owner,root;
+	Color ink=SColorText(),paper=SColorPaper();
+	struct View : Ctrl {
+		UiTextComposition::State& composition;
+		explicit View(UiTextComposition::State& composition):composition(composition) { NoWantFocus(); IgnoreMouse(); }
+		void Paint(Draw& draw) override {
+			draw.DrawRect(GetSize(),composition.paper);
+			draw.DrawRect(0,0,GetSize().cx,1,Blend(composition.paper,composition.ink,70));
+			draw.DrawRect(0,GetSize().cy-1,GetSize().cx,1,Blend(composition.paper,composition.ink,70));
+			composition.PaintAt(draw,Pointf(4,3),Rect(GetSize()),composition.font_key,max(1,DPI(1)));
+		}
+	};
+	One<View> view;
+	const UiTextLayout& Layout(Font font) const {
+		if(IsNull(font)) font=StdFont(); font.RealizeStd();
+		if(!layout.IsValid() || font_key!=font) { layout=UiTextLayout::Create(text,font); font_key=font; }
+		return layout;
+	}
+	Pointf InlineOrigin(Rect anchor,Rect limits,Font font) const {
+		const auto& shaped=Layout(font); Sizef size=shaped.GetSize();
+		Pointf origin(anchor.left-shaped.GetCaret(0).x,anchor.top);
+		origin.x=max<double>(limits.left,min(origin.x,limits.right-size.cx));
+		origin.y=max<double>(limits.top,min(origin.y,limits.bottom-size.cy)); return origin;
+	}
+	Rect CaretAt(Pointf origin,Font font,int width) const {
+		const auto& shaped=Layout(font); if(!shaped.IsValid()) return RectC((int)origin.x,(int)origin.y,width,1);
+		Pointf at=shaped.GetCaret(shaped.NextGrapheme(cursor,0)); int line=0;
+		while(line+1<shaped.GetLineCount() && shaped.GetLine(line+1).bounds.top<=at.y+.01) ++line;
+		return RectC((int)floor(origin.x+at.x+.5),(int)floor(origin.y+at.y+.5),max(1,width),
+		             max(1,(int)ceil(shaped.GetLine(line).bounds.Height())));
+	}
+	bool PositionView(Rect anchor,Font font) {
+		if(!view || !owner || !root || !root->IsOpen()) return false;
+		const auto& shaped=Layout(font); Sizef size=shaped.GetSize();
+		Point offset=owner->GetScreenView().TopLeft()-root->GetScreenView().TopLeft();
+		Size available=root->GetView().GetSize(); int width=min(available.cx,max(DPI(24),(int)ceil(size.cx)+8));
+		int height=min(available.cy,max(DPI(16),(int)ceil(size.cy)+6));
+		int x=offset.x+anchor.left,y=offset.y+anchor.bottom+2;
+		if(y+height>available.cy) y=offset.y+anchor.top-height-2;
+		x=max(0,min(x,available.cx-width)); y=max(0,min(y,available.cy-height));
+		view->SetRect(x,y,width,height); return true;
+	}
+	void PaintAt(Draw& draw,Pointf origin,Rect limits,Font font,int caret_width) const {
+		const auto& shaped=Layout(font);
+		if(!shaped.IsValid()) { shaped.Draw(draw,origin,ink); return; }
+		draw.Clip(limits); shaped.Draw(draw,origin,ink);
+		for(int first=0;first<text.GetCount();) {
+			byte attribute=attributes.IsEmpty()?0:attributes[first]; int last=first+1;
+			while(last<text.GetCount() && (attributes.IsEmpty()?0:attributes[last])==attribute) ++last;
+			int thickness=attribute==1 || attribute==3?2:1;
+			for(const auto& rect:shaped.GetSelection(first,last))
+				draw.DrawRect((int)floor(origin.x+rect.left),(int)ceil(origin.y+rect.bottom)-thickness,
+				              max(1,(int)ceil(rect.right)-(int)floor(rect.left)),thickness,ink);
+			first=last;
+		}
+		draw.DrawRect(CaretAt(origin,font,caret_width),ink); draw.End();
+	}
+};
+UiTextComposition::UiTextComposition() {}
+UiTextComposition::~UiTextComposition() {}
+bool UiTextComposition::IsActive() const { return state && !state->text.IsEmpty(); }
+bool UiTextComposition::Update(const GpuImeComposition& value)
+{
+	if(!value.IsValid()) return false;
+	if(value.text.IsEmpty()) { Clear(); return true; }
+	if(!state) state.Create();
+	if(state->text!=value.text) { state->layout=UiTextLayout(); state->font_key=Null; }
+	state->text=value.text; state->attributes=clone(value.attributes); state->cursor=value.caret; return true;
+}
+void UiTextComposition::Bind(Ctrl& owner)
+{
+	if(!IsActive()) return;
+	state->owner=&owner; Ctrl *root=owner.GetTopCtrl();
+	bool gpu=false;
+	int depth=0;
+	for(Ctrl *candidate=root;candidate && depth++<32;candidate=candidate->GetOwner()) {
+		if(auto *host=dynamic_cast<GpuImeOverlayHost *>(candidate)) { gpu=host->IsGpuImeOverlayReady(); break; }
+	}
+	if(!gpu || !root || !root->IsOpen()) return;
+	if(!state->view || state->root!=root) {
+		state->view.Clear(); state->root=root; state->view.Create(*state); root->Add(*state->view);
+	}
+}
+void UiTextComposition::Clear() { state.Clear(); }
+Rect UiTextComposition::GetCaret(Rect anchor,Rect limits,Font font) const
+{
+	if(!IsActive()) return anchor;
+	if(state->PositionView(anchor,font)) {
+		Rect caret=state->CaretAt(Pointf(4,3),font,max(1,anchor.Width()));
+		Point offset=state->view->GetScreenView().TopLeft()-state->owner->GetScreenView().TopLeft();
+		return caret.Offseted(offset.x,offset.y);
+	}
+	return state->CaretAt(state->InlineOrigin(anchor,limits,font),font,max(1,anchor.Width()));
+}
+void UiTextComposition::Paint(Draw& draw,Rect anchor,Rect limits,Font font,Color ink,Color paper) const
+{
+	if(!IsActive()) return;
+	state->ink=ink; state->paper=paper;
+	// The root child shares the existing Vulkan device and avoids native popup
+	// contexts, clipping in compact fields and covering the editable source text.
+	if(state->PositionView(anchor,font)) return;
+	Pointf origin=state->InlineOrigin(anchor,limits,font); Sizef size=state->Layout(font).GetSize();
+	draw.Clip(limits);
+	draw.DrawRect(Rect((int)floor(origin.x),(int)floor(origin.y),(int)ceil(origin.x+size.cx),(int)ceil(origin.y+size.cy+2)),paper);
+	state->PaintAt(draw,origin,limits,font,max(1,anchor.Width())); draw.End();
+}
+
+#endif
+
 UiTextLayoutStats GetUiTextLayoutStats() {
 	auto& cache=Cache(); Mutex::Lock lock(cache.mutex);
 	auto stats=cache.stats; stats.cache_entries=cache.entries.GetCount(); return stats;

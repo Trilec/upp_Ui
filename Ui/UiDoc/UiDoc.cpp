@@ -203,6 +203,9 @@ UiDocRange UiDoc::SelectionRange() const
 void UiDoc::MoveCaret(int pos, bool keep_selection,bool upstream)
 {
     ViewGuard view_guard(*this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!view_guard) return; }
+#endif
     int next = SnapTextPosition(pos);
     caret_upstream_=upstream;
     if(!keep_selection)
@@ -425,6 +428,9 @@ bool UiDoc::Load(const String& path, String* error)
 void UiDoc::SetText(const String& text)
 {
     ViewGuard view_guard(*this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!view_guard) return; }
+#endif
     Model().Clear();
     if(!view_guard) return;
     UiDocCoreTransaction tx;
@@ -495,6 +501,9 @@ UiDocSelection UiDoc::GetSelection() const
 void UiDoc::SetSelection(const UiDocSelection& selection)
 {
     ViewGuard view_guard(*this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!view_guard) return; }
+#endif
     bool reverse=selection.anchor>selection.caret;
     anchor_pos_=SnapTextPosition(selection.anchor,reverse);
     caret_pos_=SnapTextPosition(selection.caret,selection.anchor!=selection.caret && !reverse);
@@ -508,6 +517,9 @@ void UiDoc::SetSelection(const UiDocSelection& selection)
 void UiDoc::SetSelection(UiDocRange range)
 {
     ViewGuard view_guard(*this);
+#ifdef flagGPUUI
+    if(gpu_composition_.IsActive()) { gpu_composition_.Clear(); CancelMyPreedit(); if(!view_guard) return; }
+#endif
     range = NormalizeRange(range);
     anchor_pos_=SnapTextPosition(range.from);
     caret_pos_=SnapTextPosition(range.to,range.from!=range.to);
@@ -1159,6 +1171,39 @@ Size UiDoc::GetMinSize() const
     return Size(DPI(300), DPI(200));
 }
 
+Rect UiDoc::GetCaret() const
+{
+    Rect anchor=GetCaretRect();
+#ifdef flagGPUUI
+    Font font=ResolveFont(typing_style_.IsDefault()?StyleAt(caret_pos_):typing_style_,BlockRoleAt(caret_pos_));
+    if(gpu_composition_.IsActive()) return gpu_composition_.GetCaret(anchor,page_rect_,font);
+#endif
+    return anchor;
+}
+#ifdef flagGPUUI
+void UiDoc::State(int reason)
+{
+    Ctrl::State(reason);
+    if(!AcceptsGpuIme() || reason==CLOSE) gpu_composition_.Clear();
+}
+bool UiDoc::AcceptsGpuIme() const { return !readonly_ && IsEditable() && IsEnabled(); }
+bool UiDoc::UpdateGpuComposition(const GpuImeComposition& value)
+{
+    if(!AcceptsGpuIme() || !gpu_composition_.Update(value)) return false;
+    gpu_composition_.Bind(*this);
+    Refresh(); return true;
+}
+void UiDoc::CancelGpuComposition() { gpu_composition_.Clear(); Refresh(); }
+bool UiDoc::CommitGpuComposition(const WString& text)
+{
+    GpuImeComposition value; value.text=text; value.caret=text.GetCount();
+    if(!AcceptsGpuIme() || !value.IsValid()) return false;
+    gpu_composition_.Clear();
+    if(text.IsEmpty()) { Refresh(); return true; }
+    return InsertText(text);
+}
+#endif
+
 void UiDoc::GotFocus()
 {
     Refresh();
@@ -1167,6 +1212,9 @@ void UiDoc::GotFocus()
 
 void UiDoc::LostFocus()
 {
+#ifdef flagGPUUI
+    gpu_composition_.Clear();
+#endif
     Refresh();
     Ctrl::LostFocus();
 }

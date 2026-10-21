@@ -11,6 +11,7 @@
 #include <memory>
 #ifdef flagGPUUI
 #include <RenderCore/GpuTextLayout.h>
+#include <RenderCore/GpuImeClient.h>
 #endif
 
 namespace Upp {
@@ -98,6 +99,27 @@ private:
 	struct Data;
 	std::shared_ptr<Data> data;
 };
+
+#ifdef flagGPUUI
+// A small transient overlay shared by Ui text editors. Model text and undo
+// remain unchanged until commit; native candidate windows remain OS services.
+class Ctrl;
+class UiTextComposition {
+public:
+	UiTextComposition();
+	~UiTextComposition();
+	bool Update(const GpuImeComposition& value);
+	void Bind(Ctrl& owner);
+	void Clear();
+	bool IsActive() const;
+	Rect GetCaret(Rect anchor,Rect limits,Font font) const;
+	void Paint(Draw& draw,Rect anchor,Rect limits,Font font,Color ink,Color paper) const;
+private:
+	struct State;
+	mutable One<State> state;
+};
+
+#endif
 
 struct UiTextLayoutStats {
 	int cache_entries=0, cache_entry_limit=256;
