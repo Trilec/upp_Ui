@@ -13,7 +13,7 @@ uses
 
 
 
-library(WIN32) "dwrite";
+library(WIN32) "dwrite windowscodecs ole32";
 
 file
 	Ui.h,

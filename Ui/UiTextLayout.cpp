@@ -11,6 +11,7 @@
 #if defined(PLATFORM_WIN32) && defined(flagGPUUI)
 #include <d2d1.h>
 #include <dwrite_3.h>
+#include <wincodec.h>
 #endif
 
 namespace Upp {
@@ -48,6 +49,74 @@ struct LayoutFactory {
 	}
 };
 LayoutFactory& Factory() { static LayoutFactory factory; return factory; }
+
+
+struct FontBitmapEntry {
+ Image image; int64 bytes=0; uint64 used=0;
+};
+struct FontBitmapCache {
+ Mutex mutex; ArrayMap<String,FontBitmapEntry> entries;
+ int64 bytes=0; uint64 clock=0,hits=0,misses=0;
+};
+FontBitmapCache& BitmapCache() { static FontBitmapCache cache; return cache; }
+Image DecodeFontBitmap(const DWRITE_GLYPH_IMAGE_DATA& data,DWRITE_GLYPH_IMAGE_FORMATS format)
+{
+ if(!data.imageData || !data.imageDataSize || data.imageDataSize>4*1024*1024 ||
+    !data.pixelSize.width || !data.pixelSize.height || data.pixelSize.width>1024 || data.pixelSize.height>1024) return Image();
+ const Size size((int)data.pixelSize.width,(int)data.pixelSize.height);
+ ImageBuffer image(size);
+ if(format==DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8) {
+  if((int64)size.cx*size.cy*4!=data.imageDataSize) return Image();
+  const byte *source=(const byte *)data.imageData;
+  for(int i=0;i<image.GetLength();++i) {
+   RGBA& p=image.Begin()[i]; p.r=source[4*i+2]; p.g=source[4*i+1]; p.b=source[4*i]; p.a=source[4*i+3];
+   if(p.r>p.a || p.g>p.a || p.b>p.a) return Image();
+  }
+  return Image(image);
+ }
+ const HRESULT apartment=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
+ struct Apartment { bool release; ~Apartment() { if(release) CoUninitialize(); } } guard{SUCCEEDED(apartment)};
+ if(FAILED(apartment) && apartment!=RPC_E_CHANGED_MODE) return Image();
+ LayoutCom<IWICImagingFactory> factory; LayoutCom<IWICStream> stream;
+ LayoutCom<IWICBitmapDecoder> decoder; LayoutCom<IWICBitmapFrameDecode> frame;
+ LayoutCom<IWICFormatConverter> converter;
+ if(FAILED(CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(factory.Put()))) ||
+    FAILED(factory->CreateStream(stream.Put())) ||
+    FAILED(stream->InitializeFromMemory((BYTE *)data.imageData,data.imageDataSize)) ||
+    FAILED(factory->CreateDecoderFromStream(stream.p,nullptr,WICDecodeMetadataCacheOnDemand,decoder.Put())) ||
+    FAILED(decoder->GetFrame(0,frame.Put()))) return Image();
+ UINT width=0,height=0;
+ if(FAILED(frame->GetSize(&width,&height)) || width!=data.pixelSize.width || height!=data.pixelSize.height ||
+    FAILED(factory->CreateFormatConverter(converter.Put())) ||
+    FAILED(converter->Initialize(frame.p,GUID_WICPixelFormat32bppPRGBA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom))) return Image();
+ Vector<byte> bytes; bytes.SetCount(size.cx*size.cy*4);
+ if(FAILED(converter->CopyPixels(nullptr,size.cx*4,bytes.GetCount(),bytes.Begin()))) return Image();
+ for(int i=0;i<image.GetLength();++i) {
+  RGBA& p=image.Begin()[i]; p.r=bytes[4*i]; p.g=bytes[4*i+1]; p.b=bytes[4*i+2]; p.a=bytes[4*i+3];
+ }
+ return Image(image);
+}
+Image FontBitmap(const String& identity,const DWRITE_GLYPH_IMAGE_DATA& data,DWRITE_GLYPH_IMAGE_FORMATS format)
+{
+ String key=identity+":"+AsString((int)format)+":"+AsString(data.uniqueDataId);
+ auto& cache=BitmapCache();
+ {
+  Mutex::Lock lock(cache.mutex); int found=cache.entries.Find(key);
+  if(found>=0) { ++cache.hits; cache.entries[found].used=++cache.clock; return cache.entries[found].image; }
+  ++cache.misses;
+ }
+ Image image=DecodeFontBitmap(data,format); if(image.IsEmpty()) return image;
+ int64 bytes=(int64)image.GetLength()*sizeof(RGBA)+key.GetCount()+sizeof(FontBitmapEntry);
+ if(bytes>4*1024*1024) return Image();
+ Mutex::Lock lock(cache.mutex); int found=cache.entries.Find(key);
+ if(found>=0) return cache.entries[found].image;
+ while(!cache.entries.IsEmpty() && (cache.entries.GetCount()>=128 || cache.bytes>4*1024*1024-bytes)) {
+  int oldest=0; for(int i=1;i<cache.entries.GetCount();++i) if(cache.entries[i].used<cache.entries[oldest].used) oldest=i;
+  cache.bytes-=cache.entries[oldest].bytes; cache.entries.Remove(oldest);
+ }
+ auto& entry=cache.entries.Add(key); entry.image=image; entry.bytes=bytes; entry.used=++cache.clock; cache.bytes+=bytes;
+ return image;
+}
 
 class LayoutOutlineSink : public IDWriteGeometrySink {
 	FontGlyphConsumer& out;
@@ -183,11 +252,13 @@ class RunCollector : public IDWriteTextRenderer {
 	Vector<int>& run_lines;
 	Vector<int>& decoration_lines;
 	double scale,yoffset;
+	bool color_fonts;
+	ArrayMap<IDWriteFontFace *,std::shared_ptr<LayoutFace>> faces;
 	ULONG refs=1;
 public:
 	RunCollector(GpuShapedText& text,Vector<UiTextInlinePlacement>& objects,const Vector<UiTextLine>& lines,
-	             Vector<int>& run_lines,Vector<int>& decoration_lines,double scale,double yoffset)
-	:text(text),objects(objects),lines(lines),run_lines(run_lines),decoration_lines(decoration_lines),scale(scale),yoffset(yoffset) {}
+	             Vector<int>& run_lines,Vector<int>& decoration_lines,double scale,double yoffset,bool color_fonts)
+	:text(text),objects(objects),lines(lines),run_lines(run_lines),decoration_lines(decoration_lines),scale(scale),yoffset(yoffset),color_fonts(color_fonts) {}
 	int LineAt(double y) const {
 		y+=yoffset; int lo=0,hi=lines.GetCount();
 		while(lo<hi) { int mid=(lo+hi)/2; if(lines[mid].bounds.top+lines[mid].baseline<y) lo=mid+1; else hi=mid; }
@@ -209,24 +280,79 @@ public:
 		*matrix={1,0,0,1,0,0}; return S_OK;
 	}
 	HRESULT STDMETHODCALLTYPE GetPixelsPerDip(void *,FLOAT *pixels) override { *pixels=1; return S_OK; }
-	HRESULT STDMETHODCALLTYPE DrawGlyphRun(void *,FLOAT x,FLOAT y,DWRITE_MEASURING_MODE,
-		const DWRITE_GLYPH_RUN *run,const DWRITE_GLYPH_RUN_DESCRIPTION *,IUnknown *effect) override {
-		if(!run || !run->fontFace || run->isSideways || text.runs.GetCount()>=1024 ||
-		   run->glyphCount>65536 || run->glyphCount>(UINT32)(65536-text.GetGlyphCount())) return E_INVALIDARG;
-		auto source=std::make_shared<LayoutFace>(run->fontFace,scale);
-		if(source->GetIdentity().IsEmpty()) return E_FAIL;
-		auto& target=text.runs.Add(); target.face=source; target.em_size=run->fontEmSize; target.ink=EffectInk(effect); run_lines.Add(LineAt(y));
-		const bool rtl=(run->bidiLevel&1)!=0; double pen=x;
-		for(UINT32 i=0;i<run->glyphCount;++i) {
-			double advance=run->glyphAdvances?run->glyphAdvances[i]:0;
-			DWRITE_GLYPH_OFFSET offset=run->glyphOffsets?run->glyphOffsets[i]:DWRITE_GLYPH_OFFSET{};
-			auto& glyph=target.glyphs.Add(); glyph.glyph=run->glyphIndices[i];
-			glyph.origin=Pointf((pen+(rtl?-advance:0)+(rtl?-offset.advanceOffset:offset.advanceOffset))*scale,
-			                    y-offset.ascenderOffset+yoffset);
-			pen+=rtl?-advance:advance;
-		}
-		return S_OK;
-	}
+
+ HRESULT Collect(FLOAT x,FLOAT y,const DWRITE_GLYPH_RUN *run,Color ink,byte opacity,
+                 DWRITE_GLYPH_IMAGE_FORMATS format=DWRITE_GLYPH_IMAGE_FORMATS_TRUETYPE) {
+  if(!run || !run->fontFace || run->isSideways || run->glyphCount>65536 ||
+     run->glyphCount>(UINT32)(65536-text.GetGlyphCount())) return E_INVALIDARG;
+  int face_index=faces.Find(run->fontFace);
+  if(face_index<0) { face_index=faces.GetCount(); faces.Add(run->fontFace,std::make_shared<LayoutFace>(run->fontFace,scale)); }
+  auto source=faces[face_index];
+  if(source->GetIdentity().IsEmpty()) return E_FAIL;
+  const bool bitmap=format==DWRITE_GLYPH_IMAGE_FORMATS_PNG || format==DWRITE_GLYPH_IMAGE_FORMATS_JPEG ||
+    format==DWRITE_GLYPH_IMAGE_FORMATS_TIFF || format==DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8;
+  LayoutCom<IDWriteFontFace4> face4;
+  if(bitmap && FAILED(run->fontFace->QueryInterface(IID_PPV_ARGS(face4.Put())))) return E_NOINTERFACE;
+  GpuGlyphRunSnapshot *target=nullptr;
+  if(!bitmap) {
+   if(text.runs.GetCount()>=1024) return E_OUTOFMEMORY;
+   target=&text.runs.Add(); target->face=source; target->em_size=run->fontEmSize; target->ink=ink; target->opacity=opacity;
+   run_lines.Add(LineAt(y));
+  }
+  const bool rtl=(run->bidiLevel&1)!=0; double pen=x;
+  for(UINT32 i=0;i<run->glyphCount;++i) {
+   const double advance=run->glyphAdvances?run->glyphAdvances[i]:0;
+   const DWRITE_GLYPH_OFFSET offset=run->glyphOffsets?run->glyphOffsets[i]:DWRITE_GLYPH_OFFSET{};
+   Pointf origin((pen+(rtl?-advance:0)+(rtl?-offset.advanceOffset:offset.advanceOffset))*scale,y-offset.ascenderOffset+yoffset);
+   if(bitmap) {
+    if(text.runs.GetCount()>=1024) return E_OUTOFMEMORY;
+    DWRITE_GLYPH_IMAGE_DATA data{}; void *context=nullptr;
+    HRESULT hr=face4->GetGlyphImageData(run->glyphIndices[i],(UINT32)ceil(run->fontEmSize),format,&data,&context);
+    struct Guard { IDWriteFontFace4 *face; void *context; ~Guard() { if(context) face->ReleaseGlyphImageData(context); } } guard{face4.p,context};
+    if(FAILED(hr) || !data.pixelsPerEm || !data.imageDataSize) return E_FAIL;
+    Image image=FontBitmap(source->GetIdentity(),data,format); if(image.IsEmpty()) return E_FAIL;
+    target=&text.runs.Add(); target->face=source; target->em_size=run->fontEmSize; target->ink=ink; target->opacity=opacity;
+    run_lines.Add(LineAt(y)); target->bitmap=image;
+    double ratio=(double)run->fontEmSize/data.pixelsPerEm;
+    Pointf top=origin-Pointf(data.horizontalLeftOrigin.x*ratio*scale,data.horizontalLeftOrigin.y*ratio);
+    target->bitmap_bounds=Rectf(top,Sizef(image.GetWidth()*ratio*scale,image.GetHeight()*ratio));
+   }
+   auto& glyph=target->glyphs.Add(); glyph.glyph=run->glyphIndices[i]; glyph.origin=origin;
+   pen+=rtl?-advance:advance;
+  }
+  return text.GetPayloadBytes()<=4*1024*1024?S_OK:E_OUTOFMEMORY;
+ }
+ HRESULT STDMETHODCALLTYPE DrawGlyphRun(void *,FLOAT x,FLOAT y,DWRITE_MEASURING_MODE measuring,
+  const DWRITE_GLYPH_RUN *run,const DWRITE_GLYPH_RUN_DESCRIPTION *description,IUnknown *effect) override {
+  if(!run || !run->fontFace) return E_INVALIDARG;
+  LayoutCom<IDWriteFontFace2> face2;
+  if(!color_fonts || (SUCCEEDED(run->fontFace->QueryInterface(IID_PPV_ARGS(face2.Put()))) && !face2->IsColorFont()))
+   return Collect(x,y,run,EffectInk(effect),255);
+  LayoutCom<IDWriteFactory4> factory;
+  if(FAILED(Factory().factory->QueryInterface(IID_PPV_ARGS(factory.Put())))) return E_NOINTERFACE;
+  LayoutCom<IDWriteColorGlyphRunEnumerator1> layers;
+  auto formats=(DWRITE_GLYPH_IMAGE_FORMATS)(DWRITE_GLYPH_IMAGE_FORMATS_TRUETYPE|DWRITE_GLYPH_IMAGE_FORMATS_CFF|
+    DWRITE_GLYPH_IMAGE_FORMATS_COLR|DWRITE_GLYPH_IMAGE_FORMATS_PNG|DWRITE_GLYPH_IMAGE_FORMATS_JPEG|
+    DWRITE_GLYPH_IMAGE_FORMATS_TIFF|DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8);
+  HRESULT hr=factory->TranslateColorGlyphRun(D2D1_POINT_2F{x,y},run,description,formats,measuring,nullptr,0,layers.Put());
+  if(hr==DWRITE_E_NOCOLOR) return Collect(x,y,run,EffectInk(effect),255);
+  if(FAILED(hr)) return hr;
+  for(int count=0;count<1024;++count) {
+   BOOL more=FALSE; hr=layers->MoveNext(&more); if(FAILED(hr) || !more) return hr;
+   const DWRITE_COLOR_GLYPH_RUN1 *layer=nullptr;
+   if(FAILED(hr=layers->GetCurrentRun(&layer)) || !layer) return E_FAIL;
+   Color ink=EffectInk(effect); byte alpha=255;
+   if(layer->paletteIndex!=0xffff) {
+    auto channel=[](float value) { return (int)floor(minmax<double>(value,0,1)*255+.5); };
+    if(!Finite(layer->runColor.r)||!Finite(layer->runColor.g)||!Finite(layer->runColor.b)||!Finite(layer->runColor.a)) return E_INVALIDARG;
+    ink=Color(channel(layer->runColor.r),channel(layer->runColor.g),channel(layer->runColor.b)); alpha=channel(layer->runColor.a);
+   }
+   hr=Collect(layer->baselineOriginX,layer->baselineOriginY,&layer->glyphRun,ink,alpha,layer->glyphImageFormat);
+   if(FAILED(hr)) return hr;
+  }
+  return E_OUTOFMEMORY;
+ }
+
 	HRESULT Decoration(FLOAT x,FLOAT y,FLOAT width,FLOAT thickness,FLOAT offset,DWRITE_READING_DIRECTION direction,Color ink) {
 		if(width<=0 || thickness<=0) return S_OK;
 		if(text.decorations.GetCount()>=4096) return E_OUTOFMEMORY;
@@ -296,12 +422,51 @@ struct UiTextLayout::Data {
 		auto *factory=Factory().factory.p;
 		if(!factory) { error="DirectWrite text factory unavailable"; return false; }
 		UiTextInternal::Encoding family,locale;
+		double tab_advance=max(1,font.GetWidth(' '))/scale;
 		String locale_name=options.locale;
 		if(locale_name.IsEmpty()) {
 			wchar_t buffer[LOCALE_NAME_MAX_LENGTH]{};
 			if(GetUserDefaultLocaleName(buffer,LOCALE_NAME_MAX_LENGTH)) locale_name=FromSystemCharsetW(buffer);
 		}
 		if(!family.Build(font.GetFaceName().ToWString(),error) || !locale.Build(locale_name.ToWString(),error)) return false;
+		LayoutCom<IDWriteFontCollection1> private_fonts;
+		if(!options.font_file.IsEmpty()) {
+			String path=GetFullPath(options.font_file);
+			const int64 bytes=GetFileLength(path);
+			if(bytes<=0 || bytes>256*1024*1024) { error="font file is missing or exceeds256MiB"; return false; }
+			UiTextInternal::Encoding file_path;
+			if(!file_path.Build(path.ToWString(),error)) return false;
+			LayoutCom<IDWriteFactory5> modern; LayoutCom<IDWriteFontFile> file;
+			LayoutCom<IDWriteFontSetBuilder1> builder; LayoutCom<IDWriteFontSet> set;
+			if(!Check(factory->QueryInterface(IID_PPV_ARGS(modern.Put())),"private fonts need DirectWrite factory5") ||
+			   !Check(factory->CreateFontFileReference((const WCHAR *)file_path.utf16.Begin(),nullptr,file.Put()),"cannot open application font file") ||
+			   !Check(modern->CreateFontSetBuilder(builder.Put()),"cannot create application font set") ||
+			   !Check(builder->AddFontFile(file.p),"unsupported application font file") ||
+			   !Check(builder->CreateFontSet(set.Put()),"cannot create application font set") ||
+			   !Check(modern->CreateFontCollectionFromFontSet(set.p,private_fonts.Put()),"cannot create application font collection")) return false;
+			UINT32 index=0; BOOL found=FALSE;
+			if(!Check(private_fonts->FindFamilyName((const WCHAR *)family.utf16.Begin(),&index,&found),"cannot find application font family")) return false;
+			if(!found) index=0;
+			LayoutCom<IDWriteFontFamily1> first; LayoutCom<IDWriteLocalizedStrings> names;
+			if(!Check(private_fonts->GetFontFamily(index,first.Put()),"application font has no family") ||
+			   !Check(first->GetFamilyNames(names.Put()),"application font family has no name")) return false;
+			UINT32 length=0;
+			if(!Check(names->GetStringLength(0,&length),"cannot read application font family") || length>4096) return false;
+			Buffer<WCHAR> name(length+1);
+			if(!Check(names->GetString(0,~name,length+1),"cannot read application font family") ||
+			   !family.Build(FromSystemCharsetW(~name).ToWString(),error)) return false;
+			LayoutCom<IDWriteFont> metrics_font; LayoutCom<IDWriteFontFace> metrics_face;
+			if(!Check(first->GetFirstMatchingFont(font.IsBold()?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL,
+			    DWRITE_FONT_STRETCH_NORMAL,font.IsItalic()?DWRITE_FONT_STYLE_ITALIC:DWRITE_FONT_STYLE_NORMAL,metrics_font.Put()),"cannot measure application font") ||
+			   !Check(metrics_font->CreateFontFace(metrics_face.Put()),"cannot measure application font face")) return false;
+			DWRITE_FONT_METRICS metrics{}; metrics_face->GetMetrics(&metrics);
+			UINT32 scalars[2]={'M',' '}; UINT16 indices[2]{}; DWRITE_GLYPH_METRICS advances[2]{};
+			if(!metrics.designUnitsPerEm || !Check(metrics_face->GetGlyphIndices(scalars,2,indices),"cannot find application font metrics") ||
+			   !Check(metrics_face->GetDesignGlyphMetrics(indices,2,advances,FALSE),"cannot measure application glyphs")) return false;
+			if(font.GetWidth()) scale=abs(font.GetWidth())/max(1.,advances[0].advanceWidth*em/metrics.designUnitsPerEm);
+			tab_advance=max(1.,advances[1].advanceWidth*em/metrics.designUnitsPerEm);
+
+		}
 		Vector<int> run_lines,decoration_lines;
 		int start=0;
 		for(int end=0;;++end) {
@@ -315,13 +480,13 @@ struct UiTextLayout::Data {
 				if(!part.Build(text.Mid(start,end-start),error) || !UiTextInternal::BaseDirection(part,rtl,error)) return false;
 			}
 			LayoutCom<IDWriteTextFormat> format;
-			if(!Check(factory->CreateTextFormat((const WCHAR *)family.utf16.Begin(),nullptr,
+			if(!Check(factory->CreateTextFormat((const WCHAR *)family.utf16.Begin(),private_fonts.p,
 				font.IsBold()?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL,
 				font.IsItalic()?DWRITE_FONT_STYLE_ITALIC:DWRITE_FONT_STYLE_NORMAL,
 				DWRITE_FONT_STRETCH_NORMAL,(FLOAT)em,(const WCHAR *)locale.utf16.Begin(),format.Put()),"cannot create text format")) return false;
 			if(!Check(format->SetReadingDirection(rtl?DWRITE_READING_DIRECTION_RIGHT_TO_LEFT:DWRITE_READING_DIRECTION_LEFT_TO_RIGHT),"invalid paragraph direction") ||
 			   !Check(format->SetWordWrapping(options.wrap?(options.wrap_at_character?DWRITE_WORD_WRAPPING_CHARACTER:DWRITE_WORD_WRAPPING_WRAP):DWRITE_WORD_WRAPPING_NO_WRAP),"invalid wrapping") ||
-			   !Check(format->SetIncrementalTabStop((FLOAT)(max(1,font.GetWidth(' '))*options.tab_spaces/scale)),"invalid tab stop")) return false;
+			   !Check(format->SetIncrementalTabStop((FLOAT)(tab_advance*options.tab_spaces)),"invalid tab stop")) return false;
 			DWRITE_TEXT_ALIGNMENT alignment=DWRITE_TEXT_ALIGNMENT_LEADING;
 			if(options.alignment==UiTextAlignment::Center) alignment=DWRITE_TEXT_ALIGNMENT_CENTER;
 			else if(options.alignment==UiTextAlignment::Left) alignment=rtl?DWRITE_TEXT_ALIGNMENT_TRAILING:DWRITE_TEXT_ALIGNMENT_LEADING;
@@ -341,6 +506,11 @@ struct UiTextLayout::Data {
 				if(!IsNull(style.font)) {
 					Font f=style.font; f.RealizeStd(); UiTextInternal::Encoding name;
 					if(f.GetWidth()!=font.GetWidth()) { error="styled font width differs from paragraph width scale"; return false; }
+					if(private_fonts.p && f.GetFace()!=font.GetFace()) {
+						LayoutCom<IDWriteFontCollection> system;
+						if(!Check(factory->GetSystemFontCollection(system.Put()),"cannot access system font collection") ||
+						   !Check(p.native->SetFontCollection(system.p,styled),"cannot set styled system font collection")) return false;
+					}
 					if(!name.Build(f.GetFaceName().ToWString(),error) ||
 					   !Check(p.native->SetFontFamilyName((const WCHAR *)name.utf16.Begin(),styled),"cannot set styled family") ||
 					   !Check(p.native->SetFontSize((FLOAT)(f.GetHeight()?abs(f.GetHeight()):em),styled),"cannot set styled size") ||
@@ -387,7 +557,7 @@ struct UiTextLayout::Data {
 				line.baseline=native_line.baseline; line.right_to_left=rtl;
 				top+=native_line.height; offset+=native_line.length;
 			}
-			RunCollector collector(*glyphs,objects,lines,run_lines,decoration_lines,scale,p.y);
+			RunCollector collector(*glyphs,objects,lines,run_lines,decoration_lines,scale,p.y,options.color_fonts);
 			if(!Check(p.native->Draw(nullptr,&collector,0,0),"cannot collect positioned glyphs")) return false;
 			if(end==text.GetCount()) break;
 			if(text[end]=='\r' && end+1<text.GetCount() && text[end+1]=='\n') ++end;
@@ -403,7 +573,8 @@ struct UiTextLayout::Data {
 				int line=run_lines[i];
 				if(line<0 || line>=slices.GetCount()) { error="glyph run has no native line"; return false; }
 				const auto& source=glyphs->runs[i]; auto& target=slices[line]->runs.Add();
-				target.face=source.face; target.em_size=source.em_size; target.ink=source.ink; target.glyphs=clone(source.glyphs);
+				target.face=source.face; target.em_size=source.em_size; target.ink=source.ink; target.opacity=source.opacity; target.glyphs=clone(source.glyphs);
+				target.bitmap=source.bitmap; target.bitmap_bounds=source.bitmap_bounds-Pointf(0,lines[line].bounds.top);
 				for(auto& glyph:target.glyphs) glyph.origin.y-=lines[line].bounds.top;
 			}
 			for(int i=0;i<glyphs->decorations.GetCount();++i) {
@@ -433,7 +604,8 @@ struct UiTextLayout::Data {
 		        (int64)encoded.utf16.GetCount()*2+
 		        (int64)(encoded.scalar_to_utf16.GetCount()+encoded.utf16_to_scalar.GetCount()+graphemes.GetCount()+words.GetCount())*4+
 		        (int64)visual_stops.GetCount()*sizeof(VisualStop)+(int64)paragraphs.GetCount()*sizeof(Paragraph)+
-		        (int64)lines.GetCount()*sizeof(UiTextLine)+(int64)objects.GetCount()*sizeof(UiTextInlinePlacement);
+		        (int64)lines.GetCount()*sizeof(UiTextLine)+(int64)objects.GetCount()*sizeof(UiTextInlinePlacement)+
+		        options.locale.GetCount()+options.font_file.GetCount();
 		valid=true; error.Clear(); return true;
 	}
 	int Snap(int position,bool up) const {
@@ -480,7 +652,7 @@ UiTextLayout UiTextLayout::CreateStyled(const WString& text,Font font,
 {
 	UiTextLayout result;
 	// Validate before serialising an untrusted-size key.
-	if(styles.GetCount()>1024 || objects.GetCount()>1024 || text.GetCount()>32768 || options.locale.GetCount()>256 || options.locale.Find('\0')>=0 || !Finite(options.width) ||
+	if(styles.GetCount()>1024 || objects.GetCount()>1024 || text.GetCount()>32768 || options.locale.GetCount()>256 || options.locale.Find('\0')>=0 || options.font_file.GetCount()>4096 || options.font_file.Find('\0')>=0 || !Finite(options.width) ||
 	   options.width<=0 || options.tab_spaces<1 || options.tab_spaces>64 ||
 	   (int)options.direction<0 || (int)options.direction>2) {
 		result.data=std::make_shared<Data>(); result.data->error="invalid text layout input or options"; return result;
@@ -514,8 +686,8 @@ UiTextLayout UiTextLayout::CreateStyled(const WString& text,Font font,
 	StringStream key_stream;
 	int64 font_key=font.AsInt64(); int direction=(int)options.direction;
 	double width=options.width; bool wrap=options.wrap; int tabs=options.tab_spaces; String locale=options.locale; WString key_text=text;
-	int alignment=(int)options.alignment; bool character_wrap=options.wrap_at_character;
-	key_stream % font_key % direction % width % wrap % character_wrap % alignment % tabs % locale % key_text;
+	int alignment=(int)options.alignment; bool character_wrap=options.wrap_at_character, color_fonts=options.color_fonts;
+	key_stream % font_key % direction % width % wrap % character_wrap % color_fonts % alignment % tabs % locale % key_text;
 	int style_count=styles.GetCount(),object_count=objects.GetCount(); key_stream % style_count % object_count;
 	for(const auto& style:styles) {
 		int from=style.from,length=style.length; Font f=style.font; if(!IsNull(f)) f.RealizeStd();
@@ -525,6 +697,16 @@ UiTextLayout UiTextLayout::CreateStyled(const WString& text,Font font,
 	for(const auto& object:objects) {
 		int position=object.position; Sizef size=object.size; double baseline=object.baseline;
 		key_stream % position % size % baseline;
+	}
+	if(!options.font_file.IsEmpty()) {
+		String path=GetFullPath(options.font_file); int64 length=GetFileLength(path);
+		key_stream % path % length;
+#ifdef PLATFORM_WIN32
+		FileTime modified=GetFileTime(path); uint64 stamp=((uint64)modified.dwHighDateTime<<32)|modified.dwLowDateTime;
+		key_stream % stamp;
+#else
+		Time modified=FileGetTime(path); key_stream % modified;
+#endif
 	}
 	String key=key_stream.GetResult();
 	auto& cache=Cache();
@@ -747,10 +929,27 @@ bool DrawLayoutSnapshot(Upp::Draw& draw,Pointf origin,Color ink,bool override_in
 		return target->DrawShapedText(origin,glyphs,ink,override_ink);
 	if(glyphs) if(auto *painter=dynamic_cast<Painter *>(&draw)) {
 		painter->Begin(); painter->EvenOdd(false); String error;
-		for(const auto& run:glyphs->runs) for(const auto& glyph:run.glyphs) {
-			LayoutPainterSink sink(*painter,origin+glyph.origin);
-			if(!run.face->GetOutline(glyph.glyph,run.em_size,sink,error)) { painter->End(); return false; }
-			if(sink.used) painter->Fill(override_ink || IsNull(run.ink)?ink:run.ink);
+		for(const auto& run:glyphs->runs) {
+			painter->Begin(); painter->Opacity(run.opacity/255.);
+			if(!run.bitmap.IsEmpty()) {
+				Image image=run.bitmap;
+				if(override_ink) {
+					ImageBuffer pixels(image); RGBA color=ink;
+					for(RGBA& p:pixels) {
+						p.r=(p.a*color.r+127)/255; p.g=(p.a*color.g+127)/255; p.b=(p.a*color.b+127)/255;
+					}
+					image=Image(pixels);
+				}
+				Rectf rect=run.bitmap_bounds+origin;
+				painter->Rectangle(rect).Fill(image,Xform2D::Scale(rect.Width()/image.GetWidth(),rect.Height()/image.GetHeight())*
+				                            Xform2D::Translation(rect.left,rect.top),FILL_PAD);
+			}
+			else for(const auto& glyph:run.glyphs) {
+				LayoutPainterSink sink(*painter,origin+glyph.origin);
+				if(!run.face->GetOutline(glyph.glyph,run.em_size,sink,error)) { painter->End(); painter->End(); return false; }
+				if(sink.used) painter->Fill(override_ink || IsNull(run.ink)?ink:run.ink);
+			}
+			painter->End();
 		}
 		for(const auto& r:glyphs->decorations) painter->Rectangle(r.rect+origin).Fill(override_ink || IsNull(r.ink)?ink:r.ink);
 		painter->End(); return true;
@@ -891,11 +1090,21 @@ void UiTextComposition::Paint(Draw& draw,Rect anchor,Rect limits,Font font,Color
 
 UiTextLayoutStats GetUiTextLayoutStats() {
 	auto& cache=Cache(); Mutex::Lock lock(cache.mutex);
-	auto stats=cache.stats; stats.cache_entries=cache.entries.GetCount(); return stats;
+	auto stats=cache.stats; stats.cache_entries=cache.entries.GetCount();
+#if defined(PLATFORM_WIN32) && defined(flagGPUUI)
+	auto& bitmaps=BitmapCache(); Mutex::Lock bitmap_lock(bitmaps.mutex);
+	stats.bitmap_asset_entries=bitmaps.entries.GetCount(); stats.bitmap_asset_bytes=bitmaps.bytes;
+	stats.bitmap_asset_hits=bitmaps.hits; stats.bitmap_asset_misses=bitmaps.misses;
+#endif
+	return stats;
 }
 void ClearUiTextLayoutCache() {
 	auto& cache=Cache(); Mutex::Lock lock(cache.mutex);
 	cache.entries.Clear(); cache.stats=UiTextLayoutStats();
+#if defined(PLATFORM_WIN32) && defined(flagGPUUI)
+	auto& bitmaps=BitmapCache(); Mutex::Lock bitmap_lock(bitmaps.mutex);
+	bitmaps.entries.Clear(); bitmaps.bytes=0; bitmaps.hits=bitmaps.misses=0;
+#endif
 }
 Size UiGetTextSize(const WString& text,Font font)
 {

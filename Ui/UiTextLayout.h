@@ -23,10 +23,14 @@ struct UiTextLayoutOptions {
 	UiTextDirection direction=UiTextDirection::Auto;
 	double width=1000000;
 	bool wrap=false;
+	bool color_fonts=true; // Native palette layers/embedded bitmap assets; false forces outlines.
 	bool wrap_at_character=false;
 	UiTextAlignment alignment=UiTextAlignment::Leading;
 	int tab_spaces=4;
 	String locale;
+	// Optional application-owned OpenType file; no system font installation.
+	// Select the requested family when present, otherwise the file's first family.
+	String font_file;
 };
 
 // Sorted, non-overlapping scalar ranges. Font Null inherits the base font.
@@ -123,6 +127,9 @@ private:
 
 struct UiTextLayoutStats {
 	int cache_entries=0, cache_entry_limit=256;
+	int bitmap_asset_entries=0, bitmap_asset_limit=128;
+	int64 bitmap_asset_bytes=0, bitmap_asset_byte_limit=4*1024*1024;
+	uint64 bitmap_asset_hits=0, bitmap_asset_misses=0;
 	int64 cache_payload_bytes=0, cache_payload_limit=4*1024*1024;
 	uint64 hits=0, misses=0;
 };
