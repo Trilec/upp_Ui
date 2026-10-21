@@ -118,6 +118,7 @@ void UiDoc::RebuildPagedTops() const
                 embed.table.rect.Offset(0, delta);
                 for(auto& cell : embed.table.cells) {
                     cell.rect.Offset(0, delta);
+                    cell.text_origin.y+=delta;
                     for(auto& unit : cell.units) unit.rect.Offset(0, delta);
                     for(auto& caret : cell.carets) caret.Offset(0, delta);
                 }
@@ -163,7 +164,8 @@ Vector<UiDoc::LayoutLine> UiDoc::GetLayoutLines() const
             item.range = UiDocRange(line.from, line.to);
             item.role = paragraph.role;
             item.paragraph = i;
-            int right = line.glyphs.IsEmpty() ? line.left : line.glyphs.Top().x + line.glyphs.Top().width;
+            int right=line.left;
+            for(const auto& glyph:line.glyphs) right=max(right,glyph.x+glyph.width);
             item.rect = RectC(page_rect_.left + style_.page_padding + line.left,
                               page_rect_.top + paragraph.top + line.y - scroll_y_,
                               max(1, right - line.left), line.height);

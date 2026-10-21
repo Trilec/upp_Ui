@@ -42,6 +42,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
 
     paragraph_build_count_++;
     paragraph.lines.Clear();
+    paragraph.text_layout=UiTextLayout();
     paragraph.embeds.Clear();
     paragraph.width = width;
     paragraph.revision = Model().GetRevision();
@@ -63,6 +64,66 @@ void UiDoc::LayoutParagraph(int index, int width) const
     int text_left = indent_px + format.left;
     int available = max(DPI(16), width - text_left - format.right);
 
+#ifdef flagGPUUI
+    Vector<UiTextStyleRange> styles;
+    for(const auto& run:Model().GetStyles()) {
+        int a=max(from,run.from),b=min(to,run.to); if(a>=b) continue;
+        auto& native=styles.Add(); native.from=a-from; native.length=b-a;
+        native.font=ResolveFont(run.style,role); native.ink=ResolveInk(run.style); native.tracking=run.style.tracking_delta;
+    }
+    Vector<UiTextInlineObject> objects;
+    for(const auto& embed:Model().GetEmbeds()) {
+        if(!IsInlineImageLayout(embed) || embed.range.from<from || embed.range.from>=to) continue;
+        UiDocResource resource;
+        int iw=embed.payload.Find("width")>=0?(int)embed.payload["width"]:0;
+        int ih=embed.payload.Find("height")>=0?(int)embed.payload["height"]:0;
+        if(embed.payload.Find("resource_key")>=0 && Model().GetResource(AsString(embed.payload["resource_key"]),resource)) {
+            if(iw<=0) iw=resource.width; if(ih<=0) ih=resource.height;
+        }
+        iw=max(DPI(16),iw>0?iw:DPI(96)); ih=max(DPI(16),ih>0?ih:DPI(64));
+        if(iw>available) { ih=max(DPI(16),ih*available/iw); iw=available; }
+        auto& object=objects.Add(); object.position=embed.range.from-from; object.size=Sizef(iw,ih);
+    }
+    Sort(objects,[](const UiTextInlineObject& a,const UiTextInlineObject& b) { return a.position<b.position; });
+    UiTextLayoutOptions options; options.width=available; options.wrap=true; options.wrap_at_character=!format.word_wrap;
+    options.tab_spaces=max(1,style_.tab_size);
+    options.alignment=format.align==ALIGN_RIGHT?UiTextAlignment::Right:
+                      format.align==ALIGN_CENTER?UiTextAlignment::Center:UiTextAlignment::Left;
+    paragraph.text_layout=UiTextLayout::CreateStyled(text.Mid(from,to-from),ResolveFont(UiDocTextStyle(),role),styles,objects,options);
+    if(paragraph.text_layout.IsValid()) {
+        for(int i=0;i<paragraph.text_layout.GetLineCount();++i) {
+            auto native=paragraph.text_layout.GetLine(i); VisualLine line;
+            line.from=from+native.from; line.to=from+native.to; line.native_line=i; line.native_top=native.bounds.top;
+            line.baseline=(int)ceil(native.baseline); line.left=text_left;
+            int leading=0;
+            for(int pos=native.from;pos<native.to;) {
+                int next=paragraph.text_layout.NextGrapheme(pos,1); if(next<=pos) break;
+                UiDocTextStyle text_style=StyleAt(from+pos); leading=max(leading,text_style.leading_delta);
+                auto rectangles=paragraph.text_layout.GetSelection(pos,next);
+                if(!rectangles.IsEmpty()) {
+                    double left=1e100,right=-1e100;
+                    for(const auto& r:rectangles) if(r.top>=native.bounds.top-.01 && r.top<native.bounds.bottom) {
+                        left=min(left,r.left); right=max(right,r.right);
+                    }
+                    if(left<=right) {
+                        auto& glyph=line.glyphs.Add(); glyph.pos=from+pos; glyph.x=text_left+(int)floor(left);
+                        glyph.width=(int)ceil(right)-(int)floor(left); glyph.ch=text[from+pos];
+                        glyph.font=ResolveFont(text_style,role); glyph.ink=ResolveInk(text_style);
+                    }
+                }
+                pos=next;
+            }
+            line.height=max(DPI(14),(int)ceil(native.bounds.Height())+style_.line_gap+max(0,leading));
+            paragraph.lines.Add(pick(line));
+        }
+    }
+    else {
+        // Keep an explicit failed snapshot for the semantic receiver to reject.
+        VisualLine line; line.from=from; line.to=to; line.left=text_left;
+        line.height=max(DPI(14),ResolveFont(UiDocTextStyle(),role).GetHeight()+style_.line_gap);
+        paragraph.lines.Add(pick(line));
+    }
+#else
     VisualLine current;
     current.from = from;
     current.to = from;
@@ -164,10 +225,13 @@ void UiDoc::LayoutParagraph(int index, int width) const
     if(current.from < to || paragraph.lines.IsEmpty())
         paragraph.lines.Add(pick(current));
 
+#endif
+
     int y = max(0, format.before);
     for(VisualLine& line : paragraph.lines) {
         if(format.line_height > 0)
             line.height = max(format.line_height, line.height);
+#ifndef flagGPUUI
         int used = line.glyphs.IsEmpty() ? 0 : line.glyphs.Top().x + line.glyphs.Top().width - text_left;
         int shift = format.align == ALIGN_RIGHT ? available - used :
                     format.align == ALIGN_CENTER ? (available - used) / 2 : 0;
@@ -175,6 +239,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
         line.left = text_left + shift;
         for(auto& glyph : line.glyphs)
             glyph.x += shift;
+#endif
         line.flow_y = line.y = y;
         y += max(1, line.height);
     }
@@ -193,6 +258,68 @@ void UiDoc::LayoutParagraph(int index, int width) const
         visual.type = embed.type;
 
         if(embed.type == "table") {
+#ifdef flagGPUUI
+            UiDocTable table; if(!Model().GetTable(embed.id,table)) continue;
+            int columns=max(1,table.columns),table_width=available;
+            int cell_width=max(DPI(24),table_width/columns);
+            auto& tv=visual.table; tv.embed_id=embed.id; tv.rows=table.rows.GetCount(); tv.columns=columns;
+            int top=embed_y;
+            for(int r=0;r<tv.rows;++r) {
+                int row_height=DPI(20),first_cell=tv.cells.GetCount();
+                for(int c=0;c<columns;++c) {
+                    const auto& cell=table.rows[r].cells[c];
+                    auto& cv=tv.cells.Add(); cv.rect=RectC(text_left+c*cell_width,top,cell_width,1);
+                    cv.text_origin=Point(cv.rect.left+style_.table_cell_padding,top+style_.table_cell_padding);
+                    int inner=max(DPI(8),cell_width-2*style_.table_cell_padding),leading=0;
+                    WString text; Vector<UiTextStyleRange> styles; Vector<UiTextInlineObject> objects;
+                    for(const auto& run:cell.runs) {
+                        if(run.type=="text" && !run.text.IsEmpty()) {
+                            auto& style=styles.Add(); style.from=text.GetCount(); style.length=run.text.GetCount();
+                            style.font=ResolveFont(run.style); style.ink=ResolveInk(run.style); style.tracking=run.style.tracking_delta;
+                            leading=max(leading,run.style.leading_delta); text.Cat(run.text);
+                        }
+                        else if(run.type=="image") {
+                            int ih=run.height>0?run.height:BaseFont().GetHeight();
+                            int iw=run.width>0?run.width:ih;
+                            if(iw>inner) { ih=max(DPI(8),ih*inner/max(1,iw)); iw=inner; }
+                            auto& object=objects.Add(); object.position=text.GetCount(); object.size=Sizef(iw,ih);
+                            auto& image=cv.units.Add(); image.pos=object.position; image.image=true; image.resource_key=run.resource_key;
+                            text.Cat(0xfffc);
+                        }
+                    }
+                    UiTextLayoutOptions options; options.width=inner; options.wrap=true; options.wrap_at_character=true;
+                    options.tab_spaces=max(1,style_.tab_size);
+                    cv.text_layout=UiTextLayout::CreateStyled(text,BaseFont(),styles,objects,options);
+                    int extra=max(0,style_.line_gap)+max(0,leading);
+                    for(int i=0;i<cv.text_layout.GetLineCount();++i)
+                        cv.line_tops.Add((int)ceil(cv.text_layout.GetLine(i).bounds.top)+i*extra);
+                    cv.carets.SetCount(text.GetCount()+1);
+                    for(int pos=0;pos<=text.GetCount() && cv.text_layout.IsValid();++pos) {
+                        Pointf at=cv.text_layout.GetCaret(pos); int line=0;
+                        while(line+1<cv.text_layout.GetLineCount() && cv.text_layout.GetLine(line+1).bounds.top<=at.y+.01) ++line;
+                        int height=cv.text_layout.GetLineCount()?(int)ceil(cv.text_layout.GetLine(line).bounds.Height()):DPI(14);
+                        cv.carets[pos]=RectC(cv.text_origin.x+(int)floor(at.x+.5),
+                                            cv.text_origin.y+(cv.line_tops.IsEmpty()?0:cv.line_tops[line]),
+                                            max(1,style_.caret_width),max(DPI(14),height));
+                    }
+                    for(int i=0;i<cv.text_layout.GetInlineCount();++i) {
+                        auto placed=cv.text_layout.GetInline(i); int line=0;
+                        while(line+1<cv.text_layout.GetLineCount() && cv.text_layout.GetLine(line+1).bounds.top<=placed.bounds.top+.01) ++line;
+                        for(auto& image:cv.units) if(image.pos==placed.position)
+                            image.rect=Rect((int)floor(cv.text_origin.x+placed.bounds.left),
+                                            (int)floor(cv.text_origin.y+placed.bounds.top+line*extra),
+                                            (int)ceil(cv.text_origin.x+placed.bounds.right),
+                                            (int)ceil(cv.text_origin.y+placed.bounds.bottom+line*extra));
+                    }
+                    int h=(int)ceil(cv.text_layout.GetSize().cy)+max(0,cv.text_layout.GetLineCount()-1)*extra+2*style_.table_cell_padding;
+                    row_height=max(row_height,h);
+                }
+                for(int i=first_cell;i<tv.cells.GetCount();++i) tv.cells[i].rect.bottom=top+row_height;
+                tv.row_heights.Add(row_height); top+=row_height;
+            }
+            tv.rect=visual.rect=RectC(text_left,embed_y,cell_width*columns,top-embed_y);
+#else
+
             UiDocTable table;
             if(!Model().GetTable(embed.id, table))
                 continue;
@@ -372,6 +499,7 @@ void UiDoc::LayoutParagraph(int index, int width) const
                 }
                 top += row_height;
             }
+#endif
         }
         else if(embed.type == "image") {
             UiDocResource resource;

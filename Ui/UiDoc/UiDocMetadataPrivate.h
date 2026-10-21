@@ -63,7 +63,7 @@ inline Vector<String> UiDocMetadataWrapLines(const String& text, const Font& fon
 
         WString next = line;
         next.Cat(ch);
-        if(!line.IsEmpty() && GetTextSize(ToUtf8(next), font).cx > width) {
+        if(!line.IsEmpty() && UiGetTextSize(ToUtf8(next), font).cx > width) {
             Flush();
             if(ch != ' ')
                 line.Cat(ch);
@@ -77,6 +77,14 @@ inline Vector<String> UiDocMetadataWrapLines(const String& text, const Font& fon
     return out;
 }
 
+#ifdef flagGPUUI
+inline UiTextLayout UiDocMetadataLayout(const String& text,Font font,int width)
+{
+    UiTextLayoutOptions options; options.width=max(DPI(24),width); options.wrap=true;
+    return UiTextLayout::Create(text.ToWString(),font,options);
+}
+#endif
+
 inline int UiDocMetadataCardHeight(const UiDocAnnotation& annotation, int width)
 {
     Font title_font = UiFonts::Inherit(SansSerifZ(9).Bold(), UiTypographyRole::Heading);
@@ -85,9 +93,14 @@ inline int UiDocMetadataCardHeight(const UiDocAnnotation& annotation, int width)
     int pad = DPI(7);
     int header = max(icon, title_font.GetHeight());
     int body_width = max(DPI(32), width - 2 * pad);
+#ifdef flagGPUUI
+    auto body=UiDocMetadataLayout(UiDocMetadataBody(annotation),body_font,body_width);
+    int body_height=(int)ceil(body.GetSize().cy)+max(0,body.GetLineCount()-1)*DPI(2);
+#else
     Vector<String> lines = UiDocMetadataWrapLines(UiDocMetadataBody(annotation), body_font, body_width);
     int body_height = max(body_font.GetHeight(), lines.GetCount() * max(DPI(12), body_font.GetHeight() + DPI(2)));
-    return pad + header + DPI(4) + body_height + pad;
+#endif
+    return pad + header + DPI(4) + max(body_font.GetHeight(),body_height) + pad;
 }
 
 }

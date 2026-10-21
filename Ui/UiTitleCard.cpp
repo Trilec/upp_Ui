@@ -1,4 +1,5 @@
 #include <Ui/UiTitleCard.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
@@ -401,9 +402,9 @@ void UiTitleCard::RebuildTextCache()
         return;
 
     const Style& style = GetEffectiveStyle();
-    title_size_ = title_.IsEmpty() ? Size(0, 0) : GetTextSize(title_, style.title_font);
-    subtitle_size_ = subtitle_.IsEmpty() ? Size(0, 0) : GetTextSize(subtitle_, style.subtitle_font);
-    copy_size_ = copy_.IsEmpty() ? Size(0, 0) : GetTextSize(copy_, style.copy_font);
+    title_size_ = title_.IsEmpty() ? Size(0, 0) : UiGetTextSize(title_, style.title_font);
+    subtitle_size_ = subtitle_.IsEmpty() ? Size(0, 0) : UiGetTextSize(subtitle_, style.subtitle_font);
+    copy_size_ = copy_.IsEmpty() ? Size(0, 0) : UiGetTextSize(copy_, style.copy_font);
 
     int w = 0;
     int h = 0;
@@ -818,7 +819,7 @@ void UiTitleCard::Paint(Draw& w)
             else if(style.text_align_h == UiAlign::RIGHT)
                 tx = text_r.right - ts.cx;
 
-            w.DrawText(tx, y, title_, style.title_font, title_ink);
+            UiDrawText(w,tx, y, title_, style.title_font, title_ink);
             y += ts.cy;
 
             if(style.title_line && style.title_line_length != NONE) {
@@ -850,7 +851,7 @@ void UiTitleCard::Paint(Draw& w)
             else if(style.text_align_h == UiAlign::RIGHT)
                 tx = text_r.right - ts.cx;
 
-            w.DrawText(tx, y, subtitle_, style.subtitle_font, subtitle_ink);
+            UiDrawText(w,tx, y, subtitle_, style.subtitle_font, subtitle_ink);
             y += ts.cy;
         }
 
@@ -865,7 +866,7 @@ void UiTitleCard::Paint(Draw& w)
             else if(style.text_align_h == UiAlign::RIGHT)
                 tx = text_r.right - ts.cx;
 
-            w.DrawText(tx, y, copy_, style.copy_font, copy_ink);
+            UiDrawText(w,tx, y, copy_, style.copy_font, copy_ink);
         }
 
         if(split && style.card_line && style.card_line_length != NONE) {
@@ -1015,7 +1016,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, title_, style.title_font, title_ink);
+        UiDrawText(w,tx, y, title_, style.title_font, title_ink);
         y += ts.cy;
 
         if(style.title_line && style.title_line_length != NONE) {
@@ -1047,7 +1048,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, subtitle_, style.subtitle_font, subtitle_ink);
+        UiDrawText(w,tx, y, subtitle_, style.subtitle_font, subtitle_ink);
         y += ts.cy;
     }
 
@@ -1062,7 +1063,7 @@ void UiTitleCard::Paint(Draw& w)
         else if(style.text_align_h == UiAlign::RIGHT)
             tx = text_r.right - ts.cx;
 
-        w.DrawText(tx, y, copy_, style.copy_font, copy_ink);
+        UiDrawText(w,tx, y, copy_, style.copy_font, copy_ink);
     }
 
     if(style.card_line && style.card_line_length != NONE) {

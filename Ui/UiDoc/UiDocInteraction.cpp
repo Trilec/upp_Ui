@@ -131,6 +131,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
         if(!extend)
             active_table_anchor_pos_ = cell_pos;
         active_table_pos_ = cell_pos;
+        table_upstream_=point_upstream_;
         active_embed_id_.Clear();
         image_dragging_ = image_resizing_ = image_drag_moved_ = false;
         table_drag_selecting_ = true;
@@ -169,6 +170,7 @@ void UiDoc::LeftDown(Point p, dword keyflags)
 
     ClearActiveObject();
     int pos = PosAtDocumentPoint(p);
+    caret_upstream_=point_upstream_;
     if(keyflags & K_SHIFT)
         caret_pos_ = pos;
     else
@@ -325,6 +327,7 @@ void UiDoc::MouseMove(Point p, dword)
     if(!drag_selecting_)
         return;
     caret_pos_ = PosAtDocumentPoint(p);
+    caret_upstream_=point_upstream_;
     if(!Emit(WhenSelection)) return;
     ScrollCaretIntoView();
     Refresh();
@@ -404,6 +407,16 @@ void UiDoc::LeftDouble(Point p, dword)
     if(text.IsEmpty())
         return;
     pos = clamp(pos, 0, text.GetCount() - 1);
+#ifdef flagGPUUI
+    int paragraph_index=FindParagraphAtPos(pos);
+    if(paragraph_index>=0 && paragraph_index<paragraphs_.GetCount()) {
+        LayoutParagraph(paragraph_index,ContentWidth()); const auto& paragraph=paragraphs_[paragraph_index];
+        int from=0,to=0;
+        if(paragraph.text_layout.GetWord(pos-paragraph.from,from,to)) {
+            SetSelection(UiDocRange(paragraph.from+from,paragraph.from+to)); return;
+        }
+    }
+#endif
     bool word = IsWordChar(text[pos]);
     int from = pos;
     int to = pos + 1;
@@ -484,8 +497,13 @@ bool UiDoc::Key(dword key, int count)
             const UiDocTableCell& cell = table.rows[active_table_row_].cells[active_table_column_];
             int units = InteractionCellUnits(cell);
 
-            auto SetTablePosition = [&](int next, bool extend) {
+            auto SetTablePosition = [&](int next, bool extend,bool upstream=false) {
                 next = clamp(next, 0, units);
+#ifdef flagGPUUI
+                if(const auto *visual=FindActiveTableCell()) if(visual->text_layout.IsValid())
+                    next=visual->text_layout.NextGrapheme(next,0);
+#endif
+                table_upstream_=upstream;
                 if(!extend)
                     active_table_anchor_pos_ = next;
                 active_table_pos_ = next;
@@ -500,13 +518,29 @@ bool UiDoc::Key(dword key, int count)
                 if(!shift && HasTableSelection())
                     SetTablePosition(TableSelectionRange().from, false);
                 else
+                {
+#ifdef flagGPUUI
+                    if(const auto *visual=FindActiveTableCell()) if(visual->text_layout.IsValid()) {
+                        UiTextHit at; at.position=active_table_pos_; at.trailing=table_upstream_;
+                        auto next=visual->text_layout.MoveVisual(at,-1,true); SetTablePosition(next.position,shift,next.trailing); return true;
+                    }
+#endif
                     SetTablePosition(active_table_pos_ - 1, shift);
+                }
                 return true;
             case K_RIGHT:
                 if(!shift && HasTableSelection())
                     SetTablePosition(TableSelectionRange().to, false);
                 else
+                {
+#ifdef flagGPUUI
+                    if(const auto *visual=FindActiveTableCell()) if(visual->text_layout.IsValid()) {
+                        UiTextHit at; at.position=active_table_pos_; at.trailing=table_upstream_;
+                        auto next=visual->text_layout.MoveVisual(at,1,true); SetTablePosition(next.position,shift,next.trailing); return true;
+                    }
+#endif
                     SetTablePosition(active_table_pos_ + 1, shift);
+                }
                 return true;
             case K_UP:
                 if(active_table_row_ > 0)
@@ -574,8 +608,8 @@ bool UiDoc::Key(dword key, int count)
     }
 
     switch(base) {
-    case K_LEFT: MoveCaret(caret_pos_ - 1, shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
-    case K_RIGHT: MoveCaret(caret_pos_ + 1, shift); if(!view_guard) return false; ScrollCaretIntoView(); return true;
+    case K_LEFT: return MoveVisualText(-1,shift);
+    case K_RIGHT: return MoveVisualText(1,shift);
     case K_UP: return MoveVertical(-1, shift);
     case K_DOWN: return MoveVertical(1, shift);
     case K_HOME: {
@@ -607,6 +641,7 @@ bool UiDoc::Key(dword key, int count)
         if(!active_embed_id_.IsEmpty())
             ClearActiveObject();
         WString text;
+        if(base>=0xd800 && base<=0xdfff) return false;
         for(int i = 0; i < max(1, count); i++)
             text.Cat((wchar)base);
         return InsertText(text);

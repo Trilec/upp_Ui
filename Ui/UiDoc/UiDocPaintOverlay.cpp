@@ -11,37 +11,25 @@ void PaintOverlayMarkerShapeAA(Draw& w, const Rect& marker,
     if(marker.IsEmpty() || IsNull(color))
         return;
 
-    Size size = marker.GetSize();
-    UiRasterCachePolicy policy = UiRasterPolicyIcon("uidoc/metadata-marker");
-    UiRasterCacheKeyBuilder key("uidoc/metadata-marker");
-    key.Add((int)shape).Add(color).Add(size);
-    Image image = UiGetCachedRasterImage(policy, key, size, [=](Size qsz) {
-        ImageBuffer ib(qsz);
-        ib.SetKind(IMAGE_ALPHA);
-        Fill(~ib, RGBAZero(), ib.GetLength());
-
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        double inset = 0.5;
-        double width = max(1.0, (double)qsz.cx - 1.0);
-        double height = max(1.0, (double)qsz.cy - 1.0);
-        p.Begin();
-        if(shape == UiDoc::MARKER_TRIANGLE) {
-            p.Move(qsz.cx * 0.5, inset);
-            p.Line(qsz.cx - inset, qsz.cy - inset);
-            p.Line(inset, qsz.cy - inset);
-            p.Close();
-        }
+    Size size=marker.GetSize();
+    auto paint=[=](Painter& p) {
+        double inset=.5,width=max(1.0,(double)size.cx-1),height=max(1.0,(double)size.cy-1);
+        if(shape==UiDoc::MARKER_TRIANGLE)
+            p.Move(size.cx*.5,inset).Line(size.cx-inset,size.cy-inset).Line(inset,size.cy-inset).Close();
         else {
-            double radius = shape == UiDoc::MARKER_CIRCLE
-                          ? min(width, height) * 0.5
-                          : min((double)DPI(2), qsz.cx / 3.0);
-            p.RoundedRectangle(inset, inset, width, height, radius);
+            double radius=shape==UiDoc::MARKER_CIRCLE?min(width,height)*.5:min((double)DPI(2),size.cx/3.0);
+            p.RoundedRectangle(inset,inset,width,height,radius);
         }
         p.Fill(color);
-        p.End();
-        return Image(ib);
+    };
+    if(UiTryGpuArtwork(w,marker,paint)) return;
+    UiRasterCachePolicy policy=UiRasterPolicyIcon("uidoc/metadata-marker");
+    UiRasterCacheKeyBuilder key("uidoc/metadata-marker"); key.Add((int)shape).Add(color).Add(size);
+    Image image=UiGetCachedRasterImage(policy,key,size,[=](Size qsz) {
+        ImageBuffer pixels(qsz); pixels.SetKind(IMAGE_ALPHA); Fill(~pixels,RGBAZero(),pixels.GetLength());
+        BufferPainter p(pixels,MODE_ANTIALIASED); paint(p); p.Finish(); return Image(pixels);
     });
-    UiDrawCachedRaster(w, marker, image);
+    UiDrawCachedRaster(w,marker,image);
 }
 
 void PaintOverlayCountBadge(Draw& w, const Rect& marker, int count, Color color)
@@ -53,8 +41,8 @@ void PaintOverlayCountBadge(Draw& w, const Rect& marker, int count, Color color)
     UiPaintAACircle(w, badge, color);
     String label = count > 9 ? String("9+") : AsString(count);
     Font font = UiFonts::Inherit(SansSerifZ(6).Bold(), UiTypographyRole::Heading);
-    Size ts = GetTextSize(label, font);
-    w.DrawText(badge.left + (badge.GetWidth() - ts.cx) / 2,
+    Size ts = UiGetTextSize(label, font);
+    UiDrawText(w,badge.left + (badge.GetWidth() - ts.cx) / 2,
                badge.top + (badge.GetHeight() - ts.cy) / 2,
                label, font, White());
 }
@@ -90,10 +78,10 @@ void UiDoc::PaintEmbeds(Draw& w)
                 w.DrawRect(rc.left, y, rc.GetWidth(), 1, line);
                 String label = "Page break";
                 Font font = UiFonts::Inherit(SansSerifZ(9));
-                Size ts = GetTextSize(label, font);
+                Size ts = UiGetTextSize(label, font);
                 w.DrawRect(rc.CenterPoint().x - ts.cx / 2 - DPI(4), y - ts.cy / 2,
                            ts.cx + DPI(8), ts.cy, style_.page_face);
-                w.DrawText(rc.CenterPoint().x - ts.cx / 2, y - ts.cy / 2, label, font, SColorDisabled());
+                UiDrawText(w,rc.CenterPoint().x - ts.cx / 2, y - ts.cy / 2, label, font, SColorDisabled());
             }
         }
     }
@@ -157,18 +145,10 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
     bool active = annotation->id == active_annotation_id_;
 
     Size size = rc.GetSize();
-    ImageBuffer ib(size);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
-        p.Begin();
-        p.RoundedRectangle(0.5, 0.5, max(1, size.cx - 1), max(1, size.cy - 1), DPI(4));
-        p.Fill(face);
-        p.Stroke(active ? 2.0 : 1.0, active ? accent : Blend(accent, style_.page_frame, 30));
-        p.End();
-    }
-    w.DrawImage(rc.left, rc.top, ib);
+    UiPaintVectorArtwork(w,rc,[=](Painter& p) {
+        p.RoundedRectangle(.5,.5,max(1,size.cx-1),max(1,size.cy-1),DPI(4));
+        p.Fill(face).Stroke(active?2.0:1.0,active?accent:Blend(accent,style_.page_frame,30));
+    });
     int accent_width = active ? DPI(3) : DPI(2);
     w.DrawRect(rc.left, rc.top + DPI(4), accent_width, max(1, rc.GetHeight() - DPI(8)), accent);
 
@@ -191,24 +171,34 @@ void UiDoc::PaintMetadataReference(Draw& w, const EmbedVisual& visual)
 
     int title_x = icon_rect.right + DPI(5);
     int title_y = rc.top + pad + max(0, (icon_size - title_font.GetHeight()) / 2);
-    w.DrawText(title_x, title_y, title, title_font, style_.palette.ink[ST_NORMAL]);
+    UiDrawText(w,title_x, title_y, title, title_font, style_.palette.ink[ST_NORMAL]);
 
     if(!type.IsEmpty()) {
-        Size ts = GetTextSize(type, type_font);
+        Size ts = UiGetTextSize(type, type_font);
         int tx = max(title_x, rc.right - pad - ts.cx);
-        w.DrawText(tx, title_y, type, type_font, SColorDisabled());
+        UiDrawText(w,tx, title_y, type, type_font, SColorDisabled());
     }
 
     int body_y = rc.top + pad + max(icon_size, title_font.GetHeight()) + DPI(4);
     int body_width = max(DPI(32), rc.GetWidth() - 2 * pad);
+#ifdef flagGPUUI
+    auto body=UiDocMetadataLayout(UiDocMetadataBody(*annotation),body_font,body_width);
+    if(!body.IsValid()) body.Draw(w,Pointf(rc.left+pad,body_y),style_.palette.ink[ST_NORMAL]);
+    for(int line=0;line<body.GetLineCount();++line) {
+        auto metrics=body.GetLine(line); int height=(int)ceil(metrics.bounds.Height());
+        if(body_y+height>rc.bottom-pad+DPI(1)) break;
+        body.DrawLine(w,line,Pointf(rc.left+pad,body_y),style_.palette.ink[ST_NORMAL]); body_y+=height+DPI(2);
+    }
+#else
     Vector<String> lines = UiDocMetadataWrapLines(UiDocMetadataBody(*annotation), body_font, body_width);
     int line_height = max(DPI(12), body_font.GetHeight() + DPI(2));
     for(const String& line : lines) {
         if(body_y + body_font.GetHeight() > rc.bottom - pad + DPI(1))
             break;
-        w.DrawText(rc.left + pad, body_y, line, body_font, style_.palette.ink[ST_NORMAL]);
+        UiDrawText(w,rc.left + pad, body_y, line, body_font, style_.palette.ink[ST_NORMAL]);
         body_y += line_height;
     }
+#endif
 }
 
 void UiDoc::PaintGutter(Draw& w)
@@ -243,9 +233,9 @@ void UiDoc::PaintGutter(Draw& w)
             if(y > page_rect_.bottom)
                 break;
             String number = AsString(i + 1);
-            Size ts = GetTextSize(number, font);
+            Size ts = UiGetTextSize(number, font);
             int x = gutter_side_ == GUTTER_LEFT ? area.right - ts.cx - DPI(2) : area.left + DPI(2);
-            w.DrawText(x, y, number, font, ink);
+            UiDrawText(w,x, y, number, font, ink);
         }
     }
 

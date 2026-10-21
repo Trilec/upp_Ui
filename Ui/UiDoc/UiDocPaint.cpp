@@ -151,7 +151,7 @@ void UiDoc::PaintText(Draw& w)
             int marker_x = origin_x + indent_px + DPI(4);
             int marker_y = paragraph_y + max(0, (paragraph.lines.IsEmpty() ? marker_font.GetHeight()
                                                                : paragraph.lines[0].height) - marker_font.GetHeight()) / 2;
-            w.DrawText(marker_x, marker_y, marker, marker_font, style_.palette.ink[ST_NORMAL]);
+            UiDrawText(w,marker_x,marker_y,marker,marker_font,style_.palette.ink[ST_NORMAL]);
         }
         else if(role == "quote") {
             int x = origin_x + indent_px + DPI(6);
@@ -233,13 +233,27 @@ void UiDoc::PaintText(Draw& w)
                 else if(annotated)
                     w.DrawRect(cell, Blend(style_.annotation_fill, style_.page_face, 55));
 
+#ifndef flagGPUUI
                 if(glyph.ch != '\t') {
                     WString one;
                     one.Cat(glyph.ch);
                     int text_y = y + max(0, (line.height - glyph.font.GetHeight()) / 2);
                     w.DrawText(x, text_y, ToUtf8(one), glyph.font, glyph.ink);
                 }
+#endif
             }
+#ifdef flagGPUUI
+            Pointf origin(origin_x+line.left,y);
+            paragraph.text_layout.DrawLine(w,line.native_line,origin,style_.palette.ink[ST_NORMAL]);
+            if(!selection.IsEmpty()) {
+                for(const auto& r:paragraph.text_layout.GetSelection(selection.from-paragraph.from,selection.to-paragraph.from)) {
+                    if(r.top<line.native_top-.01 || r.top>=line.native_top+line.height) continue;
+                    Rect clip((int)floor(origin.x+r.left),(int)floor(y+r.top-line.native_top),
+                              (int)ceil(origin.x+r.right),(int)ceil(y+r.bottom-line.native_top));
+                    w.Clip(clip); paragraph.text_layout.DrawLine(w,line.native_line,origin,SColorHighlightText(),true); w.End();
+                }
+            }
+#endif
         }
     }
 }
@@ -296,6 +310,26 @@ void UiDoc::PaintTable(Draw& w, const EmbedVisual& visual)
             w.DrawRect(rc.right - 2, rc.top + 1, 1, max(0, rc.GetHeight() - 2), focus);
         }
 
+#ifdef flagGPUUI
+        int native_lines=cell_visual.text_layout.GetLineCount();
+        // Invalid snapshots reach the semantic receiver instead of falling back.
+        if(!cell_visual.text_layout.IsValid())
+            cell_visual.text_layout.Draw(w,Pointf(origin_x+cell_visual.text_origin.x,origin_y+cell_visual.text_origin.y),style_.palette.ink[ST_NORMAL]);
+        for(int line=0;line<native_lines;++line) {
+            auto metrics=cell_visual.text_layout.GetLine(line);
+            Pointf at(origin_x+cell_visual.text_origin.x,origin_y+cell_visual.text_origin.y+cell_visual.line_tops[line]);
+            auto selection=active_cell?cell_visual.text_layout.GetSelection(table_selection.from,table_selection.to):Vector<Rectf>();
+            for(const auto& rect:selection) if(fabs(rect.top-metrics.bounds.top)<.1)
+                w.DrawRect(Rect((int)floor(at.x+rect.left),(int)floor(at.y+rect.top-metrics.bounds.top),
+                                (int)ceil(at.x+rect.right),(int)ceil(at.y+rect.bottom-metrics.bounds.top)),style_.selection_fill);
+            cell_visual.text_layout.DrawLine(w,line,at,style_.palette.ink[ST_NORMAL]);
+            for(const auto& rect:selection) if(fabs(rect.top-metrics.bounds.top)<.1) {
+                w.Clip(Rect((int)floor(at.x+rect.left),(int)floor(at.y+rect.top-metrics.bounds.top),
+                            (int)ceil(at.x+rect.right),(int)ceil(at.y+rect.bottom-metrics.bounds.top)));
+                cell_visual.text_layout.DrawLine(w,line,at,SColorHighlightText(),true); w.End();
+            }
+        }
+#endif
         for(const TableUnitVisual& unit : cell_visual.units) {
             Rect ur = unit.rect.Offseted(origin_x, origin_y);
             bool unit_selected = active_cell && RangeContains(table_selection, unit.pos);

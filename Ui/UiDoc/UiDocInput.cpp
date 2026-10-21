@@ -193,40 +193,23 @@ bool InsertCellImage(UiDocTableCell& cell, int pos, const String& resource_key, 
     return true;
 }
 
-bool DeleteCellUnit(UiDocTableCell& cell, int pos)
+bool DeleteCellRange(UiDocTableCell& cell,UiDocRange range)
 {
-    int total = CellUnits(cell);
-    if(pos < 0 || pos >= total)
-        return false;
-
-    int at = 0;
-    for(int i = 0; i < cell.runs.GetCount(); i++) {
-        UiDocInlineRun& run = cell.runs[i];
-        int units = run.type == "text" ? run.text.GetCount() : (run.type == "image" ? 1 : 0);
-        if(pos < at + units) {
-            if(run.type == "text")
-                run.text.Remove(pos - at, 1);
-            else
-                cell.runs.Remove(i);
-            NormalizeCellRuns(cell);
-            return true;
+    range.Normalize(); int total=CellUnits(cell);
+    range.from=clamp(range.from,0,total); range.to=clamp(range.to,0,total);
+    if(range.IsEmpty()) return false;
+    Vector<UiDocInlineRun> out; int at=0;
+    for(const auto& source:cell.runs) {
+        int count=source.type=="text"?source.text.GetCount():source.type=="image"?1:0;
+        int first=max(0,range.from-at),last=min(count,range.to-at);
+        if(first>=last) out.Add(CopyInlineRun(source));
+        else if(source.type=="text") {
+            if(first>0) { auto prefix=CopyInlineRun(source); prefix.text=source.text.Left(first); out.Add(pick(prefix)); }
+            if(last<count) { auto suffix=CopyInlineRun(source); suffix.text=source.text.Mid(last); out.Add(pick(suffix)); }
         }
-        at += units;
+        at+=count;
     }
-    return false;
-}
-
-bool DeleteCellRange(UiDocTableCell& cell, UiDocRange range)
-{
-    range.Normalize();
-    range.from = clamp(range.from, 0, CellUnits(cell));
-    range.to = clamp(range.to, 0, CellUnits(cell));
-    if(range.IsEmpty())
-        return false;
-    for(int pos = range.to - 1; pos >= range.from; pos--)
-        if(!DeleteCellUnit(cell, pos))
-            return false;
-    return true;
+    cell.runs=pick(out); NormalizeCellRuns(cell); return true;
 }
 
 int InputBlockIndentAt(const UiDocCore& core, int pos)
@@ -446,6 +429,68 @@ bool UiDoc::InsertParagraphBreak()
     return true;
 }
 
+int UiDoc::NextTextGrapheme(int position,int direction) const
+{
+    position=ClampPos(position);
+#ifdef flagGPUUI
+    EnsureLayout();
+    int index=FindParagraphAtPos(position);
+    if(index>=0 && index<paragraphs_.GetCount()) {
+        LayoutParagraph(index,ContentWidth()); const auto& paragraph=paragraphs_[index];
+        if(paragraph.text_layout.IsValid() && position>=paragraph.from && position<=paragraph.to) {
+            int local=position-paragraph.from;
+            if(direction<0 && local==0) return max(0,position-1);
+            if(direction>0 && position==paragraph.to) return min(Model().GetLength(),position+1);
+            return paragraph.from+paragraph.text_layout.NextGrapheme(local,direction);
+        }
+    }
+#endif
+    return ClampPos(position+(direction<0?-1:direction>0?1:0));
+}
+int UiDoc::SnapTextPosition(int position,bool forward) const
+{
+    position=ClampPos(position); int snapped=NextTextGrapheme(position,0);
+    return forward && snapped<position?NextTextGrapheme(snapped,1):snapped;
+}
+bool UiDoc::MoveVisualText(int direction,bool keep_selection)
+{
+    ViewGuard guard(*this);
+#ifdef flagGPUUI
+    EnsureLayout(); int index=FindParagraphAtPos(caret_pos_);
+    if(index>=0 && index<paragraphs_.GetCount()) {
+        LayoutParagraph(index,ContentWidth()); const auto& paragraph=paragraphs_[index];
+        if(paragraph.text_layout.IsValid()) {
+            UiTextHit current; current.position=caret_pos_-paragraph.from; current.trailing=caret_upstream_;
+            UiTextHit next=paragraph.text_layout.MoveVisual(current,direction,true);
+            if(next.position!=current.position || next.trailing!=current.trailing) {
+                MoveCaret(paragraph.from+next.position,keep_selection,next.trailing);
+                if(!guard) return false; ScrollCaretIntoView(); return true;
+            }
+            // Up/Down remains native hit-testing. At a horizontal visual edge,
+            // move to the adjacent logical line, respecting paragraph direction.
+            Pointf caret=paragraph.text_layout.GetCaret(current.position,current.trailing);
+            int line=0;
+            while(line+1<paragraph.text_layout.GetLineCount() && paragraph.text_layout.GetLine(line+1).bounds.top<=caret.y+.01) ++line;
+            bool rtl=paragraph.text_layout.GetLine(line).right_to_left;
+            int delta=direction*(rtl?-1:1),target_line=line+delta,target_paragraph=index;
+            if(target_line<0 || target_line>=paragraph.text_layout.GetLineCount()) {
+                target_paragraph+=delta;
+                if(target_paragraph<0 || target_paragraph>=paragraphs_.GetCount()) return true;
+                LayoutParagraph(target_paragraph,ContentWidth());
+                const auto& target=paragraphs_[target_paragraph].text_layout;
+                target_line=delta>0?0:target.GetLineCount()-1;
+            }
+            const auto& target=paragraphs_[target_paragraph]; auto bounds=target.text_layout.GetLine(target_line).bounds;
+            auto hit=target.text_layout.HitTest(Pointf(direction<0?1e7:-1e7,(bounds.top+bounds.bottom)*.5));
+            MoveCaret(target.from+hit.position,keep_selection,hit.trailing);
+            if(!guard) return false; ScrollCaretIntoView(); return true;
+        }
+    }
+#endif
+    MoveCaret(NextTextGrapheme(caret_pos_,direction),keep_selection);
+    if(!guard) return false; ScrollCaretIntoView(); return true;
+}
+
 bool UiDoc::DeleteBackward()
 {
     if(readonly_) return false;
@@ -460,7 +505,7 @@ bool UiDoc::DeleteBackward()
     if(caret_pos_ <= 0)
         return false;
 
-    int from = caret_pos_ - 1;
+    int from = NextTextGrapheme(caret_pos_,-1);
     UiDocRange range(from, caret_pos_);
     UiDocCoreTransaction tx;
     tx.label = "Backspace";
@@ -492,7 +537,7 @@ bool UiDoc::DeleteForward()
     if(caret_pos_ >= Model().GetLength())
         return false;
 
-    UiDocRange range(caret_pos_, caret_pos_ + 1);
+    UiDocRange range(caret_pos_,NextTextGrapheme(caret_pos_,1));
     UiDocCoreTransaction tx;
     tx.label = "Delete";
     AppendInlineImageRemovals(tx, Model(), range);
@@ -514,6 +559,18 @@ bool UiDoc::MoveWord(int direction, bool keep_selection)
     ViewGuard view_guard(*this);
     const WString& text = Model().GetText();
     int pos = caret_pos_;
+#ifdef flagGPUUI
+    EnsureLayout(); int index=FindParagraphAtPos(pos);
+    if(index>=0 && index<paragraphs_.GetCount()) {
+        LayoutParagraph(index,ContentWidth()); const auto& paragraph=paragraphs_[index];
+        if(paragraph.text_layout.IsValid()) {
+            int next=paragraph.from+paragraph.text_layout.NextWord(pos-paragraph.from,direction);
+            if(next==pos) next=NextTextGrapheme(pos,direction);
+            MoveCaret(next,keep_selection);
+            if(!view_guard) return false; ScrollCaretIntoView(); return true;
+        }
+    }
+#endif
     if(direction < 0) {
         if(pos <= 0)
             return false;
@@ -588,6 +645,15 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
 
     int local_x = preferred_x_ - page_rect_.left - style_.page_padding;
     int next = line.to;
+#ifdef flagGPUUI
+    bool upstream=false;
+    if(target_paragraph_cache.text_layout.IsValid()) {
+        auto native=target_paragraph_cache.text_layout.GetLine(line.native_line);
+        auto hit=target_paragraph_cache.text_layout.HitTest(Pointf(local_x-line.left,(native.bounds.top+native.bounds.bottom)*.5));
+        next=target_paragraph_cache.from+hit.position; upstream=hit.trailing;
+    }
+    else
+#endif
     if(line.glyphs.IsEmpty())
         next = line.from;
     else {
@@ -600,7 +666,11 @@ bool UiDoc::MoveVertical(int direction, bool keep_selection)
     }
 
     int keep_x = preferred_x_;
-    MoveCaret(next, keep_selection);
+    MoveCaret(next,keep_selection
+#ifdef flagGPUUI
+              ,upstream
+#endif
+    );
     if(!view_guard) return false;
     preferred_x_ = keep_x;
     ScrollCaretIntoView();
@@ -666,6 +736,17 @@ bool UiDoc::InsertActiveTableImage(const String& resource_key, int width, int he
     return true;
 }
 
+const UiDoc::TableCellVisual *UiDoc::FindActiveTableCell() const
+{
+    EnsureLayout();
+    for(const auto& paragraph:paragraphs_) if(paragraph.valid)
+        for(const auto& embed:paragraph.embeds) if(embed.type=="table" && embed.table.embed_id==active_table_id_) {
+            int index=active_table_row_*embed.table.columns+active_table_column_;
+            if(index>=0 && index<embed.table.cells.GetCount()) return &embed.table.cells[index];
+        }
+    return nullptr;
+}
+
 bool UiDoc::DeleteActiveTableCell(bool forward)
 {
     if(readonly_) return false;
@@ -695,17 +776,21 @@ bool UiDoc::DeleteActiveTableCell(bool forward)
 
     int total = CellUnits(cell);
     int pos = clamp(active_table_pos_, 0, total);
-    int remove_at = forward ? pos : pos - 1;
-    if(remove_at < 0 || remove_at >= total)
-        return false;
-    if(!DeleteCellUnit(cell, remove_at))
-        return false;
+    int from=forward?pos:pos-1,to=forward?pos+1:pos;
+#ifdef flagGPUUI
+    if(const auto *visual=FindActiveTableCell()) if(visual->text_layout.IsValid()) {
+        if(forward) to=visual->text_layout.NextGrapheme(pos,1);
+        else from=visual->text_layout.NextGrapheme(pos,-1);
+    }
+#endif
+    if(from<0 || to>total || from>=to) return false;
+    if(!DeleteCellRange(cell,UiDocRange(from,to))) return false;
     if(!Model().SetTableCell(active_table_id_, active_table_row_, active_table_column_, cell))
         return false;
     scroll_y_ = preserved_scroll;
     sb_.Set(scroll_y_);
-    if(!forward)
-        active_table_pos_ = max(0, pos - 1);
+    active_table_pos_=from;
+    table_upstream_=false;
     active_table_anchor_pos_ = active_table_pos_;
     if(!Emit(WhenSelection)) return false;
     ScrollCaretIntoView();

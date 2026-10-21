@@ -166,6 +166,12 @@ int UiDoc::PosAtDocumentPoint(Point point) const
             line = &candidate;
     }
 
+#ifdef flagGPUUI
+    if(paragraph.text_layout.IsValid()) {
+        auto hit=paragraph.text_layout.HitTest(Pointf(local_x-line->left,line->native_top+min<double>(max(0,local_y-line->y),max(0,line->height-1))));
+        point_upstream_=hit.trailing; return paragraph.from+hit.position;
+    }
+#endif
     if(line->glyphs.IsEmpty())
         return line->from;
     int pos = line->from;
@@ -189,6 +195,14 @@ Point UiDoc::DocumentPointAtPos(int pos) const
     LayoutParagraph(index, ContentWidth());
     const ParagraphCache& paragraph = paragraphs_[index];
 
+#ifdef flagGPUUI
+    if(paragraph.text_layout.IsValid()) {
+        Pointf caret=paragraph.text_layout.GetCaret(pos-paragraph.from,caret_upstream_);
+        for(const auto& line:paragraph.lines) if(fabs(line.native_top-caret.y)<.1)
+            return Point(page_rect_.left+style_.page_padding+line.left+(int)floor(caret.x+.5),
+                         page_rect_.top+paragraph.top+line.y-scroll_y_);
+    }
+#endif
     int local_x = 0;
     int local_y = 0;
     for(int i = 0; i < paragraph.lines.GetCount(); i++) {
@@ -265,6 +279,15 @@ Rect UiDoc::TableCaretRectInternal() const
             if(cell.carets.IsEmpty())
                 return CaretRectInternal();
             int pos = clamp(active_table_pos_, 0, cell.carets.GetCount() - 1);
+#ifdef flagGPUUI
+            if(cell.text_layout.IsValid()) {
+                Pointf at=cell.text_layout.GetCaret(pos,table_upstream_); int line=0;
+                while(line+1<cell.text_layout.GetLineCount() && cell.text_layout.GetLine(line+1).bounds.top<=at.y+.01) ++line;
+                return RectC(page_rect_.left+style_.page_padding+cell.text_origin.x+(int)floor(at.x+.5),
+                             page_rect_.top+paragraph.top-scroll_y_+cell.text_origin.y+cell.line_tops[line],
+                             max(1,style_.caret_width),max(DPI(14),(int)ceil(cell.text_layout.GetLine(line).bounds.Height())));
+            }
+#endif
             return cell.carets[pos].Offseted(page_rect_.left + style_.page_padding,
                                              page_rect_.top + paragraph.top - scroll_y_);
         }
@@ -318,6 +341,16 @@ bool UiDoc::HitTestTable(Point point, String& table_id, int& row, int& column, i
                 column = i % max(1, table.columns);
                 cell_pos = 0;
 
+#ifdef flagGPUUI
+                if(cell_visual.text_layout.IsValid()) {
+                    int line=0,local_y=point.y-oy-cell_visual.text_origin.y;
+                    while(line+1<cell_visual.line_tops.GetCount() && cell_visual.line_tops[line+1]<=local_y) ++line;
+                    auto metrics=cell_visual.text_layout.GetLine(line);
+                    auto hit=cell_visual.text_layout.HitTest(Pointf(point.x-ox-cell_visual.text_origin.x,
+                        metrics.bounds.top+local_y-cell_visual.line_tops[line]));
+                    cell_pos=hit.position; point_upstream_=hit.trailing; return true;
+                }
+#endif
                 int best_distance = INT_MAX;
                 for(int pos = 0; pos < cell_visual.carets.GetCount(); pos++) {
                     Rect caret = cell_visual.carets[pos].Offseted(ox, oy);

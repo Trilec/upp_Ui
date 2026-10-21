@@ -16,12 +16,40 @@
 namespace Upp {
 enum class UiTextDirection { Auto, LeftToRight, RightToLeft };
 
+enum class UiTextAlignment { Leading, Left, Center, Right };
+
 struct UiTextLayoutOptions {
 	UiTextDirection direction=UiTextDirection::Auto;
 	double width=1000000;
 	bool wrap=false;
+	bool wrap_at_character=false;
+	UiTextAlignment alignment=UiTextAlignment::Leading;
 	int tab_spaces=4;
 	String locale;
+};
+
+// Sorted, non-overlapping scalar ranges. Font Null inherits the base font.
+struct UiTextStyleRange : Moveable<UiTextStyleRange> {
+	int from=0, length=0;
+	Font font=Null;
+	Color ink=Null;
+	double tracking=0;
+};
+// One U+FFFC scalar reserves native inline metrics; the host draws its asset.
+struct UiTextInlineObject : Moveable<UiTextInlineObject> {
+	int position=0;
+	Sizef size=Sizef(0,0);
+	double baseline=-1; // Negative uses the bottom edge.
+};
+struct UiTextInlinePlacement : Moveable<UiTextInlinePlacement> {
+	int position=0;
+	Rectf bounds=Rectf(0,0,0,0);
+};
+struct UiTextLine : Moveable<UiTextLine> {
+	int from=0,to=0; // Scalar range, excluding a hard paragraph separator.
+	Rectf bounds=Rectf(0,0,0,0);
+	double baseline=0; // Distance below bounds.top.
+	bool right_to_left=false;
 };
 
 struct UiTextHit {
@@ -37,6 +65,14 @@ public:
 	UiTextLayout() = default;
 	static UiTextLayout Create(const WString& text, Font font,
 	                           const UiTextLayoutOptions& options=UiTextLayoutOptions());
+	static UiTextLayout CreateStyled(const WString& text,Font font,
+	                           const Vector<UiTextStyleRange>& styles,
+	                           const Vector<UiTextInlineObject>& objects=Vector<UiTextInlineObject>(),
+	                           const UiTextLayoutOptions& options=UiTextLayoutOptions());
+	int GetLineCount() const;
+	UiTextLine GetLine(int index) const;
+	int GetInlineCount() const;
+	UiTextInlinePlacement GetInline(int index) const;
 	bool IsValid() const;
 	String GetError() const;
 	Sizef GetSize() const;
@@ -48,10 +84,15 @@ public:
 	UiTextHit HitTest(Pointf point) const;
 	Vector<Rectf> GetSelection(int from,int to) const;
 	int NextGrapheme(int position,int direction) const;
-	UiTextHit MoveVisual(UiTextHit position,int direction) const;
-	bool Draw(Draw& draw,Pointf origin,Color ink) const;
+	int NextWord(int position,int direction) const;
+	bool GetWord(int position,int& from,int& to) const;
+	UiTextHit MoveVisual(UiTextHit position,int direction,bool cross_lines=false) const;
+	bool Draw(Draw& draw,Pointf origin,Color ink,bool override_ink=false) const;
+	// Line-local immutable snapshot; origin is the line's top-left in the host.
+	bool DrawLine(Upp::Draw& draw,int line,Pointf origin,Color ink,bool override_ink=false) const;
 #ifdef flagGPUUI
 	std::shared_ptr<const GpuShapedText> GetGpuText() const;
+	std::shared_ptr<const GpuShapedText> GetLineGpuText(int line) const;
 #endif
 private:
 	struct Data;

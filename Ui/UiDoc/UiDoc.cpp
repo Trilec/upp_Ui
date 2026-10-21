@@ -200,10 +200,11 @@ UiDocRange UiDoc::SelectionRange() const
     return NormalizeRange(UiDocRange(anchor_pos_, caret_pos_));
 }
 
-void UiDoc::MoveCaret(int pos, bool keep_selection)
+void UiDoc::MoveCaret(int pos, bool keep_selection,bool upstream)
 {
     ViewGuard view_guard(*this);
-    int next = ClampPos(pos);
+    int next = SnapTextPosition(pos);
+    caret_upstream_=upstream;
     if(!keep_selection)
         anchor_pos_ = next;
     caret_pos_ = next;
@@ -494,8 +495,10 @@ UiDocSelection UiDoc::GetSelection() const
 void UiDoc::SetSelection(const UiDocSelection& selection)
 {
     ViewGuard view_guard(*this);
-    anchor_pos_ = ClampPos(selection.anchor);
-    caret_pos_ = ClampPos(selection.caret);
+    bool reverse=selection.anchor>selection.caret;
+    anchor_pos_=SnapTextPosition(selection.anchor,reverse);
+    caret_pos_=SnapTextPosition(selection.caret,selection.anchor!=selection.caret && !reverse);
+    caret_upstream_=false;
     preferred_x_ = -1;
     ClearActiveObject();
     if(!Emit(WhenSelection)) return;
@@ -506,8 +509,9 @@ void UiDoc::SetSelection(UiDocRange range)
 {
     ViewGuard view_guard(*this);
     range = NormalizeRange(range);
-    anchor_pos_ = range.from;
-    caret_pos_ = range.to;
+    anchor_pos_=SnapTextPosition(range.from);
+    caret_pos_=SnapTextPosition(range.to,range.from!=range.to);
+    caret_upstream_=false;
     preferred_x_ = -1;
     ClearActiveObject();
     if(!Emit(WhenSelection)) return;

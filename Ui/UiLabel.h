@@ -59,7 +59,7 @@ public:
 
         Color  ink;
         Color  bg;
-        Font   font;
+        Font   font = Null;
         bool   bold = false;
         bool   italic = false;
         bool   underline = false;

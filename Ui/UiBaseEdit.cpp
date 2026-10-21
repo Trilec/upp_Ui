@@ -112,7 +112,7 @@ void UiBaseEdit::SyncThemeStyle()
     if(IsNull(fnt))
         fnt = StdFont();
 
-    font_size_ = GetTextSize("A", fnt);
+    font_size_ = UiGetTextSize("A", fnt);
     if(font_size_.cx <= 0) font_size_.cx = 8;
     if(font_size_.cy <= 0) font_size_.cy = 12;
     caret_height_ = GetVisualLineHeight();
@@ -748,7 +748,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
 
     fnt.RealizeStd();
 
-    space_width_cache_ = GetTextSize(" ", fnt).cx;
+    space_width_cache_ = UiGetTextSize(" ", fnt).cx;
     if(space_width_cache_ <= 0)
         space_width_cache_ = 1;
     tab_width_cache_ = space_width_cache_ * max(style.tab_size, 1);
@@ -766,6 +766,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
         mc.source_key=source; mc.display_key=s; mc.font_key=fnt;
         mc.tab_key=tab_width_cache_; mc.ready=true;
         mc.char_widths.Clear(); mc.line_px=0;
+#ifndef flagGPUUI
         int px = 0;
         mc.char_widths.SetCount(s.GetCount(), 0);
         for(int j = 0; j < s.GetCount(); j++) {
@@ -782,7 +783,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
                 else {
                     WString one;
                     one.Cat(s[j]);
-                    cw = GetTextSize(one, fnt).cx;
+                    cw = UiGetTextSize(one, fnt).cx;
                     if(cw <= 0)
                         cw = 1;
                     glyph_width_cache.Add(key, cw);
@@ -794,6 +795,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
             px += cw;
         }
         mc.line_px = px;
+#endif
 #ifdef flagGPUUI
         UiTextLayoutOptions options; options.tab_spaces=minmax(style.tab_size,1,64);
         mc.layout=UiTextLayout::Create(s,fnt,options);
@@ -814,7 +816,7 @@ void UiBaseEdit::EnsureTextMetricsCache() const
     const_cast<UiBaseEdit *>(this)->caret_height_=height;
 #endif
     if(placeholder_width_dirty_)
-        placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : GetTextSize(placeholder_text_, fnt).cx;
+        placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : UiGetTextSize(placeholder_text_, fnt).cx;
 
     line_metrics_dirty_ = false;
     placeholder_width_dirty_ = false;
@@ -833,7 +835,7 @@ void UiBaseEdit::SyncFont()
     if(IsNull(fnt))
         fnt = StdFont();
 
-    font_size_ = GetTextSize("A", fnt);
+    font_size_ = UiGetTextSize("A", fnt);
     if(font_size_.cx <= 0) font_size_.cx = 8;
     if(font_size_.cy <= 0) font_size_.cy = 12;
 
@@ -1971,7 +1973,7 @@ void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
 #ifdef flagGPUUI
     if(i>=0 && i<line_metrics_cache_.GetCount()) {
         const auto& layout=line_metrics_cache_[i].layout;
-        if(!layout.IsValid()) layout.Draw(w,Pointf(px,text_y),style.palette.ink[ink_state]);
+        if(!layout.IsValid()) { layout.Draw(w,Pointf(px,text_y),style.palette.ink[ink_state]); return; }
         if(layout.IsValid()) {
             text_y=y+max(0,(line_height-(int)ceil(layout.GetSize().cy))/2);
             Color ink=style.palette.ink[ink_state];

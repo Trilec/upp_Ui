@@ -130,12 +130,68 @@ public:
 	}
 };
 
+// Private effects are retained by DirectWrite together with the immutable layout.
+class LayoutInk : public IUnknown {
+	LONG refs=1;
+public:
+	Color ink;
+	explicit LayoutInk(Color ink):ink(ink) {}
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void **object) override {
+		if(!object) return E_POINTER; *object=nullptr;
+		if(IsEqualIID(iid,__uuidof(IUnknown))) { *object=this; AddRef(); return S_OK; }
+		return E_NOINTERFACE;
+	}
+	ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&refs); }
+	ULONG STDMETHODCALLTYPE Release() override { ULONG left=InterlockedDecrement(&refs); if(!left) delete this; return left; }
+};
+Color EffectInk(IUnknown *effect) {
+	// This provider installs only LayoutInk effects; native Draw returns them.
+	auto *ink=dynamic_cast<LayoutInk *>(effect); return ink?ink->ink:Color(Null);
+}
+class LayoutInline : public IDWriteInlineObject {
+	LONG refs=1;
+public:
+	int position;
+	DWRITE_INLINE_OBJECT_METRICS metrics{};
+	LayoutInline(const UiTextInlineObject& object,double scale):position(object.position) {
+		metrics.width=(FLOAT)(object.size.cx/scale); metrics.height=(FLOAT)object.size.cy;
+		metrics.baseline=(FLOAT)(object.baseline<0?object.size.cy:object.baseline);
+	}
+	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void **object) override {
+		if(!object) return E_POINTER; *object=nullptr;
+		if(IsEqualIID(iid,__uuidof(IUnknown))||IsEqualIID(iid,__uuidof(IDWriteInlineObject))) {
+			*object=static_cast<IDWriteInlineObject *>(this); AddRef(); return S_OK;
+		} return E_NOINTERFACE;
+	}
+	ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&refs); }
+	ULONG STDMETHODCALLTYPE Release() override { ULONG left=InterlockedDecrement(&refs); if(!left) delete this; return left; }
+	HRESULT STDMETHODCALLTYPE Draw(void *,IDWriteTextRenderer *,FLOAT,FLOAT,BOOL,BOOL,IUnknown *) override { return S_OK; }
+	HRESULT STDMETHODCALLTYPE GetMetrics(DWRITE_INLINE_OBJECT_METRICS *out) override { if(!out) return E_POINTER; *out=metrics; return S_OK; }
+	HRESULT STDMETHODCALLTYPE GetOverhangMetrics(DWRITE_OVERHANG_METRICS *out) override { if(!out) return E_POINTER; *out={}; return S_OK; }
+	HRESULT STDMETHODCALLTYPE GetBreakConditions(DWRITE_BREAK_CONDITION *before,DWRITE_BREAK_CONDITION *after) override {
+		if(!before||!after) return E_POINTER; *before=*after=DWRITE_BREAK_CONDITION_NEUTRAL; return S_OK;
+	}
+};
+
 class RunCollector : public IDWriteTextRenderer {
 	GpuShapedText& text;
+	Vector<UiTextInlinePlacement>& objects;
+	const Vector<UiTextLine>& lines;
+	Vector<int>& run_lines;
+	Vector<int>& decoration_lines;
 	double scale,yoffset;
 	ULONG refs=1;
 public:
-	RunCollector(GpuShapedText& text,double scale,double yoffset):text(text),scale(scale),yoffset(yoffset) {}
+	RunCollector(GpuShapedText& text,Vector<UiTextInlinePlacement>& objects,const Vector<UiTextLine>& lines,
+	             Vector<int>& run_lines,Vector<int>& decoration_lines,double scale,double yoffset)
+	:text(text),objects(objects),lines(lines),run_lines(run_lines),decoration_lines(decoration_lines),scale(scale),yoffset(yoffset) {}
+	int LineAt(double y) const {
+		y+=yoffset; int lo=0,hi=lines.GetCount();
+		while(lo<hi) { int mid=(lo+hi)/2; if(lines[mid].bounds.top+lines[mid].baseline<y) lo=mid+1; else hi=mid; }
+		if(lo==lines.GetCount()) return lo-1;
+		if(lo && fabs(lines[lo-1].bounds.top+lines[lo-1].baseline-y)<fabs(lines[lo].bounds.top+lines[lo].baseline-y)) --lo;
+		return lo;
+	}
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void **object) override {
 		if(!object) return E_POINTER; *object=nullptr;
 		if(IsEqualIID(iid,__uuidof(IUnknown)) || IsEqualIID(iid,__uuidof(IDWriteTextRenderer)) ||
@@ -151,12 +207,12 @@ public:
 	}
 	HRESULT STDMETHODCALLTYPE GetPixelsPerDip(void *,FLOAT *pixels) override { *pixels=1; return S_OK; }
 	HRESULT STDMETHODCALLTYPE DrawGlyphRun(void *,FLOAT x,FLOAT y,DWRITE_MEASURING_MODE,
-		const DWRITE_GLYPH_RUN *run,const DWRITE_GLYPH_RUN_DESCRIPTION *,IUnknown *) override {
+		const DWRITE_GLYPH_RUN *run,const DWRITE_GLYPH_RUN_DESCRIPTION *,IUnknown *effect) override {
 		if(!run || !run->fontFace || run->isSideways || text.runs.GetCount()>=1024 ||
 		   run->glyphCount>65536 || run->glyphCount>(UINT32)(65536-text.GetGlyphCount())) return E_INVALIDARG;
 		auto source=std::make_shared<LayoutFace>(run->fontFace,scale);
 		if(source->GetIdentity().IsEmpty()) return E_FAIL;
-		auto& target=text.runs.Add(); target.face=source; target.em_size=run->fontEmSize;
+		auto& target=text.runs.Add(); target.face=source; target.em_size=run->fontEmSize; target.ink=EffectInk(effect); run_lines.Add(LineAt(y));
 		const bool rtl=(run->bidiLevel&1)!=0; double pen=x;
 		for(UINT32 i=0;i<run->glyphCount;++i) {
 			double advance=run->glyphAdvances?run->glyphAdvances[i]:0;
@@ -168,20 +224,27 @@ public:
 		}
 		return S_OK;
 	}
-	HRESULT Decoration(FLOAT x,FLOAT y,FLOAT width,FLOAT thickness,FLOAT offset,DWRITE_READING_DIRECTION direction) {
+	HRESULT Decoration(FLOAT x,FLOAT y,FLOAT width,FLOAT thickness,FLOAT offset,DWRITE_READING_DIRECTION direction,Color ink) {
 		if(width<=0 || thickness<=0) return S_OK;
 		if(text.decorations.GetCount()>=4096) return E_OUTOFMEMORY;
 		double left=direction==DWRITE_READING_DIRECTION_RIGHT_TO_LEFT?x-width:x;
-		text.decorations.Add(Rectf(left*scale,y+offset+yoffset,(left+width)*scale,y+offset+thickness+yoffset));
+		decoration_lines.Add(LineAt(y));
+		text.decorations.Add(GpuTextDecoration(Rectf(left*scale,y+offset+yoffset,(left+width)*scale,y+offset+thickness+yoffset),ink));
 		return S_OK;
 	}
-	HRESULT STDMETHODCALLTYPE DrawUnderline(void *,FLOAT x,FLOAT y,const DWRITE_UNDERLINE *line,IUnknown *) override {
-		return Decoration(x,y,line->width,line->thickness,line->offset,line->readingDirection);
+	HRESULT STDMETHODCALLTYPE DrawUnderline(void *,FLOAT x,FLOAT y,const DWRITE_UNDERLINE *line,IUnknown *effect) override {
+		return Decoration(x,y,line->width,line->thickness,line->offset,line->readingDirection,EffectInk(effect));
 	}
-	HRESULT STDMETHODCALLTYPE DrawStrikethrough(void *,FLOAT x,FLOAT y,const DWRITE_STRIKETHROUGH *line,IUnknown *) override {
-		return Decoration(x,y,line->width,line->thickness,line->offset,line->readingDirection);
+	HRESULT STDMETHODCALLTYPE DrawStrikethrough(void *,FLOAT x,FLOAT y,const DWRITE_STRIKETHROUGH *line,IUnknown *effect) override {
+		return Decoration(x,y,line->width,line->thickness,line->offset,line->readingDirection,EffectInk(effect));
 	}
-	HRESULT STDMETHODCALLTYPE DrawInlineObject(void *,FLOAT,FLOAT,IDWriteInlineObject *,BOOL,BOOL,IUnknown *) override { return E_NOTIMPL; }
+	HRESULT STDMETHODCALLTYPE DrawInlineObject(void *,FLOAT x,FLOAT y,IDWriteInlineObject *object,BOOL sideways,BOOL,IUnknown *) override {
+		auto *placed=dynamic_cast<LayoutInline *>(object);
+		if(!placed || sideways || objects.GetCount()>=1024) return E_INVALIDARG;
+		auto& out=objects.Add(); out.position=placed->position;
+		out.bounds=Rectf(x*scale,y+yoffset,(x+placed->metrics.width)*scale,y+yoffset+placed->metrics.height);
+		return S_OK;
+	}
 };
 #endif
 }
@@ -194,6 +257,8 @@ struct UiTextLayout::Data {
 	Sizef size=Sizef(0,0);
 	int64 payload=0;
 	bool valid=false;
+	Vector<UiTextLine> lines;
+	Vector<UiTextInlinePlacement> objects;
 #if defined(PLATFORM_WIN32) && defined(flagGPUUI)
 	struct Paragraph {
 		int start=0,end=0,utf16_start=0;
@@ -201,21 +266,24 @@ struct UiTextLayout::Data {
 		LayoutCom<IDWriteTextLayout> native;
 	};
 	Array<Paragraph> paragraphs;
-	Vector<int> graphemes;
+	Vector<int> graphemes,words;
 	struct VisualStop : Moveable<VisualStop> { Pointf point; UiTextHit hit; };
 	Vector<VisualStop> visual_stops;
 	std::shared_ptr<GpuShapedText> glyphs=std::make_shared<GpuShapedText>();
+	Array<std::shared_ptr<const GpuShapedText>> line_glyphs;
 	double scale=1;
 	bool Check(HRESULT hr,const char *message) { if(SUCCEEDED(hr)) return true; error=message; return false; }
-	bool Build(const WString& text,Font requested,const UiTextLayoutOptions& settings) {
+	bool Build(const WString& text,Font requested,const UiTextLayoutOptions& settings,
+	           const Vector<UiTextStyleRange>& styles,const Vector<UiTextInlineObject>& inline_objects) {
 		font=requested; font.RealizeStd(); options=settings;
 		if(!encoded.Build(text,error)) return false;
 		if(!Finite(options.width) || options.width<=0 || options.tab_spaces<1 || options.tab_spaces>64 ||
-		   options.locale.GetCount()>256 || (int)options.direction<0 || (int)options.direction>2) {
+		   options.locale.GetCount()>256 || (int)options.direction<0 || (int)options.direction>2 || (int)options.alignment<0 || (int)options.alignment>3) {
 			error="invalid text layout options"; return false;
 		}
-		if(!UiTextInternal::GraphemeBreaks(encoded,options.locale,graphemes,error)) return false;
-		double em=font.GetHeight()?abs(font.GetHeight()):12;
+		if(!UiTextInternal::GraphemeBreaks(encoded,options.locale,graphemes,error) ||
+		   !UiTextInternal::WordBreaks(encoded,options.locale,words,error)) return false;
+		double em=font.GetHeight()?abs(font.GetHeight()):max(1,StdFont().GetHeight());
 		if(em<=0 || em>512) { error="text size exceeds512pixel glyph contract"; return false; }
 		if(font.GetWidth()) {
 			Font natural=font; natural.Width(0);
@@ -231,6 +299,7 @@ struct UiTextLayout::Data {
 			if(GetUserDefaultLocaleName(buffer,LOCALE_NAME_MAX_LENGTH)) locale_name=FromSystemCharsetW(buffer);
 		}
 		if(!family.Build(font.GetFaceName().ToWString(),error) || !locale.Build(locale_name.ToWString(),error)) return false;
+		Vector<int> run_lines,decoration_lines;
 		int start=0;
 		for(int end=0;;++end) {
 			bool separator=end<text.GetCount() && (text[end]=='\r'||text[end]=='\n'||text[end]==0x2028||text[end]==0x2029);
@@ -248,14 +317,50 @@ struct UiTextLayout::Data {
 				font.IsItalic()?DWRITE_FONT_STYLE_ITALIC:DWRITE_FONT_STYLE_NORMAL,
 				DWRITE_FONT_STRETCH_NORMAL,(FLOAT)em,(const WCHAR *)locale.utf16.Begin(),format.Put()),"cannot create text format")) return false;
 			if(!Check(format->SetReadingDirection(rtl?DWRITE_READING_DIRECTION_RIGHT_TO_LEFT:DWRITE_READING_DIRECTION_LEFT_TO_RIGHT),"invalid paragraph direction") ||
-			   !Check(format->SetWordWrapping(options.wrap?DWRITE_WORD_WRAPPING_WRAP:DWRITE_WORD_WRAPPING_NO_WRAP),"invalid wrapping") ||
+			   !Check(format->SetWordWrapping(options.wrap?(options.wrap_at_character?DWRITE_WORD_WRAPPING_CHARACTER:DWRITE_WORD_WRAPPING_WRAP):DWRITE_WORD_WRAPPING_NO_WRAP),"invalid wrapping") ||
 			   !Check(format->SetIncrementalTabStop((FLOAT)(max(1,font.GetWidth(' '))*options.tab_spaces/scale)),"invalid tab stop")) return false;
+			DWRITE_TEXT_ALIGNMENT alignment=DWRITE_TEXT_ALIGNMENT_LEADING;
+			if(options.alignment==UiTextAlignment::Center) alignment=DWRITE_TEXT_ALIGNMENT_CENTER;
+			else if(options.alignment==UiTextAlignment::Left) alignment=rtl?DWRITE_TEXT_ALIGNMENT_TRAILING:DWRITE_TEXT_ALIGNMENT_LEADING;
+			else if(options.alignment==UiTextAlignment::Right) alignment=rtl?DWRITE_TEXT_ALIGNMENT_LEADING:DWRITE_TEXT_ALIGNMENT_TRAILING;
+			if(!Check(format->SetTextAlignment(alignment),"invalid text alignment")) return false;
 			UINT32 length=encoded.scalar_to_utf16[end]-p.utf16_start;
 			if(!Check(factory->CreateTextLayout((const WCHAR *)encoded.utf16.Begin()+p.utf16_start,length,format.p,
 				(FLOAT)(options.width/scale),10000000,p.native.Put()),"cannot create text layout")) return false;
 			DWRITE_TEXT_RANGE range{0,length};
 			if(font.IsUnderline() && !Check(p.native->SetUnderline(TRUE,range),"cannot underline text")) return false;
 			if(font.IsStrikeout() && !Check(p.native->SetStrikethrough(TRUE,range),"cannot strike text")) return false;
+			for(const auto& style:styles) {
+				int first=max(start,style.from),last=min(end,style.from+style.length);
+				if(first>=last) continue;
+				DWRITE_TEXT_RANGE styled{(UINT32)(encoded.scalar_to_utf16[first]-p.utf16_start),
+				                        (UINT32)(encoded.scalar_to_utf16[last]-encoded.scalar_to_utf16[first])};
+				if(!IsNull(style.font)) {
+					Font f=style.font; f.RealizeStd(); UiTextInternal::Encoding name;
+					if(f.GetWidth()!=font.GetWidth()) { error="styled font width differs from paragraph width scale"; return false; }
+					if(!name.Build(f.GetFaceName().ToWString(),error) ||
+					   !Check(p.native->SetFontFamilyName((const WCHAR *)name.utf16.Begin(),styled),"cannot set styled family") ||
+					   !Check(p.native->SetFontSize((FLOAT)(f.GetHeight()?abs(f.GetHeight()):em),styled),"cannot set styled size") ||
+					   !Check(p.native->SetFontWeight(f.IsBold()?DWRITE_FONT_WEIGHT_BOLD:DWRITE_FONT_WEIGHT_NORMAL,styled),"cannot set styled weight") ||
+					   !Check(p.native->SetFontStyle(f.IsItalic()?DWRITE_FONT_STYLE_ITALIC:DWRITE_FONT_STYLE_NORMAL,styled),"cannot set styled slant") ||
+					   !Check(p.native->SetUnderline(f.IsUnderline(),styled),"cannot set styled underline") ||
+					   !Check(p.native->SetStrikethrough(f.IsStrikeout(),styled),"cannot set styled strike")) return false;
+				}
+				if(!IsNull(style.ink)) {
+					LayoutCom<LayoutInk> effect; *effect.Put()=new LayoutInk(style.ink);
+					if(!Check(p.native->SetDrawingEffect(effect.p,styled),"cannot set styled ink")) return false;
+				}
+				if(style.tracking) {
+					LayoutCom<IDWriteTextLayout1> spaced;
+					if(!Check(p.native->QueryInterface(__uuidof(IDWriteTextLayout1),reinterpret_cast<void **>(spaced.Put())),"character spacing unavailable") ||
+					   !Check(spaced->SetCharacterSpacing(0,(FLOAT)(style.tracking/scale),0,styled),"cannot set character spacing")) return false;
+				}
+			}
+			for(const auto& object:inline_objects) if(object.position>=start && object.position<end) {
+				LayoutCom<LayoutInline> native_object; *native_object.Put()=new LayoutInline(object,scale);
+				DWRITE_TEXT_RANGE replaced{(UINT32)(encoded.scalar_to_utf16[object.position]-p.utf16_start),1};
+				if(!Check(p.native->SetInlineObject(native_object.p,replaced),"cannot set inline metrics")) return false;
+			}
 			DWRITE_TEXT_METRICS metrics{};
 			if(!Check(p.native->GetMetrics(&metrics),"cannot measure text")) return false;
 			if(!options.wrap) {
@@ -263,13 +368,52 @@ struct UiTextLayout::Data {
 				   !Check(p.native->GetMetrics(&metrics),"cannot remeasure paragraph")) return false;
 			}
 			p.height=metrics.height; size.cx=max(size.cx,(double)metrics.widthIncludingTrailingWhitespace*scale); size.cy+=p.height;
-			RunCollector collector(*glyphs,scale,p.y);
+			UINT32 line_count=0;
+			p.native->GetLineMetrics(nullptr,0,&line_count);
+			if(line_count>32769) { error="native line count exceeds text budget"; return false; }
+			Buffer<DWRITE_LINE_METRICS> native_lines(line_count);
+			if(!Check(p.native->GetLineMetrics(~native_lines,line_count,&line_count),"cannot get native lines")) return false;
+			int offset=0; double top=p.y;
+			for(UINT32 i=0;i<line_count;++i) {
+				const auto& native_line=native_lines[i];
+				auto& line=lines.Add();
+				line.from=encoded.utf16_to_scalar[p.utf16_start+offset];
+				int finish=min<int>(length,offset+native_line.length-native_line.newlineLength);
+				line.to=encoded.utf16_to_scalar[p.utf16_start+finish];
+				line.bounds=Rectf(0,top,options.wrap?options.width:metrics.widthIncludingTrailingWhitespace*scale,top+native_line.height);
+				line.baseline=native_line.baseline; line.right_to_left=rtl;
+				top+=native_line.height; offset+=native_line.length;
+			}
+			RunCollector collector(*glyphs,objects,lines,run_lines,decoration_lines,scale,p.y);
 			if(!Check(p.native->Draw(nullptr,&collector,0,0),"cannot collect positioned glyphs")) return false;
 			if(end==text.GetCount()) break;
 			if(text[end]=='\r' && end+1<text.GetCount() && text[end+1]=='\n') ++end;
 			start=end+1;
 		}
 		if(!glyphs->IsValid(&error)) return false;
+		int64 line_bytes=0;
+		if(lines.GetCount()==1 && lines[0].bounds.top==0) line_glyphs.Add()=glyphs;
+		else {
+			Array<std::shared_ptr<GpuShapedText>> slices;
+			for(int i=0;i<lines.GetCount();++i) slices.Add()=std::make_shared<GpuShapedText>();
+			for(int i=0;i<glyphs->runs.GetCount();++i) {
+				int line=run_lines[i];
+				if(line<0 || line>=slices.GetCount()) { error="glyph run has no native line"; return false; }
+				const auto& source=glyphs->runs[i]; auto& target=slices[line]->runs.Add();
+				target.face=source.face; target.em_size=source.em_size; target.ink=source.ink; target.glyphs=clone(source.glyphs);
+				for(auto& glyph:target.glyphs) glyph.origin.y-=lines[line].bounds.top;
+			}
+			for(int i=0;i<glyphs->decorations.GetCount();++i) {
+				int line=decoration_lines[i];
+				if(line<0 || line>=slices.GetCount()) { error="decoration has no native line"; return false; }
+				auto decoration=glyphs->decorations[i]; decoration.rect-=Pointf(0,lines[line].bounds.top);
+				slices[line]->decorations.Add(decoration);
+			}
+			for(const auto& slice:slices) {
+				if(!slice->IsValid(&error)) return false;
+				line_bytes+=slice->GetPayloadBytes(); line_glyphs.Add()=slice;
+			}
+		}
 		for(int position:graphemes) for(bool upstream:{false,true}) {
 			Pointf point=Caret(position,upstream);
 			if(!Finite(point.x)||!Finite(point.y)) { error="cannot obtain text caret geometry"; return false; }
@@ -282,10 +426,11 @@ struct UiTextLayout::Data {
 			if(a.hit.position!=b.hit.position) return a.hit.position<b.hit.position;
 			return a.hit.trailing<b.hit.trailing;
 		});
-		payload=glyphs->GetPayloadBytes()+(int64)encoded.text.GetCount()*4+
+		payload=glyphs->GetPayloadBytes()+line_bytes+(int64)line_glyphs.GetCount()*sizeof(std::shared_ptr<const GpuShapedText>)+(int64)encoded.text.GetCount()*4+
 		        (int64)encoded.utf16.GetCount()*2+
-		        (int64)(encoded.scalar_to_utf16.GetCount()+encoded.utf16_to_scalar.GetCount()+graphemes.GetCount())*4+
-		        (int64)visual_stops.GetCount()*sizeof(VisualStop)+(int64)paragraphs.GetCount()*sizeof(Paragraph);
+		        (int64)(encoded.scalar_to_utf16.GetCount()+encoded.utf16_to_scalar.GetCount()+graphemes.GetCount()+words.GetCount())*4+
+		        (int64)visual_stops.GetCount()*sizeof(VisualStop)+(int64)paragraphs.GetCount()*sizeof(Paragraph)+
+		        (int64)lines.GetCount()*sizeof(UiTextLine)+(int64)objects.GetCount()*sizeof(UiTextInlinePlacement);
 		valid=true; error.Clear(); return true;
 	}
 	int Snap(int position,bool up) const {
@@ -319,15 +464,20 @@ struct UiTextLayout::Data {
 		return Pointf(x*scale,y+p.y);
 	}
 #else
-	bool Build(const WString&,Font,const UiTextLayoutOptions&) { error="full text layout provider unavailable in this assembly"; return false; }
+	bool Build(const WString&,Font,const UiTextLayoutOptions&,const Vector<UiTextStyleRange>&,const Vector<UiTextInlineObject>&) { error="full text layout provider unavailable in this assembly"; return false; }
 #endif
 };
 
 UiTextLayout UiTextLayout::Create(const WString& text,Font font,const UiTextLayoutOptions& options)
 {
+	return CreateStyled(text,font,Vector<UiTextStyleRange>(),Vector<UiTextInlineObject>(),options);
+}
+UiTextLayout UiTextLayout::CreateStyled(const WString& text,Font font,
+    const Vector<UiTextStyleRange>& styles,const Vector<UiTextInlineObject>& objects,const UiTextLayoutOptions& options)
+{
 	UiTextLayout result;
 	// Validate before serialising an untrusted-size key.
-	if(text.GetCount()>32768 || options.locale.GetCount()>256 || options.locale.Find('\0')>=0 || !Finite(options.width) ||
+	if(styles.GetCount()>1024 || objects.GetCount()>1024 || text.GetCount()>32768 || options.locale.GetCount()>256 || options.locale.Find('\0')>=0 || !Finite(options.width) ||
 	   options.width<=0 || options.tab_spaces<1 || options.tab_spaces>64 ||
 	   (int)options.direction<0 || (int)options.direction>2) {
 		result.data=std::make_shared<Data>(); result.data->error="invalid text layout input or options"; return result;
@@ -336,12 +486,43 @@ UiTextLayout UiTextLayout::Create(const WString& text,Font font,const UiTextLayo
 		if(text[i]>0x10ffff || (text[i]>=0xd800 && text[i]<=0xdfff)) {
 			result.data=std::make_shared<Data>(); result.data->error="invalid Unicode scalar"; return result;
 		}
+	int previous=0;
+	for(const auto& style:styles) {
+		Font resolved=style.font; if(!IsNull(resolved)) resolved.RealizeStd();
+		if(style.from<previous || style.length<=0 || style.length>text.GetCount()-style.from ||
+		   style.from<0 || !Finite(style.tracking) || fabs(style.tracking)>512 ||
+		   (!IsNull(resolved) && (abs(resolved.GetHeight())>512))) {
+			result.data=std::make_shared<Data>(); result.data->error="invalid or overlapping styled text range"; return result;
+		}
+		previous=style.from+style.length;
+	}
+	previous=-1;
+	for(const auto& object:objects) {
+		if(object.position<=previous || object.position<0 || object.position>=text.GetCount() ||
+		   text[object.position]!=0xfffc || !Finite(object.size.cx) || !Finite(object.size.cy) ||
+		   object.size.cx<=0 || object.size.cy<=0 || !Finite(object.baseline) ||
+		   object.baseline>object.size.cy) {
+			result.data=std::make_shared<Data>(); result.data->error="invalid inline object metrics or position"; return result;
+		}
+		previous=object.position;
+	}
 	if(IsNull(font)) font=StdFont();
 	font.RealizeStd();
 	StringStream key_stream;
 	int64 font_key=font.AsInt64(); int direction=(int)options.direction;
 	double width=options.width; bool wrap=options.wrap; int tabs=options.tab_spaces; String locale=options.locale; WString key_text=text;
-	key_stream % font_key % direction % width % wrap % tabs % locale % key_text;
+	int alignment=(int)options.alignment; bool character_wrap=options.wrap_at_character;
+	key_stream % font_key % direction % width % wrap % character_wrap % alignment % tabs % locale % key_text;
+	int style_count=styles.GetCount(),object_count=objects.GetCount(); key_stream % style_count % object_count;
+	for(const auto& style:styles) {
+		int from=style.from,length=style.length; Font f=style.font; if(!IsNull(f)) f.RealizeStd();
+		int64 id=f.AsInt64(); Color ink=style.ink; double tracking=style.tracking;
+		key_stream % from % length % id % ink % tracking;
+	}
+	for(const auto& object:objects) {
+		int position=object.position; Sizef size=object.size; double baseline=object.baseline;
+		key_stream % position % size % baseline;
+	}
 	String key=key_stream.GetResult();
 	auto& cache=Cache();
 	{
@@ -350,7 +531,7 @@ UiTextLayout UiTextLayout::Create(const WString& text,Font font,const UiTextLayo
 		++cache.stats.misses;
 	}
 	result.data=std::make_shared<Data>();
-	if(!result.data->Build(text,font,options)) return result;
+	if(!result.data->Build(text,font,options,styles,objects)) return result;
 	int64 bytes=result.data->payload+key.GetCount();
 	Mutex::Lock lock(cache.mutex);
 	int existing=cache.entries.Find(key); if(existing>=0) return cache.entries[existing].layout;
@@ -365,6 +546,14 @@ UiTextLayout UiTextLayout::Create(const WString& text,Font font,const UiTextLayo
 		cache.stats.cache_payload_bytes+=bytes;
 	}
 	return result;
+}
+int UiTextLayout::GetLineCount() const { return IsValid()?data->lines.GetCount():0; }
+UiTextLine UiTextLayout::GetLine(int index) const {
+	return IsValid() && index>=0 && index<data->lines.GetCount()?data->lines[index]:UiTextLine();
+}
+int UiTextLayout::GetInlineCount() const { return IsValid()?data->objects.GetCount():0; }
+UiTextInlinePlacement UiTextLayout::GetInline(int index) const {
+	return IsValid() && index>=0 && index<data->objects.GetCount()?data->objects[index]:UiTextInlinePlacement();
 }
 bool UiTextLayout::IsValid() const { return data && data->valid; }
 String UiTextLayout::GetError() const { return data?data->error:String("uninitialised text layout"); }
@@ -456,7 +645,38 @@ int UiTextLayout::NextGrapheme(int position,int direction) const {
 #endif
 	return 0;
 }
-UiTextHit UiTextLayout::MoveVisual(UiTextHit current,int direction) const {
+int UiTextLayout::NextWord(int position,int direction) const {
+#if defined(PLATFORM_WIN32) && defined(flagGPUUI)
+	if(IsValid()) {
+		position=minmax(position,0,GetLength()); const auto& words=data->words;
+		if(direction<0) {
+			while(position>0 && UiTextInternal::IsWhitespace(data->encoded.text[position-1])) --position;
+			int i=FindLowerBound(words,position);
+			return data->Snap(words[max(0,i-1)],false);
+		}
+		if(direction>0) {
+			int i=FindUpperBound(words,position);
+			position=words[min(i,words.GetCount()-1)];
+			while(position<GetLength() && UiTextInternal::IsWhitespace(data->encoded.text[position])) ++position;
+			return data->Snap(position,true);
+		}
+		return data->Snap(position,false);
+	}
+#endif
+	return 0;
+}
+bool UiTextLayout::GetWord(int position,int& from,int& to) const {
+#if defined(PLATFORM_WIN32) && defined(flagGPUUI)
+	if(IsValid() && GetLength()>0) {
+		position=minmax(position,0,GetLength()-1);
+		int i=max(0,FindUpperBound(data->words,position)-1);
+		from=data->Snap(data->words[i],false);
+		to=data->Snap(data->words[min(i+1,data->words.GetCount()-1)],true); return true;
+	}
+#endif
+	return false;
+}
+UiTextHit UiTextLayout::MoveVisual(UiTextHit current,int direction,bool cross_lines) const {
 #if defined(PLATFORM_WIN32) && defined(flagGPUUI)
 	if(IsValid() && direction) {
 		Pointf point=GetCaret(current.position,current.trailing);
@@ -474,12 +694,26 @@ UiTextHit UiTextLayout::MoveVisual(UiTextHit current,int direction) const {
 		UiTextHit next=current;
 		if(index>=0 && index<stops.GetCount() && fabs(stops[index].point.y-point.y)<.01)
 			next=stops[index].hit;
+		if(next.position==current.position && next.trailing==current.trailing && cross_lines) {
+			int line=0; while(line+1<data->lines.GetCount() && data->lines[line+1].bounds.top<=point.y+.01) ++line;
+			int delta=direction*(data->lines[line].right_to_left?-1:1),target=line+delta;
+			if(target>=0 && target<data->lines.GetCount()) {
+				const auto& bounds=data->lines[target].bounds;
+				return HitTest(Pointf(direction<0?1e7:-1e7,(bounds.top+bounds.bottom)*.5));
+			}
+		}
 		return next;
 	}
 #endif
 	return current;
 }
 #ifdef flagGPUUI
+std::shared_ptr<const GpuShapedText> UiTextLayout::GetLineGpuText(int line) const {
+#ifdef PLATFORM_WIN32
+	if(IsValid() && line>=0 && line<data->line_glyphs.GetCount()) return data->line_glyphs[line];
+#endif
+	return {};
+}
 std::shared_ptr<const GpuShapedText> UiTextLayout::GetGpuText() const {
 #ifdef PLATFORM_WIN32
 	if(IsValid()) return data->glyphs;
@@ -500,25 +734,41 @@ struct LayoutPainterSink : FontGlyphConsumer {
 };
 #endif
 }
-bool UiTextLayout::Draw(Upp::Draw& draw,Pointf origin,Color ink) const {
+namespace {
 #ifdef flagGPUUI
+bool DrawLayoutSnapshot(Upp::Draw& draw,Pointf origin,Color ink,bool override_ink,
+                        const std::shared_ptr<const GpuShapedText>& glyphs) {
 	if(auto *target=dynamic_cast<GpuDrawTarget *>(&draw))
-		return target->DrawShapedText(origin,GetGpuText(),ink);
+		return target->DrawShapedText(origin,glyphs,ink,override_ink);
 	if(auto *target=dynamic_cast<GpuPainterEffects *>(&draw))
-		return target->DrawShapedText(origin,GetGpuText(),ink);
-	if(IsValid()) if(auto *painter=dynamic_cast<Painter *>(&draw)) {
+		return target->DrawShapedText(origin,glyphs,ink,override_ink);
+	if(glyphs) if(auto *painter=dynamic_cast<Painter *>(&draw)) {
 		painter->Begin(); painter->EvenOdd(false); String error;
-		const auto glyphs=GetGpuText();
 		for(const auto& run:glyphs->runs) for(const auto& glyph:run.glyphs) {
 			LayoutPainterSink sink(*painter,origin+glyph.origin);
 			if(!run.face->GetOutline(glyph.glyph,run.em_size,sink,error)) { painter->End(); return false; }
-			if(sink.used) painter->Fill(ink);
+			if(sink.used) painter->Fill(override_ink || IsNull(run.ink)?ink:run.ink);
 		}
-		for(const auto& r:glyphs->decorations) painter->Rectangle(r+origin).Fill(ink);
+		for(const auto& r:glyphs->decorations) painter->Rectangle(r.rect+origin).Fill(override_ink || IsNull(r.ink)?ink:r.ink);
 		painter->End(); return true;
 	}
-#endif
 	return false;
+}
+#endif
+}
+bool UiTextLayout::Draw(Upp::Draw& draw,Pointf origin,Color ink,bool override_ink) const {
+#ifdef flagGPUUI
+	return DrawLayoutSnapshot(draw,origin,ink,override_ink,GetGpuText());
+#else
+	return false;
+#endif
+}
+bool UiTextLayout::DrawLine(Upp::Draw& draw,int line,Pointf origin,Color ink,bool override_ink) const {
+#ifdef flagGPUUI
+	return DrawLayoutSnapshot(draw,origin,ink,override_ink,GetLineGpuText(line));
+#else
+	return false;
+#endif
 }
 UiTextLayoutStats GetUiTextLayoutStats() {
 	auto& cache=Cache(); Mutex::Lock lock(cache.mutex);
@@ -585,7 +835,7 @@ bool UiDrawTextSelection(Upp::Draw& draw,Point origin,const UiTextLayout& layout
 	for(const auto& r:rectangles) {
 		draw.Clip(Rect((int)floor(origin.x+r.left),(int)floor(origin.y+r.top),
 		               (int)ceil(origin.x+r.right),(int)ceil(origin.y+r.bottom)));
-		bool ok=layout.Draw(draw,Pointf(origin),selected_ink); draw.End();
+		bool ok=layout.Draw(draw,Pointf(origin),selected_ink,true); draw.End();
 		if(!ok) return false;
 	}
 	return true;

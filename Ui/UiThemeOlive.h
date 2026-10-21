@@ -327,7 +327,7 @@ inline UiList::Style List(UiList::Style s, const UiOliveTokens& t, UiRole role)
 inline UiTree::Style Tree(UiTree::Style s, const UiOliveTokens& t, UiRole role)
 {
     Base(s,t,UiRole::Standard,t.panel); s.font = FontPx(11);
-    s.row_height = max(DPI(32),GetTextSize("Ag",s.font).cy+DPI(16));
+    s.row_height = max(DPI(32),UiGetTextSize("Ag",s.font).cy+DPI(16));
     s.v_padding = DPI(8); s.row_radius = DPI(5);
     s.ink = t.muted; s.hot_ink = t.text; s.selected_ink = t.accent; s.disabled_ink = t.disabled_ink;
     s.hot_face = t.hover; s.hot_frame = Null; s.selected_face = t.active; s.selected_frame = Null;

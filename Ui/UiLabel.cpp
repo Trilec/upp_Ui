@@ -22,13 +22,51 @@ struct RichPiece : Moveable<RichPiece> {
 
 static Font ResolveSpanFont(const UiLabel::Span& s, Font base)
 {
-    Font f = IsNull(s.font) ? base : s.font;
+    Font f = IsNull(s.font) || s.font.AsInt64()==Font().AsInt64() ? base : s.font;
     if(s.bold)
         f = f.Bold();
     if(s.italic)
         f = f.Italic();
     return f;
 }
+
+#ifdef flagGPUUI
+struct RichNativeLine {
+    UiTextLayout layout;
+    Vector<int> native_to_plain,starts,ends;
+    int plain_length=0;
+    RichNativeLine(const Vector<RichPiece>& pieces,Font base) {
+        base.RealizeStd();
+        WString text; Vector<UiTextStyleRange> styles; Vector<UiTextInlineObject> objects;
+        native_to_plain.Add(0);
+        for(const auto& piece:pieces) {
+            starts.Add(text.GetCount());
+            if(piece.kind==UiLabel::Span::TEXT) {
+                WString part=piece.text.ToWString();
+                if(!part.IsEmpty()) {
+                    auto& style=styles.Add(); style.from=text.GetCount(); style.length=part.GetCount();
+                    style.font=piece.font; if(piece.underline) style.font.Underline(); style.ink=piece.ink;
+                    text.Cat(part);
+                    for(int i=0;i<part.GetCount();++i) native_to_plain.Add(++plain_length);
+                }
+            }
+            else {
+                auto& object=objects.Add(); object.position=text.GetCount(); object.size=Sizef(piece.sz);
+                object.baseline=min<double>(piece.sz.cy,max(0.0,(piece.sz.cy-base.GetHeight())*.5+base.GetAscent()));
+                text.Cat(0xfffc);
+                if(piece.kind==UiLabel::Span::BULLET) plain_length+=2; // Clipboard convention is "* ".
+                native_to_plain.Add(plain_length);
+            }
+            ends.Add(text.GetCount());
+        }
+        layout=UiTextLayout::CreateStyled(text,base,styles,objects);
+    }
+    int NativePosition(int plain) const {
+        return min(FindLowerBound(native_to_plain,minmax(plain,0,plain_length)),native_to_plain.GetCount()-1);
+    }
+    int PlainPosition(int native) const { return native_to_plain[minmax(native,0,native_to_plain.GetCount()-1)]; }
+};
+#endif
 
 static void BuildRichLines(const Vector<UiLabel::Span>& spans,
                            Font base_font,
@@ -83,7 +121,11 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
                 p.bg = s.bg;
                 p.font = ResolveSpanFont(s, base_font);
                 p.underline = s.underline;
+#ifdef flagGPUUI
+                p.sz=Size(0,0); // Complete native line below owns text measurement.
+#else
                 p.sz = UiGetTextSize(seg, p.font);
+#endif
                 lines.Top().Add(p);
             }
 
@@ -106,6 +148,12 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
             w += p.sz.cx;
             h = max(h, p.sz.cy);
         }
+#ifdef flagGPUUI
+        RichNativeLine native(lines[i],base_font);
+        if(native.layout.IsValid()) {
+            Sizef size=native.layout.GetSize(); w=(int)ceil(size.cx); h=(int)ceil(size.cy);
+        }
+#endif
         line_sizes[i] = Size(w, h);
     }
 }
@@ -442,11 +490,17 @@ int UiLabel::HitTestTextPos(Point p) const
             for(const RichPiece& rp : line)
                 if(rp.kind == Span::TEXT)
                     line_text_len += rp.text.ToWString().GetCount();
+                else if(rp.kind == Span::BULLET) line_text_len+=2;
 
             if(p.y < line_top)
                 return text_ofs;
 
             if(p.y <= line_bottom || i + 1 == count) {
+#ifdef flagGPUUI
+                RichNativeLine native(line,fnt);
+                if(native.layout.IsValid())
+                    return text_ofs+native.PlainPosition(native.layout.HitTest(Pointf(p.x-line_x,p.y-y)).position);
+#endif
                 if(p.x <= line_x)
                     return text_ofs;
                 if(p.x >= line_x + sz.cx)
@@ -1246,6 +1300,34 @@ void UiLabel::Paint(Draw& w)
             default: x = layout_.main.left; break;
             }
 
+#ifdef flagGPUUI
+            RichNativeLine native(ln,fnt);
+            Point origin(x,y);
+            for(int piece=0;piece<ln.GetCount();++piece) if(!IsNull(ln[piece].bg)) {
+                for(const auto& rect:native.layout.GetSelection(native.starts[piece],native.ends[piece]))
+                    w.DrawRect(Rect((int)floor(x+rect.left),(int)floor(y+rect.top),
+                                    (int)ceil(x+rect.right),(int)ceil(y+rect.bottom)),ln[piece].bg);
+            }
+            if(draw_sel && native.layout.IsValid())
+                UiDrawTextSelection(w,origin,native.layout,ink,native.NativePosition(sf-text_ofs),
+                                    native.NativePosition(st-text_ofs),SColorHighlight(),SColorHighlightText());
+            else native.layout.Draw(w,Pointf(origin),ink);
+            for(int object=0;object<native.layout.GetInlineCount();++object) {
+                auto placed=native.layout.GetInline(object);
+                int piece=FindLowerBound(native.starts,placed.position);
+                if(piece>=ln.GetCount() || native.starts[piece]!=placed.position) continue;
+                const auto& rp=ln[piece]; const auto& rect=placed.bounds;
+                Rect pr((int)floor(x+rect.left),(int)floor(y+rect.top),(int)ceil(x+rect.right),(int)ceil(y+rect.bottom));
+                if(rp.kind==Span::ICON)
+                    UiPaintStyledIcon(w,pr,rp.icon,true,false,rp.icon_render_mode,
+                                      IsNull(rp.ink)?icon_ink:rp.ink,enabled);
+                else if(rp.kind==Span::BULLET)
+                    w.DrawEllipse(pr,IsNull(rp.bullet_color)?ink:rp.bullet_color);
+            }
+            text_ofs+=native.plain_length+(i+1<rich_lines.GetCount()?1:0);
+            y+=lsz.cy+(i+1<rich_lines.GetCount()?gap:0);
+            continue;
+#endif
             for(const RichPiece& rp : ln) {
                 Rect pr(x, y + (lsz.cy - rp.sz.cy) / 2, x + rp.sz.cx, y + (lsz.cy - rp.sz.cy) / 2 + rp.sz.cy);
 

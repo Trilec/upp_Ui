@@ -23,6 +23,7 @@
 #include <Ui/UiFonts.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiDoc/UiDocCore.h>
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 
@@ -156,6 +157,8 @@ private:
         int y = 0;
         int height = 0;
         int baseline = 0;
+        int native_line = -1;
+        double native_top = 0;
         int left = 0;
         int flow_y = 0;
         Vector<VisualGlyph> glyphs;
@@ -173,6 +176,9 @@ private:
 
     struct TableCellVisual : Moveable<TableCellVisual> {
         Rect rect;
+        UiTextLayout text_layout;
+        Point text_origin=Point(0,0);
+        Vector<int> line_tops;
         Vector<TableUnitVisual> units;
         Vector<Rect> carets;
     };
@@ -206,6 +212,7 @@ private:
         int flow_height = 0;
         ParagraphFormat format;
         String role;
+        UiTextLayout text_layout;
         Vector<VisualLine> lines;
         Vector<EmbedVisual> embeds;
     };
@@ -233,6 +240,8 @@ private:
 
     int anchor_pos_ = 0;
     int caret_pos_ = 0;
+    bool caret_upstream_ = false;
+    mutable bool point_upstream_ = false;
     bool drag_selecting_ = false;
     int preferred_x_ = -1;
     UiDocTextStyle typing_style_;
@@ -268,6 +277,7 @@ private:
 
     String active_table_id_;
     int active_table_row_ = -1;
+    bool table_upstream_ = false;
     int active_table_column_ = -1;
     int active_table_anchor_pos_ = 0;
     int active_table_pos_ = 0;
@@ -291,7 +301,11 @@ private:
     UiDocRange TableSelectionRange() const;
     bool HasSelection() const { return anchor_pos_ != caret_pos_; }
     bool HasTableSelection() const { return active_table_anchor_pos_ != active_table_pos_; }
-    void MoveCaret(int pos, bool keep_selection = false);
+    void MoveCaret(int pos, bool keep_selection = false,bool upstream=false);
+    int NextTextGrapheme(int position,int direction) const;
+    int SnapTextPosition(int position,bool forward=false) const;
+    bool MoveVisualText(int direction,bool keep_selection);
+    const TableCellVisual *FindActiveTableCell() const;
     void MapViewState(const UiDocPositionMap& map);
     void OnCoreChange(const UiDocApplyResult& result);
 
@@ -522,6 +536,7 @@ public:
     void Copy() const;
     void Paste();
 
+    Rect GetCaret() const override { return GetCaretRect(); }
     Rect GetCaretRect() const { return active_table_id_.IsEmpty() ? CaretRectInternal() : TableCaretRectInternal(); }
     int PosAtPoint(Point point) const;
     Point PointAtPos(int pos) const;
