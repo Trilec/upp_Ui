@@ -1,4 +1,5 @@
 #include <Ui/UiIndicatorBase.h>
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 
@@ -18,7 +19,7 @@ void UiIndicatorBase::InvalidateIndicatorCaches()
 
 void UiIndicatorBase::OnIndicatorStyleChanged(const Font& font)
 {
-    text_size_cache_ = GetTextSize(text_, font);
+    text_size_cache_ = UiGetTextSize(text_, font);
     text_size_dirty_ = false;
     layout_dirty_ = true;
     layout_content_cache_ = Rect(0, 0, 0, 0);
@@ -32,7 +33,7 @@ void UiIndicatorBase::SetIndicatorTextValue(const String& text, const Font& font
         return;
 
     text_ = text;
-    text_size_cache_ = GetTextSize(text_, font);
+    text_size_cache_ = UiGetTextSize(text_, font);
     text_size_dirty_ = false;
     layout_dirty_ = true;
     layout_content_cache_ = Rect(0, 0, 0, 0);
@@ -43,7 +44,7 @@ void UiIndicatorBase::SetIndicatorTextValue(const String& text, const Font& font
 Size UiIndicatorBase::GetIndicatorTextSizeCached(const Font& font) const
 {
     if(text_size_dirty_) {
-        text_size_cache_ = GetTextSize(text_, font);
+        text_size_cache_ = UiGetTextSize(text_, font);
         text_size_dirty_ = false;
     }
     return text_size_cache_;

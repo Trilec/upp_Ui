@@ -1,4 +1,5 @@
 #include <Ui/UiRadioButton.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiIndicatorSupport.h>
 #include <Ui/UiTheme.h>
 
@@ -261,7 +262,7 @@ Size UiRadioButton::GetMinSize() const
                                style.indicator_side,
                                style.indicator_gap,
                                0,
-                               max(GetTextSize("A", style.font).cy, style.indicator_size),
+                               max(UiGetTextSize("A", style.font).cy, style.indicator_size),
                                max(DPI(10), style.indicator_size));
 }
 

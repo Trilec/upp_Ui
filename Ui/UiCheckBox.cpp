@@ -1,4 +1,5 @@
 #include <Ui/UiCheckBox.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiIndicatorSupport.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
@@ -348,7 +349,7 @@ Size UiCheckBox::GetMinSize() const
                                style.indicator_side,
                                style.indicator_gap,
                                0,
-                               max(GetTextSize("A", style.font).cy, support_natural.cy),
+                               max(UiGetTextSize("A", style.font).cy, support_natural.cy),
                                max(DPI(10), max(support_natural.cx, support_natural.cy)));
 }
 

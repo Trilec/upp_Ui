@@ -1,6 +1,7 @@
 // Compact native palette composition; local preview is separate from commit.
 // Layout owns the ten-pixel inset. Theme chrome does not add a second padding.
 #include "UiColorPickerMicro.h"
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiIcons.h>
 #include <Ui/UiTheme.h>
 namespace Upp
@@ -430,7 +431,7 @@ Size UiColorPickerMicro::GetMinSize() const
         if(rgb_mode_)
         {
             height += DPI(6) + EditorHeight();
-            width = max(width, 3 * GetTextSize("G 255", channel_labels_[0].GetStyle().font).cx + DPI(70));
+            width = max(width, 3 * UiGetTextSize("G 255", channel_labels_[0].GetStyle().font).cx + DPI(70));
         }
     }
     return Size(max(width, inherited.cx), max(height, inherited.cy));

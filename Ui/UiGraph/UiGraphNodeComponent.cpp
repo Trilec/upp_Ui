@@ -1,4 +1,5 @@
 #include "UiGraphNodeComponent.h"
+#include <Ui/UiTextLayout.h>
 #include "UiNodeGraphLod.h"
 #include <cmath>
 
@@ -38,17 +39,7 @@ bool ScalarText(const Value& raw, String& text)
 
 WString FitText(const WString& input, Font font, int width, bool ellipsis)
 {
-    if(width <= 0) return WString();
-    if(GetTextSize(input, font).cx <= width) return input;
-    const WString tail = ellipsis ? String("...").ToWString() : WString();
-    if(GetTextSize(tail, font).cx > width) return WString();
-    int lo = 0, hi = input.GetCount();
-    while(lo < hi) {
-        int mid = lo + (hi - lo + 1) / 2;
-        if(GetTextSize(input.Left(mid) + tail, font).cx <= width) lo = mid;
-        else hi = mid - 1;
-    }
-    return input.Left(lo) + tail;
+    return UiFitText(input,font,width,ellipsis?WString("..."):WString());
 }
 
 // Single-line Ellipsis text keeps readable letters before falling back to a
@@ -183,7 +174,7 @@ ResolvedNodeComponent ResolveNodeComponent(const UiGraphNodeSlotRule& r,
         if(micro) out.authored_size = Size(min(2048, text.GetCount()) * max(1, height / 2), height);
         else {
             out.text = r.overflow == UiGraphNodeOverflow::Wrap ? text.ToWString() : OneLine(text);
-            out.authored_size = GetTextSize(OneLine(text), out.base_font);
+            out.authored_size = UiGetTextSize(OneLine(text), out.base_font);
         }
     }
     else if(kind == Kind::Progress) {
@@ -299,7 +290,7 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
                 auto& item = out.items.Add();
                 item.text = text;
                 item.text_rect = AlignComponent(RectC(area.left, area.top + n * line, area.GetWidth(), line),
-                                                 GetTextSize(text, font), h, UiAlign::TOP);
+                                                 UiGetTextSize(text, font), h, UiAlign::TOP);
                 remaining = remaining.Mid(min(remaining.GetCount(), max(1, take)));
                 while(!remaining.IsEmpty() && (remaining[0] == ' ' || remaining[0] == '\n')) remaining = remaining.Mid(1);
             }
@@ -318,7 +309,7 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
                           : FitText(value.text, font, area.GetWidth(), true);
             if(!text.IsEmpty()) {
                 out.text = text;
-                out.footprint = AlignComponent(area, GetTextSize(text, font), h, v);
+                out.footprint = AlignComponent(area, UiGetTextSize(text, font), h, v);
                 out.representation = Rep::Text;
                 return;
             }
@@ -383,8 +374,8 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
             Rect rr(middle + 2, item.box.top, area.right, item.box.bottom);
             item.text = FitText(OneLine(label), font, lr.GetWidth(), true);
             item.value = FitText(OneLine(val), font, rr.GetWidth(), true);
-            item.text_rect = AlignComponent(lr, GetTextSize(item.text, font), UiAlign::LEFT, UiAlign::CENTER);
-            item.value_rect = AlignComponent(rr, GetTextSize(item.value, font), UiAlign::RIGHT, UiAlign::CENTER);
+            item.text_rect = AlignComponent(lr, UiGetTextSize(item.text, font), UiAlign::LEFT, UiAlign::CENTER);
+            item.value_rect = AlignComponent(rr, UiGetTextSize(item.value, font), UiAlign::RIGHT, UiAlign::CENTER);
         }
         if(count > 0) {
             int used = count * row_height;
@@ -409,7 +400,7 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
                 out.items.Clear(); out.reason = Reason::InvalidData; return;
             }
             WString text = FitText(OneLine((String)items[i]), font, max(0, area.GetWidth() - pad * 2), true);
-            Size ts = GetTextSize(text, font);
+            Size ts = UiGetTextSize(text, font);
             int width = min(area.GetWidth(), ts.cx + pad * 2);
             if(x > area.left && x + width > area.right) { x = area.left; y += row + gap; }
             if(y + row > area.bottom) break;

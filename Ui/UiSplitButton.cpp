@@ -1,4 +1,5 @@
 #include <Ui/UiSplitButton.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -28,8 +29,8 @@ int UiSplitButton::GetPopupRowHeight() const
             measured = max(measured, font.GetCy() + pad_y * 2);
             continue;
         }
-        int title_h = GetTextSize(it.text, font).cy;
-        int desc_h = it.description.IsEmpty() ? 0 : GetTextSize(it.description, desc_font).cy + DPI(1);
+        int title_h = UiGetTextSize(it.text, font).cy;
+        int desc_h = it.description.IsEmpty() ? 0 : UiGetTextSize(it.description, desc_font).cy + DPI(1);
         int text_h = title_h + desc_h;
         int content_h = max(text_h, IsNull(it.icon) ? 0 : icon_side);
         measured = max(measured, content_h + pad_y * 2);
@@ -575,7 +576,7 @@ void UiSplitButton::PopupWindow::Paint(Draw& w)
             int hy = text.top + max(0, (text.GetHeight() - desc_font.Bold().GetCy()) / 2);
             Color hdr = Blend(SColorFace(), popup_base, 20);
             w.DrawRect(row.Deflated(1, 0), hdr);
-            w.DrawText(text.left, hy, ToUpper(it.text), desc_font.Bold(), Blend(SColorText(), popup_base, 120));
+            UiDrawText(w,text.left, hy, ToUpper(it.text), desc_font.Bold(), Blend(SColorText(), popup_base, 120));
             continue;
         }
         if(state == ST_HOT) {
@@ -602,14 +603,14 @@ void UiSplitButton::PopupWindow::Paint(Draw& w)
         Color ink = bs.palette.ink[state];
         if(IsNull(ink))
             ink = SColorText();
-        Size title_sz = GetTextSize(it.text, font);
+        Size title_sz = UiGetTextSize(it.text, font);
         int ty = it.description.IsEmpty()
                ? row.top + (row.GetHeight() - title_sz.cy) / 2
                : text.top;
         w.Clip(text);
-        w.DrawText(text.left, ty, it.text, font, ink);
+        UiDrawText(w,text.left, ty, it.text, font, ink);
         if(!it.description.IsEmpty())
-            w.DrawText(text.left, ty + title_sz.cy + DPI(1), it.description, desc_font, subtitle_ink);
+            UiDrawText(w,text.left, ty + title_sz.cy + DPI(1), it.description, desc_font, subtitle_ink);
         w.End();
     }
 

@@ -1,4 +1,5 @@
 #include <Ui/UiProgressRing.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDraw.h>
@@ -492,7 +493,7 @@ Font UiProgressRing::ResolveTextFont(const String& text, const Rect& text_rect, 
 
     int preferred = max(1, font.GetHeight());
     int minimum = max(1, min(preferred, GetEffectiveStyle().min_text_height));
-    Size tsz = GetTextSize(text, font);
+    Size tsz = UiGetTextSize(text, font);
     if(tsz.cx <= text_rect.GetWidth() && tsz.cy <= text_rect.GetHeight()) {
         visible = true;
         return font;
@@ -502,7 +503,7 @@ Font UiProgressRing::ResolveTextFont(const String& text, const Rect& text_rect, 
     double sy = tsz.cy > 0 ? (double)text_rect.GetHeight() / (double)tsz.cy : 1.0;
     int fitted = max(minimum, min(preferred, (int)std::floor(preferred * min(sx, sy))));
     font.Height(max(1, fitted));
-    tsz = GetTextSize(text, font);
+    tsz = UiGetTextSize(text, font);
     visible = fitted >= minimum && tsz.cx <= text_rect.GetWidth() && tsz.cy <= text_rect.GetHeight();
     return font;
 }
@@ -626,11 +627,11 @@ void UiProgressRing::Paint(Draw& w)
     if(g.text_visible && !text.IsEmpty()) {
         Font font = style.font;
         font.Height(g.text_font_height);
-        Size tsz = GetTextSize(text, font);
+        Size tsz = UiGetTextSize(text, font);
         int tx = g.text_rect.left + (g.text_rect.GetWidth() - tsz.cx) / 2;
         int ty = g.text_rect.top + (g.text_rect.GetHeight() - tsz.cy) / 2;
         Color ink = UiRingInkColor(style.text_palette, state, SColorText());
-        w.DrawText(tx, ty, text, font, ink);
+        UiDrawText(w,tx, ty, text, font, ink);
     }
 }
 
@@ -638,7 +639,7 @@ Size UiProgressRing::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
     String sample = has_custom_text_ ? custom_text_ : show_percent_ ? String("100%") : String();
-    Size tsz = sample.IsEmpty() ? Size(0, 0) : GetTextSize(sample, style.font);
+    Size tsz = sample.IsEmpty() ? Size(0, 0) : UiGetTextSize(sample, style.font);
     int ring_space = max(1, style.thickness) * 2 + max(0, style.ring_inset) * 2 + DPI(10);
     int side = max(DPI(48), max(tsz.cx, tsz.cy) + ring_space);
     return Size(side, side);

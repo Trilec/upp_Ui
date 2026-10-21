@@ -1,4 +1,5 @@
 #include <Ui/UiTree.h>
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 
@@ -538,10 +539,10 @@ Size UiTree::GetContentSize() const
         int row_w = vr.depth * style.indent_px + style.glyph_size + style.content_gap;
         if(style.show_icons && !IsNull(item.icon))
             row_w += style.icon_size + style.content_gap;
-        row_w += GetTextSize(item.text, item.use_custom_font ? item.custom_font : font).cx;
+        row_w += UiGetTextSize(item.text, item.use_custom_font ? item.custom_font : font).cx;
         if(!item.right_text.IsEmpty())
             row_w += style.content_gap
-                   + GetTextSize(item.right_text, item.use_custom_font ? item.custom_font : font).cx;
+                   + UiGetTextSize(item.right_text, item.use_custom_font ? item.custom_font : font).cx;
         if(column_w > 0)
             row_w += style.accessory_gap + column_w;
         width = max(width, style.metrics.content_margin.left + style.metrics.content_margin.right

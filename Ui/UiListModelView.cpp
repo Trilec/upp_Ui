@@ -1,4 +1,5 @@
 #include <Ui/UiList.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -289,7 +290,7 @@ Rect UiList::GetRightTextRect(const Rect& row, const UiModelItem& item) const
         return Rect(0, 0, 0, 0);
     const Style& style = GetEffectiveStyle();
     Font font = item.use_custom_font ? item.custom_font : style.font;
-    Size sz = GetTextSize(item.right_text, font);
+    Size sz = UiGetTextSize(item.right_text, font);
     int extra = style.right_text_as_badge ? style.badge_h_padding * 2 : DPI(4);
     int w = min(sz.cx + extra, max(0, row.GetWidth() / 2));
     int right = row.right - style.h_padding;

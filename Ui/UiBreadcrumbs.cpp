@@ -1,4 +1,5 @@
 #include <Ui/UiBreadcrumbs.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -332,7 +333,7 @@ Size UiBreadcrumbs::GetItemSize(const Item& item, bool current) const
 {
     const Style& s = GetEffectiveStyle();
     Font f = current ? s.current_font : s.font;
-    return GetTextSize(item.text, IsNull(f) ? StdFont() : f);
+    return UiGetTextSize(item.text, IsNull(f) ? StdFont() : f);
 }
 
 Size UiBreadcrumbs::GetPathIconSize() const
@@ -362,7 +363,7 @@ Size UiBreadcrumbs::GetMinSize() const
         path_h = max(path_h, isz.cy);
         if(i < items_.GetCount() - 1) {
             Size dsz = IsNull(s.divider_icon)
-                ? GetTextSize(s.divider, s.font)
+                ? UiGetTextSize(s.divider, s.font)
                 : (s.divider_icon_size.cx > 0 && s.divider_icon_size.cy > 0 ? s.divider_icon_size : Size(DPI(14), DPI(14)));
             path_w += s.divider_gap * 2 + dsz.cx;
             path_h = max(path_h, dsz.cy);
@@ -415,7 +416,7 @@ void UiBreadcrumbs::RebuildLayout(Size sz) const
         x += isz.cx;
         if(i < items_.GetCount() - 1) {
             Size dsz = IsNull(s.divider_icon)
-                ? GetTextSize(s.divider, s.font)
+                ? UiGetTextSize(s.divider, s.font)
                 : (s.divider_icon_size.cx > 0 && s.divider_icon_size.cy > 0 ? s.divider_icon_size : Size(DPI(14), DPI(14)));
             Piece d;
             d.item = false;
@@ -460,7 +461,7 @@ void UiBreadcrumbs::Paint(Draw& w)
             if(!IsNull(s.divider_icon))
                 UiPaintStyledIcon(w, p.rect, s.divider_icon, true, true, s.divider_icon_render, ink, IsEnabled());
             else
-                w.DrawText(p.rect.left, p.rect.top, s.divider, s.font, ink);
+                UiDrawText(w,p.rect.left, p.rect.top, s.divider, s.font, ink);
             continue;
         }
 
@@ -474,8 +475,8 @@ void UiBreadcrumbs::Paint(Draw& w)
             ink = s.palette.ink[ST_HOT];
 
         Rect r = p.rect;
-        Size text = GetTextSize(item.text, f);
-        w.DrawText(r.left, r.top + (r.GetHeight() - text.cy) / 2, item.text, f, ink);
+        Size text = UiGetTextSize(item.text, f);
+        UiDrawText(w,r.left, r.top + (r.GetHeight() - text.cy) / 2, item.text, f, ink);
         if(current && s.current_underline_enabled) {
             Color line = IsNull(s.current_underline) ? ink : s.current_underline;
             int width = max(1, s.current_underline_width);

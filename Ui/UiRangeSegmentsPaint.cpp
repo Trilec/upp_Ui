@@ -1,4 +1,5 @@
 #include <Ui/UiRangeSegments.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiDraw.h>
 #include <Ui/UiTheme.h>
 #include <cmath>
@@ -242,7 +243,7 @@ void UiRangeSegments::PaintValueLabel(Draw& w, const String& text, Point anchor,
     if(text.IsEmpty())
         return;
     Font font = style.value_font;
-    Size ts = GetTextSize(text, font);
+    Size ts = UiGetTextSize(text, font);
     int px = DPI(5), py = DPI(2);
     Rect r;
     if(dir_ == UiDirection::H) {
@@ -275,7 +276,7 @@ void UiRangeSegments::PaintValueLabel(Draw& w, const String& text, Point anchor,
     StyledState state = !IsEnabled() || !IsShowEnabled() ? ST_DISABLED : ST_NORMAL;
     UiPaintStyledBackground(w, r, style.value_palette, metrics, StyledSkin(), state, false);
     Color ink = RangeSegmentsPaletteInk(style.value_palette, state, SColorText());
-    w.DrawText(r.left + (r.GetWidth() - ts.cx) / 2,
+    UiDrawText(w,r.left + (r.GetWidth() - ts.cx) / 2,
                r.top + (r.GetHeight() - ts.cy) / 2,
                text, font, ink);
 }
@@ -340,12 +341,12 @@ void PaintSegmentText(Draw& draw, const Rect& rect, const String& text,
                       Font font, Color ink, UiAlign align)
 {
     if(rect.IsEmpty() || text.IsEmpty() || IsNull(ink)) return;
-    Size size = GetTextSize(text, font);
+    Size size = UiGetTextSize(text, font);
     int width = min(rect.GetWidth(), size.cx);
     int x = align == UiAlign::RIGHT ? rect.right - width : align == UiAlign::CENTER ?
             rect.left + (rect.GetWidth() - width) / 2 : rect.left;
     draw.Clip(rect);
-    DrawTextEllipsis(draw, x, rect.top + (rect.GetHeight() - size.cy) / 2,
+    UiDrawTextEllipsis(draw, x, rect.top + (rect.GetHeight() - size.cy) / 2,
                      width, text, "...", font, ink);
     draw.End();
 }

@@ -1,4 +1,5 @@
 #include "UiMenu.h"
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -1161,7 +1162,7 @@ Size UiMenu::MeasureTopItem(UiMenuNodeRef node) const
         return Size(DPI(60), GetEffectiveStyle().bar_height);
     const Style& style = GetEffectiveStyle();
     const UiMenuItem& item = model_->Get(node);
-    Size tsz = GetTextSize(item.text, style.bar_font);
+    Size tsz = UiGetTextSize(item.text, style.bar_font);
     return Size(style.left_padding + tsz.cx + style.right_padding, style.bar_height);
 }
 
@@ -1180,14 +1181,14 @@ Size UiMenu::ComputePopupSize(UiMenuNodeRef parent) const
             row_w += style.check_size + style.content_gap;
         if(style.show_icons && !IsNull(item.icon))
             row_w += style.icon_size + style.content_gap;
-        row_w += GetTextSize(item.text, style.font).cx;
+        row_w += UiGetTextSize(item.text, style.font).cx;
         if(!item.description.IsEmpty() && style.show_descriptions)
             row_w = max(row_w, style.left_padding + style.right_padding
-                               + GetTextSize(item.description, style.font).cx);
+                               + UiGetTextSize(item.description, style.font).cx);
         if(style.show_shortcuts) {
             String right = GetRightText(item);
             if(!right.IsEmpty())
-                row_w += style.right_gap + GetTextSize(right, style.font).cx;
+                row_w += style.right_gap + UiGetTextSize(right, style.font).cx;
         }
         if(HasSubMenu(node))
             row_w += style.right_gap + style.arrow_size;
@@ -1246,9 +1247,9 @@ void UiMenu::PaintMenuRow(Draw& w, const Rect& row, UiMenuNodeRef node,
         w.DrawRect(rr, pressed ? style.pressed_bg : style.active_bar_bg);
     Font font = style.bar_font;
     Color ink = item.enabled ? style.item_ink : BlendDisabledMenu(style.disabled_ink);
-    Size tsz = GetTextSize(item.text, font);
+    Size tsz = UiGetTextSize(item.text, font);
     int ty = rr.top + max(0, (rr.GetHeight() - tsz.cy) / 2);
-    w.DrawText(rr.left + style.left_padding, ty, item.text, font, ink);
+    UiDrawText(w,rr.left + style.left_padding, ty, item.text, font, ink);
 }
 
 UiMenuNodeRef UiMenu::GetChildNode(UiMenuNodeRef parent, int index) const

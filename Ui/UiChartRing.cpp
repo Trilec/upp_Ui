@@ -1,4 +1,5 @@
 #include <Ui/UiChartRing.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiProgressBar.h>
 #include <Ui/UiTheme.h>
 #include <Ui/UiDraw.h>
@@ -363,7 +364,7 @@ Font UiChartRing::ResolveTextFont(const Rect& text_rect, bool& visible) const
 
     int preferred = max(1, font.GetHeight());
     int minimum = max(1, min(preferred, GetEffectiveStyle().min_text_height));
-    Size tsz = GetTextSize(center_text_, font);
+    Size tsz = UiGetTextSize(center_text_, font);
     if(tsz.cx <= text_rect.GetWidth() && tsz.cy <= text_rect.GetHeight()) {
         visible = true;
         return font;
@@ -373,7 +374,7 @@ Font UiChartRing::ResolveTextFont(const Rect& text_rect, bool& visible) const
     double sy = tsz.cy > 0 ? (double)text_rect.GetHeight() / (double)tsz.cy : 1.0;
     int fitted = max(minimum, min(preferred, (int)std::floor(preferred * min(sx, sy))));
     font.Height(max(1, fitted));
-    tsz = GetTextSize(center_text_, font);
+    tsz = UiGetTextSize(center_text_, font);
     visible = fitted >= minimum && tsz.cx <= text_rect.GetWidth() && tsz.cy <= text_rect.GetHeight();
     return font;
 }
@@ -537,18 +538,18 @@ void UiChartRing::Paint(Draw& w)
     if(g.text_visible && !center_text_.IsEmpty()) {
         Font font = style.font;
         font.Height(g.text_font_height);
-        Size tsz = GetTextSize(center_text_, font);
+        Size tsz = UiGetTextSize(center_text_, font);
         int tx = g.text_rect.left + (g.text_rect.GetWidth() - tsz.cx) / 2;
         int ty = g.text_rect.top + (g.text_rect.GetHeight() - tsz.cy) / 2;
         Color ink = ChartRingInk(style.text_palette, state, SColorText());
-        w.DrawText(tx, ty, center_text_, font, ink);
+        UiDrawText(w,tx, ty, center_text_, font, ink);
     }
 }
 
 Size UiChartRing::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
-    Size tsz = center_text_.IsEmpty() ? Size(0, 0) : GetTextSize(center_text_, style.font);
+    Size tsz = center_text_.IsEmpty() ? Size(0, 0) : UiGetTextSize(center_text_, style.font);
     int ring_space = max(1, style.thickness) * 2 + max(0, style.ring_inset) * 2 + DPI(10);
     int side = max(DPI(64), max(tsz.cx, tsz.cy) + ring_space);
     return Size(side, side);

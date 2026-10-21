@@ -1,4 +1,5 @@
 #include <Ui/UiTag.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -27,27 +28,7 @@ String TagOneLine(const String& text)
 
 WString TagEllipsize(const String& source, Font font, int width)
 {
-    if(width <= 0 || source.IsEmpty())
-        return WString();
-
-    WString text = TagOneLine(source).ToWString();
-    if(GetTextSize(text, font).cx <= width)
-        return text;
-
-    const WString ellipsis = "...";
-    if(GetTextSize(ellipsis, font).cx > width)
-        return WString();
-
-    int lo = 0;
-    int hi = text.GetCount();
-    while(lo < hi) {
-        const int mid = (lo + hi + 1) / 2;
-        if(GetTextSize(text.Left(mid) + ellipsis, font).cx <= width)
-            lo = mid;
-        else
-            hi = mid - 1;
-    }
-    return text.Left(lo) + ellipsis;
+    return UiFitText(TagOneLine(source).ToWString(),font,width);
 }
 
 UiTagStyle ResolveTagVariant(UiTagStyle style, UiTagVariant variant)
@@ -326,7 +307,7 @@ Size UiMeasureTag(const UiTagData& data, const UiTagStyle& source_style,
         IsNull(data.icon) ? Size(0, 0)
                           : FitTagIcon(data.icon, style.icon_size);
     const int text_width = data.text.IsEmpty() ? 0
-                         : GetTextSize(TagOneLine(data.text), style.font).cx;
+                         : UiGetTextSize(TagOneLine(data.text), style.font).cx;
     const int gap = icon_size.cx && text_width
                   ? max(0, style.content_gap) : 0;
     const int height = max(icon_size.cy, style.font.GetCy());
@@ -456,7 +437,7 @@ UiTagPresentation UiPrepareTag(const UiTagData& data,
                          text_right - text_left);
         if(!out.prepared_text.IsEmpty()) {
             const Size ts =
-                GetTextSize(out.prepared_text, style.font);
+                UiGetTextSize(out.prepared_text, style.font);
             out.text = RectC(
                 text_left,
                 content.top + max(0, (content.GetHeight() - ts.cy) / 2),
@@ -497,7 +478,7 @@ void UiPaintTag(Draw& w, const UiTagPresentation& tag, StyledState state)
     }
 
     if(!tag.prepared_text.IsEmpty() && !tag.text.IsEmpty())
-        w.DrawText(tag.text.left, tag.text.top,
+        UiDrawText(w,tag.text.left, tag.text.top,
                    tag.prepared_text, tag.font, tag.ink[st]);
 
     w.End();

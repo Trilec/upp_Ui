@@ -1,4 +1,5 @@
 #include <Ui/UiDropdown.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -826,7 +827,7 @@ Size UiDropdown::ComputeNaturalSize() const
     String text = text_.IsEmpty() ? (GetCount() ? placeholder_text_ : empty_text_) : text_;
     Font font = s.metrics.use_text_font ? s.metrics.text_font : s.font;
     if(IsNull(font)) font = StdFont();
-    Size main = GetTextSize(text, font);
+    Size main = UiGetTextSize(text, font);
     Size support;
     if(s.show_indicator && !IsNull(indicator_)) {
         int side = s.indicator_size > 0 ? s.indicator_size : DPI(14);
@@ -855,7 +856,7 @@ Rect UiDropdown::ComputeBadgeRect(Rect& content) const
         return Rect(0,0,0,0);
     Font font = style_.metrics.use_text_font ? style_.metrics.text_font : style_.font;
     String text = AsString(GetCheckedCount());
-    Size ts = GetTextSize(text, font);
+    Size ts = UiGetTextSize(text, font);
     int h = min(max(DPI(20), ts.cy + DPI(6)), max(1, content.GetHeight() - DPI(2)));
     int w = max(h, ts.cx + DPI(14));
     if(w > content.GetWidth())
@@ -936,8 +937,8 @@ void UiDropdown::Paint(Draw& w)
                                  Blend(s.selection_badge_face, Black(), 110), 1);
             Font font = s.metrics.use_text_font ? s.metrics.text_font : s.font;
             String text = AsString(count);
-            Size ts = GetTextSize(text, font);
-            w.DrawText(badge_rect_.left + (badge_rect_.GetWidth()-ts.cx)/2,
+            Size ts = UiGetTextSize(text, font);
+            UiDrawText(w,badge_rect_.left + (badge_rect_.GetWidth()-ts.cx)/2,
                        badge_rect_.top + (badge_rect_.GetHeight()-ts.cy)/2,
                        text, font, s.selection_badge_ink);
         }

@@ -45,6 +45,7 @@
 #include <CtrlLib/CtrlLib.h>     // Chameleon, SColor*, DrawFocus, etc.
 
 #include <Ui/UiFonts.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiVersion.h>
 #include <Ui/UiStyle.h>
 #include <Ui/UiGeometry.h>

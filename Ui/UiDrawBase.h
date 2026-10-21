@@ -33,6 +33,7 @@
 */
 
 #include <Painter/Painter.h>
+#include <Ui/UiTextLayout.h>
 #ifdef flagGPUUI
 #include <RenderCore/GpuDrawTarget.h>
 #endif
@@ -1743,8 +1744,8 @@ inline void UiBuildStyledTextLines(const String& text,
 
             // Empty lines contribute height (font) but do not inflate width.
             Size sz = line.IsEmpty()
-                      ? Size(0, GetTextSize(" ", font).cy)
-                      : GetTextSize(line, font);
+                      ? Size(0, UiGetTextSize(" ", font).cy)
+                      : UiGetTextSize(line, font);
             out_sizes.Add(sz);
 
             start = i + 1;
@@ -1859,7 +1860,7 @@ inline void UiPaintStyledText(Draw& w,
                               ak);
             }
             else {
-                w.DrawText(line_x, y, line, f, ink);
+                UiDrawText(w,line_x, y, line, f, ink);
             }
 
             underline_baseline = y + sz.cy;

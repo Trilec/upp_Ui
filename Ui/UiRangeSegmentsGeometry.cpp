@@ -1,4 +1,5 @@
 #include <Ui/UiRangeSegments.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 
 namespace Upp {
@@ -163,8 +164,8 @@ void UiRangeSegments::BuildLabelGeometry(SegmentGeometry& sg, const Geometry& g,
     const UiRangeSegment& segment = segments_[sg.index];
     bool title = show_labels_ && !segment.label.IsEmpty();
     bool subtitle = show_labels_ && !segment.subtitle.IsEmpty();
-    int title_height = title ? GetTextSize(segment.label, style.label_font).cy : 0;
-    int subtitle_height = subtitle ? GetTextSize(segment.subtitle, style.subtitle_font).cy : 0;
+    int title_height = title ? UiGetTextSize(segment.label, style.label_font).cy : 0;
+    int subtitle_height = subtitle ? UiGetTextSize(segment.subtitle, style.subtitle_font).cy : 0;
     int gap = clamp(style.label_gap, 0, area.GetHeight());
     if(title && subtitle && (int64)title_height + subtitle_height + gap > area.GetHeight())
         subtitle = false; // Small rows keep the heading readable first.
@@ -178,7 +179,7 @@ void UiRangeSegments::BuildLabelGeometry(SegmentGeometry& sg, const Geometry& g,
     Rect text = area;
     if(show_segment_values_) {
         sg.value_text = GetSegmentValueText(sg.index);
-        Size value_size = GetTextSize(sg.value_text, style.right_font);
+        Size value_size = UiGetTextSize(sg.value_text, style.right_font);
         int width = min(value_size.cx, area.GetWidth());
         int value_y = title && subtitle ? y + (title_height - value_size.cy) / 2
                                        : area.top + (area.GetHeight() - value_size.cy) / 2;

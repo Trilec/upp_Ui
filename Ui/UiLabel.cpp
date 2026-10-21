@@ -1,5 +1,6 @@
 #include <Ui/UiLabel.h>
 #include <Ui/UiTheme.h>
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 
@@ -82,7 +83,7 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
                 p.bg = s.bg;
                 p.font = ResolveSpanFont(s, base_font);
                 p.underline = s.underline;
-                p.sz = GetTextSize(seg, p.font);
+                p.sz = UiGetTextSize(seg, p.font);
                 lines.Top().Add(p);
             }
 
@@ -111,10 +112,11 @@ static void BuildRichLines(const Vector<UiLabel::Span>& spans,
 
 static Vector<int> BuildCaretAdvances(const String& text, Font font)
 {
+    WString scalars=text.ToWString();
     Vector<int> x;
-    x.SetCount(text.GetCount() + 1);
-    for(int i = 0; i <= text.GetCount(); i++)
-        x[i] = GetTextSize(text.Left(i), font).cx;
+    x.SetCount(scalars.GetCount()+1);
+    for(int i=0;i<=scalars.GetCount();++i)
+        x[i]=UiGetTextSize(scalars.Left(i),font).cx;
     return x;
 }
 
@@ -309,7 +311,7 @@ void UiLabel::RebuildTextLinesFromStyle(const Style& style)
         one.Replace("\r", "");
         one.Replace("\n", " ");
         lines_.Add(one);
-        line_sizes_.Add(one.IsEmpty() ? Size(0, GetTextSize(" ", fnt).cy) : GetTextSize(one, fnt));
+        line_sizes_.Add(one.IsEmpty() ? Size(0, UiGetTextSize(" ", fnt).cy) : UiGetTextSize(one, fnt));
         return;
     }
 
@@ -414,7 +416,7 @@ int UiLabel::HitTestTextPos(Point p) const
 
         int y = start_y;
         int text_ofs = 0;
-        int best_pos = text_.GetCount();
+        int best_pos = text_.ToWString().GetCount();
 
         for(int i = 0; i < count; i++) {
             const Vector<RichPiece>& line = rich_lines[i];
@@ -439,7 +441,7 @@ int UiLabel::HitTestTextPos(Point p) const
             int line_text_len = 0;
             for(const RichPiece& rp : line)
                 if(rp.kind == Span::TEXT)
-                    line_text_len += rp.text.GetCount();
+                    line_text_len += rp.text.ToWString().GetCount();
 
             if(p.y < line_top)
                 return text_ofs;
@@ -457,9 +459,14 @@ int UiLabel::HitTestTextPos(Point p) const
                         if(rp.kind != Span::TEXT || rp.text.IsEmpty())
                             return text_ofs;
 
+#ifdef flagGPUUI
+                        auto shaped=UiTextLayout::Create(rp.text.ToWString(),rp.font);
+                        if(shaped.IsValid())
+                            return text_ofs+shaped.HitTest(Pointf(p.x-x,shaped.GetSize().cy*.5)).position;
+#endif
                         int relx = max(0, p.x - x);
                         Vector<int> caret_x = BuildCaretAdvances(rp.text, rp.font);
-                        for(int k = 1; k <= rp.text.GetCount(); k++) {
+                        for(int k = 1; k <= rp.text.ToWString().GetCount(); k++) {
                             int w = caret_x[k];
                             if(w >= relx) {
                                 int prev = caret_x[k - 1];
@@ -467,11 +474,11 @@ int UiLabel::HitTestTextPos(Point p) const
                                 return text_ofs + pos;
                             }
                         }
-                        return text_ofs + rp.text.GetCount();
+                        return text_ofs + rp.text.ToWString().GetCount();
                     }
 
                     if(rp.kind == Span::TEXT)
-                        text_ofs += rp.text.GetCount();
+                        text_ofs += rp.text.ToWString().GetCount();
                     x = next_x;
                 }
                 return text_ofs;
@@ -513,7 +520,7 @@ int UiLabel::HitTestTextPos(Point p) const
 
     int y = start_y;
     int text_ofs = 0;
-    int best_pos = text_.GetCount();
+    int best_pos = text_.ToWString().GetCount();
 
     for(int i = 0; i < count; i++) {
         const String& line = lines_[i];
@@ -535,19 +542,24 @@ int UiLabel::HitTestTextPos(Point p) const
 
         int line_top = y;
         int line_bottom = y + sz.cy;
-        int line_len = line.GetCount();
-        Vector<int> caret_x = BuildCaretAdvances(line, fnt);
-        int line_w = caret_x.IsEmpty() ? 0 : caret_x.Top();
+        int line_len = line.ToWString().GetCount();
+        int line_w=sz.cx;
 
         if(p.y < line_top)
             return text_ofs;
 
         if(p.y <= line_bottom || i + 1 == count) {
+#ifdef flagGPUUI
+            auto shaped=UiTextLayout::Create(line.ToWString(),fnt);
+            if(shaped.IsValid())
+                return text_ofs+shaped.HitTest(Pointf(p.x-line_x,shaped.GetSize().cy*.5)).position;
+#endif
             if(p.x <= line_x)
                 return text_ofs;
             if(p.x >= line_x + line_w)
                 return text_ofs + line_len;
             int relx = p.x - line_x;
+            Vector<int> caret_x=BuildCaretAdvances(line,fnt);
             for(int k = 1; k <= line_len; k++) {
                 int w = caret_x[k];
                 if(w >= relx) {
@@ -1008,8 +1020,8 @@ void UiLabel::CopySelectionToClipboard() const
         return;
     int from = SelFrom();
     int to = SelTo();
-    String sel = text_.Mid(from, to - from);
-    WString w = sel.ToWString();
+    WString w=text_.ToWString().Mid(from,to-from);
+    String sel=ToUtf8(w);
     ClearClipboard();
     AppendClipboardUnicodeText(w);
     AppendClipboardText(sel);
@@ -1242,42 +1254,49 @@ void UiLabel::Paint(Draw& w)
 
                 if(rp.kind == Span::TEXT) {
                     Color rk = IsNull(rp.ink) ? ink : rp.ink;
-                    int piece_len = rp.text.GetCount();
+                    int piece_len = rp.text.ToWString().GetCount();
                     if(draw_sel && piece_len > 0) {
                         int hs0 = max(sf, text_ofs);
                         int hs1 = min(st, text_ofs + piece_len);
                         if(hs0 < hs1) {
                             int a = hs0 - text_ofs;
                             int b = hs1 - text_ofs;
-                            String pre = rp.text.Left(a);
-                            String mid = rp.text.Mid(a, b - a);
-                            String post = rp.text.Mid(b);
+                            bool shaped_selection=false;
+#ifdef flagGPUUI
+                            auto shaped=UiTextLayout::Create(rp.text.ToWString(),rp.font);
+                            shaped_selection=UiDrawTextSelection(w,pr.TopLeft(),shaped,rk,a,b,
+                                                                 SColorHighlight(),SColorHighlightText());
+#endif
+                            if(!shaped_selection) {
+                            WString scalar_text=rp.text.ToWString();
+                            WString pre=scalar_text.Left(a),mid=scalar_text.Mid(a,b-a),post=scalar_text.Mid(b);
                             int x0 = pr.left;
                             int x1 = pr.right;
                             if(a > 0)
-                                x0 = pr.left + GetTextSize(pre, rp.font).cx;
+                                x0 = pr.left + UiGetTextSize(pre, rp.font).cx;
                             if(b < piece_len)
-                                x1 = pr.left + GetTextSize(rp.text.Left(b), rp.font).cx;
+                                x1 = pr.left + UiGetTextSize(rp.text.ToWString().Left(b), rp.font).cx;
                             if(x1 > x0)
                                 w.DrawRect(x0, pr.top, x1 - x0, rp.sz.cy, SColorHighlight());
 
                             int tx = pr.left;
                             if(!pre.IsEmpty()) {
-                                w.DrawText(tx, pr.top, pre, rp.font, rk);
-                                tx += GetTextSize(pre, rp.font).cx;
+                                UiDrawText(w,tx, pr.top, pre, rp.font, rk);
+                                tx += UiGetTextSize(pre, rp.font).cx;
                             }
                             if(!mid.IsEmpty()) {
-                                w.DrawText(tx, pr.top, mid, rp.font, SColorHighlightText());
-                                tx += GetTextSize(mid, rp.font).cx;
+                                UiDrawText(w,tx, pr.top, mid, rp.font, SColorHighlightText());
+                                tx += UiGetTextSize(mid, rp.font).cx;
                             }
                             if(!post.IsEmpty())
-                                w.DrawText(tx, pr.top, post, rp.font, rk);
+                                UiDrawText(w,tx, pr.top, post, rp.font, rk);
+                            }
                         }
                         else
-                            w.DrawText(pr.left, pr.top, rp.text, rp.font, rk);
+                            UiDrawText(w,pr.left, pr.top, rp.text, rp.font, rk);
                     }
                     else
-                        w.DrawText(pr.left, pr.top, rp.text, rp.font, rk);
+                        UiDrawText(w,pr.left, pr.top, rp.text, rp.font, rk);
                     if(rp.underline) {
                         int uy = pr.bottom - 1;
                         w.DrawRect(pr.left, uy, rp.sz.cx, 1, rk);
@@ -1363,7 +1382,7 @@ void UiLabel::Paint(Draw& w)
             for(int i = 0; i < lines_.GetCount(); i++) {
                 const String& line = lines_[i];
                 const Size& sz = line_sizes_[i];
-                int line_len = line.GetCount();
+                int line_len = line.ToWString().GetCount();
 
                 int line_x;
                 switch(style.align_h) {
@@ -1383,31 +1402,38 @@ void UiLabel::Paint(Draw& w)
                 int lt = text_ofs + line_len;
                 int hs0 = max(sf, lf);
                 int hs1 = min(st, lt);
-                Vector<int> caret_x = BuildCaretAdvances(line, fnt);
                 if(hs0 < hs1) {
                     int a = hs0 - lf;
                     int b = hs1 - lf;
+                    bool shaped_selection=false;
+#ifdef flagGPUUI
+                    auto shaped=UiTextLayout::Create(line.ToWString(),fnt);
+                    shaped_selection=UiDrawTextSelection(w,Point(line_x,y),shaped,ink,a,b,
+                                                         SColorHighlight(),SColorHighlightText());
+#endif
+                    if(!shaped_selection) {
+                    Vector<int> caret_x=BuildCaretAdvances(line,fnt);
                     int x0 = line_x + caret_x[a];
                     int x1 = line_x + caret_x[b];
                     if(x1 > x0)
                         w.DrawRect(x0, y, x1 - x0, sz.cy, SColorHighlight());
-                    String pre = line.Left(a);
-                    String mid = line.Mid(a, b - a);
-                    String post = line.Mid(b);
+                    WString scalar_text=line.ToWString();
+                    WString pre=scalar_text.Left(a),mid=scalar_text.Mid(a,b-a),post=scalar_text.Mid(b);
                     int x = line_x;
                     if(!pre.IsEmpty()) {
-                        w.DrawText(x, y, pre, fnt, ink);
-                        x += GetTextSize(pre, fnt).cx;
+                        UiDrawText(w,x, y, pre, fnt, ink);
+                        x += UiGetTextSize(pre, fnt).cx;
                     }
                     if(!mid.IsEmpty()) {
-                        w.DrawText(x, y, mid, fnt, SColorHighlightText());
-                        x += GetTextSize(mid, fnt).cx;
+                        UiDrawText(w,x, y, mid, fnt, SColorHighlightText());
+                        x += UiGetTextSize(mid, fnt).cx;
                     }
                     if(!post.IsEmpty())
-                        w.DrawText(x, y, post, fnt, ink);
+                        UiDrawText(w,x, y, post, fnt, ink);
+                    }
                 }
                 else if(!line.IsEmpty()) {
-                    w.DrawText(line_x, y, line, fnt, ink);
+                    UiDrawText(w,line_x, y, line, fnt, ink);
                 }
 
                 text_ofs += line_len;
@@ -1471,7 +1497,7 @@ bool UiLabel::Key(dword key, int count)
     if(key == K_CTRL_A) {
         if(!text_.IsEmpty()) {
             sel_anchor_ = 0;
-            sel_caret_ = text_.GetCount();
+            sel_caret_ = text_.ToWString().GetCount();
             Refresh();
         }
         return true;

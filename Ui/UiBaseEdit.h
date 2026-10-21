@@ -29,6 +29,7 @@
 */
 
 #include <CtrlCore/CtrlCore.h>
+#include <Ui/UiTextLayout.h>
 #include <CtrlLib/CtrlLib.h> // For ChStyle, ScrollBars
 #include <Ui/UiStyle.h>      // Styling engine (UiAlign, UiDirection, StyledPalette, etc.)
 #include <Ui/UiDraw.h>       // Drawing helpers (UiPaintFaceFrameDash, UiDraw9Slice, etc.)
@@ -211,6 +212,7 @@ protected:
     Size        font_size_ {0, 0};   // Cached font size
     int64       cursor_      = 0;
     int64       anchor_      = -1;
+    bool        cursor_upstream_ = false;
     Point       caret_pos_ {0, 0};   // On-screen pixel position
     int         caret_height_ = 0;
     int         gcolumn_      = 0;   // Desired X position for Up/Down movement
@@ -248,6 +250,15 @@ protected:
     mutable Rect     text_rect_;               // cached text rect inside sides
 
     struct LineMetricsCache : Moveable<LineMetricsCache> {
+#ifdef flagGPUUI
+        UiTextLayout layout;
+        Vector<int> graphemes,words;
+#endif
+        String source_key;
+        WString display_key;
+        Font font_key;
+        int tab_key=0;
+        bool ready=false;
         Vector<int> char_widths;
         int         line_px = 0;
     };
@@ -288,12 +299,15 @@ protected:
     void    SyncFont();
     void    SyncSb();
     void    Scroll();
-    void    PlaceCaret(int64 new_cursor, bool sel);
+    void    PlaceCaret(int64 new_cursor, bool sel, bool upstream=false);
     void    PlaceCaret();
     Rect    GetCaretRect(int64 pos) const;
     void    ScrollToCaret();
     Point   GetScrollPos() const { return sb_; }
-    int64   GetMousePos(Point p) const;
+    int64   GetMousePos(Point p, bool *upstream=nullptr) const;
+    int64   NextEditingPosition(int64 pos,int direction,bool word=false) const;
+    bool    MoveVisualCaret(int direction,bool select,bool word=false);
+    bool    MoveVerticalCaret(int delta,bool select);
     Point   GetColumnLine(int64 pos) const; // (col, line_idx)
     int64   GetPos(int line, int col = 0) const;
     int     GetLine(int64 pos) const;
@@ -312,8 +326,14 @@ protected:
     WString       GetWLine(int i) const          { return ToUtf32(GetUtf8Line(i)); }
     int           GetLineLength(int i) const     { return lin_[i].len; }
     void          SetLine(int i, const WString& w);
-    void          LineInsert(int i, int n)       { lin_.InsertN(i, n); }
-    void          LineRemove(int i, int n)       { lin_.Remove(i, n); }
+    void          LineInsert(int i, int n) {
+        if(line_metrics_cache_.GetCount()==lin_.GetCount()) line_metrics_cache_.InsertN(i,n);
+        lin_.InsertN(i,n);
+    }
+    void          LineRemove(int i, int n) {
+        if(line_metrics_cache_.GetCount()==lin_.GetCount()) line_metrics_cache_.Remove(i,n);
+        lin_.Remove(i,n);
+    }
 
     WString GetW(int64 pos, int64 size) const;
     int     GetChar(int64 pos) const;
@@ -338,7 +358,7 @@ public:
         Font fnt = GetEffectiveStyle().font;
         if(IsNull(fnt))
             fnt = StdFont();
-        placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : GetTextSize(placeholder_text_, fnt).cx;
+        placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : UiGetTextSize(placeholder_text_, fnt).cx;
         placeholder_width_dirty_ = false;
         Refresh();
         return *this;

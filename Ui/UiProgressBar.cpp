@@ -1,4 +1,5 @@
 #include <Ui/UiProgressBar.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 #include <cmath>
 
@@ -359,18 +360,18 @@ void UiProgressBar::PaintText(Draw& w, const Rect& content, const Rect& fill,
     if(text.IsEmpty() || content.IsEmpty())
         return;
 
-    Size tsz = GetTextSize(text, style.font);
+    Size tsz = UiGetTextSize(text, style.font);
     int x = content.left + (content.GetWidth() - tsz.cx) / 2;
     int y = content.top + (content.GetHeight() - tsz.cy) / 2;
 
     w.Clip(content);
     if(!fill.IsEmpty()) w.ExcludeClip(fill);
-    w.DrawText(x, y, text, style.font, style.empty_text);
+    UiDrawText(w,x, y, text, style.font, style.empty_text);
     w.End();
 
     if(!fill.IsEmpty()) {
         w.Clip(UiStyledFaceRect(fill, style.fill_metrics, style.fill_skin));
-        w.DrawText(x, y, text, style.font, style.filled_text);
+        UiDrawText(w,x, y, text, style.font, style.filled_text);
         w.End();
     }
 }
@@ -394,7 +395,7 @@ Size UiProgressBar::GetMinSize() const
 {
     const Style& style = GetEffectiveStyle();
     String text = ResolvePaintText();
-    Size tsz = text.IsEmpty() ? Size(0, 0) : GetTextSize(text, style.font);
+    Size tsz = text.IsEmpty() ? Size(0, 0) : UiGetTextSize(text, style.font);
     bool vertical = orientation_ == Orientation::Vertical;
 
     Size content = vertical

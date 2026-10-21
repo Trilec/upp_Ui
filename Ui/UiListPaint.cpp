@@ -1,4 +1,5 @@
 #include <Ui/UiList.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 #include <cmath>
 
@@ -41,11 +42,11 @@ static void PaintListBadge(Draw& w, const Rect& row, const Rect& badge,
                          false, false, false);
 
     Font font = item.use_custom_font ? item.custom_font : style.font;
-    Size text = GetTextSize(item.right_text, font);
+    Size text = UiGetTextSize(item.right_text, font);
     int x = r.left + max(0, (r.GetWidth() - text.cx) / 2);
     int y = r.top + max(0, (r.GetHeight() - text.cy) / 2);
     w.Clip(r);
-    w.DrawText(x, y, item.right_text, font,
+    UiDrawText(w,x, y, item.right_text, font,
                enabled ? style.badge_ink : style.disabled_ink);
     w.End();
 }

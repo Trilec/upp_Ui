@@ -1,5 +1,7 @@
 #include "UiBaseEdit.h"
 #include <Ui/UiTheme.h>
+#include "UiTextLayoutInternal.h"
+#include <cmath>
 
 namespace Upp {
 
@@ -271,12 +273,15 @@ void UiBaseEdit::Clear()
 
 void UiBaseEdit::SetText(const WString& s)
 {
+    Ptr<UiBaseEdit> alive(this);
     Clear();
+    if(!alive) return;
     Insert0(0, s);
     ClearDirty();
     undo_.Clear();
     redo_.Clear();
     SetCursor(0);
+    if(!alive) return;
     Refresh();
 }
 
@@ -544,6 +549,7 @@ void UiBaseEdit::DecDirty()
 void UiBaseEdit::Undo()
 {
     if(undo_.IsEmpty() || IsReadOnly()) return;
+    Ptr<UiBaseEdit> alive(this);
     undo_op_ = true;
     int   s  = undo_.Tail().serial;
     int64 nc = -1;
@@ -571,15 +577,18 @@ void UiBaseEdit::Undo()
         DecDirty();
     }
     
-    ClearSelection();
-    if(nc >= 0) PlaceCaret(nc, false);
-    WhenChange();
     undo_op_ = false;
+    ClearSelection();
+    if(!alive) return;
+    if(nc >= 0) PlaceCaret(nc, false);
+    if(!alive) return;
+    WhenChange();
 }
 
 void UiBaseEdit::Redo()
 {
     if(redo_.IsEmpty() || IsReadOnly()) return;
+    Ptr<UiBaseEdit> alive(this);
     NextUndo();
     int   s  = redo_.Tail().serial;
     int64 nc = -1;
@@ -601,7 +610,9 @@ void UiBaseEdit::Redo()
     }
     
     ClearSelection();
+    if(!alive) return;
     if(nc >= 0) PlaceCaret(nc, false);
+    if(!alive) return;
     WhenChange();
 }
 
@@ -611,10 +622,13 @@ void UiBaseEdit::Redo()
 
 void UiBaseEdit::SetSelection(int64 l, int64 h)
 {
+    Ptr<UiBaseEdit> alive(this);
     l = minmax(l, (int64)0, total_wchars_);
     h = minmax(h, (int64)0, total_wchars_);
     PlaceCaret(l, false);
+    if(!alive) return;
     PlaceCaret(h, true);
+    if(!alive) return;
     WhenSelection();
 }
 
@@ -648,13 +662,14 @@ void UiBaseEdit::ClearSelection()
 
 bool UiBaseEdit::RemoveSelection()
 {
+    Ptr<UiBaseEdit> alive(this);
     if(IsReadOnly() || !IsSelection()) return false;
     int64 l, h;
     GetSelection(l, h);
     NextUndo();
     RemoveU(l, h - l);
-    ClearSelection();
     PlaceCaret(l, false);
+    if(!alive) return true;
     WhenChange();
     return true;
 }
@@ -671,7 +686,9 @@ void UiBaseEdit::SelectAll()
 void UiBaseEdit::Cut()
 {
     if(IsReadOnly()) return;
+    Ptr<UiBaseEdit> alive(this);
     Copy();
+    if(!alive) return;
     RemoveSelection();
 }
 
@@ -700,10 +717,13 @@ void UiBaseEdit::Paste()
         w.Replace("\r", "");
     }
 
+    Ptr<UiBaseEdit> alive(this);
     RemoveSelection();
+    if(!alive) return;
     NextUndo();
     int64 n = InsertU(cursor_, w, false);
     PlaceCaret(cursor_ + n, false);
+    if(!alive) return;
     WhenChange();
 }
 
@@ -726,6 +746,8 @@ void UiBaseEdit::EnsureTextMetricsCache() const
     if(IsNull(fnt))
         fnt = StdFont();
 
+    fnt.RealizeStd();
+
     space_width_cache_ = GetTextSize(" ", fnt).cx;
     if(space_width_cache_ <= 0)
         space_width_cache_ = 1;
@@ -737,10 +759,13 @@ void UiBaseEdit::EnsureTextMetricsCache() const
 
     for(int i = 0; i < GetLineCount(); i++) {
         LineMetricsCache& mc = line_metrics_cache_[i];
-        mc.char_widths.Clear();
-        mc.line_px = 0;
-
-        WString s = GetDisplayLine(i);
+        WString s=GetDisplayLine(i);
+        const String& source=GetUtf8Line(i);
+        if(mc.ready && mc.source_key==source && mc.display_key==s &&
+           mc.font_key==fnt && mc.tab_key==tab_width_cache_) continue;
+        mc.source_key=source; mc.display_key=s; mc.font_key=fnt;
+        mc.tab_key=tab_width_cache_; mc.ready=true;
+        mc.char_widths.Clear(); mc.line_px=0;
         int px = 0;
         mc.char_widths.SetCount(s.GetCount(), 0);
         for(int j = 0; j < s.GetCount(); j++) {
@@ -769,8 +794,25 @@ void UiBaseEdit::EnsureTextMetricsCache() const
             px += cw;
         }
         mc.line_px = px;
+#ifdef flagGPUUI
+        UiTextLayoutOptions options; options.tab_spaces=minmax(style.tab_size,1,64);
+        mc.layout=UiTextLayout::Create(s,fnt,options);
+        mc.graphemes.Clear(); mc.words.Clear();
+        UiTextInternal::Encoding encoded; String error;
+        if(encoded.Build(GetWLine(i),error)) {
+            UiTextInternal::GraphemeBreaks(encoded,"",mc.graphemes,error);
+            UiTextInternal::WordBreaks(encoded,"",mc.words,error);
+        }
+        if(mc.layout.IsValid()) mc.line_px=(int)ceil(mc.layout.GetSize().cx);
+#endif
     }
 
+#ifdef flagGPUUI
+    int height=max(DPI(12),font_size_.cy);
+    for(const auto& mc:line_metrics_cache_) if(mc.layout.IsValid())
+        height=max(height,(int)ceil(mc.layout.GetSize().cy));
+    const_cast<UiBaseEdit *>(this)->caret_height_=height;
+#endif
     if(placeholder_width_dirty_)
         placeholder_width_cache_ = placeholder_text_.IsEmpty() ? 0 : GetTextSize(placeholder_text_, fnt).cx;
 
@@ -806,7 +848,12 @@ void UiBaseEdit::SyncFont()
 
 int UiBaseEdit::GetVisualLineHeight() const
 {
-    return max(DPI(12), font_size_.cy);
+    int height=max(DPI(12),font_size_.cy);
+#ifdef flagGPUUI
+    for(const auto& mc:line_metrics_cache_) if(mc.layout.IsValid())
+        height=max(height,(int)ceil(mc.layout.GetSize().cy));
+#endif
+    return height;
 }
 
 int UiBaseEdit::GetSingleLineYOffset() const
@@ -1452,29 +1499,36 @@ Point UiBaseEdit::GetColumnLine(int64 pos) const
     return Point(int(pos - line_start_pos), line_idx);
 }
 
-void UiBaseEdit::PlaceCaret(int64 new_cursor, bool sel)
+void UiBaseEdit::PlaceCaret(int64 new_cursor, bool sel, bool upstream)
 {
     LTIMING("UiBaseEdit::PlaceCaret(pos, sel)");
+    Ptr<UiBaseEdit> alive(this);
     new_cursor = minmax(new_cursor, (int64)0, total_wchars_);
-    
-    if(!sel)
-        anchor_ = -1;
-    else if(anchor_ < 0)
-        anchor_ = cursor_;
-        
-    bool selection_changed = false;
-
-    if(cursor_ != new_cursor || (sel && anchor_ < 0) || (!sel && anchor_ >= 0)) {
-        cursor_ = new_cursor;
-        Point cl = GetColumnLine(cursor_);
-        gcolumn_ = cl.x;
-        PlaceCaret();          // update pixel position
-        selection_changed = true;
+    const int64 old_anchor=anchor_;
+    if(!sel) anchor_=-1;
+    else if(anchor_<0) anchor_=cursor_;
+#ifdef flagGPUUI
+    EnsureTextMetricsCache();
+    Point target=GetColumnLine(new_cursor);
+    const auto& breaks=line_metrics_cache_[target.y].graphemes;
+    if(!breaks.IsEmpty()) {
+        int at=FindLowerBound(breaks,target.x);
+        if(at>=breaks.GetCount() || breaks[at]!=target.x)
+            new_cursor=GetPos(target.y,breaks[(sel && new_cursor>anchor_)?min(at,breaks.GetCount()-1):max(0,at-1)]);
     }
-
+#endif
+    bool selection_changed=cursor_!=new_cursor || anchor_!=old_anchor || cursor_upstream_!=upstream;
+    cursor_=new_cursor; cursor_upstream_=upstream;
+    Point cl=GetColumnLine(cursor_); gcolumn_=cl.x;
+#ifdef flagGPUUI
+    if(line_metrics_cache_[cl.y].layout.IsValid())
+        gcolumn_=(int)floor(line_metrics_cache_[cl.y].layout.GetCaret(cl.x,cursor_upstream_).x+.5);
+#endif
     if(selection_changed) {
-        Refresh();             // repaint selection + caret
+        PlaceCaret();
+        Refresh();
         WhenSelection();
+        if(!alive) return;
     }
 
     ScrollToCaret();
@@ -1508,6 +1562,10 @@ void UiBaseEdit::PlaceCaret()
             prefix_px += mc.char_widths[i];
     }
 
+#ifdef flagGPUUI
+    if(line_metrics_cache_[line_idx].layout.IsValid())
+        prefix_px=(int)floor(line_metrics_cache_[line_idx].layout.GetCaret(col,cursor_upstream_).x+.5);
+#endif
     int view_w        = text_r.GetWidth();
     int line_px_width = (line_idx >= 0 && line_idx < line_metrics_cache_.GetCount())
                         ? line_metrics_cache_[line_idx].line_px
@@ -1557,13 +1615,18 @@ void UiBaseEdit::ScrollToCaret()
         for(int i = 0; i < n; i++)
             x_pixels += mc.char_widths[i];
     }
+#ifdef flagGPUUI
+    if(line_metrics_cache_[p.y].layout.IsValid())
+        x_pixels=(int)floor(line_metrics_cache_[p.y].layout.GetCaret(p.x,cursor_upstream_).x+.5);
+#endif
     sb_.ScrollInto(Point(x_pixels, p.y));
 }
 
-int64 UiBaseEdit::GetMousePos(Point p) const
+int64 UiBaseEdit::GetMousePos(Point p, bool *upstream) const
 {
     const Style& style = GetEffectiveStyle();
     LTIMING("UiBaseEdit::GetMousePos");
+    if(upstream) *upstream=false;
     if(caret_height_ == 0)
         return 0;
 
@@ -1601,6 +1664,14 @@ int64 UiBaseEdit::GetMousePos(Point p) const
     }
 
     p.x -= align_offset;
+#ifdef flagGPUUI
+    const auto& layout=line_metrics_cache_[line_idx].layout;
+    if(layout.IsValid()) {
+        auto hit=layout.HitTest(Pointf(p.x,layout.GetSize().cy*.5));
+        if(upstream) *upstream=hit.trailing;
+        return GetPos(line_idx,hit.position);
+    }
+#endif
 
     int x = 0;
     for(int i = 0; i < line_len; i++) {
@@ -1660,6 +1731,10 @@ Rect UiBaseEdit::GetCaretRect(int64 pos) const
             prefix_px += mc.char_widths[i];
     }
 
+#ifdef flagGPUUI
+    if(line_metrics_cache_[line].layout.IsValid())
+        prefix_px=(int)floor(line_metrics_cache_[line].layout.GetCaret(cl.x,pos==cursor_ && cursor_upstream_).x+.5);
+#endif
     Point spos = GetScrollPos();
     int   yoff = GetSingleLineYOffset();
 
@@ -1788,7 +1863,7 @@ void UiBaseEdit::Paint(Draw& w)
             break;
         }
 
-        w.DrawText(px, baseline_y, placeholder_text_, fnt, style.placeholder_ink);
+        UiDrawText(w,px,baseline_y,placeholder_text_,fnt,style.placeholder_ink);
     }
 
     int first_line = spos.y;
@@ -1893,6 +1968,35 @@ void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
     bool enabled = IsEnabled();
     StyledState ink_state = enabled ? ST_NORMAL : ST_DISABLED;
 
+#ifdef flagGPUUI
+    if(i>=0 && i<line_metrics_cache_.GetCount()) {
+        const auto& layout=line_metrics_cache_[i].layout;
+        if(!layout.IsValid()) layout.Draw(w,Pointf(px,text_y),style.palette.ink[ink_state]);
+        if(layout.IsValid()) {
+            text_y=y+max(0,(line_height-(int)ceil(layout.GetSize().cy))/2);
+            Color ink=style.palette.ink[ink_state];
+            bool drawn=has_sel && s1<s2
+                ? UiDrawTextSelection(w,Point(px,text_y),layout,ink,s1,s2,style.selection_color,style.selection_ink)
+                : layout.Draw(w,Pointf(px,text_y),ink);
+            if(drawn) {
+                for(int j=0;j<len;++j) {
+                    bool space=text[j]==' ' && style.show_spaces;
+                    bool tab=text[j]=='\t' && style.show_tabs;
+                    if(space || tab) {
+                        double left=layout.GetCaret(j).x,right=layout.GetCaret(j+1,true).x;
+                        int marker_x=px+(int)floor(min(left,right)+(fabs(right-left)-font_size_.cx)*.5+.5);
+                        UiDrawText(w,marker_x,text_y,space?".":"?",line_metrics_cache_[i].font_key,
+                                   space?style.whitespace_color:style.tab_char_color);
+                    }
+                }
+                if(style.show_line_endings && accepts_newlines_ && i<GetLineCount()-1)
+                    UiDrawText(w,px+(int)floor(layout.GetCaret(len).x+.5),text_y,"?",
+                               line_metrics_cache_[i].font_key,style.whitespace_color);
+                return;
+            }
+        }
+    }
+#endif
     for(int j = 0; j <= len; j++) {
         wchar chr    = (j < len) ? text[j] : 0;
         int   char_w = space_width_cache_;
@@ -1934,6 +2038,74 @@ void UiBaseEdit::PaintLine(Draw& w, int i, int x, int y, const Rect& clip) const
 
 
 
+int64 UiBaseEdit::NextEditingPosition(int64 pos,int direction,bool word) const
+{
+    if(!direction) return minmax(pos,(int64)0,total_wchars_);
+#ifdef flagGPUUI
+    EnsureTextMetricsCache();
+    Point cl=GetColumnLine(pos);
+    const auto& breaks=word?line_metrics_cache_[cl.y].words:line_metrics_cache_[cl.y].graphemes;
+    if(!breaks.IsEmpty()) {
+        if(direction<0 && cl.x>0) {
+            int at=max(0,FindLowerBound(breaks,cl.x)-1);
+            while(word && at>0 && UiTextInternal::IsWhitespace(GetChar(GetPos(cl.y,breaks[at])))) --at;
+            return GetPos(cl.y,breaks[at]);
+        }
+        if(direction>0 && cl.x<GetLineLength(cl.y)) {
+            int at=min(breaks.GetCount()-1,FindUpperBound(breaks,cl.x));
+            while(word && at+1<breaks.GetCount() && UiTextInternal::IsWhitespace(GetChar(GetPos(cl.y,breaks[at])))) ++at;
+            return GetPos(cl.y,breaks[at]);
+        }
+    }
+#endif
+    return minmax(pos+(direction<0?-1:1),(int64)0,total_wchars_);
+}
+bool UiBaseEdit::MoveVisualCaret(int direction,bool select,bool word)
+{
+#ifdef flagGPUUI
+    EnsureTextMetricsCache();
+    Point cl=GetColumnLine(cursor_);
+    const auto& layout=line_metrics_cache_[cl.y].layout;
+    if(!layout.IsValid()) return false;
+    bool masked=GetDisplayLine(cl.y)!=GetWLine(cl.y);
+    if(word || masked) {
+        bool rtl=!masked && layout.GetCaret(0).x>layout.GetCaret(layout.GetLength()).x;
+        PlaceCaret(NextEditingPosition(cursor_,direction*(rtl?-1:1),word),select);
+        return true;
+    }
+    UiTextHit hit; hit.position=cl.x; hit.trailing=cursor_upstream_;
+    auto next=layout.MoveVisual(hit,direction);
+    if(next.position==hit.position && next.trailing==hit.trailing) {
+        bool rtl=layout.GetCaret(0).x>layout.GetCaret(layout.GetLength()).x;
+        int logical=direction*(rtl?-1:1);
+        // A bidi line's visual edge can be a logical interior position. Do not
+        // step back into that same line and create a left/right navigation loop.
+        if(logical<0 && cl.y>0) PlaceCaret(GetPos(cl.y-1,GetLineLength(cl.y-1)),select,true);
+        else if(logical>0 && cl.y+1<GetLineCount()) PlaceCaret(GetPos(cl.y+1,0),select);
+        return true;
+    }
+    PlaceCaret(GetPos(cl.y,next.position),select,next.trailing); return true;
+#else
+    return false;
+#endif
+}
+bool UiBaseEdit::MoveVerticalCaret(int delta,bool select)
+{
+#ifdef flagGPUUI
+    EnsureTextMetricsCache();
+    Point cl=GetColumnLine(cursor_);
+    int line=minmax(cl.y+delta,0,GetLineCount()-1),wanted=gcolumn_;
+    const auto& layout=line_metrics_cache_[line].layout;
+    if(!layout.IsValid()) return false;
+    auto hit=layout.HitTest(Pointf(wanted,layout.GetSize().cy*.5));
+    Ptr<UiBaseEdit> alive(this);
+    PlaceCaret(GetPos(line,hit.position),select,hit.trailing);
+    if(alive) gcolumn_=wanted; return true;
+#else
+    return false;
+#endif
+}
+
 // --------------------------------------------------------------------
 // Input & Events
 // --------------------------------------------------------------------
@@ -1965,8 +2137,9 @@ void UiBaseEdit::MouseMove(Point p, dword flags)
     Ctrl::MouseMove(p, flags);
 
     if(HasCapture() && (flags & K_MOUSELEFT)) {
-        int64 pos = GetMousePos(p);
-        PlaceCaret(pos, true);
+        bool upstream=false;
+        int64 pos = GetMousePos(p,&upstream);
+        PlaceCaret(pos, true, upstream);
     }
 }
 
@@ -1987,21 +2160,26 @@ void UiBaseEdit::LostFocus()
 
 void UiBaseEdit::LeftDown(Point p, dword flags)
 {
+    Ptr<UiBaseEdit> alive(this);
     if(!IsShowEnabled() || !HasMouse()) return;
     if(click_focus_ && !HasFocus())
         SetFocus();
+    if(!alive) return;
     
-    int64 pos = GetMousePos(p);
-    PlaceCaret(pos, flags & K_SHIFT);
+    bool upstream=false;
+    int64 pos = GetMousePos(p,&upstream);
+    PlaceCaret(pos, flags & K_SHIFT, upstream);
+    if(!alive) return;
     SetCapture();
-    pressed_ = true;
+    if(alive) pressed_ = true;
 }
 
 void UiBaseEdit::LeftDrag(Point p, dword flags)
 {
     if(!HasCapture()) return;
-    int64 pos = GetMousePos(p);
-    PlaceCaret(pos, true);
+    bool upstream=false;
+    int64 pos = GetMousePos(p,&upstream);
+    PlaceCaret(pos, true, upstream);
 }
 
 void UiBaseEdit::LeftUp(Point p, dword flags)
@@ -2033,6 +2211,14 @@ void UiBaseEdit::LeftDouble(Point p, dword flags)
         return ch == 0 || ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r';
     };
 
+#ifdef flagGPUUI
+    EnsureTextMetricsCache();
+    const auto& words=line_metrics_cache_[line].words;
+    if(words.GetCount()>1) {
+        int at=minmax(FindUpperBound(words,col)-1,0,words.GetCount()-2);
+        SetSelection(GetPos(line,words[at]),GetPos(line,words[at+1])); return;
+    }
+#endif
     int left  = col;
     int right = col;
 
@@ -2068,14 +2254,16 @@ void UiBaseEdit::LeftTriple(Point p, dword flags)
 
 void UiBaseEdit::RightDown(Point p, dword flags)
 {
+    Ptr<UiBaseEdit> alive(this);
     if(!HasFocus())
         SetFocus();
+    if(!alive) return;
         
     int64 pos = GetMousePos(p);
     if(!IsSelection() || pos < min(cursor_, anchor_) || pos > max(cursor_, anchor_))
         PlaceCaret(pos, false);
         
-    MenuBar::Execute(WhenBar);
+    if(alive) MenuBar::Execute(WhenBar);
 }
 
 void UiBaseEdit::MouseWheel(Point p, int zdelta, dword flags)
@@ -2097,6 +2285,7 @@ bool UiBaseEdit::Key(dword key, int count)
 {
     if(!IsShowEnabled()) return false;
     
+    Ptr<UiBaseEdit> alive(this);
     bool sel = key & K_SHIFT;
     NextUndo();
     
@@ -2106,15 +2295,19 @@ bool UiBaseEdit::Key(dword key, int count)
         Refresh();
         return true;
     case K_LEFT:
+        if(MoveVisualCaret(-1,sel)) return true;
         PlaceCaret(cursor_ - 1, sel);
         return true;
     case K_RIGHT:
+        if(MoveVisualCaret(1,sel)) return true;
         PlaceCaret(cursor_ + 1, sel);
         return true;
     case K_UP:
+        if(MoveVerticalCaret(-1,sel)) return true;
         PlaceCaret(GetPos(GetColumnLine(cursor_).y - 1, gcolumn_), sel);
         return true;
     case K_DOWN:
+        if(MoveVerticalCaret(1,sel)) return true;
         PlaceCaret(GetPos(GetColumnLine(cursor_).y + 1, gcolumn_), sel);
         return true;
     case K_HOME:
@@ -2125,15 +2318,18 @@ bool UiBaseEdit::Key(dword key, int count)
         return true;
         
     case K_PAGEUP:
+        if(MoveVerticalCaret(-sb_.GetPage().cy,sel)) return true;
         PlaceCaret(GetPos(max(0, GetColumnLine(cursor_).y - sb_.GetPage().cy), gcolumn_), sel);
         return true;
     case K_PAGEDOWN:
+        if(MoveVerticalCaret(sb_.GetPage().cy,sel)) return true;
         PlaceCaret(GetPos(min(GetLineCount() - 1, GetColumnLine(cursor_).y + sb_.GetPage().cy), gcolumn_), sel);
         return true;
 
     case K_CTRL_LEFT:
+        MoveVisualCaret(-1,sel,true); return true;
     case K_CTRL_RIGHT:
-        return true;
+        MoveVisualCaret(1,sel,true); return true;
         
     case K_CTRL_A:
         SelectAll();
@@ -2150,28 +2346,30 @@ bool UiBaseEdit::Key(dword key, int count)
     case K_BACKSPACE:
         if(!RemoveSelection()) {
             if(cursor_ > 0) {
-                RemoveU(cursor_ - 1, 1);
-                PlaceCaret(cursor_ - 1, false);
+                int64 previous=NextEditingPosition(cursor_,-1);
+                RemoveU(previous,cursor_-previous);
+                PlaceCaret(previous,false);
             }
         }
-        WhenChange();
+        if(alive) WhenChange();
         return true;
     case K_DELETE:
         if(!RemoveSelection()) {
             if(cursor_ < total_wchars_) {
-                RemoveU(cursor_, 1);
+                RemoveU(cursor_,NextEditingPosition(cursor_,1)-cursor_);
                 PlaceCaret(cursor_, false);
             }
         }
-        WhenChange();
+        if(alive) WhenChange();
         return true;
         
     case K_ENTER:
         if(accepts_newlines_) {
             RemoveSelection();
+            if(!alive) return true;
             InsertU(cursor_, "\n", true);
             PlaceCaret(cursor_ + 1, false);
-            WhenChange();
+            if(alive) WhenChange();
         } else {
             WhenAction();
         }
@@ -2180,9 +2378,10 @@ bool UiBaseEdit::Key(dword key, int count)
     case K_TAB:
         if(accepts_tabs_) {
             RemoveSelection();
+            if(!alive) return true;
             InsertU(cursor_, "\t", true);
             PlaceCaret(cursor_ + 1, false);
-            WhenChange();
+            if(alive) WhenChange();
             return true;
         }
         return false;
@@ -2190,13 +2389,13 @@ bool UiBaseEdit::Key(dword key, int count)
     case K_CTRL_X:
     case K_SHIFT_DELETE:
         Cut();
-        WhenChange();
+        if(alive) WhenChange();
         return true;
         
     case K_CTRL_V:
     case K_SHIFT_INSERT:
         Paste();
-        WhenChange();
+        if(alive) WhenChange();
         return true;
         
     case K_CTRL_Z:
@@ -2210,15 +2409,21 @@ bool UiBaseEdit::Key(dword key, int count)
         return true;
     }
 
-    if(key >= 32 && key < 65536) {
+    if(key >= 32 && key <= 0x10ffff && !(key>=0xd800 && key<=0xdfff)) {
         if(overwrite_ && !IsSelection() && cursor_ < total_wchars_ && GetChar(cursor_) != '\n')
-            RemoveU(cursor_, count);
+        {
+            int64 end=cursor_;
+            for(int i=0;i<count && end<total_wchars_ && GetChar(end)!='\n';++i)
+                end=NextEditingPosition(end,1);
+            RemoveU(cursor_,end-cursor_);
+        }
         else
             RemoveSelection();
+        if(!alive) return true;
         
         InsertU(cursor_, WString(key, count), true);
         PlaceCaret(cursor_ + count, false);
-        WhenChange();
+        if(alive) WhenChange();
         return true;
     }
 

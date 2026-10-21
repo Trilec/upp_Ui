@@ -1,4 +1,5 @@
 #include <Ui/UiTree.h>
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 
@@ -688,7 +689,7 @@ Image UiTree::BuildDragSample(const Vector<UiTreeNodeRef>& nodes) const
     else
         label = Format("%d items", nodes.GetCount());
 
-    Size tsz = GetTextSize(label, font);
+    Size tsz = UiGetTextSize(label, font);
     Size sz(max(DPI(96), tsz.cx + DPI(20)), DPI(28));
     ImageDraw iw(sz);
     iw.DrawRect(sz, Color(17, 24, 39));

@@ -1,4 +1,5 @@
 #include <Ui/UiMediaCard.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 #include <cmath>
 
@@ -28,27 +29,7 @@ String OneLine(const String& text)
 
 WString Ellipsize(const String& source, Font font, int width)
 {
-    if(source.IsEmpty() || width <= 0)
-        return WString();
-
-    WString text = OneLine(source).ToWString();
-    if(GetTextSize(text, font).cx <= width)
-        return text;
-
-    const WString ellipsis = "...";
-    if(GetTextSize(ellipsis, font).cx > width)
-        return WString();
-
-    int lo = 0;
-    int hi = text.GetCount();
-    while(lo < hi) {
-        const int mid = (lo + hi + 1) / 2;
-        if(GetTextSize(text.Left(mid) + ellipsis, font).cx <= width)
-            lo = mid;
-        else
-            hi = mid - 1;
-    }
-    return text.Left(lo) + ellipsis;
+    return UiFitText(OneLine(source).ToWString(),font,width);
 }
 
 int RoleIndex(UiRole role)
@@ -94,7 +75,7 @@ Size BandContentSize(const UiMediaBandData& data,
     auto add = [&](const String& text, Font font) {
         if(text.IsEmpty())
             return;
-        const Size size = GetTextSize(OneLine(text), font);
+        const Size size = UiGetTextSize(OneLine(text), font);
         width = max(width, size.cx);
         if(lines++)
             height += max(0, style.text_gap);
@@ -203,19 +184,19 @@ void PaintBand(Draw& w,
                             state, false);
 
     if(!p.prepared_title.IsEmpty() && !p.title.IsEmpty())
-        w.DrawText(p.title.left, p.title.top,
+        UiDrawText(w,p.title.left, p.title.top,
                    p.prepared_title, style.title_font,
                    MediaInk(style.title_ink, state,
                             PaletteInk(style.palette, state, SColorText())));
 
     if(!p.prepared_subtitle.IsEmpty() && !p.subtitle.IsEmpty())
-        w.DrawText(p.subtitle.left, p.subtitle.top,
+        UiDrawText(w,p.subtitle.left, p.subtitle.top,
                    p.prepared_subtitle, style.subtitle_font,
                    MediaInk(style.subtitle_ink, state,
                             PaletteInk(style.palette, state, SColorText())));
 
     if(!p.prepared_metadata.IsEmpty() && !p.metadata.IsEmpty())
-        w.DrawText(p.metadata.left, p.metadata.top,
+        UiDrawText(w,p.metadata.left, p.metadata.top,
                    p.prepared_metadata, style.metadata_font,
                    MediaInk(style.metadata_ink, state,
                             PaletteInk(style.palette, state, SColorText())));
@@ -566,7 +547,7 @@ void PrepareMedia(const UiMediaCardData& data,
         out.prepared_empty_text =
             Ellipsize(data.empty_text, font,
                       max(0, out.media_content.GetWidth() - DPI(12)));
-        const Size ts = GetTextSize(out.prepared_empty_text, font);
+        const Size ts = UiGetTextSize(out.prepared_empty_text, font);
 
         if(!out.empty_icon_rect.IsEmpty()) {
             const int y =
@@ -842,7 +823,7 @@ void UiPaintMediaCard(Draw& w,
            && !p.empty_text_rect.IsEmpty()) {
             const Color ink =
                 PaletteInk(style.media_palette, state, SColorText());
-            w.DrawText(p.empty_text_rect.left,
+            UiDrawText(w,p.empty_text_rect.left,
                        p.empty_text_rect.top,
                        p.prepared_empty_text,
                        style.footer_style.title_font,

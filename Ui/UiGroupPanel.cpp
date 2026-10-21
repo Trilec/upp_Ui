@@ -1,4 +1,5 @@
 #include <Ui/UiGroupPanel.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiMeasure.h>
 #include <Ui/UiTheme.h>
 
@@ -233,8 +234,8 @@ static int UiGroupPanelAlignedOffset(int available, int size, UiAlign align)
 Size UiGroupPanel::GetTitleNaturalSize() const
 {
     const Style& s = GetEffectiveStyle();
-    Size title_sz = title_.IsEmpty() ? Size(0, 0) : GetTextSize(title_, s.title_font);
-    Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : GetTextSize(subtitle_, s.subtitle_font);
+    Size title_sz = title_.IsEmpty() ? Size(0, 0) : UiGetTextSize(title_, s.title_font);
+    Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : UiGetTextSize(subtitle_, s.subtitle_font);
     int text_w = max(title_sz.cx, sub_sz.cx);
     int text_h = title_sz.cy + (title_sz.cy && sub_sz.cy ? s.title_subtitle_gap : 0) + sub_sz.cy;
     int icon_size = !IsNull(icon_) && s.icon_size > 0 ? s.icon_size : 0;
@@ -461,8 +462,8 @@ Size UiGroupPanel::GetMinSize() const
 void UiGroupPanel::PaintHeader(Draw& w, const HeaderLayout& layout, StyledState st) const
 {
     const Style& s = GetEffectiveStyle();
-    Size title_sz = title_.IsEmpty() ? Size(0, 0) : GetTextSize(title_, s.title_font);
-    Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : GetTextSize(subtitle_, s.subtitle_font);
+    Size title_sz = title_.IsEmpty() ? Size(0, 0) : UiGetTextSize(title_, s.title_font);
+    Size sub_sz = subtitle_.IsEmpty() ? Size(0, 0) : UiGetTextSize(subtitle_, s.subtitle_font);
     int text_h = title_sz.cy + (title_sz.cy && sub_sz.cy ? s.title_subtitle_gap : 0) + sub_sz.cy;
     Rect block = layout.title;
     if(block.IsEmpty())
@@ -479,11 +480,11 @@ void UiGroupPanel::PaintHeader(Draw& w, const HeaderLayout& layout, StyledState 
     Color sub_c = IsNull(s.subtitle_color) ? Blend(s.palette.ink[st], SColorPaper(), 80) : s.subtitle_color;
     int ty = block.top + max(0, (block.GetHeight() - text_h) / 2);
     if(!title_.IsEmpty()) {
-        w.DrawText(x, ty, title_, s.title_font, title_c);
+        UiDrawText(w,x, ty, title_, s.title_font, title_c);
         ty += title_sz.cy + (subtitle_.IsEmpty() ? 0 : s.title_subtitle_gap);
     }
     if(!subtitle_.IsEmpty())
-        w.DrawText(x, ty, subtitle_, s.subtitle_font, sub_c);
+        UiDrawText(w,x, ty, subtitle_, s.subtitle_font, sub_c);
     w.End();
 }
 

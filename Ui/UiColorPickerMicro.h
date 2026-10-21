@@ -20,6 +20,7 @@
     are copied and invoked only after internal state is updated.
 */
 #include <Ui/UiBoxLayout.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiGridLayout.h>
 #include <Ui/UiLabel.h>
 #include <Ui/UiLineEdit.h>
@@ -86,7 +87,7 @@ private:
             // Reserve all seven hex characters using the host font and edit chrome.
             const auto &style = GetStyle();
             Size size =
-                UiStyledOuterSizeFromContent(GetTextSize("#FFFFFF", style.font), style.metrics, style.skin);
+                UiStyledOuterSizeFromContent(UiGetTextSize("#FFFFFF", style.font), style.metrics, style.skin);
             return Size(max(DPI(60), size.cx), max(DPI(26), UiLineEdit::GetMinSize().cy));
         }
         bool Key(dword key, int count) override

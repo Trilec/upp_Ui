@@ -1,4 +1,5 @@
 #include "UiGraphNodeComponent.h"
+#include <Ui/UiTextLayout.h>
 
 namespace Upp {
 namespace {
@@ -38,9 +39,9 @@ void UiNodeGraph::PaintNodeComponents(Draw& w, const UiGraphNodePresentation& p,
             w.Clip(c.content);
             switch(c.representation) {
             case Rep::Text:
-                if(c.items.IsEmpty()) w.DrawText(c.footprint.left, c.footprint.top, c.text, c.font, ink);
+                if(c.items.IsEmpty()) UiDrawText(w,c.footprint.left, c.footprint.top, c.text, c.font, ink);
                 else for(const auto& line : c.items)
-                    w.DrawText(line.text_rect.left, line.text_rect.top, line.text, c.font, ink);
+                    UiDrawText(w,line.text_rect.left, line.text_rect.top, line.text, c.font, ink);
                 break;
             case Rep::Icon:
                 if(c.tint_icon) w.DrawImage(c.footprint.left, c.footprint.top, c.image, ink);
@@ -53,12 +54,12 @@ void UiNodeGraph::PaintNodeComponents(Draw& w, const UiGraphNodePresentation& p,
             case Rep::Progress:
                 w.DrawRect(c.meter, muted);
                 if(!c.completed.IsEmpty()) w.DrawRect(c.completed, ink);
-                if(!c.text.IsEmpty()) w.DrawText(c.footprint.left, c.footprint.top, c.text, c.font, ink);
+                if(!c.text.IsEmpty()) UiDrawText(w,c.footprint.left, c.footprint.top, c.text, c.font, ink);
                 break;
             case Rep::Fields:
                 for(const auto& row : c.items) {
-                    w.DrawText(row.text_rect.left, row.text_rect.top, row.text, c.font, ink);
-                    w.DrawText(row.value_rect.left, row.value_rect.top, row.value, c.font, ink);
+                    UiDrawText(w,row.text_rect.left, row.text_rect.top, row.text, c.font, ink);
+                    UiDrawText(w,row.value_rect.left, row.value_rect.top, row.value, c.font, ink);
                     w.DrawRect(row.box.left, row.box.bottom - 1, row.box.GetWidth(), 1, muted);
                 }
                 break;
@@ -67,7 +68,7 @@ void UiNodeGraph::PaintNodeComponents(Draw& w, const UiGraphNodePresentation& p,
                 for(const auto& item : c.items) {
                     w.DrawRect(item.box, IsNull(c.state_face[si]) ? muted : c.state_face[si]);
                     ComponentFrame(w, item.box, IsNull(c.state_frame[si]) ? ink : c.state_frame[si], 1);
-                    w.DrawText(item.text_rect.left, item.text_rect.top, item.text, c.font, ink);
+                    UiDrawText(w,item.text_rect.left, item.text_rect.top, item.text, c.font, ink);
                 }
                 break;
             case Rep::Bar:

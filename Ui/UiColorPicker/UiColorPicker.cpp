@@ -1,4 +1,5 @@
 #include <Ui/UiColorPicker/UiColorPicker.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiColorPicker/UiColorPickerPaletteLab.h>
 
 #include <cmath>
@@ -315,8 +316,8 @@ public:
             draw.DrawEllipse(badge, SColorPaper(), DPI(1), SColorShadow());
             String number = AsString(display_.hero_number);
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
-            Size text = GetTextSize(number, font);
-            draw.DrawText(badge.left + (badge.GetWidth() - text.cx) / 2,
+            Size text = UiGetTextSize(number, font);
+            UiDrawText(draw,badge.left + (badge.GetWidth() - text.cx) / 2,
                           badge.top + (badge.GetHeight() - text.cy) / 2,
                           number, font, SColorText());
         }
@@ -326,16 +327,16 @@ public:
             draw.DrawEllipse(hero, SColorPaper(), DPI(1), SColorHighlight());
             String mark = "*";
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(10)).Bold());
-            Size text = GetTextSize(mark, font);
-            draw.DrawText(hero.left + (hero.GetWidth() - text.cx) / 2,
+            Size text = UiGetTextSize(mark, font);
+            UiDrawText(draw,hero.left + (hero.GetWidth() - text.cx) / 2,
                           hero.top + (hero.GetHeight() - text.cy) / 2 - DPI(1),
                           mark, font, SColorHighlight());
         }
         if(display_.gamut_mapped && !compact_) {
             String mark = "!";
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
-            Size text = GetTextSize(mark, font);
-            draw.DrawText(swatch.right - text.cx - DPI(2), swatch.top + DPI(1), mark, font, SColorHighlight());
+            Size text = UiGetTextSize(mark, font);
+            UiDrawText(draw,swatch.right - text.cx - DPI(2), swatch.top + DPI(1), mark, font, SColorHighlight());
         }
     }
 
@@ -1409,8 +1410,8 @@ private:
             Point label = WheelPoint_(angle, 88, wheel);
             String text = AsString(angle);
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)));
-            Size size = GetTextSize(text, font);
-            draw.DrawText(label.x - size.cx / 2, label.y - size.cy / 2,
+            Size size = UiGetTextSize(text, font);
+            UiDrawText(draw,label.x - size.cx / 2, label.y - size.cy / 2,
                           text, font, Blend(SColorText(), SurfaceColor_(), 130));
         }
     }
@@ -1473,14 +1474,14 @@ private:
                 draw.DrawEllipse(marker.Inflated(DPI(4)), Null, DPI(2), SColorHighlight());
             String number = AsString(i + 1);
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(9)).Bold());
-            Size text = GetTextSize(number, font);
-            draw.DrawText(marker.left + (marker.GetWidth() - text.cx) / 2,
+            Size text = UiGetTextSize(number, font);
+            UiDrawText(draw,marker.left + (marker.GetWidth() - text.cx) / 2,
                           marker.top + (marker.GetHeight() - text.cy) / 2,
                           number, font, SColorText());
             if(family.locked) {
                 String lock = "L";
                 Font small = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
-                draw.DrawText(marker.right - DPI(2), marker.bottom - DPI(7), lock, small, SColorText());
+                UiDrawText(draw,marker.right - DPI(2), marker.bottom - DPI(7), lock, small, SColorText());
             }
         }
     }
@@ -1626,8 +1627,8 @@ public:
         if(image_.IsEmpty()) {
             String text = "Click, drop or paste an image";
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(11)));
-            Size size = GetTextSize(text, font);
-            draw.DrawText(rect.left + (rect.GetWidth() - size.cx) / 2,
+            Size size = UiGetTextSize(text, font);
+            UiDrawText(draw,rect.left + (rect.GetWidth() - size.cx) / 2,
                           rect.top + (rect.GetHeight() - size.cy) / 2,
                           text, font, SColorDisabled());
             if(drop_hot_)
@@ -1826,8 +1827,8 @@ private:
             draw.DrawEllipse(marker, seed_[i].color, DPI(2), i == 0 ? Color(255, 220, 40) : Color(80, 190, 255));
             String text = i == 0 ? "A" : "B";
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)).Bold());
-            Size size = GetTextSize(text, font);
-            draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
+            Size size = UiGetTextSize(text, font);
+            UiDrawText(draw,marker.left + (marker.GetWidth() - size.cx) / 2,
                           marker.top + (marker.GetHeight() - size.cy) / 2,
                           text, font, SColorText());
         }
@@ -1840,8 +1841,8 @@ private:
             draw.DrawEllipse(marker, color, DPI(2), White());
             String text = AsString(i + 1);
             Font font = UiFonts::Inherit(SansSerif().Height(DPI(8)).Bold());
-            Size size = GetTextSize(text, font);
-            draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
+            Size size = UiGetTextSize(text, font);
+            UiDrawText(draw,marker.left + (marker.GetWidth() - size.cx) / 2,
                           marker.top + (marker.GetHeight() - size.cy) / 2,
                           text, font, SColorText());
         }
@@ -1856,9 +1857,9 @@ private:
                 draw.DrawEllipse(marker, color, DPI(2), White());
                 String text = AsString(i + 1);
                 Font font = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
-                Size size = GetTextSize(text, font);
+                Size size = UiGetTextSize(text, font);
                 Color ink = IsDark(color) ? White() : Black();
-                draw.DrawText(marker.left + (marker.GetWidth() - size.cx) / 2,
+                UiDrawText(draw,marker.left + (marker.GetWidth() - size.cx) / 2,
                               marker.top + (marker.GetHeight() - size.cy) / 2,
                               text, font, ink);
             }

@@ -1,4 +1,5 @@
 #include <Ui/UiFonts.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiItemRender.h>
 #include <Ui/UiList.h>
 #include <Ui/UiTheme.h>
@@ -55,7 +56,7 @@ void DrawAlignedItemText(Draw& w, const Rect& rect, const String& text,
 {
     if(rect.IsEmpty() || text.IsEmpty())
         return;
-    Size sz = GetTextSize(text, font);
+    Size sz = UiGetTextSize(text, font);
     int x = rect.left;
     if(align == ALIGN_RIGHT)
         x = max(rect.left, rect.right - sz.cx);
@@ -63,7 +64,7 @@ void DrawAlignedItemText(Draw& w, const Rect& rect, const String& text,
         x = max(rect.left, rect.left + (rect.GetWidth() - sz.cx) / 2);
     int y = rect.top + max(0, (rect.GetHeight() - sz.cy) / 2);
     w.Clip(rect);
-    w.DrawText(x, y, text, font, ink);
+    UiDrawText(w,x, y, text, font, ink);
     w.End();
 }
 
@@ -321,7 +322,7 @@ Size UiItemRenderBasic::GetContentSize() const
     const UiItemRenderStyle& style = GetStyle();
     Font title_font = ResolveItemFont(data, style);
     auto TextSize = [](const String& text, Font font, int minimum) {
-        Size size = GetTextSize(text.IsEmpty() ? String(" ") : text, font);
+        Size size = UiGetTextSize(text.IsEmpty() ? String(" ") : text, font);
         if(text.IsEmpty()) size.cx = 0;
         size.cy = max(size.cy, DPI(minimum));
         return size;
@@ -387,11 +388,11 @@ void UiItemRenderBasic::Layout()
         return;
 
     Font title_font = ResolveItemFont(data, style);
-    int title_h = max(GetTextSize(data.title.IsEmpty() ? String(" ") : data.title, title_font).cy, DPI(14));
+    int title_h = max(UiGetTextSize(data.title.IsEmpty() ? String(" ") : data.title, title_font).cy, DPI(14));
     int subtitle_h = !data.subtitle.IsEmpty() && style.show_subtitle
-                   ? max(GetTextSize(data.subtitle, style.subtitle_font).cy, DPI(12)) : 0;
+                   ? max(UiGetTextSize(data.subtitle, style.subtitle_font).cy, DPI(12)) : 0;
     int description_h = !data.description.IsEmpty() && style.show_description
-                      ? max(GetTextSize(data.description, style.description_font).cy, DPI(12)) : 0;
+                      ? max(UiGetTextSize(data.description, style.description_font).cy, DPI(12)) : 0;
 
     if(Direction() == UiDirection::V) {
         int top = content_.top;
@@ -424,7 +425,7 @@ void UiItemRenderBasic::Layout()
             description_ = Rect(content_.left, top, content_.right, min(content_.bottom, top + description_h));
         }
         if(style.show_right_text && !data.right_text.IsEmpty()) {
-            int rh = max(GetTextSize(data.right_text, style.right_font).cy, DPI(12));
+            int rh = max(UiGetTextSize(data.right_text, style.right_font).cy, DPI(12));
             right_text_ = Rect(content_.left, max(content_.top, content_.bottom - rh),
                                content_.right, content_.bottom);
         }
@@ -450,7 +451,7 @@ void UiItemRenderBasic::Layout()
         left = metadata_.right + style.metadata_gap;
     }
     if(style.show_right_text && !data.right_text.IsEmpty()) {
-        int rw = min(GetTextSize(data.right_text, style.right_font).cx + DPI(4),
+        int rw = min(UiGetTextSize(data.right_text, style.right_font).cx + DPI(4),
                      max(0, (right - left) / 2));
         right_text_ = Rect(max(left, right - rw), content_.top, right, content_.bottom);
         right = max(left, right_text_.left - style.content_gap);
@@ -509,7 +510,7 @@ void UiItemRenderBasic::Paint(Draw& w, const UiItemRenderState& state) const
                             actual.enabled ? style.muted_ink : style.palette.ink[ST_DISABLED], data.right_text_align);
 
     if(data.underline && !title_.IsEmpty()) {
-        Size tsz = GetTextSize(data.title, title_font);
+        Size tsz = UiGetTextSize(data.title, title_font);
         int x = title_.left;
         if(data.text_align == ALIGN_RIGHT)
             x = max(title_.left, title_.right - tsz.cx);
@@ -551,8 +552,8 @@ Size UiItemRenderImage::GetContentSize() const
     const UiItemRenderData& data = Data();
     const UiItemRenderStyle& style = GetStyle();
     Font title_font = ResolveItemFont(data, style);
-    Size title = GetTextSize(data.title, title_font);
-    Size desc = data.description.IsEmpty() ? Size(0, 0) : GetTextSize(data.description, style.description_font);
+    Size title = UiGetTextSize(data.title, title_font);
+    Size desc = data.description.IsEmpty() ? Size(0, 0) : UiGetTextSize(data.description, style.description_font);
     if(Direction() == UiDirection::H) {
         int h = max(style.image_extent, title.cy + (desc.cy ? style.text_gap + desc.cy : 0));
         return UiStyledOuterSizeFromContent(Size(style.image_extent + style.content_gap + max(title.cx, desc.cx), h),
@@ -630,7 +631,7 @@ void UiItemRenderImage::Layout()
             }
         }
         if(style.show_right_text && !data.right_text.IsEmpty()) {
-            int rw = min(GetTextSize(data.right_text, right_font_).cx + DPI(4),
+            int rw = min(UiGetTextSize(data.right_text, right_font_).cx + DPI(4),
                          max(0, (right - left) / 2));
             right_text_ = Rect(max(left, right - rw), content_.top, right, content_.bottom);
             right = max(left, right_text_.left - style.content_gap);

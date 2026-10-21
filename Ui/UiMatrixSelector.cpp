@@ -1,4 +1,5 @@
 #include <Ui/UiMatrixSelector.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiTheme.h>
 #include <Painter/Painter.h>
 #include <cmath>
@@ -758,8 +759,8 @@ void UiMatrixSelector::DrawCellContent(Draw& w, const Rect& r, const Cell& cell,
         DrawGlyphAA(w, content.Deflated(min(s.glyph_inset, max_inset)), cell.glyph, ink);
     }
     if(!has_visual && !cell.short_label.IsEmpty()) {
-        Size ts = GetTextSize(cell.short_label, s.cell_font);
-        w.DrawText(r.left + (r.GetWidth() - ts.cx) / 2,
+        Size ts = UiGetTextSize(cell.short_label, s.cell_font);
+        UiDrawText(w,r.left + (r.GetWidth() - ts.cx) / 2,
                    r.top + (r.GetHeight() - ts.cy) / 2,
                    cell.short_label, s.cell_font, ink);
     }
@@ -847,9 +848,9 @@ void UiMatrixSelector::DrawReadout(Draw& w, const Rect& rect, StyledState state)
     int y = rect.top + max(0, (rect.GetHeight() - total_h) / 2);
     Rect content = rect.Deflated(DPI(5), DPI(2));
     for(const String& line : lines) {
-        Size ts = GetTextSize(line, font);
+        Size ts = UiGetTextSize(line, font);
         int x = content.left + max(0, (content.GetWidth() - ts.cx) / 2);
-        DrawTextEllipsis(w, x, y, max(0, content.right - x), line, "...", font, ink);
+        UiDrawTextEllipsis(w, x, y, max(0, content.right - x), line, "...", font, ink);
         y += line_h + gap;
     }
 }

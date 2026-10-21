@@ -11,8 +11,16 @@ uses
 	Animation,
 	CtrlLib;
 
+
+
+library(WIN32) "dwrite";
+
 file
 	Ui.h,
+	UiTextLayout.h,
+	UiTextLayout.cpp,
+	UiTextLayoutInternal.h,
+	UiTextLayoutInternal.cpp,
 	UiColorProbe.h,
 	UiColorProbe.cpp,
 	UiColorPickerMicro.h,

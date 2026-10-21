@@ -1,4 +1,5 @@
 #include "UiPlaybackBar.h"
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiIcons.h>
 #include <climits>
 #include <cmath>
@@ -318,13 +319,13 @@ void UiPlaybackBar::Paint(Draw& w)
     Color ink = IsEnabled() ? SColorText() : SColorDisabled();
     int y = max(0, GetSize().cy-DPI(24));
     String left = AsString(domain_first_), right = AsString(last_);
-    w.DrawText(0,y,left,font,ink);
-    w.DrawText(max(0,GetSize().cx-GetTextSize(right,font).cx),y,right,font,ink);
+    UiDrawText(w,0,y,left,font,ink);
+    UiDrawText(w,max(0,GetSize().cx-UiGetTextSize(right,font).cx),y,right,font,ink);
     // Inner values appear only for a trimmed range; outer values always show domain.
-    if(selection_first_ != domain_first_) w.DrawText(DPI(58),y,AsString(selection_first_),font,ink);
+    if(selection_first_ != domain_first_) UiDrawText(w,DPI(58),y,AsString(selection_first_),font,ink);
     if(selection_last_ != last_) {
         String end = AsString(selection_last_);
-        w.DrawText(max(0,GetSize().cx-DPI(58)-GetTextSize(end,font).cx),y,end,font,ink);
+        UiDrawText(w,max(0,GetSize().cx-DPI(58)-UiGetTextSize(end,font).cx),y,end,font,ink);
     }
 }
 void UiPlaybackBar::Layout()

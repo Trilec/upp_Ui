@@ -1,4 +1,5 @@
 #include <Ui/UiTab.h>
+#include <Ui/UiTextLayout.h>
 #include <Ui/UiMeasure.h>
 #include <Ui/UiGeometry.h>
 #include <Ui/UiIcons.h>
@@ -338,7 +339,7 @@ void UiTab::RebuildTextSize(TabItem& t)
     Font f = style.tab_font;
     if(IsNull(f))
         f = StdFont();
-    t.text_size = t.text.IsEmpty() ? Size(0, 0) : GetTextSize(t.text, f);
+    t.text_size = t.text.IsEmpty() ? Size(0, 0) : UiGetTextSize(t.text, f);
 }
 
 void UiTab::RebuildAllTextSizes()
@@ -929,7 +930,7 @@ void UiTab::Paint(Draw& w)
             }
 
             if(!t.text.IsEmpty() && y < bottom) {
-                Size tsz = GetTextSize(t.text, tf);
+                Size tsz = UiGetTextSize(t.text, tf);
                 int text_width = max(1, text_right - text_left);
                 int tx = text_left + (text_width - tsz.cx) / 2;
                 int ty = y + max(0, bottom - y - tsz.cy) / 2;
