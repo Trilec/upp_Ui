@@ -178,6 +178,10 @@ UiButtonDemo covers Button, SplitButton and ToolButton.
 Its adjacent selectors retain separate inspector and override models for each type,
 show one live preview, and generate only that concrete control. The standalone
 UiSplitButtonDemo and UiToolButtonDemo packages are retired.
+UiFileDialogDemo combines the embeddable UiFileBrowser, its modal wrapper,
+the OS-native UiOsFileDialog and the original U++ FileSel. Adjacent selectors
+retain separate inspector/code settings. The two former standalone file demos
+are retired; browser model/native checks remain in the combined package.
 Do not create a third edit-family demo or put every widget into an enormous switch.
 
 When changing a family type, show only applicable properties, preserve/restore its

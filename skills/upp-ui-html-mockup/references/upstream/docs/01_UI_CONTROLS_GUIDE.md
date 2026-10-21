@@ -105,8 +105,8 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
-| [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileBrowserDemo](../examples/UiFileBrowserDemo) |
-| [UiOsFileDialog](../Ui/UiOsFileDialog/UiOsFileDialog.h) | Native file/folder selection through a platform wrapper. | [UiOsFileDialogDemo](../examples/UiOsFileDialogDemo) |
+| [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileDialogDemo](../examples/UiFileDialogDemo) |
+| [UiOsFileDialog](../Ui/UiOsFileDialog/UiOsFileDialog.h) | Native file/folder selection through a platform wrapper. | [UiFileDialogDemo](../examples/UiFileDialogDemo) |
 
 ## Prepared presentation primitives
 

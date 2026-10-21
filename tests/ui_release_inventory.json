@@ -507,7 +507,7 @@
       "type": "UiOsFileDialog",
       "family": "platform",
       "header": "Ui/UiOsFileDialog/UiOsFileDialog.h",
-      "example": "examples/UiOsFileDialogDemo",
+      "example": "examples/UiFileDialogDemo",
       "source_review": "pending"
     },
     {
@@ -521,7 +521,7 @@
       "type": "UiFileBrowser",
       "family": "collections",
       "header": "Ui/UiFileBrowser/UiFileBrowser.h",
-      "example": "examples/UiFileBrowserDemo",
+      "example": "examples/UiFileDialogDemo",
       "source_review": "focused migration review; Windows model/native checks; other platforms and 100k performance acceptance pending"
     }
   ],

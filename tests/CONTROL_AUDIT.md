@@ -585,7 +585,7 @@ Consolidation decisions/checkpoints:
   authoring and document editing are not generic collection/demo duplicates.
 - UiGraphComponentStudio and UiGraphHierarchyDemo are specialist authoring/
   topology examples; UiRenderBenchmarkDemo is benchmark evidence. UiThemeDemo,
-  UiFontSelectorDemo and UiOsFileDialogDemo are theme/font/platform utilities.
+  UiFontSelectorDemo and UiFileDialogDemo are theme/font/platform utilities.
   UiLabelGeneratedSmoke is generated-code infrastructure. Preserve or explicitly
   relocate these rather than presenting them as competing canonical builders.
 - UiGraphDesignMatrix was a retirement README without an executable package.

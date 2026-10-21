@@ -1,3 +1,0 @@
-description "Reusable UiFileBrowser native demo and regression checks";
-uses CtrlLib, Ui, Ui/UiFileBrowser, plugin/png;
-file main.cpp, BrowserTests.cpp;

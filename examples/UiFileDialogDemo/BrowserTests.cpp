@@ -428,10 +428,15 @@ struct UiFileBrowserTest
         SaveFile(AppendFileName(root, "preview.url"),
                  "[InternetShortcut]\r\nURL=https://example.invalid/review?frame=1\r\nIconIndex=0\r\n");
         SaveFile(AppendFileName(root, "preview.inc"), "// include fragment\nint sample = 1;\n");
-        String jpeg_source = AppendFileName(GetCurrentDirectory(), "build/fixtures/still.jpg");
         String jpeg_path = AppendFileName(root, "preview.jpg");
-        check(FileExists(jpeg_source) && FileCopy(jpeg_source, jpeg_path),
-              "JPEG preview fixture from existing generated media");
+        UiFileBrowserCreateRequest jpeg_fixture;
+        jpeg_fixture.kind = UiFileBrowserCreateKind::Jpeg;
+        jpeg_fixture.name = "preview";
+        jpeg_fixture.size = Size(384, 216);
+        jpeg_fixture.colour = Color(32, 64, 96);
+        String jpeg_error;
+        check(CreateFileBrowserItem(root, jpeg_fixture, jpeg_path, jpeg_error),
+              "Self-contained JPEG preview fixture: " + jpeg_error);
         browser.RefreshFolder();
         wait();
         auto select_name = [&](const String &name)

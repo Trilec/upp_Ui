@@ -82,7 +82,7 @@ Content/Overlay and native component/Micro budgets. See [Graph Development](09_U
 
 ## Shared browser and micro picker — 2026-10-07
 MIGRATION: UiColorPickerMicro is core Ui; Ui/UiFileBrowser is optional.
-Maintained examples: UiColorPickerDemo (family) and UiFileBrowserDemo.
+Maintained examples: UiColorPickerDemo (family) and UiFileDialogDemo.
 Contracts: Ui/UiColorPickerMicro.md and Ui/UiFileBrowser/README.md.
 Focused Windows checks recorded under upp_cineview/build; no clean release gate or cross-platform/100k acceptance claimed.
 Windows: browser 25 model / 164 native PASS (Debug/Release + BLITZ); picker

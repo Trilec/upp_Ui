@@ -1,17 +1,13 @@
 #include <Ui/UiFileBrowser/UiFileBrowser.h>
 #include <plugin/png/png.h>
+#include "BrowserChecks.h"
 
 using namespace Upp;
-namespace Upp
-{
-bool RunBrowserUiTests(const String &root, const String &report);
-}
-
-static String BuildFixture()
+String BuildBrowserFixture()
 {
     String root = AppendFileName(GetCurrentDirectory(), "build/browser-fixture");
     RealizeDirectory(root);
-    // Remove only these two generated preview fixtures so repeated runs retain
+    // Remove only owned generated preview fixtures so repeated runs retain
     // the original seven-item catalogue contract before preview tests add them.
     FileDelete(AppendFileName(root, "preview.json"));
     FileDelete(AppendFileName(root, "preview.jpg"));
@@ -41,9 +37,9 @@ static String BuildFixture()
     return root;
 }
 
-static bool RunModelSelfTest(const String &report)
+bool RunBrowserModelChecks(const String &report)
 {
-    String root = BuildFixture();
+    String root = BuildBrowserFixture();
     String error;
     Vector<String> failures;
     int checks = 0;
@@ -173,100 +169,4 @@ static bool RunModelSelfTest(const String &report)
         text << "FAIL: " << failure << '\n';
     SaveFile(report, text);
     return failures.IsEmpty();
-}
-
-GUI_APP_MAIN
-{
-    // Standalone application policy; embedded controls simply inherit this font.
-    SetStdFont(UiFileBrowserAppearance::ModernFont());
-    const Vector<String> &args = CommandLine();
-
-    if(args.GetCount() >= 2 && args[0] == "--ui-test")
-    {
-        SetExitCode(RunBrowserUiTests(BuildFixture(), args[1]) ? 0 : 1);
-        return;
-    }
-
-    if(args.GetCount() >= 1 && args[0] == "--self-test")
-    {
-        String report = args.GetCount() >= 2
-                            ? args[1]
-                            : AppendFileName(GetCurrentDirectory(), "build/file-browser-self-test.txt");
-        bool ok = RunModelSelfTest(report);
-        SetExitCode(ok ? 0 : 1);
-        return;
-    }
-
-    bool render_dark = args.GetCount() >= 2 && args[0] == "--render-dark";
-    bool render_light = args.GetCount() >= 2 && args[0] == "--render-light";
-    bool render = render_dark || render_light;
-    bool dark = !render_light;
-
-    if(dark)
-        Ctrl::SwapDarkLight();
-    UiThemeContext context = UiTheme::GetContext();
-    context.mode = dark ? UiThemeMode::Dark : UiThemeMode::Light;
-    UiTheme::Set(context);
-
-    TopWindow window;
-    UiFileBrowser browser;
-    browser.ShowThemeButton();
-    browser.WhenThemeRequested = [](UiThemeMode mode)
-    {
-        auto context = UiTheme::GetContext();
-        if(context.mode != mode)
-            Ctrl::SwapDarkLight();
-        context.mode = mode;
-        UiTheme::Set(context);
-    };
-
-    window.Title("UiFileBrowser · file and sequence browser").Sizeable().Zoomable();
-    window.SetRect(0, 0, DPI(1240), DPI(760));
-    window.Add(browser.SizePos());
-
-    if(args.GetCount() && args[0] == "--fixture")
-        browser.SetFolder(BuildFixture());
-    else if(render)
-    {
-        browser.SetFolder(args.GetCount() >= 3 ? args[2] : BuildFixture());
-        UiFileBrowserFilterRule temp;
-        temp.include = false;
-        temp.field = UiFileBrowserFilterField::Name;
-        temp.value = "temp";
-        browser.AddFilter(temp);
-        UiFileBrowserFilterRule backup;
-        backup.include = false;
-        backup.field = UiFileBrowserFilterField::Name;
-        backup.value = "backup";
-        browser.AddFilter(backup);
-    }
-    else if(args.GetCount() && args[0] != "--smoke" && DirectoryExists(args[0]))
-        browser.SetFolder(args[0]);
-
-    browser.WhenAccept = [&](const UiFileBrowserSelection &selection)
-    {
-        LOG("UiFileBrowser accept: " << selection.path);
-        window.Title("UiFileBrowser · " + selection.path);
-    };
-    browser.WhenError = [](const String &error) { LOG(error); };
-    browser.WhenCancel = [&] { window.Close(); };
-
-    if(render)
-    {
-        String output = args[1];
-        window.SetTimeCallback(700,
-                               [&]
-                               {
-                                   Ctrl::ProcessEvents();
-                                   ImageDraw image(window.GetSize());
-                                   window.DrawCtrl(image);
-                                   if(!PNGEncoder().SaveFile(output, image))
-                                       SetExitCode(1);
-                                   window.Close();
-                               });
-    }
-    else if(args.GetCount() && args[0] == "--smoke")
-        window.SetTimeCallback(700, [&] { window.Close(); });
-
-    window.Run();
 }

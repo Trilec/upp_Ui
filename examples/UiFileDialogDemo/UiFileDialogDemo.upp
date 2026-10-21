@@ -1,0 +1,21 @@
+description "File selection family: Ui browser, OS native and original U++ FileSel";
+
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui,
+    Ui/UiOsFileDialog,
+    Ui/UiFileBrowser,
+    Utilities/PropertyEditor,
+    plugin/png;
+
+file
+    main.cpp,
+    BrowserChecks.h,
+    BrowserChecks.cpp,
+    BrowserTests.cpp;
+
+mainconfig
+    "" = "GUI";

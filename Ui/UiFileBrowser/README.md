@@ -2,7 +2,13 @@
 
 Optional native browser package `Ui/UiFileBrowser`, independent of CineView and
 Imaging. Add that package to `uses` and include `<Ui/UiFileBrowser/UiFileBrowser.h>`.
-The maintained standalone example is `examples/UiFileBrowserDemo`.
+The maintained family example is `examples/UiFileDialogDemo`: select Ui browser
+for the embedded preview or its modal picker, OS native for UiOsFileDialog,
+or U++ FileSel for the original selector. Each retains its own inspector and
+generates matching public-API C++. The former browser and OS-dialog demo
+packages are retired. Model and native browser checks remain available through
+`--self-test <report>` and `--ui-test <report>`; `--shell-test` checks the family
+selectors and generated-code routing without opening a modal chooser.
 
 `UiFileBrowser` embeds in a host; `UiFileBrowserDialog` wraps the same control for
 modal Open/Cancel policy. It supplies breadcrumbs, history, places, session pins,
