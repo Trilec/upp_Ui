@@ -698,7 +698,9 @@ public:
     Size GetContentSize() const;
     Size GetPreferredSize() const;
     int  GetMinWrapWidth() const;
+    // Pre-layout Fit height, including nested wrapped content in vertical stacks.
     int  MeasureHeightForWidth(int total_width) const;
+    bool HasWidthDependentContent() const;
     int  GetLayoutCallCount() const { return layout_call_count; }
     double GetLastLayoutDurationMs() const { return last_layout_duration_ms; }
     Direction GetDirection() const { return dir; }

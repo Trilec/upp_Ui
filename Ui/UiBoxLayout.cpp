@@ -675,12 +675,45 @@ Size UiBoxLayout::GetContentSize() const
     return GetMinSize();
 }
 
+bool UiBoxLayout::HasWidthDependentContent() const
+{
+    if(dir == Direction::H)
+        return wrap_auto_resize && wrap != UiBoxWrap::None;
+    for(const Item& it : items)
+        if(it.logical_visible && !it.is_break && it.c && it.fixed < 0 &&
+           UiMeasureLayout(*it.c).width_dependent)
+            return true;
+    return false;
+}
+
 int UiBoxLayout::MeasureHeightForWidth(int total_width) const
 {
     if(total_width <= 0)
         return inset.top + inset.bottom;
 
-    if(dir == Direction::V || wrap == UiBoxWrap::None)
+    if(dir == Direction::V) {
+        // Fit stacks must carry wrapped descendants' height through panels to
+        // the scroll host. Measure before layout, not from stale child rects.
+        int width = max(0, total_width - inset.left - inset.right);
+        int height = inset.top + inset.bottom;
+        int count = 0;
+        for(const Item& it : items) {
+            if(!it.logical_visible)
+                continue;
+            if(count++)
+                height += GetMainGap();
+            if(it.is_break)
+                continue;
+            UiLayoutMeasureResult measure = it.c ? UiMeasureLayout(*it.c, {width}) : UiLayoutMeasureResult();
+            int h = it.fixed >= 0 ? it.fixed : (measure.width_dependent ? measure.measured.cy : measure.min.cy);
+            if(fixed_row > 0)
+                h = min(h, fixed_row);
+            height += max(0, min(max(h, it.minw), it.maxw));
+        }
+        return height;
+    }
+
+    if(wrap == UiBoxWrap::None)
         return GetMinSize().cy;
 
     const uint64 theme_revision = UiTheme::GetRevision();

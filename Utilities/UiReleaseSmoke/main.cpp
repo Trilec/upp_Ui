@@ -380,6 +380,82 @@ void ScrollContract(Checks& t)
     }
 }
 
+void WrappedStackScrollContract(Checks& t)
+{
+    UiThemeContext previous = UiTheme::GetContext();
+    for(auto mode : {UiThemeMode::Light, UiThemeMode::Dark}) {
+        UiTheme::Set(UiThemePreset::Minimal, mode);
+        UiScrollPanel scroll;
+        UiPanel surface;
+        UiBoxLayout stack;
+        Array<UiPanel> panels;
+        Array<UiBoxLayout> rows;
+        Array<UiLabel> labels;
+        PrepareScrollProbe(scroll, 0);
+        scroll.SetScrollMode(UIPANELSCROLL_VERTICAL);
+        scroll.Content().Add(surface.SizePos());
+        surface.Add(stack.SizePos());
+        stack.SetInset(DPI(8)).SetGap(DPI(5));
+        for(int i = 0; i < 6; ++i) {
+            auto& panel = panels.Add();
+            auto& row = rows.Add();
+            panel.Add(row.SizePos());
+            row.SetDirection(UiDirection::H).SetWrap(true).SetWrapAutoResize(true)
+               .SetGap(DPI(4)).SetInset(DPI(4));
+            const int widths[] = {180, 262, 92, 48, 24, 90};
+            for(int j = 0; j < 6; ++j) {
+                auto& label = labels.Add();
+                label.SetText(j == 5 ? "Available" : "Execution");
+                row.Add(label).Fixed(DPI(widths[j])).MinCross(DPI(24));
+            }
+            stack.Add(panel).Fit();
+        }
+        auto wide = UiMeasureLayout(surface, {DPI(1000)});
+        auto narrow = UiMeasureLayout(surface, {DPI(430)});
+        t.Expect(wide.width_dependent && narrow.width_dependent && narrow.measured.cy > wide.measured.cy,
+                 "nested vertical stacks propagate wrapped row height through panel surfaces");
+        int wide_height = 0;
+        for(int width : {1000, 430, 1000, 430}) {
+            scroll.SetRect(0, 0, DPI(width), DPI(240));
+            scroll.Layout();
+            Size page = scroll.GetViewportRect().GetSize();
+            int expected = UiMeasureLayout(surface, {page.cx}).measured.cy;
+            t.Expect(scroll.GetContentSize().cy >= expected,
+                     "scroll range includes every wrapped execution row");
+            int content_height = scroll.GetContentSize().cy;
+            if(width == 1000) {
+                if(wide_height)
+                    t.Expect(content_height == wide_height, "widening restores the original content extent");
+                wide_height = content_height;
+            }
+            else
+                t.Expect(content_height > wide_height, "narrowing grows the content extent and scrollbar range");
+            scroll.SetScrollPos(Point(0, INT_MAX));
+            const Ctrl& tail = labels.Top();
+            Rect visible = tail.GetScreenRect();
+            for(const Ctrl* p = &tail; p; p = p->GetParent())
+                visible &= p->GetScreenView();
+            t.Expect(!visible.IsEmpty() && visible == tail.GetScreenRect(),
+                     "scrolling to the bottom reveals the complete final Available label");
+            Point maximum = scroll.GetScrollPos();
+            for(int repeat = 0; repeat < 3; ++repeat) {
+                scroll.Layout();
+                t.Expect(scroll.GetContentSize().cy == content_height && scroll.GetScrollPos() == maximum,
+                         "repeated wrapped-stack layouts keep content extent and scroll position stable");
+            }
+        }
+        // Fixed and explicitly hidden children retain their sizing contract.
+        stack.ItemAt(0).Fixed(DPI(18));
+        stack.ItemAt(1).Visible(false);
+        int expected = DPI(16 + 18 + 4 * 5);
+        for(int i = 2; i < 6; ++i)
+            expected += UiMeasureLayout(panels[i], {DPI(414)}).measured.cy;
+        t.Expect(stack.MeasureHeightForWidth(DPI(430)) == expected,
+                 "width-aware stack measurement respects Fixed, hidden entries, gaps and insets");
+    }
+    UiTheme::Set(previous);
+}
+
 void BorrowedHostContract(Checks& t)
 {
     UiDirectContentHost host;
@@ -427,6 +503,7 @@ GUI_APP_MAIN
         return;
     }
     ScrollContract(t);
+    WrappedStackScrollContract(t);
     if(scroll_only) {
         Cout() << "UI_SCROLL_PANEL_SMOKE checks=" << t.count << " failed=" << t.failed << '\n';
         SetExitCode(t.failed ? 1 : 0);

@@ -57,6 +57,12 @@ UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& 
 	out.measured = out.preferred;
 
 	if(const UiBoxLayout* box = dynamic_cast<const UiBoxLayout*>(&c)) {
+		if(box->GetDirection() == UiDirection::V && box->HasWidthDependentContent()) {
+			int width = spec.available_width >= 0 ? max(1, spec.available_width) : max(1, out.preferred.cx);
+			out.measured = Size(width, max(0, box->MeasureHeightForWidth(width)));
+			out.width_dependent = true;
+			return out;
+		}
 		if(box->GetDirection() == UiDirection::H &&
 		   box->GetWrapMode() != UiBoxWrap::None &&
 		   box->IsWrapAutoResize()) {
