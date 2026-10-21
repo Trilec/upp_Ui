@@ -136,6 +136,10 @@ void UiRangeSegments::PaintTrackContent(Draw& w, const Geometry& g,
         p.End();
     };
 
+    if(UiTryGpuArtwork(w, g.content, [&](Painter& p) {
+        p.Translate(-g.content.left, -g.content.top);
+        paint(p);
+    })) return;
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-range-segments/track");
     policy.allow_scale_from_bucket = false;
     Size size = g.content.GetSize();
@@ -211,6 +215,10 @@ void UiRangeSegments::PaintBoundaryThumb(Draw& w, int index, const Geometry& g,
         if(dot > 0 && !IsNull(ink))
             p.Circle(cx, cy, dot * 0.5).Fill(ink);
     };
+    if(UiTryGpuArtwork(w, r, [&](Painter& p) {
+        p.Translate(-r.left, -r.top);
+        paint(p);
+    })) return;
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-range-segments/thumb");
     policy.allow_scale_from_bucket = false;
     if(UiQuantizeRasterSize(size, policy) != size) {

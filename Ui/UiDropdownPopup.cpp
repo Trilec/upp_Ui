@@ -497,8 +497,7 @@ void UiDropdown::PopupWindow::Paint(Draw& target)
     int radius = style.popup_use_main_skin ? max(0, style.metrics.radius)
                                            : max(0, style.popup_radius);
 
-    ImageDraw buffer(bounds.GetWidth(), bounds.GetHeight());
-    Draw& w = buffer;
+    auto paint_content = [&](Draw& w) {
     w.DrawRect(bounds, popup_base);
 
     int first = max(0, prepared_first_);
@@ -585,6 +584,27 @@ void UiDropdown::PopupWindow::Paint(Draw& target)
                    style.drag_marker);
     }
 
+    };
+#ifdef flagGPUUI
+    if(dynamic_cast<GpuDrawTarget *>(&target)) {
+        if(UiTryGpuArtwork(target, bounds, [&](Painter& p) {
+            p.Rectangle(0,0,bounds.GetWidth(),bounds.GetHeight()).Fill(popup_base);
+            p.Begin();
+            if(radius>0) p.RoundedRectangle(.5,.5,bounds.GetWidth()-1.0,bounds.GetHeight()-1.0,radius).Clip();
+            paint_content(p);
+            p.End();
+            if(frame_w>0 && !IsNull(frame)) {
+                double fw=max(1,frame_w), inset=fw*.5;
+                if(radius>0) p.RoundedRectangle(inset,inset,max(1.0,bounds.GetWidth()-fw),
+                                                max(1.0,bounds.GetHeight()-fw),max(0.0,radius-fw*.5));
+                else p.Rectangle(inset,inset,max(1.0,bounds.GetWidth()-fw),max(1.0,bounds.GetHeight()-fw));
+                p.Stroke(fw,frame);
+            }
+        })) return;
+    }
+#endif
+    ImageDraw buffer(bounds.GetWidth(), bounds.GetHeight());
+    paint_content(buffer);
     UiPaintRoundedPopupComposited(target, bounds, buffer, radius, popup_base, frame_w, frame);
 }
 

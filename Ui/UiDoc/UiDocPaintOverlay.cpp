@@ -50,8 +50,7 @@ void PaintOverlayCountBadge(Draw& w, const Rect& marker, int count, Color color)
         return;
     int side = DPI(9);
     Rect badge = RectC(marker.right - side / 2, marker.top - side / 2, side, side);
-    Image face = UiGetCachedAACircleImage(badge.GetSize(), color);
-    UiDrawCachedRaster(w, badge, face);
+    UiPaintAACircle(w, badge, color);
     String label = count > 9 ? String("9+") : AsString(count);
     Font font = UiFonts::Inherit(SansSerifZ(6).Bold(), UiTypographyRole::Heading);
     Size ts = GetTextSize(label, font);

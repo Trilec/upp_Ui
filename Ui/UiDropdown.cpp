@@ -932,10 +932,8 @@ void UiDropdown::Paint(Draw& w)
         if(WhenPaintSelectionBadge)
             WhenPaintSelectionBadge(w, badge_rect_, count, s);
         else {
-            const Image& badge = UiGetCachedRoundedBadgeImage(badge_rect_.GetSize(), s.selection_badge_radius,
-                                                              s.selection_badge_face, 1,
-                                                              Blend(s.selection_badge_face, Black(), 110));
-            UiDrawCachedRaster(w, badge_rect_, badge);
+            UiPaintAARoundedRect(w, badge_rect_, s.selection_badge_radius, s.selection_badge_face,
+                                 Blend(s.selection_badge_face, Black(), 110), 1);
             Font font = s.metrics.use_text_font ? s.metrics.text_font : s.font;
             String text = AsString(count);
             Size ts = GetTextSize(text, font);

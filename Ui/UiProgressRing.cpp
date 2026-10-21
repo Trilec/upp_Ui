@@ -586,6 +586,15 @@ void UiProgressRing::Paint(Draw& w)
     Color gradient_end = IsNull(style.gradient_end[state]) ? progress : style.gradient_end[state];
     const bool gradient_enabled = style.gradient_enabled;
 
+    const Size gpu_size = g.square.GetSize();
+    bool gpu_ring = UiTryGpuArtwork(w, g.square, [&](Painter& p) {
+        Pointf center(gpu_size.cx / 2.0, gpu_size.cy / 2.0);
+        if(g.radius > 0.0 && g.thickness > 0 && !IsNull(track))
+            p.Circle(center, g.radius).Stroke((double)g.thickness, track);
+        UiPaintCircularArc(p, gpu_size, center, g.radius, g.start_angle, g.sweep_angle,
+                           g.thickness, g.cap_roundness, progress, gradient_end, gradient_enabled);
+    });
+    if(!gpu_ring) {
     Image ring;
     const bool stable_determinate = !g.indeterminate
         && !(animation_mode_ == ANIM_INTRO && animation_ticker_.IsRunning());
@@ -611,6 +620,7 @@ void UiProgressRing::Paint(Draw& w)
         ring = RenderRingRaster(g, gradient_enabled, track, progress, gradient_end);
 
     w.DrawImage(g.square.left, g.square.top, ring);
+    }
 
     String text = ResolvePaintText();
     if(g.text_visible && !text.IsEmpty()) {

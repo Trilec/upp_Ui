@@ -33,12 +33,48 @@
 */
 
 #include <Painter/Painter.h>
+#ifdef flagGPUUI
+#include <RenderCore/GpuDrawTarget.h>
+#endif
 #include <cmath>
 //#include <CtrlCore/CtrlCore.h>   // AccessKeyBit
 #include <CtrlLib/CtrlLib.h>     // DrawSmartText, DisabledImage, DPI, etc.
 #include <Ui/UiStyle.h>
 
 namespace Upp {
+
+inline bool UiTryGpuArtwork(Draw& w, const Rect& bounds,
+                            const Function<void(Painter&)>& paint)
+{
+#ifdef flagGPUUI
+    if(auto *target = dynamic_cast<GpuDrawTarget *>(&w))
+        return target->DrawVectorArtwork(bounds, paint);
+#endif
+    if(auto *painter = dynamic_cast<Painter *>(&w)) {
+        painter->Begin();
+        painter->Rectangle(Rectf(bounds)).Clip();
+        painter->Translate(bounds.left, bounds.top);
+        paint(*painter);
+        painter->End();
+        return true;
+    }
+    return false;
+}
+
+inline void UiPaintVectorArtwork(Draw& w, const Rect& bounds,
+                                 const Function<void(Painter&)>& paint)
+{
+    if(bounds.IsEmpty()) return;
+    if(UiTryGpuArtwork(w, bounds, paint)) return;
+    ImageBuffer pixels(bounds.GetSize());
+    pixels.SetKind(IMAGE_ALPHA);
+    Fill(~pixels, RGBAZero(), pixels.GetLength());
+    BufferPainter painter(pixels, MODE_ANTIALIASED);
+    paint(painter);
+    painter.Finish();
+    w.DrawImage(bounds.left, bounds.top, pixels);
+}
+
 
 // Paints only the optional inner Frame Accent. Call with the actual surface
 // rectangle (already adjusted for shadows); never changes content geometry.
@@ -393,6 +429,36 @@ public:
         return img;
     }
 
+    template <class Factory>
+    static Painting GetPainting(const UiRasterCacheKey& key, const UiRasterCachePolicy& policy, Factory factory)
+    {
+        String lookup = "vector:" + key.encoded;
+        {
+            Mutex::Lock __(MutexRef());
+            int i = EntriesRef().Find(lookup);
+            if(i >= 0) {
+                StatsRef().hits++;
+                Entry& e = EntriesRef().GetValues()[i]; e.last_use = ++UseClockRef();
+                return e.painting;
+            }
+            StatsRef().misses++;
+        }
+        Painting painting = factory();
+        int64 bytes = StoreAsString(painting).GetCount();
+        Mutex::Lock __(MutexRef());
+        if(bytes > policy.max_single_image_bytes && !policy.allow_cache_large) {
+            StatsRef().skipped_too_large++;
+            return painting;
+        }
+        int i = EntriesRef().Find(lookup);
+        if(i >= 0) return EntriesRef().GetValues()[i].painting;
+        Entry e; e.lookup = lookup; e.tag = "vector/" + key.tag;
+        e.painting = painting; e.bytes = bytes; e.last_use = ++UseClockRef();
+        EntriesRef().Add(lookup, e); CurrentBytesRef() += bytes; StatsRef().insertions++;
+        TrimLocked();
+        return painting;
+    }
+
     static void Clear()
     {
         Mutex::Lock __(MutexRef());
@@ -433,6 +499,16 @@ public:
         return out;
     }
 
+    // Retained payload by source family, for cold/warm memory qualification.
+    static VectorMap<String, int64> GetTagBytes()
+    {
+        Mutex::Lock __(MutexRef());
+        VectorMap<String, int64> tags;
+        for(const auto& entry : EntriesRef().GetValues())
+            tags.GetAdd(entry.tag, 0) += entry.bytes;
+        return tags;
+    }
+
     static void NoteSkippedTooLarge()
     {
         Mutex::Lock __(MutexRef());
@@ -454,6 +530,7 @@ private:
         String lookup;
         String tag;
         Image image;
+        Painting painting;
         int64 bytes = 0;
         uint64 last_use = 0;
     };
@@ -1008,6 +1085,14 @@ inline void UiPaintStyledIcon(Draw& w,
     int img_x = area.left + (area.GetWidth()  - dst_w) / 2;
     int img_y = area.top  + (area.GetHeight() - dst_h) / 2;
 
+#ifdef flagGPUUI
+    if(dynamic_cast<GpuDrawTarget *>(&w) || dynamic_cast<GpuPainterEffects *>(&w)) {
+        Rect target = RectC(img_x, img_y, dst_w, dst_h);
+        if(mono && !IsNull(ink)) w.DrawImage(target, img, ink);
+        else w.DrawImage(target, img);
+        return;
+    }
+#endif
     Image draw_img = img;
     if(scale && (dst_w != src_sz.cx || dst_h != src_sz.cy))
         draw_img = CachedRescale(img, Size(dst_w, dst_h));
@@ -1061,11 +1146,7 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
 
-    ImageBuffer ib(sz);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
+    UiPaintVectorArtwork(w, outer, [=](Painter& p) {
 
         double inset = fw > 0 ? max(0.5, fw * 0.5) : 0.5;
         double x     = inset;
@@ -1103,9 +1184,7 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
             p.Stroke(fw, palette.frame[st]);
         }
         p.End();
-    }
-
-    w.DrawImage(outer.left, outer.top, ib);
+    });
     UiPaintFrameAccent(w, outer, palette, m, st);
 }
 
@@ -1134,10 +1213,7 @@ inline void UiPaintFocusShape(Draw& w,
     Size sz = outer.GetSize();
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
-    ImageBuffer ib(sz);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
+    UiPaintVectorArtwork(w, outer, [=](Painter& p) {
         double inset_px = max(0.5, stroke_override * 0.5);
         double x = inset_px;
         double y = inset_px;
@@ -1158,8 +1234,7 @@ inline void UiPaintFocusShape(Draw& w,
         p.Opacity(clamp(alpha, 0, 255) / 255.0);
         p.Stroke(stroke_w, color);
         p.End();
-    }
-    w.DrawImage(outer.left, outer.top, ib);
+    });
 }
 
 
@@ -1213,6 +1288,62 @@ inline void UiPaintStyledBackground(Draw& w,
 
         int pad = ly.inset ? 0 : (extent + max(abs(off.x), abs(off.y)) + 2);
         Size cache_sz = ly.inset ? osz : Size(osz.cx + pad * 2, osz.cy + pad * 2);
+#ifdef flagGPUUI
+        if(dynamic_cast<GpuDrawTarget *>(&w)) {
+            Rect destination = RectC(surface_outer.left - pad, surface_outer.top - pad,
+                                     cache_sz.cx, cache_sz.cy);
+            if(UiTryGpuArtwork(w, destination, [&](Painter& p) {
+                auto rounded = [&](const Rectf& r, double rad) {
+                    double radius = min<double>(max(0.0, rad), min(r.GetWidth(), r.GetHeight()) / 2);
+                    if(radius > 0) p.RoundedRectangle(r, radius); else p.Rectangle(r);
+                };
+                if(ly.inset) {
+                    for(int i=0; i<extent; ++i) {
+                        double t=(i+.5)/max(1,extent);
+                        int alpha=clamp((int)std::round(ly.alpha *
+                            (ly.mode==SHADOW_HARD?1.0:1.0-UiShadowCurveEval(ly.curve,t))),0,255);
+                        Rect rr(0,0,osz.cx,osz.cy); rr.Deflate(i,i); rr.Offset(off);
+                        if(rr.GetWidth()<=1 || rr.GetHeight()<=1) break;
+                        if(alpha<=0) continue;
+                        p.Begin(); rounded(Rectf(rr).Deflated(.5,.5),max(0,metrics.radius-i));
+                        if(ly.mode==SHADOW_HARD) p.Fill(alpha * ly.color); else p.Stroke(1,alpha * ly.color);
+                        p.End();
+                    }
+                }
+                else {
+                    Rect base(pad,pad,pad+osz.cx,pad+osz.cy);
+                    Rect cutoff=base.Deflated(1,1);
+                    p.Begin();
+                    p.Rectangle(0,0,cache_sz.cx,cache_sz.cy);
+                    if(cutoff.GetWidth()>1 && cutoff.GetHeight()>1)
+                        rounded(Rectf(cutoff).Deflated(.5,.5),max(0,metrics.radius-1));
+                    p.EvenOdd().Clip();
+                    p.Begin();
+                    if(ly.mode!=SHADOW_HARD && extent>1)
+                        dynamic_cast<GpuPainterEffects&>(p).BlurLayer(1);
+                    if(ly.mode==SHADOW_HARD) {
+                        Rect rr=base; rr.Inflate(extent,extent); rr.Offset(off);
+                        rounded(Rectf(rr).Deflated(.5,.5),max(0,metrics.radius+extent));
+                        p.Fill(clamp(ly.alpha,0,255) * ly.color);
+                    }
+                    else {
+                        int next_alpha=0;
+                        for(int d=extent; d>=1; --d) {
+                            double t=(d-.5)/max(1,extent);
+                            int target_alpha=clamp((int)std::round(ly.alpha*(1.0-UiShadowCurveEval(ly.curve,t))),0,255);
+                            int alpha=max(0,target_alpha-next_alpha); next_alpha=target_alpha;
+                            if(alpha<=0) continue;
+                            double ox=(double)off.x*d/max(1,extent), oy=(double)off.y*d/max(1,extent);
+                            Rectf rr(base.left-d+ox+.5,base.top-d+oy+.5,
+                                     base.right+d+ox-.5,base.bottom+d+oy-.5);
+                            p.Begin(); rounded(rr,max(0,metrics.radius+d)); p.Fill(alpha * ly.color); p.End();
+                        }
+                    }
+                    p.End(); p.End();
+                }
+            })) return;
+        }
+#endif
         UiRasterCachePolicy policy = UiRasterPolicyShadow();
         Image img = UiRasterCache::Get(MakeShadowCacheKey(ly, cache_sz, metrics.radius), policy, [=] {
             Image img;
@@ -1520,12 +1651,7 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
 
-    ImageBuffer ib(sz);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
+    UiPaintVectorArtwork(w, outer, [=](Painter& p) {
 
         double inset = fw > 0 ? max(0.5, fw * 0.5) : 0.5;
         double x     = inset;
@@ -1544,7 +1670,7 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
                 p.Fill(alpha * ff.color);
             }
             else if(ff.IsImage() && !IsNull(ff.image)) {
-                Image img = UiImageMultiplyAlpha(ff.image, alpha);
+                Image img = ff.image;
                 Size isz = img.GetSize();
                 if(isz.cx > 0 && isz.cy > 0) {
                     double sx = wdt / isz.cx;
@@ -1553,7 +1679,7 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
                     Xform2D xf = Xform2D::Scale(sx, sy)
                                * Xform2D::Translation(x, y);
 
-                    p.Fill(img, xf, FILL_FAST);
+                    p.Opacity(alpha / 255.0).Fill(img, xf, FILL_FAST);
                 }
             }
         }
@@ -1564,9 +1690,7 @@ inline void UiPaintFaceFrameDashAlpha(Draw& w, const Rect& outer,
             p.Stroke(fw, alpha * palette.frame[st]);
         }
         p.End();
-    }
-
-    w.DrawImage(outer.left, outer.top, ib);
+    });
     StyledMetrics faded = m;
     faded.frame_accent.alpha = (clamp(m.frame_accent.alpha, 0, 255) * alpha + 127) / 255;
     UiPaintFrameAccent(w, outer, palette, faded, st);
@@ -1774,10 +1898,9 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, int radius, Color color, in
     radius = max(radius, 0);
 
     if(radius <= 0) {
-        ImageBuffer ib(1, 1);
-        ib.SetKind(IMAGE_ALPHA);
-        ib[0][0] = alpha * color;
-        w.DrawImage(outer, ib);
+        UiPaintVectorArtwork(w, outer, [=](Painter& p) {
+            p.Rectangle(0, 0, outer.GetWidth(), outer.GetHeight()).Opacity(alpha / 255.0).Fill(color);
+        });
         return;
     }
 
@@ -1785,12 +1908,7 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, int radius, Color color, in
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
 
-    ImageBuffer ib(sz);
-    ib.SetKind(IMAGE_ALPHA);
-    Fill(~ib, RGBAZero(), ib.GetLength());
-
-    {
-        BufferPainter p(ib, MODE_ANTIALIASED);
+    UiPaintVectorArtwork(w, outer, [=](Painter& p) {
 
         double inset = 0.5;
         double x     = inset;
@@ -1805,9 +1923,7 @@ inline void UiPaintFlash(Draw& w, const Rect& outer, int radius, Color color, in
         p.RoundedRectangle(x, y, wdt, hgt, rad);
         p.Fill(alpha * color);
         p.End();
-    }
-
-    w.DrawImage(outer.left, outer.top, ib);
+    });
 }
 
 // Later V1 audit pass:
@@ -1891,6 +2007,21 @@ inline void UiPaintIndicatorRadioDot(Draw& w, const Rect& outer, Color ink,
     double cy = mark_area.top + mark_area.GetHeight() * 0.5;
     double x = cx - dot * 0.5;
     double y = cy - dot * 0.5;
+
+    Size gpu_size(max(1, dot + 4), max(1, dot + 4));
+    Rect gpu_bounds = RectC(fround(x) - 2, fround(y) - 2, gpu_size.cx, gpu_size.cy);
+    if(UiTryGpuArtwork(w, gpu_bounds, [=](Painter& p) {
+        double draw_dot = max<double>(min_side, min(gpu_size.cx, gpu_size.cy) * 76 / 100.0);
+        draw_dot = max(1.0, min<double>(draw_dot, min(gpu_size.cx, gpu_size.cy) - 4.0));
+        if(radius_percent >= 95)
+            p.Circle(gpu_size.cx * 0.5, gpu_size.cy * 0.5, draw_dot * 0.5);
+        else {
+            double rr = max(0.0, draw_dot * clamp(radius_percent, 0, 100) / 200.0);
+            p.RoundedRectangle((gpu_size.cx - draw_dot) * 0.5,
+                               (gpu_size.cy - draw_dot) * 0.5, draw_dot, draw_dot, rr);
+        }
+        p.Fill(ink);
+    })) return;
 
     Size requested(max(1, dot + 4), max(1, dot + 4));
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/indicator");
@@ -2137,6 +2268,45 @@ inline Image UiGetCachedRoundedBadgeImage(Size sz, int radius, Color face,
 // -------------------------------------------------------------------------
 // Rounded popup compositor (single-call internal draw path)
 // -------------------------------------------------------------------------
+
+inline void UiPaintAACircle(Draw& w, const Rect& bounds, Color fill)
+{
+    const Size sz = bounds.GetSize();
+    if(UiTryGpuArtwork(w, bounds, [=](Painter& p) {
+        p.Ellipse(sz.cx / 2.0, sz.cy / 2.0,
+                  max(0.5, (sz.cx - 1.0) / 2.0), max(0.5, (sz.cy - 1.0) / 2.0)).Fill(fill);
+    })) return;
+    UiDrawCachedRaster(w, bounds, UiGetCachedAACircleImage(sz, fill));
+}
+
+inline void UiPaintAACapsule(Draw& w, const Rect& bounds, Color fill)
+{
+    const Size sz = bounds.GetSize();
+    if(UiTryGpuArtwork(w, bounds, [=](Painter& p) {
+        p.RoundedRectangle(0.5, 0.5, max(1.0, sz.cx - 1.0), max(1.0, sz.cy - 1.0),
+                           max(0, min(sz.cx, sz.cy) / 2)).Fill(fill);
+    })) return;
+    UiDrawCachedRaster(w, bounds, UiGetCachedAACapsuleImage(sz, fill));
+}
+
+inline void UiPaintAARoundedRect(Draw& w, const Rect& bounds, int radius,
+                                 Color face, Color frame, int frame_width)
+{
+    const Size sz = bounds.GetSize();
+    const int qr = max(0, min(radius, min(sz.cx, sz.cy) / 2));
+    if(UiTryGpuArtwork(w, bounds, [=](Painter& p) {
+        double fw = frame_width > 0 ? max(1.0, (double)frame_width) : 0.0;
+        double inset = fw > 0 ? fw * 0.5 : 0.5;
+        double width = max(1.0, sz.cx - inset * 2), height = max(1.0, sz.cy - inset * 2);
+        double rr = max(0.0, (double)qr - (fw > 0 ? fw * 0.5 : 0.0));
+        if(qr > 0) p.RoundedRectangle(inset, inset, width, height, rr);
+        else p.Rectangle(inset, inset, width, height);
+        if(!IsNull(face)) p.Fill(face);
+        if(frame_width > 0 && !IsNull(frame)) p.Stroke(fw, frame);
+    })) return;
+    UiDrawCachedRaster(w, bounds, UiGetCachedAARoundedRectImage(sz, radius, face, frame, frame_width));
+}
+
 inline void UiPaintRoundedPopupComposited(Draw& w,
                                           const Rect& outer,
                                           const Image& src,

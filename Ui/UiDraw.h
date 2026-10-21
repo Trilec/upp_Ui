@@ -154,13 +154,16 @@ inline void UiPaintFaceFrameDash(Draw& w, const Rect& outer,
     }
 
 #ifdef flagGPUUI
-    if(auto *target = dynamic_cast<GpuDrawTarget *>(&w))
+    if(auto *target = dynamic_cast<GpuDrawTarget *>(&w)) {
         if(target->DrawRoundedFaceFrame(outer, metrics.radius, max(0, metrics.frame_width),
                                        draws_face ? fill.color : Color(Null),
                                        draws_frame ? palette.frame[st] : Color(Null))) {
             UiPaintFrameAccent(w, outer, palette, metrics, st);
             return;
         }
+        UiPaintFaceFrameDashBase(w, outer, palette, metrics, st);
+        return;
+    }
 #endif
 
     Image cached = UiGetCachedStyledFaceFrame(outer.GetSize(), palette, metrics, st);

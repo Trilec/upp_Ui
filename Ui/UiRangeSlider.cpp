@@ -63,24 +63,22 @@ static void UiRangeSliderPaintThumb_(Draw& w, Rect thumb, const UiRangeSlider::S
                          max(DPI(1), min(visual.GetWidth(), visual.GetHeight()) / 6));
         int radius = max(0, min(max(0, style.thumb_metrics.radius),
                                 min(visual.GetWidth(), visual.GetHeight()) / 2));
-        const Image& thumb_face = UiGetCachedAARoundedRectImage(visual.GetSize(),
+        UiPaintAARoundedRect(w, visual,
                                                                 radius,
                                                                 face,
                                                                 frame,
                                                                 frame_w);
-        UiDrawCachedRaster(w, visual, thumb_face);
 
         int ring_inset = frame_w + max(DPI(1), ring_w);
         Rect ring_rect = visual.Deflated(ring_inset);
         if(!ring_rect.IsEmpty() && !IsNull(style.thumb_inner_ring_color)) {
             int ring_radius = max(0, min(radius - ring_inset,
                                         min(ring_rect.GetWidth(), ring_rect.GetHeight()) / 2));
-            const Image& ring = UiGetCachedAARoundedRectImage(ring_rect.GetSize(),
+            UiPaintAARoundedRect(w, ring_rect,
                                                               ring_radius,
                                                               Null,
                                                               style.thumb_inner_ring_color,
                                                               ring_w);
-            UiDrawCachedRaster(w, ring_rect, ring);
         }
         return;
     }
@@ -664,7 +662,7 @@ void UiRangeSlider::Paint(Draw& w)
                                             : Point(center.x, track.bottom - 1);
         for(Point p : { first, last }) {
             Rect dot = RectC(p.x - radius, p.y - radius, radius * 2 + 1, radius * 2 + 1);
-            UiDrawCachedRaster(w, dot, UiGetCachedAACircleImage(dot.GetSize(), marker));
+            UiPaintAACircle(w, dot, marker);
         }
     }
 
@@ -675,13 +673,12 @@ void UiRangeSlider::Paint(Draw& w)
             const Point center = thumb.CenterPoint();
             // Paint exactly the geometry used by hit testing, including custom sizes.
             Rect outer = thumb;
-            UiDrawCachedRaster(w, outer, UiGetCachedAACircleImage(outer.GetSize(), ring));
+            UiPaintAACircle(w, outer, ring);
             Rect inner = outer.Deflated(DPI(2));
             if(!inner.IsEmpty())
-                UiDrawCachedRaster(w, inner,
-                                   UiGetCachedAACircleImage(inner.GetSize(), SColorPaper()));
+                UiPaintAACircle(w, inner, SColorPaper());
             Rect dot = RectC(center.x - DPI(2), center.y - DPI(2), DPI(5), DPI(5));
-            UiDrawCachedRaster(w, dot, UiGetCachedAACircleImage(dot.GetSize(), ring));
+            UiPaintAACircle(w, dot, ring);
         }
     }
 

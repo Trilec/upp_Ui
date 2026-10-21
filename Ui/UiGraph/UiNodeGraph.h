@@ -687,6 +687,19 @@ private:
             Color frame = frame_width > 0 ? palette.frame[st] : Null;
             Size sz = surface.GetSize();
 
+            if(UiTryGpuArtwork(w, surface, [=](Painter& p) {
+                double fw = frame_width > 0 ? (double)frame_width : 0.0;
+                double inset = fw > 0.0 ? max(0.5, fw * 0.5) : 0.5;
+                double width = max(1.0, sz.cx - 2.0 * inset), height = max(1.0, sz.cy - 2.0 * inset);
+                double radius = min<double>(metrics.radius, min(sz.cx, sz.cy) * 0.5);
+                p.RoundedRectangle(inset, inset, width, height, radius);
+                if(!IsNull(face)) p.Fill(face);
+                if(frame_width > 0 && !IsNull(frame)) p.Stroke(frame_width, frame);
+            })) {
+                UiPaintFrameAccent(w, surface, palette, metrics, st);
+                return;
+            }
+
             UiRasterCachePolicy policy = UiRasterPolicyAA("aa/nodegraph-surface");
             policy.allow_scale_from_bucket = false;
             UiRasterCacheKeyBuilder kb("aa/nodegraph-surface");

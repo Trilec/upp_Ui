@@ -33,6 +33,25 @@ void UiNodeGraph::Paint(Draw& w)
 
             int minor_step = max(1, fround(minor_spacing));
             int major_step = minor_step * hierarchy;
+#ifdef flagGPUUI
+            if(dynamic_cast<GpuDrawTarget *>(&w)) {
+                double px=std::fmod(pan_.x,(double)major_step), py=std::fmod(pan_.y,(double)major_step);
+                if(px<0) px+=major_step;
+                if(py<0) py+=major_step;
+                const int phase_x=outer.left+fround(px), phase_y=outer.top+fround(py);
+                const int step=draw_minor?minor_step:major_step;
+                int first_x=phase_x+(int)std::ceil((grid_paint.left-phase_x)/(double)step)*step;
+                int first_y=phase_y+(int)std::ceil((grid_paint.top-phase_y)/(double)step)*step;
+                for(int y=first_y;y<grid_paint.bottom;y+=step)
+                    for(int x=first_x;x<grid_paint.right;x+=step) {
+                        bool is_major=(x-phase_x)%major_step==0 && (y-phase_y)%major_step==0;
+                        Color colour=is_major && !IsNull(major)?major:draw_minor?minor:Color(Null);
+                        if(!IsNull(colour)) w.DrawRect(x,y,1,1,colour);
+                    }
+            }
+            else
+#endif
+            {
             Image tile = GetGraphGridTile(minor_step, major_step, draw_minor, minor, major);
             Size ts = tile.GetSize();
             if(ts.cx > 0 && ts.cy > 0) {
@@ -49,6 +68,7 @@ void UiNodeGraph::Paint(Draw& w)
                 for(int y = start_y; y < grid_paint.bottom; y += ts.cy)
                     for(int x = start_x; x < grid_paint.right; x += ts.cx)
                         w.DrawImage(x, y, tile);
+            }
             }
         }
 

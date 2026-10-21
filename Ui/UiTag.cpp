@@ -130,11 +130,11 @@ String TagImageIdentity(const Image& image)
                          : AsString((int64)image.GetSerialId());
 }
 
-Image PrepareTagDecoration(const UiTagStyle& style, Size size,
+UiTagDecoration PrepareTagDecoration(const UiTagStyle& style, Size size,
                            StyledState state)
 {
     if(size.cx <= 0 || size.cy <= 0)
-        return Image();
+        return UiTagDecoration();
 
     StyledMetrics metrics = style.metrics;
     metrics.focus_enabled = false;
@@ -154,7 +154,7 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
         && !IsNull(style.palette.frame[state]);
 
     if(!draw_face && !draw_frame && !metrics.frame_accent.IsVisible())
-        return Image();
+        return UiTagDecoration();
 
     UiRasterCachePolicy policy = UiRasterPolicyAA("tag/decoration");
     policy.allow_scale_from_bucket = false;
@@ -184,16 +184,19 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
     key.Add(style.palette.frame[state]);
 
     auto factory = [=] {
+#ifdef flagGPUUI
+        PaintingPainter painter(Sizef(size.cx, size.cy));
+#else
         ImageBuffer buffer(size);
         buffer.SetKind(IMAGE_ALPHA);
         Fill(~buffer, RGBAZero(), buffer.GetLength());
-
         BufferPainter painter(buffer, MODE_ANTIALIASED);
+#endif
 
         Rect surface = UiStyledSurfaceRect(
             RectC(0, 0, size.cx, size.cy), metrics);
         if(surface.IsEmpty())
-            return Image(buffer);
+            return UiTagDecoration();
 
         const int frame_width =
             draw_frame ? max(0, metrics.frame_width) : 0;
@@ -208,7 +211,7 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
                         min(surface.GetWidth(), surface.GetHeight()) / 2);
 
         if(width <= 0.0 || height <= 0.0)
-            return Image(buffer);
+            return UiTagDecoration();
 
         painter.Begin();
         if(radius > 0.0)
@@ -247,15 +250,23 @@ Image PrepareTagDecoration(const UiTagStyle& style, Size size,
         accent_metrics.frame_width = frame_width;
         accent_metrics.frame_enabled = draw_frame;
         UiPaintFrameAccent(painter, surface, style.palette, accent_metrics, state);
+#ifdef flagGPUUI
+        return painter.GetResult();
+#else
         painter.Finish();
         return Image(buffer);
+#endif
     };
 
     Size cached_size = UiQuantizeRasterSize(size, policy);
     if(cached_size.IsEmpty())
         return factory();
 
+#ifdef flagGPUUI
+    return UiRasterCache::GetPainting(key.Build(), policy, factory);
+#else
     return UiRasterCache::Get(key.Build(), policy, factory);
+#endif
 }
 
 } // namespace
@@ -363,7 +374,7 @@ UiTagPresentation UiPrepareTag(const UiTagData& data,
     // disabled tags need only Disabled; interactive enabled tags need the three
     // pointer states. This matters when Graph/Gallery retains many tags.
     if(!out.enabled) {
-        Image disabled = PrepareTagDecoration(
+        UiTagDecoration disabled = PrepareTagDecoration(
             style, bounds.GetSize(), ST_DISABLED);
         for(int st = 0; st < 4; st++)
             out.decoration[st] = disabled;
@@ -378,7 +389,7 @@ UiTagPresentation UiPrepareTag(const UiTagData& data,
         out.decoration[ST_DISABLED] = out.decoration[ST_NORMAL];
     }
     else {
-        Image normal = PrepareTagDecoration(
+        UiTagDecoration normal = PrepareTagDecoration(
             style, bounds.GetSize(), ST_NORMAL);
         for(int st = 0; st < 4; st++)
             out.decoration[st] = normal;
@@ -468,9 +479,13 @@ void UiPaintTag(Draw& w, const UiTagPresentation& tag, StyledState state)
     const StyledState st =
         tag.enabled ? state : ST_DISABLED;
 
-    if(!IsNull(tag.decoration[st]))
-        w.DrawImage(tag.bounds.left, tag.bounds.top,
-                    tag.decoration[st]);
+    if(!IsNull(tag.decoration[st])) {
+#ifdef flagGPUUI
+        w.DrawPainting(tag.bounds, tag.decoration[st]);
+#else
+        w.DrawImage(tag.bounds.left, tag.bounds.top, tag.decoration[st]);
+#endif
+    }
 
     if(!tag.icon.IsEmpty() && !IsNull(tag.icon_image)) {
         if(tag.tint_icon)

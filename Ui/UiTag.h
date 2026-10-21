@@ -82,6 +82,12 @@ struct UiTagStyle : Moveable<UiTagStyle> {
 // Paint-ready, bounded presentation. It intentionally retains no complete
 // UiTagStyle snapshot per instance. Cached decoration images are shared through
 // UiRasterCache.
+#ifdef flagGPUUI
+using UiTagDecoration = Painting;
+#else
+using UiTagDecoration = Image;
+#endif
+
 struct UiTagPresentation : Moveable<UiTagPresentation> {
     Rect bounds;
     Rect icon;
@@ -89,7 +95,7 @@ struct UiTagPresentation : Moveable<UiTagPresentation> {
 
     WString prepared_text;
     Image icon_image;
-    Image decoration[4];
+    UiTagDecoration decoration[4];
 
     Font font;
     Color ink[4] = { Null, Null, Null, Null };

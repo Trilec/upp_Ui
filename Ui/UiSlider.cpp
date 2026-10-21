@@ -510,23 +510,21 @@ void UiSlider::Paint(Draw& w)
                          max(DPI(1), min(visual.GetWidth(), visual.GetHeight()) / 6));
         int radius = max(0, min(max(0, style.thumb_metrics.radius),
                                 min(visual.GetWidth(), visual.GetHeight()) / 2));
-        const Image& thumb_face = UiGetCachedAARoundedRectImage(visual.GetSize(),
+        UiPaintAARoundedRect(w, visual,
                                                                 radius,
                                                                 face,
                                                                 frame,
                                                                 frame_w);
-        UiDrawCachedRaster(w, visual, thumb_face);
 
         int ring_inset = frame_w + max(DPI(1), ring_w);
         Rect ring_rect = visual.Deflated(ring_inset);
         if(!ring_rect.IsEmpty() && !IsNull(style.thumb_inner_ring_color)) {
             int ring_radius = max(0, min(radius - ring_inset, min(ring_rect.GetWidth(), ring_rect.GetHeight()) / 2));
-            const Image& ring = UiGetCachedAARoundedRectImage(ring_rect.GetSize(),
+            UiPaintAARoundedRect(w, ring_rect,
                                                               ring_radius,
                                                               Null,
                                                               style.thumb_inner_ring_color,
                                                               ring_w);
-            UiDrawCachedRaster(w, ring_rect, ring);
         }
     }
     else if(!handled)

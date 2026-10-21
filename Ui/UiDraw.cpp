@@ -47,6 +47,27 @@ void UiPaintFrameAccent(Draw& w, const Rect& surface,
         return;
     }
 
+    if(UiTryGpuArtwork(w, surface, [&](Painter& p) {
+        const double l = outer.left, t = outer.top, r = outer.right, b = outer.bottom;
+        const double d = min(outer.GetWidth(), outer.GetHeight()) * 0.5;
+        p.Begin();
+        if(edges & StyledFrameAccent::Top)
+            p.Move(l,t).Line(r,t).Line(r-d,t+d).Line(l+d,t+d).Close();
+        if(edges & StyledFrameAccent::Right)
+            p.Move(r,t).Line(r,b).Line(r-d,b-d).Line(r-d,t+d).Close();
+        if(edges & StyledFrameAccent::Bottom)
+            p.Move(r,b).Line(l,b).Line(l+d,b-d).Line(r-d,b-d).Close();
+        if(edges & StyledFrameAccent::Left)
+            p.Move(l,b).Line(l,t).Line(l+d,t+d).Line(l+d,b-d).Close();
+        p.Clip();
+        p.RoundedRectangle(l, t, outer.GetWidth(), outer.GetHeight(), radius);
+        const double iw = outer.GetWidth() - 2 * thickness, ih = outer.GetHeight() - 2 * thickness;
+        if(iw > 0 && ih > 0)
+            p.RoundedRectangle(l + thickness, t + thickness, iw, ih, max(0.0, radius - thickness));
+        p.EvenOdd().Opacity(alpha / 255.0).Fill(color);
+        p.End();
+    })) return;
+
     // Rasterize only disjoint boundary bands, in bounded exact tiles. A large
     // panel never allocates a full-panel accent buffer or an unbounded fallback.
     Rect bounds((int)floor(outer.left), (int)floor(outer.top),
@@ -380,13 +401,25 @@ void UiPaintCircularArc(Painter& p, Size raster_size,
     const double tau = 2.0 * M_PI;
     const bool use_gradient = gradient && start != end;
     Image gradient_brush;
-    if(use_gradient)
+    bool gpu_paint = false;
+    Function<void(double)> paint_angular;
+#ifdef flagGPUUI
+    if(auto *effect = dynamic_cast<GpuPainterEffects *>(&p)) {
+        gpu_paint = true;
+        paint_angular = [=](double width) {
+            effect->PaintAngular(center, start_angle, sweep_angle, start, end, width);
+        };
+    }
+#endif
+    if(use_gradient && !gpu_paint)
         gradient_brush = UiCircularArcAngularGradient(raster_size, center,
                                                       start_angle, sweep_angle,
                                                       start, end);
 
     auto StrokePath = [&] {
-        if(use_gradient)
+        if(use_gradient && gpu_paint)
+            paint_angular(thickness);
+        else if(use_gradient)
             p.Stroke((double)thickness, gradient_brush, Xform2D::Identity());
         else
             p.Stroke((double)thickness, start);
@@ -434,7 +467,9 @@ void UiPaintCircularArc(Painter& p, Size raster_size,
             p.Begin();
             UiCircularArcRoundedCapPath(p, endpoint, angle, direction, at_start,
                                         half_width, q);
-            if(use_gradient)
+            if(use_gradient && gpu_paint)
+                paint_angular(-1);
+            else if(use_gradient)
                 p.Fill(gradient_brush, Xform2D::Identity());
             else
                 p.Fill(start);

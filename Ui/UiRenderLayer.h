@@ -44,6 +44,9 @@
 */
 
 #include <Painter/Painter.h>
+#ifdef flagGPUUI
+#include <RenderCore/GpuDrawTarget.h>
+#endif
 #include <CtrlLib/CtrlLib.h>
 
 namespace Upp {
@@ -83,6 +86,17 @@ inline void UiPaintRenderLayer(Draw& w, const Rect& target, PaintFn paint,
     if(sz.cx <= 0 || sz.cy <= 0)
         return;
 
+#ifdef flagGPUUI
+    if(antialiased)
+        if(auto *receiver = dynamic_cast<GpuDrawTarget *>(&w))
+            if(receiver->DrawVectorArtwork(target, [&](Painter& p) {
+                p.Translate(-target.left, -target.top);
+                paint(p);
+            })) {
+                UiRenderLayerStatsRef().calls++;
+                return;
+            }
+#endif
     UiRenderLayerStats& stats = UiRenderLayerStatsRef();
     const int64 pixels = (int64)sz.cx * (int64)sz.cy;
     stats.calls++;

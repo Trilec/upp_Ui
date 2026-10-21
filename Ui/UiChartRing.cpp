@@ -500,6 +500,17 @@ void UiChartRing::Paint(Draw& w)
     StyledState state = IsEnabled() ? ST_NORMAL : ST_DISABLED;
     Color track = ChartRingFace(style.track_palette, state, Color(229, 231, 235));
 
+    const Size gpu_size = g.square.GetSize();
+    bool gpu_ring = UiTryGpuArtwork(w, g.square, [&](Painter& p) {
+        Pointf center(gpu_size.cx / 2.0, gpu_size.cy / 2.0);
+        if(g.radius > 0.0 && !IsNull(track)) p.Circle(center, g.radius).Stroke((double)g.thickness, track);
+        for(const SegmentGeometry& segment : g.segments)
+            if(segment.visible)
+                UiPaintCircularArc(p, gpu_size, center, g.radius,
+                                   segment.start_angle, segment.sweep_angle,
+                                   g.thickness, g.cap_roundness, segment.color, segment.color, false);
+    });
+    if(!gpu_ring) {
     UiRasterCachePolicy policy = UiRasterPolicyAA("aa/ui-chart-ring");
     policy.allow_scale_from_bucket = false;
     UiRasterCacheKeyBuilder key("aa/ui-chart-ring");
@@ -521,6 +532,7 @@ void UiChartRing::Paint(Draw& w)
     Image ring = UiRasterCache::Get(key.Build(), policy,
                                     [&] { return RenderRaster(g, track); });
     w.DrawImage(g.square.left, g.square.top, ring);
+    }
 
     if(g.text_visible && !center_text_.IsEmpty()) {
         Font font = style.font;
