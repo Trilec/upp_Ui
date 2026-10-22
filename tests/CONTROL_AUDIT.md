@@ -1,5 +1,21 @@
 # Ui controls audit — 27 September 2026
 
+## Cleanup follow-up — 22 October 2026
+
+The redundant `Utilities/UiGalleryRegressionTest` launcher is retired in favour
+of `Utilities/UiModelViewTests`. Its 29-check Gallery suite remains unchanged in
+`GalleryRegression.cpp` and is invoked by the aggregate driver. A fresh CLANGx64
+Release/BLITZ build passes all five aggregate suites with zero failed suites.
+Other focused tests retain distinct coverage and are not retired based on age.
+
+Eight selected demos were rebuilt for the Windows x64 release bundle and each
+opened, responded and closed normally from the bundle folder. The ZIP integrity,
+executable checksums and Windows system DLL imports were checked. This is startup
+validation, not full native interaction or all-controls release acceptance.
+Current evidence is under `build/release-demos`; obsolete build intermediates were
+removed after archiving and byte-verifying all noncompiled files in
+`build/history/cleanup-2026-10-22.zip`. Active caches and current work were retained.
+
 ## Result and scope
 
 **Not a clean all-controls release sign-off.** The catalogue covers all 50 inventoried

@@ -108,6 +108,16 @@ void TestThemeSurfaces(TestCtx& t)
 }
 
 
+int EntryInkHeight(const UiBaseEdit::Style& style,int height)
+{
+    UiLineEdit field;field.SetCustomStyle(style);field.SetTextUtf8("Rowan Bell Wgyp");
+    field.SetRect(0,0,DPI(240),height);field.Layout();
+    ImageDraw canvas(DPI(240),height);field.Paint(canvas);Image image=canvas;
+    Color ink=style.palette.ink[ST_NORMAL];int top=height,bottom=-1;
+    for(int y=0;y<height;y++)for(int x=DPI(14);x<DPI(220);x++)if(ImagePixel(image,x,y)==ink){top=min(top,y);bottom=max(bottom,y);}
+    return bottom<top?0:bottom-top+1;
+}
+
 void TestOlivePreset(TestCtx& t)
 {
     const int first_check = t.checks, first_fail = t.fails;
@@ -155,6 +165,11 @@ void TestOlivePreset(TestCtx& t)
             t.Expect(Face(edit.palette) == v.field && edit.caret_color == v.text
                      && edit.palette.frame[ST_NORMAL] == (role == UiRole::Alert ? v.alert : v.line),
                      "Olive fields retain native field face and semantic error edge");
+            UiLineEdit compact;compact.SetCustomStyle(edit);compact.SetRect(0,0,DPI(240),DPI(30));compact.Layout();
+            t.Expect(compact.GetMinSize().cy<=DPI(30),"Unmodified Olive entry fits a compact 30px allocation");
+            int full_ink=EntryInkHeight(edit,DPI(72));
+            t.Expect(full_ink>0&&EntryInkHeight(edit,DPI(30))==full_ink&&EntryInkHeight(edit,v.control_height)==full_ink,
+                     "Compact and standard entries paint the complete glyph including descenders");
             const auto dropdown = UiTheme::ResolveDropdown(ctx,role);
             t.Expect(dropdown.popup_background_color == v.panel && dropdown.popup_item_height == v.row_height,
                      "Olive popup shares its surface and row metrics");

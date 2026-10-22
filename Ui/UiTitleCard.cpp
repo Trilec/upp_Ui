@@ -497,12 +497,31 @@ Rect UiTitleCard::GetContentCellRect(const Rect& content) const
         return RectC(0, 0, 0, 0);
 
     const Style& style = GetEffectiveStyle();
+    Rect bounds = content;
+    if(card_line_full_span_ && style.card_line && style.card_line_length != NONE) {
+        int reserve = max(1, style.card_line_thickness) + max(0, style.card_line_gap);
+        if(style.card_line_side == UiAlign::BOTTOM)
+            bounds.bottom = max(bounds.top, bounds.bottom - reserve);
+        else if(style.card_line_side == UiAlign::TOP)
+            bounds.top = min(bounds.bottom, bounds.top + reserve);
+    }
+    int edge_reserve = 0;
+    if(media_at_edge_ && !IsNull(media_) &&
+       (style.media_side == UiAlign::LEFT || style.media_side == UiAlign::RIGHT)) {
+        Rect media = GetMediaRect(content);
+        edge_reserve = media.GetWidth() + max(0, style.media_gap);
+        if(style.media_side == UiAlign::RIGHT)
+            bounds.right = max(bounds.left, media.left - max(0, style.media_gap));
+        else
+            bounds.left = min(bounds.right, media.right + max(0, style.media_gap));
+    }
     Size heading = GetHeadingMinSize();
-    // Keep a visible prospective content lane even when the card is narrower
+    heading.cx = max(0, heading.cx - edge_reserve);
+    // Keep a visible prospective bounds lane even when the card is narrower
     // than its natural heading. The same reservation is used once a child is
     // attached, so preview geometry and runtime placement cannot diverge.
-    const int content_lane = max(1, content.GetWidth() / 3);
-    int heading_w = max(0, min(max(0, content.GetWidth() - content_lane), heading.cx));
+    const int content_lane = max(1, bounds.GetWidth() / 3);
+    int heading_w = max(0, min(max(0, bounds.GetWidth() - content_lane), heading.cx));
     int gap = max(0, style.content_cell_gap);
     bool split = style.card_line && style.card_line_length != NONE &&
                  (style.card_line_side == UiAlign::LEFT || style.card_line_side == UiAlign::RIGHT);
@@ -511,9 +530,9 @@ Rect UiTitleCard::GetContentCellRect(const Rect& content) const
     int cell_gap = gap + divider_gap + divider_th;
     bool cell_right = split ? style.card_line_side == UiAlign::RIGHT
                             : style.text_align_h != UiAlign::RIGHT;
-    int cell_w = max(0, content.GetWidth() - heading_w - cell_gap);
-    int x = cell_right ? content.left + heading_w + cell_gap : content.left;
-    return RectC(x, content.top, cell_w, content.GetHeight());
+    int cell_w = max(0, bounds.GetWidth() - heading_w - cell_gap);
+    int x = cell_right ? bounds.left + heading_w + cell_gap : bounds.left;
+    return RectC(x, bounds.top, cell_w, bounds.GetHeight());
 }
 
 Rect UiTitleCard::GetContentCellRect() const
@@ -644,6 +663,26 @@ Size UiTitleCard::GetMinSize() const
     return out;
 }
 
+UiTitleCard& UiTitleCard::SetMediaAtEdge(bool on)
+{
+    if(media_at_edge_ != on) {
+        media_at_edge_ = on;
+        RefreshLayout();
+        Refresh();
+    }
+    return *this;
+}
+
+UiTitleCard& UiTitleCard::SetCardLineFullSpan(bool on)
+{
+    if(card_line_full_span_ != on) {
+        card_line_full_span_ = on;
+        RefreshLayout();
+        Refresh();
+    }
+    return *this;
+}
+
 void UiTitleCard::Layout()
 {
     if(!content_cell_ || content_cell_->GetParent() != this)
@@ -732,6 +771,15 @@ void UiTitleCard::Paint(Draw& w)
         // Paint uses the same reserved child lane as Layout, including narrow cards.
         Rect cell_r = GetContentCellRect(content);
         Rect heading_r = content;
+        bool edge_media = media_at_edge_ &&
+                          (style.media_side == UiAlign::LEFT || style.media_side == UiAlign::RIGHT);
+        if(edge_media && !IsNull(media_)) {
+            Rect media = GetMediaRect(content);
+            if(style.media_side == UiAlign::RIGHT)
+                heading_r.right = max(heading_r.left, media.left - max(0, style.media_gap));
+            else
+                heading_r.left = min(heading_r.right, media.right + max(0, style.media_gap));
+        }
         if(cell_right) {
             heading_r.right = max(content.left, cell_r.left - total_gap);
         }
@@ -739,9 +787,9 @@ void UiTitleCard::Paint(Draw& w)
             heading_r.left = min(content.right, cell_r.right + total_gap);
         }
 
-        Rect media_r = GetMediaRect(heading_r);
+        Rect media_r = GetMediaRect(edge_media ? content : heading_r);
         Rect text_r = heading_r;
-        if(!media_r.IsEmpty()) {
+        if(!media_r.IsEmpty() && !edge_media) {
             switch(style.media_side) {
             case UiAlign::LEFT:
                 text_r.left = min(text_r.right, media_r.right + style.media_gap);
@@ -889,7 +937,8 @@ void UiTitleCard::Paint(Draw& w)
 
         if(!split && style.card_line && style.card_line_length != NONE &&
            (style.card_line_side == UiAlign::TOP || style.card_line_side == UiAlign::BOTTOM)) {
-            int len = max(0, heading_r.GetWidth());
+            Rect rule_r = card_line_full_span_ ? content : heading_r;
+            int len = max(0, rule_r.GetWidth());
             if(style.card_line_length == SMALL)
                 len = min(len, DPI(40));
             else if(style.card_line_length == MEDIUM)
@@ -901,9 +950,9 @@ void UiTitleCard::Paint(Draw& w)
                                : Blend(ink, SColorShadow(), 80);
                 int th = max(1, style.card_line_thickness);
                 int gap = max(0, style.card_line_gap);
-                int x = heading_r.left;
-                if(style.text_align_h == UiAlign::CENTER) x += max(0, (heading_r.GetWidth() - len) / 2);
-                else if(style.text_align_h == UiAlign::RIGHT) x = heading_r.right - len;
+                int x = rule_r.left;
+                if(style.text_align_h == UiAlign::CENTER) x += max(0, (rule_r.GetWidth() - len) / 2);
+                else if(style.text_align_h == UiAlign::RIGHT) x = rule_r.right - len;
                 int y = style.card_line_side == UiAlign::TOP
                       ? content.top + gap
                       : content.bottom - gap - th;

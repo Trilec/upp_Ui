@@ -3,7 +3,8 @@
 Style-first controls, layouts and model-backed views for Ultimate++.
 
 Ui supplies shared themes, four semantic roles, modern controls, drawing helpers,
-icons, and retained Graph/document views. It can coexist with ordinary CtrlLib
+icons, media cards, and model-backed graph/document views. The optional file browser
+adds themeable navigation and image-sequence handling. Ui can coexist with ordinary CtrlLib
 controls. Reusable PropertyEditorCore and PropertyEditor packages support typed
 property inspection without depending on UiDesigner.
 
@@ -14,8 +15,8 @@ property inspection without depending on UiDesigner.
 Read [Getting Started](GETTING_STARTED.md) to configure the assembly and build a
 real demo. Browse the [Controls Guide](docs/01_UI_CONTROLS_GUIDE.md) for every public
 control and its reference example. Full demos are self-contained packages with a
-live preview, production PropertyEditor and C++ examples; UiLabelDemo defines the
-reference shell.
+live preview, production PropertyEditor and C++ examples. MediaCard and Collection
+are the accepted shell references; UiLabelDemo is a small starting example.
 
 [Control usage recipes](docs/CONTROL_USAGE.md) give a small public API example for
 every catalogue entry, including shared Frame Accent decoration on panel surfaces.
@@ -23,6 +24,43 @@ every catalogue entry, including shared Frame Accent decoration on panel surface
 For AI-assisted work, see [Skills](skills/README.md): packaged native U++/Ui
 development guidance and HTML mockups grounded in the available controls. Each
 ZIP includes its instructions and supporting references.
+
+## Control highlights
+
+### Media cards
+
+[UiMediaCardDemo](examples/UiMediaCardDemo) shows image and empty states, header and
+footer content, tags, overlays, and the shared renderer used for gallery items.
+The inspector and theme overrides drive the preview and generated C++.
+
+![UiMediaCard demo with image cards, gallery items and a property inspector](Snapshot_MediaCard.jpg)
+
+### Node graphs
+
+[UiGraphDemo](examples/UiGraphDemo) shows model-backed nodes, media, ports and
+connections, with straight, Bezier and orthogonal routing. Explore node shapes,
+roles and live property editing, then see the [graph guide](docs/08_UIGRAPH_GUIDE.md)
+for integration and the specialized graph examples.
+
+![UiNodeGraph demo with connected node shapes, media nodes and a property inspector](Snapshot_NodeGraph.jpg)
+
+### File browsing
+
+The optional [UiFileBrowser](Ui/UiFileBrowser/README.md) supports embedded and modal
+use, detail and tile views, natural sorting, filters, image-sequence grouping and
+JPEG/PNG/text previews. Additional preview formats use a host-supplied provider.
+[UiFileDialogDemo](examples/UiFileDialogDemo) brings the Ui browser, OS-native
+dialogs and the original U++ FileSel together in one example.
+
+Build maintained demos with `python examples/build_demos.py --umk <path-to-umk.exe>`;
+successful executables go in `bin/windows-x64`, with intermediate output and logs
+in `build/demos`. See the [demo guide](docs/04_UI_DEMO_GUIDE.md) for individual
+targets, shell conventions and generated-code requirements.
+
+For a quick look without a compiler, download the Windows x64 demo ZIP from
+[GitHub Releases](https://github.com/Trilec/upp_Ui/releases), extract it and run a
+demo. Release bundles are prepared locally under `bin/releases` and include a
+selection of the maintained demos, launch instructions and license notices.
 
 ## Release status
 
@@ -34,8 +72,8 @@ and the [coverage register](tests/ui_release_inventory.json) for remaining gates
 The [control audit](tests/CONTROL_AUDIT.md) records current findings, reproduced
 defects and test results, including checks that still need manual validation.
 
-The maintainer's validation environment is Windows, U++18468 and CLANGx64. Recent
-source changes still require that native gate. Do not infer Linux/macOS acceptance
+The maintainer's validation environment is Windows, U++18468 and CLANGx64.
+Validation is recorded per implementation slice. Do not infer Linux/macOS acceptance
 from portable source or from an optional OS-dialog implementation. Existing sibling
 package versions and saved-data schemas are independent of the Ui release number.
 

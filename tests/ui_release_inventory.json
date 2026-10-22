@@ -571,6 +571,12 @@
   },
   "retired_test_packages": [
     {
+      "package": "Utilities/UiGalleryRegressionTest",
+      "replacement": "Utilities/UiModelViewTests",
+      "retained_source": "Utilities/UiModelViewTests/GalleryRegression.cpp",
+      "suite": "RunGalleryRegressionSuite"
+    },
+    {
       "package": "Utilities/UiButtonInteractionContractTest",
       "replacement": "Utilities/UiControlTests",
       "retained_source": "Utilities/UiControlTests/Button.cpp",

@@ -78,6 +78,13 @@ Use `--upp-root` when the installed tool is not beside uppsrc. The generated bui
 report in `build/demos` records each package's outcome; compilation remains
 separate from native visual and generated-code acceptance.
 
+Curated Windows x64 demo bundles for GitHub Releases belong in `bin/releases`.
+Rebuild each selected executable from the intended source before packaging; do not
+copy stale binaries just because they are already in bin. Include short launch
+instructions and applicable license notices. Launch-check the selected demos
+without source-tree assets or a U++ installation. Keep tests, build logs and
+compiler caches out of the release ZIP; retain validation evidence in `build`.
+
 ## Inspector and PropertyEditor
 
 Inspector rows map to meaningful supported public APIs: content/value, roles,

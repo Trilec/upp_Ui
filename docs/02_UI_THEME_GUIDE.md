@@ -70,7 +70,7 @@ UiThemeContext stores preset/mode and supports serialization.
 Olive is an opt-in Light/Dark preset (serialized ID 7; existing IDs 0..6 and
 the Minimal default are unchanged). It uses neutral layered surfaces, green
 emphasis (Dark #b5d7a5, Light #456d3a), amber alerts, unboxed action glyphs,
-36px control and 33px collection-row metrics. These are logical pixels, scaled
+36px control and 33px collection-row metrics. Fields use 3px vertical content margins so the same public style also fits compact 30px entry allocations without clipping; applications do not need local inset overrides. These are logical pixels, scaled
 once by DPI. Family-specific metrics still apply: Table rows/headers use 32px.
 Select it with `UiTheme::Set(UiThemePreset::Olive, UiThemeMode::Dark)`.
 Use `UiThemeContext` with existing `Resolve...(context, role)` APIs to obtain

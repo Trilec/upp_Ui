@@ -316,6 +316,10 @@ UiPanel parents ordinary children; UiScrollPanel supplies a Content() parent for
 scrolling children. Use one box/grid/absolute layout root to arrange several
 children automatically. UiTitleCard borrows an adjacent SetContentCell;
 UiGroupPanel has independently replaceable header-content and body-content roots.
+For horizontal accordion headers, UiTitleCard.SetMediaAtEdge(true) places media
+at the outer edge beyond the content cell; SetCardLineFullSpan(true) extends
+the card rule across that cell and reserves its line/gap in child height.
+Both options default to false, preserving existing title-card geometry.
 Parenting still does not imply deletion ownership.
 A derived UiPanel may override the protected ResolveThemeStyle hook to refine
 inherited metrics without freezing an explicit style. InvalidateStyleCache once

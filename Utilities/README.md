@@ -31,10 +31,11 @@ The inventory is maintained source metadata used by `examples/build_demos.py` an
 Keep it when cleaning build outputs, so canonical demos and coverage routes remain
 discoverable without scanning old executables.
 
-Focused RangeSegments, Gallery, callback lifecycle, numeric, Doc, PropertyEditor,
-native/platform and other unique regression targets remain separate. Gallery's
-small entry point already uses the shared aggregate source. Different test bodies
-are retained until their coverage has been reconciled.
+Focused RangeSegments, callback lifecycle, numeric, Doc, PropertyEditor,
+native/platform and other unique regression targets remain separate. Gallery
+regressions run through `UiModelViewTests`; the redundant standalone Gallery
+launcher is retired. Different test bodies are retained until their coverage has
+been reconciled.
 
 `PropertyEditorDemo` and `PropertyEditorSemanticDemo` demonstrate the property
 browser itself and its semantic editors. `PropertyEditorCoreProbe` checks the

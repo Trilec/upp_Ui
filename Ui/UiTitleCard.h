@@ -151,6 +151,11 @@ public:
     const Image& GetMedia() const { return media_; }
     Rect         GetContentCellRect() const;
     UiTitleCard& SetContentCellGap(int pixels);
+    // Opt-in horizontal headers reserve media at the card edge, outside the child lane.
+    // Existing cards retain their heading-group placement by default.
+    UiTitleCard& SetMediaAtEdge(bool on = true);
+    // Extend a top/bottom card rule across both heading and child content.
+    UiTitleCard& SetCardLineFullSpan(bool on = true);
 
     UiTitleCard& SetTitleLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
     UiTitleCard& SetCardLine(UiSpan ex, int thickness = 1, UiLineStyle style = SOLID, Color c = Null);
@@ -212,6 +217,8 @@ private:
     Image media_;
     Size  media_pref_ = Size(0, 0);
     Ctrl* content_cell_ = nullptr;
+    bool media_at_edge_ = false;
+    bool card_line_full_span_ = false;
 
     bool hot_ = false;
     bool pressed_ = false;

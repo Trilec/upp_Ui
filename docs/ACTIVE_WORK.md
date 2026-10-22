@@ -1,9 +1,13 @@
 # ACTIVE WORK
-
 Fetch the applicable remote branch before publishing; preserve concurrent work
 and never force-push. This is a current recovery index, not a validation log.
 Contracts live in the reader guides; historical checkpoints live in Git.
-
+## Compact Olive fields — 2026-10-20
+TASK: fix clipped compact CineCast entries in the public theme; no app inset overrides.
+TOUCHED: UiThemeOlive.h field metrics, ThemeSurface.cpp and 02_UI_THEME_GUIDE.md.
+VALIDATION: Release and Debug non-BLITZ UiThemeTests each pass 1402 checks (2 suites).
+Native 30/36px entry ink matches tall reference in all four roles, Dark and Light.
+BOUNDARY: CineCast rebuilt; other consumers inherit on rebuild. No sibling app staging.
 ## UiDoc foundation — 2026-10-11
 BASE: Ui `b09b06f`; foundation published in `ecadb12` on main.
 TASK: audit/harden the reusable document foundation.
@@ -12,7 +16,6 @@ STATUS: implemented; findings and reproducible checks in [audit](UIDOC_AUDIT.md)
 VALIDATION: all eight Doc suites pass in Release BLITZ and Debug without BLITZ.
 BOUNDARY: application-specific authoring controls are maintained outside Ui.
 NEXT: native authoring, capture/focus/resize and platform/font/print acceptance.
-
 ## RangeSegments cards — 2026-10-10
 PUBLISHED: recover with `git log -1 -- Ui/UiRangeSegmentsGeometry.cpp`.
 VALIDATION: Debug/Release range 363/0 and native smoke 73/0; demo 46/0;

@@ -85,7 +85,8 @@ inline void Metrics(StyledMetrics& m, const UiOliveTokens& t, bool field = false
 {
     m.radius = DPI(field ? 6 : 7); m.frame_width = t.border;
     m.face_enabled = m.frame_enabled = m.focus_enabled = true;
-    m.content_margin = Rect(DPI(field ? 10 : 12),DPI(8),DPI(field ? 10 : 12),DPI(8));
+    // Fields must fit both the 36px default and compact 30px layouts.
+    m.content_margin = Rect(DPI(field ? 10 : 12),DPI(field ? 3 : 8),DPI(field ? 10 : 12),DPI(field ? 3 : 8));
     m.focus_color = t.focus; m.focus_margin = DPI(field ? 0 : 3); m.focus_alpha = 255;
     m.shadow.enabled = m.highlight.enabled = false;
     m.text_font = t.body; m.use_text_font = false;
