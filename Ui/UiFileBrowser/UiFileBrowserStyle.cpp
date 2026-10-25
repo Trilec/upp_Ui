@@ -2,6 +2,7 @@
 // file colours and glyphs live in UiFileBrowserAppearance.h/.cpp.
 #include "UiFileBrowser.h"
 #include <Ui/UiFonts.h>
+#include <Ui/UiListRenderStyle.h>
 
 namespace Upp
 {
@@ -216,6 +217,15 @@ void UiFileBrowser::ApplyTheme()
     list_style.font = font_;
     list_style.metrics.radius = 0;
     list_style.metrics.frame_enabled = false;
+    // Font::GetHeight is an em request, not the native line/glyph height.
+    // Measure the same styled renderer used by UiList, including row padding,
+    // so a larger Windows font/DPI cannot clip the bottom of Places labels.
+    UiItemRenderBasic measured_row;
+    measured_row.SetCustomStyle(UiListOwnedItemRenderStyle(list_style, 0));
+    UiItemRenderData measured_data;
+    measured_data.title = "Ag";
+    measured_row.SetData(measured_data);
+    list_style.row_height = max(list_style.row_height, measured_row.GetMinSize().cy);
     places_.SetCustomStyle(list_style);
     filter_list_.SetCustomStyle(list_style);
     RefreshPlaces();

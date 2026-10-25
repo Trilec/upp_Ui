@@ -1,4 +1,5 @@
 #include <Ui/UiFileBrowser/UiFileBrowser.h>
+#include <Ui/UiListRenderStyle.h>
 #include <atomic>
 #include <chrono>
 #include <plugin/png/png.h>
@@ -41,6 +42,38 @@ struct UiFileBrowserTest
         browser.SetFolder(root);
         wait();
         check(browser.GetEntryCount() == 7, "browser consumes grouped scan result");
+        // Sidebar rows must contain the renderer's native text metrics, including
+        // Windows font faces/densities whose glyph height exceeds the requested em.
+        const UiThemeContext saved_font_theme = UiTheme::GetContext();
+        for(auto mode : {UiThemeMode::Light, UiThemeMode::Dark})
+        {
+            UiThemeContext context = saved_font_theme;
+            context.mode = mode;
+            UiTheme::Set(context);
+            for(const char *face : {"Segoe UI", "Tahoma"})
+                for(int height : {13, 20, 26, 39})
+                    for(auto density : {UiFileBrowser::ViewSize::Small,
+                                        UiFileBrowser::ViewSize::Medium,
+                                        UiFileBrowser::ViewSize::Large})
+                    {
+                        browser.SetFont(Font(Font::FindFaceNameIndex(face), DPI(height)));
+                        browser.SetViewSize(density);
+                        const auto &style = browser.places_.GetStyle();
+                        bool fits = true;
+                        for(int i = 0; i < browser.places_.Model().GetCount(); ++i)
+                        {
+                            UiItemRenderBasic render;
+                            render.SetCustomStyle(UiListOwnedItemRenderStyle(style, i));
+                            render.SetData(UiListOwnedItemRenderData(style, browser.places_.Model().Get(i)));
+                            render.PrepareLayout(RectC(0, 0, DPI(600), style.row_height), UiDirection::H);
+                            fits &= render.GetContentSize().cy <= render.GetBounds().GetHeight();
+                        }
+                        check(fits, Format("Places glyphs fit: %s %d density %d mode %d",
+                                           face, height, int(density), int(mode)));
+                    }
+        }
+        UiTheme::Set(saved_font_theme);
+        browser.UseThemeFont().SetViewSize(UiFileBrowser::ViewSize::Medium);
         for(const auto &entry : browser.model_->Entries())
             if(entry.friendly_name == "010_020_comp_v012")
             {
