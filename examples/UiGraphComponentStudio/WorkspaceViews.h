@@ -1,6 +1,6 @@
 #ifndef _UiGraphWorkspaceViews_h_
 #define _UiGraphWorkspaceViews_h_
-#include <Utilities/UiGraphWorkspace/UiGraphWorkspace.h>
+#include <Ui/UiGraphWorkspace/UiGraphWorkspace.h>
 
 namespace Upp {
 namespace GraphWorkspace {

@@ -2,8 +2,8 @@
 #define _UiRangeSegmentsDemo_UiRangeSegmentsDemo_h_
 
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 namespace Upp {
 
@@ -37,7 +37,7 @@ private:
     bool ApplyOverrides(UiRangeSegments::Style& style) const;
     void SyncInheritedOverrides(const UiRangeSegments::Style& style);
     void SyncDataSpans();
-    void ResetProperty(PropertyEditorModel& model, const String& id);
+    void ResetProperty(UiPropertyInspectorModel& model, const String& id);
     void SetOverrideActive(const String& id, bool active);
     void ToggleTheme();
     void UpdateGeneratedCode();
@@ -48,10 +48,10 @@ private:
     bool OverrideActive(const String& id) const;
 
 private:
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_;
-    PropertyEditorModel override_model_;
-    PropertyEditorModel data_model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel inspector_model_;
+    UiPropertyInspectorModel override_model_;
+    UiPropertyInspectorModel data_model_;
 
     UiTitleCard header_;
     UiBoxLayout header_actions_;
@@ -77,9 +77,9 @@ private:
     UiPanel overrides_page_;
     UiPanel data_page_;
     UiPanel code_page_;
-    PropertyEditor inspector_;
-    PropertyEditor overrides_;
-    PropertyEditor data_;
+    UiPropertyInspector inspector_;
+    UiPropertyInspector overrides_;
+    UiPropertyInspector data_;
     UiMultiEdit code_;
     UiToolButton copy_;
 

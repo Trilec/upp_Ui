@@ -58,7 +58,7 @@ void InstallUiGraphDemoRuntime(UiGraphDemo& d)
     // Keep historical enum names out of the user-facing Inspector immediately.
     // Custom remains a callback/API silhouette rather than a demo drop-down
     // choice because this reference does not install a custom-shape editor.
-    if(PropertyEditorItem *shape = d.pe_model_node.Find("shape")) {
+    if(UiPropertyInspectorItem *shape = d.pe_model_node.Find("shape")) {
         shape->choices.Clear();
         static const char *canonical_shapes[] = {
             "Rectangle", "Ellipse", "Diamond", "Triangle",

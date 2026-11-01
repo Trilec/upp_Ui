@@ -1,6 +1,6 @@
 ---
 name: upp-ui-development
-description: Build, integrate or repair native U++ C++ applications and reusable Ui controls, including ownership, layouts, themes, models, PropertyEditor and UMK packages. Use for native implementation; not for Designer JSON authoring or browser-only mockups.
+description: Build, integrate or repair native U++ C++ applications and reusable Ui controls, including ownership, layouts, themes, models, UiPropertyInspector and UMK packages. Use for native implementation; not for Designer JSON authoring or browser-only mockups.
 ---
 
 # U++ and Ui development
@@ -27,7 +27,9 @@ machine paths or API summaries from an old session still apply.
 - For appearance, read [themes](references/upstream/docs/02_UI_THEME_GUIDE.md);
   for a custom renderer, read [drawing](references/upstream/docs/07_UI_DRAWING_GUIDE.md).
 - For data-backed views, read [models](references/upstream/docs/03_UI_MODEL_GUIDE.md).
-  For inspectors, also read [PropertyEditor](references/upstream/docs/05_UI_PROPERTY_EDITOR_GUIDE.md).
+  For inspectors, also read [UiPropertyInspector](references/upstream/docs/05_UI_PROPERTY_EDITOR_GUIDE.md).
+  Its production packages are `Ui/UiPropertyInspector` and headless
+  `Ui/UiPropertyInspector/Core`; tests belong under `tests/`, not utilities.
 - For control demos, read the [demo contract](references/upstream/docs/04_UI_DEMO_GUIDE.md).
   For graphs, start with [graph usage](references/upstream/docs/08_UIGRAPH_GUIDE.md);
   read [graph internals](references/upstream/docs/09_UIGRAPH_DEVELOPMENT.md) only when changing that engine.

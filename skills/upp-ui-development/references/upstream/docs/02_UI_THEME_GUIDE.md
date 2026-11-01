@@ -4,6 +4,27 @@ UiStyle provides value-only style primitives. UiTheme maps context and semantic
 roles into concrete family styles. A control either follows those defaults or owns
 an explicit custom-style snapshot. There is no separate demo-only theme system.
 
+## Built-in catalogue and recipe files
+
+`Ui/Themes/` owns the built-in preset recipes and their shared catalogue.
+`UiTheme.h` remains the public include; its internal resolver and structural
+ownership helpers live with the recipes. `Minimal.h`, `Pill.h`, `Linear.h`,
+`Solid.h`, `Outline.h`, `Compact.h`, `Layered.h` and `Olive.h` group the preset
+recipes; Minimal also has palette/role modules. See [theme authoring](../Ui/Themes/README.md).
+
+The Core-only `Ui/Themes/UiThemePresets.h` catalogue supplies names, stable IDs,
+`UiThemePresetCount()`, `UiThemePresetName()` and `UiParseThemePreset()`. UiDesigner
+uses this same catalogue for validation, built-in library entries and generated
+C++. Add working recipes and append a new catalogue entry together; existing IDs
+and the Minimal default remain unchanged. No application theme profiles are imported.
+
+[UiThemeDemo](../examples/UiThemeDemo) is the modular design workbench: choose a
+preset, compare live Light/Dark panes, switch the supported semantic roles in the
+header and focus a compact control section with category buttons. Short fields
+and list/tree views share rows. Values and model selection survive theme changes.
+The optional browser and OS selector have real launch buttons; their modal
+lifetimes remain host-owned. Native OS dialog chrome follows the platform.
+
 ## Project typography
 
 `UiFonts.h` supplies a revisioned project catalogue and Body / Heading / Code
@@ -14,7 +35,7 @@ not private aliases or runtime face indices. Optional `system:<name>` selections
 and legacy family-name projects retain their separate meaning.
 
 See [PROJECT_FONTS.md](PROJECT_FONTS.md) for supported formats/platforms, lifetime
-limits, PropertyEditor refresh, Designer resources/export and runnable acceptance.
+limits, UiPropertyInspector refresh, Designer resources/export and runnable acceptance.
 
 ## Minimal baseline and roles
 
@@ -63,10 +84,33 @@ Range/Cards selector in UiRangeSegmentsDemo for complete generated C++.
 
 ## Theme context and lifecycle
 
-UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered.
+UiThemePreset: Minimal, Pill, Linear, Solid, Outline, Compact, Layered, Olive.
 UiThemeMode: Light, Dark, System. System currently resolves to Light where the
 platform-following policy is not wired; do not advertise universal OS-mode tracking.
 UiThemeContext stores preset/mode and supports serialization.
+Olive is an opt-in Light/Dark preset (serialized ID 7; existing IDs 0..6 and
+the Minimal default are unchanged). It uses neutral layered surfaces, green
+emphasis (Dark #b5d7a5, Light #456d3a), amber alerts, unboxed action glyphs,
+36px control and 33px collection-row metrics. Fields use 3px vertical content margins so the same public style also fits compact 30px entry allocations without clipping; applications do not need local inset overrides. These are logical pixels, scaled
+once by DPI. Family-specific metrics still apply: Table rows/headers use 32px.
+Select it with `UiTheme::Set(UiThemePreset::Olive, UiThemeMode::Dark)`.
+Use `UiThemeContext` with existing `Resolve...(context, role)` APIs to obtain
+styles without changing the global theme; Table and RangeSegments also expose
+context overloads. `UiTheme::GetOliveTokens(mode)` returns a value snapshot for
+application shells. `ResolveOlivePalette(mode, role, face, selected)` provides
+the same shared state recipe for host-owned selection. Wash colors are solid
+approximations on the panel surface; blend against the actual host when needed.
+
+Olive's single token/family authority is `Ui/Themes/Olive.h` (included by
+UiTheme; do not include the recipe header directly). It has no application
+dependency or profile selector. Authored tab visuals, range direction/card
+layout, explicit series colors and other structure remain control/host data.
+Fonts participate in UiFonts typography selection; the recipe preserves the
+existing binary weight mapping (600+ becomes Bold). It does not invoke native
+static-weight discovery during resolution. Numeric font-weight verification,
+native visual acceptance and selecting Olive as a library-wide default are
+separate decisions.
+
 
 The theme revision invalidates cached inherited styles. Theme-driven controls
 re-resolve when context changes; explicit custom styles are not overwritten.
@@ -164,12 +208,12 @@ A demo must check actual icons, not just the presence of a generic placeholder.
 StyledShadow supports enabled, distance/offset, alpha/color, inset, hard/curve modes
 and ShadowSoft/Tight/Linear/Gamma recipes. Margins include shadow geometry. Focus
 and highlight use their existing metric contracts. Do not expose an override field
-in PropertyEditor unless the actual paint path consumes it.
+in UiPropertyInspector unless the actual paint path consumes it.
 
 ## Runtime mode changes and validation
 
 Change UiTheme context through its API, update the host's native Light/Dark bridge
-when needed, and refresh the complete shell and PropertyEditor palette. Do not call
+when needed, and refresh the complete shell and UiPropertyInspector palette. Do not call
 SwapDarkLight blindly on every paint or on an unchanged mode. The canonical demo
 shows the explicit host-level transition; reusable controls follow their theme.
 

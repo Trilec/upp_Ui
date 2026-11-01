@@ -2,14 +2,14 @@
   "source_repository": "upp_Ui",
   "version_header": "#ifndef _Ui_UiVersion_h_\n#define _Ui_UiVersion_h_\n\n/*\n    Ui release identity\n    ===================\n    Author: C Edwards (dodobar)\n    License: Apache License 2.0 (see LICENSE).\n\n    One version for the Ui library, not a separate counter for each control.\n    An RC identifier does not certify platform/visual acceptance. Independently\n    versioned sibling packages and serialized-data schemas retain their versions.\n    No GUI dependency; safe to include in build and diagnostic tools.\n*/\n#define UPP_UI_VERSION \"1.0.0-rc.1\"\n\nnamespace Upp {\ninline const char* UiGetVersion() { return UPP_UI_VERSION; }\n}\n\n#endif\n",
   "sha256": {
-    "docs/01_UI_CONTROLS_GUIDE.md": "334edc64a6eb0a0b9708b18e085a1be3279567b63d62aaf98cb12ce33fd5ebca",
-    "docs/02_UI_THEME_GUIDE.md": "920678dc5077da4129516265acf7eac57fc0bc457a3e1802de53196b30181e38",
-    "docs/CONTROL_USAGE.md": "4e2b2346ce0ae590683d6642eeae4c60df233ea84539283523bfa4af5a4dfc7b",
-    "docs/PROJECT_FONTS.md": "8aee057cbd0a38d4bcc07052f05950685e40296a98cbfc73679742ee729acded",
-    "docs/MEDIA_CONTROLS.md": "23cd8ace7106305f134a39ac442425504fa85b60037cde3481d698f7f20a9cec",
-    "docs/UIDOC_AUDIT.md": "b47ca0780cf3b9630038e345e49d747134a479519e1963619c202eefb88f79ae",
+    "docs/01_UI_CONTROLS_GUIDE.md": "0b07e116821d66bbc5e7c03ddae2b9871c2727f46db8c153bd33a4bdd05fe24d",
+    "docs/02_UI_THEME_GUIDE.md": "0bf3c625dfb69612b804eebb4039be1e562ca06490de50626f9e240439164ef2",
+    "docs/CONTROL_USAGE.md": "a108687f2ef9dabfe73b2e6fb4f880bf5025b36a2fe6a3d353dd15ef27c7f912",
+    "docs/PROJECT_FONTS.md": "89a39db3381388260d85ad74b5f3e2ac22c44ab2c5a535a6c391f6cc1516bbcc",
+    "docs/MEDIA_CONTROLS.md": "0a0b25416805cde9b42ce0c7d2bc015951c0b88b427a63523bb7a9b789d82663",
+    "docs/UIDOC_AUDIT.md": "1c6c8832c97f1ea1c0a213941e98ec08ee23996a8a933103a39e252ab56a3581",
     "LICENSE": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
-    "GETTING_STARTED.md": "58f04fe448fa583e82acc62c02bd5e24b519b21e4fc4662553247686374d84a0"
+    "GETTING_STARTED.md": "22aa3c4dae496a41281eeae528a3d2bb718fd6549c16e039cf9e52509b2ab5cd"
   },
   "note": "Working-tree snapshots; headers and examples are resolved in the target checkout."
 }

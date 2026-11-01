@@ -1,4 +1,4 @@
-﻿#include "UiGraphDemo.h"
+#include "UiGraphDemo.h"
 
 namespace Upp {
 namespace {
@@ -288,8 +288,8 @@ UiGraphDemo::UiGraphDemo()
     Sizeable().Zoomable();
     SetRect(0, 0, DPI(1380), DPI(860));
 
-    RegisterPropertyEditorEditors(pe_factory);
-    RegisterPropertyEditorWorkingRangeEditors(pe_factory);
+    RegisterUiPropertyInspectorEditors(pe_factory);
+    RegisterUiPropertyInspectorWorkingRangeEditors(pe_factory);
 
     BuildHeader();
     BuildAuthoringPanel();
@@ -339,7 +339,7 @@ void UiGraphDemo::BuildHeader()
 {
     Add(tc_header);
     tc_header.SetTitle("UiNodeGraph")
-           .SetSubTitle("Model-driven graph, spatially bounded 10,000-node view and live PropertyEditor styling")
+           .SetSubTitle("Model-driven graph, spatially bounded 10,000-node view and live UiPropertyInspector styling")
            .SetMedia(ICON_DESIGN_WIDGETS_48())
            .SetMediaSide(UiAlign::LEFT)
            .SetMediaAlign(UiAlign::CENTER, UiAlign::CENTER)
@@ -440,7 +440,7 @@ void UiGraphDemo::BuildNodeEditorModel()
     pe_model_node.AddText("subtitle", "Subtitle", String(), "Identity");
     pe_model_node.AddMultiline("description", "Description", String(), "Identity").SetExpandedRowSpan(3);
 
-    PropertyEditorItem& shape = pe_model_node.AddChoice("shape", "Shape", "RoundedRectangle", "Presentation");
+    UiPropertyInspectorItem& shape = pe_model_node.AddChoice("shape", "Shape", "RoundedRectangle", "Presentation");
     const char *shape_names[] = {
         "Rectangle", "RoundedRectangle", "Square", "Circle", "Ellipse", "Diamond",
         "Triangle", "Hexagon", "Capsule", "Cloud", "Document", "Database"
@@ -457,9 +457,9 @@ void UiGraphDemo::BuildNodeEditorModel()
                  .AddChoice("Glow", "Glow").AddChoice("Custom", "Custom");
     pe_model_node.AddText("tag", "Tag", String(), "Presentation");
 
-    PropertyEditorItem& x = pe_model_node.Add("x", "X", PropertyEditorKind::Custom, 0.0, "Layout");
-    x.custom_editor = PropertyEditorWorkingRangeDoubleId();
-    x.editor_variant = PropertyEditorWorkingRangeVariant(-1000.0, 1000.0);
+    UiPropertyInspectorItem& x = pe_model_node.Add("x", "X", UiPropertyInspectorKind::Custom, 0.0, "Layout");
+    x.custom_editor = UiPropertyInspectorWorkingRangeDoubleId();
+    x.editor_variant = UiPropertyInspectorWorkingRangeVariant(-1000.0, 1000.0);
     x.step = 1.0;
     x.decimals = 2;
     x.inline_editor = true;
@@ -477,9 +477,9 @@ void UiGraphDemo::BuildNodeEditorModel()
         return minmax(value, lo - span, hi + span);
     };
 
-    PropertyEditorItem& y = pe_model_node.Add("y", "Y", PropertyEditorKind::Custom, 0.0, "Layout");
-    y.custom_editor = PropertyEditorWorkingRangeDoubleId();
-    y.editor_variant = PropertyEditorWorkingRangeVariant(-1000.0, 1000.0);
+    UiPropertyInspectorItem& y = pe_model_node.Add("y", "Y", UiPropertyInspectorKind::Custom, 0.0, "Layout");
+    y.custom_editor = UiPropertyInspectorWorkingRangeDoubleId();
+    y.editor_variant = UiPropertyInspectorWorkingRangeVariant(-1000.0, 1000.0);
     y.step = 1.0;
     y.decimals = 2;
     y.inline_editor = true;
@@ -551,7 +551,7 @@ void UiGraphDemo::BuildStyleEditorModel()
     for(int i = 0; i < 4; i++) {
         int si = GraphDemoStyleIndex(i);
         pe_model_style.Add("face." + String(GraphDemoStateId(i)), labels[i],
-                           PropertyEditorKind::FillRecipe,
+                           UiPropertyInspectorKind::FillRecipe,
                            GraphDemoFillRecipe(base.palette.face[si], White()), "Face");
     }
 
@@ -637,7 +637,7 @@ void UiGraphDemo::ConfigureEditors()
     pe_inspector.SetLabelRatio(39);
     pe_style.SetLabelRatio(39);
 
-    PropertyEditorStyle style = PropertyEditorStyle::System();
+    UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
     style.show_group_summaries = true;
     pe_inspector.SetStyle(style);
     pe_style.SetStyle(style);
@@ -839,12 +839,12 @@ void UiGraphDemo::SyncNodeEditor()
                 double ylo = min(a.y, b.y), yhi = max(a.y, b.y);
                 double xspan = max(1.0, xhi - xlo);
                 double yspan = max(1.0, yhi - ylo);
-                PropertyEditorItem *xi = pe_model_node.Find("x");
-                PropertyEditorItem *yi = pe_model_node.Find("y");
+                UiPropertyInspectorItem *xi = pe_model_node.Find("x");
+                UiPropertyInspectorItem *yi = pe_model_node.Find("y");
                 if(xi)
-                    xi->editor_variant = PropertyEditorWorkingRangeVariant(xlo - xspan, xhi + xspan);
+                    xi->editor_variant = UiPropertyInspectorWorkingRangeVariant(xlo - xspan, xhi + xspan);
                 if(yi)
-                    yi->editor_variant = PropertyEditorWorkingRangeVariant(ylo - yspan, yhi + yspan);
+                    yi->editor_variant = UiPropertyInspectorWorkingRangeVariant(ylo - yspan, yhi + yspan);
             }
         }
         else
@@ -1244,9 +1244,9 @@ void UiGraphDemo::ApplyTheme()
     surface.metrics.face_enabled = surface.metrics.frame_enabled = false;
     for(UiPanel* page : { &pnl_inspector_page, &pnl_style_page, &pnl_code_page, &pnl_diagnostics_page })
         page->SetCustomStyle(surface);
-    for(PropertyEditor* editor : { &pe_inspector, &pe_style }) {
-        editor->SetPaletteMode(dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light);
-        PropertyEditorStyle style = editor->GetStyle();
+    for(UiPropertyInspector* editor : { &pe_inspector, &pe_style }) {
+        editor->SetPaletteMode(dark ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light);
+        UiPropertyInspectorStyle style = editor->GetStyle();
         style.show_frame = false;
         style.background = panel_face;
         style.show_group_summaries = true;

@@ -1,9 +1,9 @@
-description "List and Gallery designer with shared data, PropertyEditor and generated C++";
+description "List and Gallery designer with shared data, UiPropertyInspector and generated C++";
 
 uses
     CtrlLib,
     Ui,
-    Utilities/PropertyEditor;
+    Ui/UiPropertyInspector;
 
 file
     UiCollectionDemo.h,

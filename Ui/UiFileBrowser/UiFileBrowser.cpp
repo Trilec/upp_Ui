@@ -137,8 +137,13 @@ void UiFileBrowser::RebuildShell()
     shell_.Add(navigation_panel_).Fixed(SizePx(38));
     if(mode_ == Mode::Advanced)
     {
-        new_button_.SetText("New ▾");
-        commands_layout_.Add(new_button_).Fit();
+        if(!read_only_)
+        {
+            new_button_.SetText("New ▾");
+            commands_layout_.Add(new_button_).Fit();
+        }
+        else
+            new_button_.Hide();
         for(UiToolButton *button : {&filter_button_, &sequence_button_, &view_button_, &sort_button_})
             commands_layout_.Add(*button).Fit();
         commands_layout_.AddSpacer(1).Expand(1);
@@ -161,16 +166,46 @@ void UiFileBrowser::RebuildShell()
     shell_.Add(header_divider_).Fixed(DPI(2));
     shell_.Add(workspace_).Expand(1).MinMain(DPI(160));
     shell_.Add(scan_progress_).Fixed(DPI(2));
-    shell_.Add(footer_panel_).Fixed(SizePx(48));
+    shell_.Add(footer_panel_).Fixed(SizePx(48)).Visible(show_selection_footer_);
     RefreshModeVisuals();
     RefreshLayout();
+}
+
+UiFileBrowser& UiFileBrowser::ShowSelectionFooter(bool show)
+{
+    show_selection_footer_ = show;
+    RebuildShell();
+    return *this;
+}
+
+UiFileBrowser& UiFileBrowser::SetReadOnly(bool on)
+{
+    if(read_only_ == on)
+        return *this;
+    read_only_ = on;
+    if(read_only_ && options_open_ && options_page_ == OptionsPage::NewItem)
+        CloseOptions();
+    RebuildShell();
+    return *this;
+}
+
+UiFileBrowser& UiFileBrowser::SetPlacesWidth(int logical_pixels)
+{
+    const int width = minmax(logical_pixels, 88, 400);
+    if(places_width_px_ != width)
+    {
+        places_width_px_ = width;
+        RebuildWorkspace();
+        RefreshLayout();
+    }
+    return *this;
 }
 
 void UiFileBrowser::RebuildWorkspace()
 {
     workspace_.ClearItems();
     workspace_.SetGap(0).SetInset(0).SetAlignItems(UiCrossAlign::Stretch);
-    workspace_.Add(places_panel_).Fixed(SizePx(205));
+    workspace_.Add(places_panel_).Fixed(SizePx(places_width_px_));
     if(browser_inspector_.GetCount() == 2)
         inspector_split_ = browser_inspector_.GetSplitPercent();
     browser_inspector_.Clear();
@@ -326,6 +361,9 @@ void UiFileBrowser::PollScan()
 
 void UiFileBrowser::EditAddress(bool edit)
 {
+    if(!edit && !editing_address_)
+        return;
+    editing_address_ = edit;
     address_stack_.SetActiveKey(edit ? "edit" : "crumbs");
     if(edit)
     {
@@ -333,6 +371,41 @@ void UiFileBrowser::EditAddress(bool edit)
         address_edit_.SetFocus();
         address_edit_.SelectAll();
     }
+}
+
+void UiFileBrowser::SubmitAddress()
+{
+    String path = TrimBoth(AsString(address_edit_.GetData()));
+    if(path.GetCount() >= 2 && path[0] == '"' && path[path.GetCount() - 1] == '"')
+        path = path.Mid(1, path.GetCount() - 2);
+    if(path.IsEmpty())
+    {
+        EditAddress(false);
+        return;
+    }
+    // Accept pasted separators from either platform without changing the
+    // SetFolder/scan policy used by history, places and host applications.
+#ifdef PLATFORM_WIN32
+    path.Replace("/", "\\");
+#else
+    path.Replace("\\", "/");
+#endif
+    path = NormalizePath(path, folder_);
+    String destination = path;
+    if(!DirectoryExists(destination))
+    {
+        destination = GetFileFolder(path);
+        // One parent attempt only: never silently climb to a distant ancestor.
+        if(destination.IsEmpty() || SamePath(destination, path) || !DirectoryExists(destination))
+        {
+            auto notify = WhenError;
+            notify("Folder does not exist: " + path);
+            return;
+        }
+    }
+    EditAddress(false);
+    // Navigation callbacks may synchronously destroy this browser.
+    SetFolderInternal(destination, true);
 }
 
 bool UiFileBrowser::Key(dword key, int count)
@@ -1176,6 +1249,20 @@ void UiFileBrowser::HandlePlaceAction()
     String path = AsString(places_.Model().Get(index).data);
     if(!IsNull(places_.Model().Get(index).data) && !path.IsEmpty() && !SamePath(path, folder_))
         SetFolderInternal(path, true);
+}
+
+bool UiFileBrowser::SelectPath(const String& path)
+{
+    if(scanning_) return false;
+    if(path.IsEmpty()) {
+        selected_entry_=-1; selected_frame_=-1;
+        SyncSelectionViews(); RefreshInspector(); RefreshFooter();
+        UiFileBrowserSelection selection;
+        auto notify=WhenSelection; notify(selection); return true;
+    }
+    for(int i=0;i<model_->GetCount();++i)
+        if(SamePath((*model_)[i].path,path)) { SelectEntry(i); return true; }
+    return false;
 }
 
 void UiFileBrowser::SelectEntry(int entry, int frame, bool sync_views)

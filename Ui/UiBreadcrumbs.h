@@ -142,6 +142,8 @@ public:
     virtual void MouseLeave() override;
 
     Event<int> WhenAction;
+    // Empty space or a divider was clicked; item navigation remains WhenAction.
+    Event<> WhenBackgroundAction;
 
 private:
     struct Piece : Moveable<Piece> {

@@ -69,6 +69,8 @@ void UiFileBrowser::CloseOptions()
 
 void UiFileBrowser::OpenOptions(OptionsPage page, Ctrl &anchor)
 {
+    if(read_only_ && page == OptionsPage::NewItem)
+        return;
     bool same = options_open_ && options_page_ == page;
     CloseOptions();
     if(same)
@@ -169,6 +171,11 @@ void UiFileBrowser::RefreshCreationColour()
 
 void UiFileBrowser::CreateItem()
 {
+    if(read_only_)
+    {
+        new_item_error_.SetText("This browser is read-only.");
+        return;
+    }
     UiFileBrowserCreateRequest request;
     request.kind = (UiFileBrowserCreateKind)(int)new_item_kind_.GetData();
     request.name = AsString(new_item_name_.GetData());

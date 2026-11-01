@@ -1,0 +1,31 @@
+description "Ui deterministic non-model control contract tests";
+
+noblitz;
+
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui;
+
+file
+    main.cpp,
+    Accordion.cpp,
+    FrameAccent.cpp,
+    Button.cpp,
+    ColorMatrix.cpp,
+    DateTime.cpp,
+    GroupPanel.cpp,
+    MatrixSelector.cpp,
+    ProgressBar.cpp,
+    ProgressRing.cpp,
+    ChartRing.cpp,
+    RangeSliderEdit.cpp,
+    RangeSlider.cpp,
+    Slider.cpp,
+    Stack.cpp,
+    Tab.cpp;
+
+mainconfig
+    "CONSOLE" = "";

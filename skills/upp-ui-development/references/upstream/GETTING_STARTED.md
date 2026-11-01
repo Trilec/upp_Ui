@@ -10,7 +10,9 @@ The maintainer setup uses Windows, U++18468 and CLANGx64. Keep your established
 compiler/framework version while validating a checkpoint; do not upgrade silently.
 Ui depends on Core, Draw, Painter, CtrlCore, CtrlLib and the external Animation
 package. The checked-in assembly also includes the external upp_statemachine nest.
-Demos using PropertyEditor find its packages under this repository's Utilities path.
+The visual inspector is the `Ui/UiPropertyInspector` package; its independently
+buildable headless model is `Ui/UiPropertyInspector/Core`. Both resolve from the
+repository root nest. Regression packages live under `tests/`, not `utilities/`.
 
 GitHubOut.var contains the maintainer's actual nest and output configuration:
 
@@ -42,7 +44,7 @@ the equivalent nests and an explicit artifact directory. Debug is the default; `
 selects Release and `-b` BLITZ. `-a` is rebuild-all, not a library-link workaround.
 TheIDE users open an assembly with the same nests, select UiLabelDemo and run it.
 
-Ui/Ui.upp and the PropertyEditor packages are libraries with no main entry point.
+Ui/Ui.upp and the UiPropertyInspector packages are libraries with no main entry point.
 A missing main when asking for Ui.exe is a wrong build target, not a missing library
 feature. Real test/demo packages supply GUI_APP_MAIN or CONSOLE_APP_MAIN.
 

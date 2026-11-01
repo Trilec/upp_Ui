@@ -1,0 +1,6 @@
+#ifndef _Ui_UiPropertyInspector_Core_UiPropertyInspectorCore_h_
+#define _Ui_UiPropertyInspector_Core_UiPropertyInspectorCore_h_
+
+#include "UiPropertyInspectorModel.h"
+
+#endif

@@ -164,9 +164,9 @@ anchor distribution, all sides, persistence and export together in a separate ta
 
 ## Workspace ownership and transactions
 
-Utilities/UiGraphWorkspace owns authoring documents, strict JSON, C++ export and
+Ui/UiGraphWorkspace owns authoring documents, strict JSON, C++ export and
 validated document transactions. UiGraphComponentStudio owns dialogs, selection,
-undo and PropertyEditor lifetime. UiNodeGraph alone owns real layout/rendering.
+undo and UiPropertyInspector lifetime. UiNodeGraph alone owns real layout/rendering.
 The workspace is an authoring application, not code that runs per production node.
 
 One named family has Base layout and Base appearance plus eight independently
@@ -188,7 +188,7 @@ available in the table, not invented as visible preview pixels. Diagram inventor
 for every unallocated/hidden component is still an open usability item.
 
 Delete routes to the component command only when structure/diagram/preview has
-focus; text/filter/PropertyEditor keeps its own Delete semantics. Preview deletion
+focus; text/filter/UiPropertyInspector keeps its own Delete semantics. Preview deletion
 must not invoke graph-topology deletion. Undo and inherited-scope rejection remain
 transactional. Palette DND disarms button click state before a modal drag. LOD cells
 do not initiate component moves; horizontal structure scrolling preserves LOD3 hits.
@@ -200,7 +200,7 @@ region/overlay diagrams and **one** production preview; wide hierarchy/placement
 LOD table; right Inspector/Template/Style/C++ pages. V8 HTML is current design input,
 not proof of every native feature or a production API/schema.
 
-Ordinary commits refresh dependent values without destroying the PropertyEditor
+Ordinary commits refresh dependent values without destroying the UiPropertyInspector
 model/selection/filter/scroll/expanded state. A genuine renderer-kind/schema change
 may rebuild under guarded revision/page/selection and reselect the relevant row.
 Typography sits near identity; summaries show actual representation and cause.

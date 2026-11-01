@@ -4,7 +4,7 @@ namespace Upp {
 
 namespace {
 
-void CanonicalizeStateRow(PropertyEditorItem& item, const String& prefix,
+void CanonicalizeStateRow(UiPropertyInspectorItem& item, const String& prefix,
                           const String& group)
 {
     const String token = prefix + ".";
@@ -56,7 +56,7 @@ int CanonicalOrder(const String& id)
     return -1;
 }
 
-void CanonicalizeItem(PropertyEditorItem& item)
+void CanonicalizeItem(UiPropertyInspectorItem& item)
 {
     CanonicalizeStateRow(item, "face", "Face");
     CanonicalizeStateRow(item, "frame", "Frame");
@@ -139,12 +139,12 @@ void UiLabelOverrideModel::StructureChanged()
 {
     int tail_order = 10000;
     for(int i = 0; i < GetCount(); i++) {
-        PropertyEditorItem& item = (*this)[i];
+        UiPropertyInspectorItem& item = (*this)[i];
         CanonicalizeItem(item);
         const int order = CanonicalOrder(item.id);
         item.sort_order = order >= 0 ? order : tail_order++;
     }
-    PropertyEditorModel::StructureChanged();
+    UiPropertyInspectorModel::StructureChanged();
 }
 
 } // namespace Upp

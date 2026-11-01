@@ -1,27 +1,27 @@
 // Self-contained UiEditDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
 
 using namespace Upp;
 
 namespace {
 // Frame Accent is an authored addition to the ordinary frame, not layout padding.
-void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+void AddFrameAccentProperties(UiPropertyInspectorModel& model, const String& prefix,
                               const StyledMetrics& metrics, const String& group)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const char* label[] = { "Top", "Bottom", "Left", "Right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
                          StyledFrameAccent::Left, StyledFrameAccent::Right };
-    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    auto mark = [](UiPropertyInspectorItem& item) { item.SetDefault(item.value); };
     for(int i = 0; i < 4; i++)
         mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
     mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
     mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
     mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
 }
-void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const UiPropertyInspectorModel& model, const String& prefix)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
@@ -40,7 +40,7 @@ void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorMode
     row = model.Find(prefix + "color");
     if(row && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
 }
-void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+void EmitFrameAccentProperties(String& code, const UiPropertyInspectorModel& model, const String& prefix,
                                const String& target, const String& declaration, bool& authored)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
@@ -68,9 +68,9 @@ void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, c
     }
 }
 
-bool HasFrameAccentChanges(const PropertyEditorModel& model)
+bool HasFrameAccentChanges(const UiPropertyInspectorModel& model)
 {
-    for(const PropertyEditorItem& item : model.GetItems())
+    for(const UiPropertyInspectorItem& item : model.GetItems())
         if(item.id.Find(".frame_accent.") >= 0 && item.value != item.default_value) return true;
     return false;
 }
@@ -192,7 +192,7 @@ public:
         context.preset = UiThemePreset::Minimal;
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
         SeedConfigs();
 
         Add(header_);
@@ -266,7 +266,7 @@ public:
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
         properties_.SetLabelRatio(38);
-        PropertyEditorStyle pe_style = PropertyEditorStyle::System();
+        UiPropertyInspectorStyle pe_style = UiPropertyInspectorStyle::System();
         pe_style.show_group_summaries = true;
         properties_.SetStyle(pe_style);
 
@@ -352,7 +352,7 @@ public:
         code_mode_.SelectByData("explicit"); UpdateCode();
         SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_LINE_explicit.cpp"), code_.GetTextUtf8());
         {
-        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        if(UiPropertyInspectorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
         static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
         for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
         if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
@@ -369,7 +369,7 @@ public:
         code_mode_.SelectByData("explicit"); UpdateCode();
         SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_PASSWORD_explicit.cpp"), code_.GetTextUtf8());
         {
-        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        if(UiPropertyInspectorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
         static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
         for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
         if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
@@ -386,7 +386,7 @@ public:
         code_mode_.SelectByData("explicit"); UpdateCode();
         SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MASK_explicit.cpp"), code_.GetTextUtf8());
         {
-        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        if(UiPropertyInspectorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
         static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
         for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
         if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
@@ -403,7 +403,7 @@ public:
         code_mode_.SelectByData("explicit"); UpdateCode();
         SaveFile(AppendFileName(directory, "UiEditDemo_EDIT_MULTI_explicit.cpp"), code_.GetTextUtf8());
         {
-        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        if(UiPropertyInspectorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
         static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
         for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
         if(selected_ == EDIT_MULTI) { model_.SetValue("multi_left_icon", true, false); model_.SetValue("multi_clear_action", true, false); }
@@ -415,7 +415,7 @@ public:
     }
 
 private:
-    PropertyEditorItem& Resettable(PropertyEditorItem& item)
+    UiPropertyInspectorItem& Resettable(UiPropertyInspectorItem& item)
     {
         item.SetDefault(item.value);
         return item;
@@ -423,13 +423,13 @@ private:
 
     Value Get(const char *id) const
     {
-        const PropertyEditorItem *item = model_.Find(id);
+        const UiPropertyInspectorItem *item = model_.Find(id);
         return item ? item->value : Value();
     }
 
     bool Changed(const char *id) const
     {
-        const PropertyEditorItem *item = model_.Find(id);
+        const UiPropertyInspectorItem *item = model_.Find(id);
         return item && item->value != item->default_value;
     }
 
@@ -528,28 +528,28 @@ private:
         model_.Find("metrics.frame_accent.thickness")->default_value = defaults.frame_accent.thickness;
         model_.Find("metrics.frame_accent.alpha")->default_value = defaults.frame_accent.alpha;
         model_.Find("metrics.frame_accent.color")->default_value = defaults.frame_accent.color;
-        if(PropertyEditorItem* item = model_.Find("block_caret")) item->default_value = defaults.block_caret;
-        if(PropertyEditorItem* item = model_.Find("caret")) item->default_value = defaults.caret;
-        if(PropertyEditorItem* item = model_.Find("caret_width")) item->default_value = defaults.caret_width;
-        if(PropertyEditorItem* item = model_.Find("face")) item->default_value = defaults.face;
-        if(PropertyEditorItem* item = model_.Find("font_height")) item->default_value = defaults.font_height;
-        if(PropertyEditorItem* item = model_.Find("frame")) item->default_value = defaults.frame;
-        if(PropertyEditorItem* item = model_.Find("frame_width")) item->default_value = defaults.frame_width;
-        if(PropertyEditorItem* item = model_.Find("ink")) item->default_value = defaults.ink;
-        if(PropertyEditorItem* item = model_.Find("margin_x")) item->default_value = defaults.margin_x;
-        if(PropertyEditorItem* item = model_.Find("margin_y")) item->default_value = defaults.margin_y;
-        if(PropertyEditorItem* item = model_.Find("placeholder_ink")) item->default_value = defaults.placeholder_ink;
-        if(PropertyEditorItem* item = model_.Find("radius")) item->default_value = defaults.radius;
-        if(PropertyEditorItem* item = model_.Find("selection_face")) item->default_value = defaults.selection_face;
-        if(PropertyEditorItem* item = model_.Find("selection_ink")) item->default_value = defaults.selection_ink;
-        if(PropertyEditorItem* item = model_.Find("show_line_endings")) item->default_value = defaults.show_line_endings;
-        if(PropertyEditorItem* item = model_.Find("show_spaces")) item->default_value = defaults.show_spaces;
-        if(PropertyEditorItem* item = model_.Find("show_tabs")) item->default_value = defaults.show_tabs;
-        if(PropertyEditorItem* item = model_.Find("tab_size")) item->default_value = defaults.tab_size;
-        if(PropertyEditorItem* item = model_.Find("text_align")) item->default_value = defaults.text_align;
-        if(PropertyEditorItem* item = model_.Find("underline")) item->default_value = defaults.underline;
-        if(PropertyEditorItem* item = model_.Find("underline_enabled")) item->default_value = defaults.underline_enabled;
-        if(PropertyEditorItem* item = model_.Find("underline_width")) item->default_value = defaults.underline_width;
+        if(UiPropertyInspectorItem* item = model_.Find("block_caret")) item->default_value = defaults.block_caret;
+        if(UiPropertyInspectorItem* item = model_.Find("caret")) item->default_value = defaults.caret;
+        if(UiPropertyInspectorItem* item = model_.Find("caret_width")) item->default_value = defaults.caret_width;
+        if(UiPropertyInspectorItem* item = model_.Find("face")) item->default_value = defaults.face;
+        if(UiPropertyInspectorItem* item = model_.Find("font_height")) item->default_value = defaults.font_height;
+        if(UiPropertyInspectorItem* item = model_.Find("frame")) item->default_value = defaults.frame;
+        if(UiPropertyInspectorItem* item = model_.Find("frame_width")) item->default_value = defaults.frame_width;
+        if(UiPropertyInspectorItem* item = model_.Find("ink")) item->default_value = defaults.ink;
+        if(UiPropertyInspectorItem* item = model_.Find("margin_x")) item->default_value = defaults.margin_x;
+        if(UiPropertyInspectorItem* item = model_.Find("margin_y")) item->default_value = defaults.margin_y;
+        if(UiPropertyInspectorItem* item = model_.Find("placeholder_ink")) item->default_value = defaults.placeholder_ink;
+        if(UiPropertyInspectorItem* item = model_.Find("radius")) item->default_value = defaults.radius;
+        if(UiPropertyInspectorItem* item = model_.Find("selection_face")) item->default_value = defaults.selection_face;
+        if(UiPropertyInspectorItem* item = model_.Find("selection_ink")) item->default_value = defaults.selection_ink;
+        if(UiPropertyInspectorItem* item = model_.Find("show_line_endings")) item->default_value = defaults.show_line_endings;
+        if(UiPropertyInspectorItem* item = model_.Find("show_spaces")) item->default_value = defaults.show_spaces;
+        if(UiPropertyInspectorItem* item = model_.Find("show_tabs")) item->default_value = defaults.show_tabs;
+        if(UiPropertyInspectorItem* item = model_.Find("tab_size")) item->default_value = defaults.tab_size;
+        if(UiPropertyInspectorItem* item = model_.Find("text_align")) item->default_value = defaults.text_align;
+        if(UiPropertyInspectorItem* item = model_.Find("underline")) item->default_value = defaults.underline;
+        if(UiPropertyInspectorItem* item = model_.Find("underline_enabled")) item->default_value = defaults.underline_enabled;
+        if(UiPropertyInspectorItem* item = model_.Find("underline_width")) item->default_value = defaults.underline_width;
         model_.StructureChanged();
         properties_.RefreshModel();
     }
@@ -782,7 +782,7 @@ private:
             UpdateCode();
         };
         properties_.WhenReset = [=](String id) {
-            PropertyEditorItem *item = model_.Find(id);
+            UiPropertyInspectorItem *item = model_.Find(id);
             if(item && item->resettable) {
                 model_.SetValue(id, item->default_value);
                 PullConfig(selected_);
@@ -1043,7 +1043,7 @@ private:
 
     void UpdatePropertyPage()
     {
-        for(const PropertyEditorItem& item : model_.GetItems())
+        for(const UiPropertyInspectorItem& item : model_.GetItems())
             model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
         model_.StructureChanged();
     }
@@ -1078,11 +1078,11 @@ private:
 
 
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         properties_.SetPaletteMode(mode);
 
-        for(PropertyEditor* editor : { &properties_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &properties_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -1129,8 +1129,8 @@ private:
     EditConfig cfg_[EDIT_COUNT];
     EditSample selected_ = EDIT_LINE;
 
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
     UiToolButton theme_button_, help_button_, exit_button_;
@@ -1146,7 +1146,7 @@ private:
 
     UiBoxLayout view_bar_ { UiDirection::H };
     UiToolButton props_button_, overrides_button_, code_button_;
-    PropertyEditor properties_;
+    UiPropertyInspector properties_;
     UiDropdown code_mode_;
     UiMultiEdit code_;
     bool code_view_ = false;

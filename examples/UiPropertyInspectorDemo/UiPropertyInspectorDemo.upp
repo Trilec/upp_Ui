@@ -1,0 +1,17 @@
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui,
+    Ui/UiOsFileDialog,
+    Ui/UiPropertyInspector,
+    plugin/png,
+    plugin/jpg,
+    plugin/bmp;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "GUI";

@@ -54,6 +54,8 @@ enabled.SetOn(true);
 UiBreadcrumbs represents a path, with stable payloads on individual crumbs when
 navigation needs more than display text. The current index is separate from the
 host's navigation operation.
+`WhenAction(index)` handles crumb activation; `WhenBackgroundAction()` handles
+clicks on dividers or unused space without inventing a negative item index.
 
 ```cpp
 UiBreadcrumbs path;
@@ -325,6 +327,9 @@ UiStack owns exclusive page visibility; keys are useful for host navigation.
 UiTab adds a visible tab strip around that page-selection behavior. UiAccordion
 owns collapsible sections; populate each section's content parent. Parent children
 must outlive the host binding, and hidden pages must not be shown by another layout.
+Accordion content is laid out inside the body surface's frame, padding and shadow.
+Filling children (`SizePos` / `VSizePos`) contribute their intrinsic height and
+anchor insets to Fit measurement; their previous allocation is not a minimum.
 
 ```cpp
 UiStack pages;
@@ -411,6 +416,33 @@ table.Model().SetCellValue(0, 0, "Shot 010");
 table.SetRowHeight(DPI(28)).SetHeaderHeight(DPI(30));
 ```
 
+## Property inspection
+
+UiPropertyInspector is an optional production package. Add
+`Ui/UiPropertyInspector` to the package's `uses` list and include
+`<Ui/UiPropertyInspector/UiPropertyInspector.h>` explicitly. The constructor
+registers the standard value adapters. Declare the model before the control to
+keep its borrowed binding alive; the host owns undo, persistence and resources.
+
+```cpp
+UiPropertyInspectorModel properties; // Outlives the inspector's binding.
+UiPropertyInspector inspector;
+properties.AddText("title", "Title", "Aurora", "General");
+properties.AddNumericInt("takes", "Takes", 3, 1, 10, 1, "General");
+properties.AddBoolean("enabled", "Enabled", true, "General");
+inspector.SetModel(&properties);
+inspector.SetPaletteMode(UiPropertyInspectorPaletteMode::FollowUiTheme);
+```
+
+Connect `WhenPreview`, `WhenCommit` and `WhenCancel` to the host's transient,
+durable and rollback paths. Detach with `SetModel(nullptr)` before destroying a
+borrowed model ahead of its inspector. Headless callers use the separate
+`Ui/UiPropertyInspector/Core` dependency and
+`<Ui/UiPropertyInspector/Core/UiPropertyInspectorCore.h>`. See the
+[inspector guide](05_UI_PROPERTY_EDITOR_GUIDE.md) and
+[UiPropertyInspectorDemo](../examples/UiPropertyInspectorDemo) for the full
+schema, custom editor/provider and inherited-value contracts.
+
 ## Curves, documents and graphs
 
 UiBezierCurveEditor edits a ShadowCurve. UiBezierCurveField adds formula/copy
@@ -445,6 +477,10 @@ UiFileBrowser is an embeddable browser with asynchronous scanning and host-drive
 accept/cancel callbacks. Declare a direct dependency on `Ui/UiFileBrowser` and
 include `<Ui/UiFileBrowser/UiFileBrowser.h>`; the base Ui package does not pull it
 in. The host supplies a real folder path and decides what acceptance does.
+
+Click the current breadcrumb or empty address-bar space (or press Ctrl+L) to
+paste a folder path. Enter accepts either slash style and tries the immediate
+parent once if the directory is missing. Escape cancels path editing.
 
 ```cpp
 UiFileBrowser browser;

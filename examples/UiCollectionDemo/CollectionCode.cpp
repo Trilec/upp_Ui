@@ -23,7 +23,7 @@ String CppColor(Color value)
     return IsNull(value) ? String("Null") : Format("Color(%d, %d, %d)", value.GetR(), value.GetG(), value.GetB());
 }
 
-void ApplySurface(StyledPalette& palette, StyledMetrics& metrics, const PropertyEditorModel& model)
+void ApplySurface(StyledPalette& palette, StyledMetrics& metrics, const UiPropertyInspectorModel& model)
 {
     auto active = [&](const char* id) { const auto* item = model.Find(id); return item && item->override_active; };
     auto value = [&](const char* id) { return model.Find(id)->value; };
@@ -296,11 +296,11 @@ bool UiCollectionDemo::RunAcceptance(const String& directory)
     override_model.Find("surface.face.normal")->override_active = true;
     override_model.SetValue("surface.face.normal", Color(24, 40, 70));
             for(int accent_index = 0; accent_index < override_model.GetCount(); accent_index++) {
-                PropertyEditorItem& row = override_model[accent_index];
+                UiPropertyInspectorItem& row = override_model[accent_index];
                 if(row.id.Find("frame_accent.") < 0) continue;
                 row.override_active = true;
-                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
-                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                if(row.kind == UiPropertyInspectorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == UiPropertyInspectorKind::Color) row.value = Color(45, 110, 180);
                 else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
                 else if(row.id.EndsWith(".alpha")) row.value = 190;
             }

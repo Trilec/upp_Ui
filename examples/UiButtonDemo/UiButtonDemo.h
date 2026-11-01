@@ -15,16 +15,16 @@
     - Interactive, self-contained UiButton reference and style builder.
 
     Features
-    - Uses the same demo shell and production PropertyEditor architecture as
+    - Uses the same demo shell and production UiPropertyInspector architecture as
       UiLabelDemo.
     - Demonstrates the real UiButton content, icon, alignment, checkable,
       focus, sizing and underline APIs.
     - Exposes the live themed appearance as explicit opt-in local overrides,
-      grouped by the canonical PropertyEditor override layout.
-    - Generates copyable U++ from the same authored PropertyEditor state.
+      grouped by the canonical UiPropertyInspector override layout.
+    - Generates copyable U++ from the same authored UiPropertyInspector state.
 
     Design
-    - PropertyEditor models are the single authored configuration state.
+    - UiPropertyInspector models are the single authored configuration state.
     - The preview is the real UiButton and retains normal mouse/keyboard
       interaction.
     - Theme rows remain inherited until their override action is enabled.
@@ -32,8 +32,8 @@
 */
 
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 namespace Upp {
 
@@ -58,10 +58,10 @@ private:
     void GenerateSplitCode();
     void GenerateToolCode();
     void SelectKind(int kind);
-    PropertyEditorModel& InspectorModel();
-    PropertyEditorModel& OverrideModel();
-    const PropertyEditorModel& InspectorModel() const;
-    const PropertyEditorModel& OverrideModel() const;
+    UiPropertyInspectorModel& InspectorModel();
+    UiPropertyInspectorModel& OverrideModel();
+    const UiPropertyInspectorModel& InspectorModel() const;
+    const UiPropertyInspectorModel& OverrideModel() const;
     void BuildPreview();
     void BuildRightRail();
     void BuildInspectorModel();
@@ -77,7 +77,7 @@ private:
     void SelectPage(int page);
     void ToggleTheme();
 
-    void ResetProperty(PropertyEditorModel& model, const String& id);
+    void ResetProperty(UiPropertyInspectorModel& model, const String& id);
     void SetOverrideActive(const String& id, bool active);
     bool PickImage(Value& value, Ctrl *owner);
     Image LoadImageValue(const Value& value) const;
@@ -86,10 +86,10 @@ private:
     Value OverrideValue(const String& id) const;
     bool OverrideActive(const String& id) const;
 
-    PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_inspector;
-    PropertyEditorModel pe_model_override;
-    PropertyEditorModel split_inspector,split_overrides,tool_inspector,tool_overrides;
+    UiPropertyInspectorFactory pe_factory;
+    UiPropertyInspectorModel pe_model_inspector;
+    UiPropertyInspectorModel pe_model_override;
+    UiPropertyInspectorModel split_inspector,split_overrides,tool_inspector,tool_overrides;
     UiTitleCard tc_header;
     UiBoxLayout box_header_actions { UiDirection::H };
     UiToolButton btn_theme, btn_help, btn_exit;
@@ -108,7 +108,7 @@ private:
     UiToolButton btn_inspector_mode, btn_overrides_mode, btn_code_mode;
     UiStack stk_right_pages;
     UiPanel pnl_inspector_page, pnl_overrides_page, pnl_code_page;
-    PropertyEditor pe_inspector, pe_overrides;
+    UiPropertyInspector pe_inspector, pe_overrides;
     UiMultiEdit edit_generated_code;
     UiToolButton btn_copy_code;
 

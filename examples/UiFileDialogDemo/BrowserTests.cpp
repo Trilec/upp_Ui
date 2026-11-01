@@ -42,12 +42,16 @@ struct UiFileBrowserTest
         browser.SetFolder(root);
         wait();
         check(browser.GetEntryCount() == 7, "browser consumes grouped scan result");
-        // Sidebar rows must contain the renderer's native text metrics, including
-        // Windows font faces/densities whose glyph height exceeds the requested em.
+        // Native text metrics and inherited theme padding must fit in both
+        // sidebar rows and column headings, including compact Olive tables.
         const UiThemeContext saved_font_theme = UiTheme::GetContext();
+        const auto saved_browser_mode = browser.GetMode();
+        browser.SetMode(UiFileBrowser::Mode::Simple);
+        for(auto preset : {UiThemePreset::Minimal, UiThemePreset::Olive})
         for(auto mode : {UiThemeMode::Light, UiThemeMode::Dark})
         {
             UiThemeContext context = saved_font_theme;
+            context.preset = preset;
             context.mode = mode;
             UiTheme::Set(context);
             for(const char *face : {"Segoe UI", "Tahoma"})
@@ -68,12 +72,38 @@ struct UiFileBrowserTest
                             render.PrepareLayout(RectC(0, 0, DPI(600), style.row_height), UiDirection::H);
                             fits &= render.GetContentSize().cy <= render.GetBounds().GetHeight();
                         }
-                        check(fits, Format("Places glyphs fit: %s %d density %d mode %d",
-                                           face, height, int(density), int(mode)));
+                        check(fits, Format("Places glyphs fit: %s %d density %d mode %d preset %d",
+                                           face, height, int(density), int(mode), int(preset)));
+                        const auto &table_style = browser.table_.GetStyle();
+                        bool headings_fit = true;
+                        for(int col = 0; col < browser.table_model_.GetColumnCount(); ++col)
+                        {
+                            One<UiItemRender> render = browser.table_.GetHeaderRender().Clone();
+                            const auto &header = browser.table_model_.GetHeader(UITABLE_COLUMN_AXIS, col);
+                            render->SetData(UiMakeItemRenderData(header, header.text));
+                            render->PrepareLayout(RectC(0, 0, DPI(600), table_style.header_height),
+                                                  UiDirection::H);
+                            headings_fit &= render->GetContentSize().cy <= table_style.header_height;
+                        }
+                        check(headings_fit, Format("Column headings fit: %s %d density %d mode %d preset %d",
+                                                   face, height, int(density), int(mode), int(preset)));
+                        if(String(face) == "Segoe UI" && height == 13 &&
+                           density == UiFileBrowser::ViewSize::Small)
+                        {
+                            Ctrl::ProcessEvents();
+                            ImageDraw heading_draw(Size(max(1, browser.table_.GetSize().cx),
+                                                        table_style.header_height + DPI(8)));
+                            browser.table_.DrawCtrl(heading_draw);
+                            check(PNGEncoder().SaveFile(report + Format("-headings-%s-%s.png",
+                                      preset == UiThemePreset::Olive ? "olive" : "minimal",
+                                      mode == UiThemeMode::Light ? "light" : "dark"), heading_draw),
+                                  "Native column-heading capture saved");
+                        }
                     }
         }
         UiTheme::Set(saved_font_theme);
         browser.UseThemeFont().SetViewSize(UiFileBrowser::ViewSize::Medium);
+        browser.SetMode(saved_browser_mode);
         for(const auto &entry : browser.model_->Entries())
             if(entry.friendly_name == "010_020_comp_v012")
             {
@@ -1022,6 +1052,108 @@ struct UiFileBrowserTest
                   browser.preview_image_.GetIcon().IsEmpty(),
               "Folder refresh clears stale preview and cancels its debounce/poll timers");
         wait();
+        // Address navigation uses the real owned controls and existing empty
+        // fixture folders. A failed leaf may fall back exactly one level.
+        const String address_root = NormalizePath(root);
+        const String address_precomp = NormalizePath(AppendFileName(root, "precomp"));
+        const String address_archive = NormalizePath(AppendFileName(root, "archive"));
+        browser.breadcrumbs_.LeftDown(Point(browser.breadcrumbs_.GetSize().cx - 2,
+                                           browser.breadcrumbs_.GetSize().cy / 2), 0);
+        int64 address_low = 0, address_high = 0;
+        check(browser.editing_address_ && browser.address_edit_.HasFocus() &&
+                  browser.address_edit_.GetSelection(address_low, address_high) && address_low == 0 &&
+                  address_high == AsString(browser.address_edit_.GetData()).GetCount(),
+              "Clicking the address bar focuses and selects its complete editable path");
+        String slash_path = address_precomp;
+        slash_path.Replace("\\", "/");
+        browser.address_edit_.SetData(slash_path);
+        browser.address_edit_.Key(K_ENTER, 1);
+        wait();
+        check(browser.GetFolder() == address_precomp && !browser.editing_address_,
+              "Enter navigates a forward-slash path and restores breadcrumbs");
+        browser.breadcrumbs_.WhenAction(browser.breadcrumbs_.GetCount() - 1);
+        check(browser.editing_address_, "Clicking the current crumb opens path editing");
+        browser.address_edit_.SetData("..\\archive");
+        browser.address_edit_.Key(K_ENTER, 1);
+        wait();
+        check(browser.GetFolder() == address_archive, "Backslash relative paths resolve from the current folder");
+        browser.EditAddress(true);
+        String quoted_path = address_precomp;
+        quoted_path.Replace("/", "\\");
+        browser.address_edit_.SetData("  \"" + quoted_path + "\"  ");
+        browser.address_edit_.Key(K_ENTER, 1);
+        wait();
+        check(browser.GetFolder() == address_precomp, "Quoted pasted paths accept Windows separators");
+        int address_errors = 0, address_changes = 0, address_cancels = 0;
+        browser.WhenError = [&](const String&) { ++address_errors; };
+        browser.WhenFolderChanged = [&](const String&) { ++address_changes; };
+        browser.WhenCancel = [&] { ++address_cancels; };
+        browser.EditAddress(true);
+        browser.address_edit_.SetData(AppendFileName(address_archive, "missing-address-leaf"));
+        browser.address_edit_.Key(K_ENTER, 1);
+        wait();
+        check(browser.GetFolder() == address_archive && address_changes == 1 && address_errors == 0,
+              "Missing leaf navigates once to its existing immediate parent");
+        const int address_history = browser.history_.GetCount();
+        browser.EditAddress(true);
+        browser.address_edit_.SetData(AppendFileName(address_root, "missing-address-parent/missing-leaf"));
+        browser.address_edit_.Key(K_ENTER, 1);
+        check(browser.GetFolder() == address_archive && browser.history_.GetCount() == address_history &&
+                  address_changes == 1 && address_errors == 1 && browser.editing_address_,
+              "Missing parent stops without climbing further, scanning or adding history");
+        browser.address_edit_.Key(K_ESCAPE, 1);
+        check(!browser.editing_address_ && address_cancels == 0,
+              "Escape from the actual path field cancels editing rather than the browser");
+        browser.EditAddress(true);
+        browser.address_edit_.SetData("unsubmitted path");
+        browser.table_.SetFocus();
+        check(!browser.editing_address_ && browser.GetFolder() == address_archive,
+              "Losing path focus restores breadcrumbs without navigation");
+        browser.breadcrumbs_.WhenAction(browser.breadcrumbs_.GetCount() - 2);
+        wait();
+        check(browser.GetFolder() == address_root && !browser.editing_address_,
+              "Ancestor breadcrumbs retain direct folder navigation");
+        browser.WhenError.Clear();
+        browser.WhenFolderChanged.Clear();
+        browser.WhenCancel.Clear();
+        // CineRig workbench requires a genuinely read-only embedded browser.
+        // Test BOTH presentation and the actual create/popup execution seams.
+        const String protected_name = "read-only-do-not-create";
+        const String protected_path = AppendFileName(root, protected_name);
+        check(!FileExists(protected_path),
+              "Read-only guard test starts with absent target");
+        browser.SetMode(UiFileBrowser::Mode::Advanced);
+        browser.SetReadOnly(true);
+        Ctrl::ProcessEvents();
+        check(browser.IsReadOnly() && !browser.new_button_.IsShown(),
+              "Read-only advanced mode hides the New command");
+        browser.OpenOptions(UiFileBrowser::OptionsPage::NewItem, browser.new_button_);
+        check(!browser.options_open_,
+              "Read-only guard refuses direct New popup request");
+        browser.new_item_kind_.SelectByData(1);
+        browser.new_item_name_.SetData(protected_name);
+        browser.CreateItem();
+        check(!FileExists(protected_path) &&
+                  browser.new_item_error_.GetText().Find("read-only") >= 0,
+              "Read-only create handler rejects output without touching disk");
+        browser.SetMode(UiFileBrowser::Mode::Simple);
+        Ctrl::ProcessEvents();
+        check(browser.IsReadOnly() && !browser.new_button_.IsShown(),
+              "Read-only simple mode also hides New command");
+        const int old_places = browser.GetPlacesWidth();
+        browser.SetPlacesWidth(108);
+        Ctrl::ProcessEvents();
+        check(browser.GetPlacesWidth() == 108 &&
+                  NormalizePath(browser.GetFolder()) == NormalizePath(root),
+              "Compact Places lane preserves navigation state");
+        browser.SetPlacesWidth(old_places);
+        browser.SetReadOnly(false);
+        browser.SetMode(UiFileBrowser::Mode::Advanced);
+        Ctrl::ProcessEvents();
+        check(!browser.IsReadOnly() && browser.new_button_.IsShown(),
+              "Leaving read-only restores the standard creation UI");
+        check(!FileExists(protected_path),
+              "Read-only guards did not create protected test output");
         window.Close();
         UiFileBrowserDialog dialog;
         dialog.SetTimeCallback(100, [&] { dialog.browser_.cancel_button_.WhenAction(); });

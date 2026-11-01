@@ -137,13 +137,13 @@ self-containment. Enter/Exit changes the view's active scope, not topology.
 
 UiGraphDemo remains the general graph/10k reference; UiGraphHierarchyDemo teaches
 scope hierarchy. UiGraphComponentStudio is the current single-preview family/node
-workspace with real PropertyEditor, diagrams, structure/LOD table, files and C++.
+workspace with real UiPropertyInspector, diagrams, structure/LOD table, files and C++.
 DesignMatrix is retired, not another active editor.
 
 Workspace files are authoring interchange, not runtime layout programs. Base layout
 and appearance inherit independently into eight shapes. Explicit detach creates a
 section snapshot. Inherited sections are read-only; selecting a shape alone does
-not author an override. The generated C++ has no workspace/PropertyEditor dependency.
+not author an override. The generated C++ has no workspace/UiPropertyInspector dependency.
 
 Use node data/provider hooks for application tags, thumbnails and status rather
 than universal graph fields. Declare extension paint/hit bounds before painting

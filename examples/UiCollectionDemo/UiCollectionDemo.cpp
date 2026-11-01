@@ -3,13 +3,13 @@
 namespace Upp {
 namespace {
 
-PropertyEditorItem& Authored(PropertyEditorItem& item)
+UiPropertyInspectorItem& Authored(UiPropertyInspectorItem& item)
 {
     item.SetDefault(item.value);
     return item;
 }
 
-PropertyEditorItem& LocalOverride(PropertyEditorItem& item)
+UiPropertyInspectorItem& LocalOverride(UiPropertyInspectorItem& item)
 {
     Authored(item);
     item.overrideable = true;
@@ -37,7 +37,7 @@ UiCollectionDemo::UiCollectionDemo()
     Title("List + Gallery Designer");
     Sizeable().Zoomable();
     SetRect(0, 0, DPI(1340), DPI(820));
-    RegisterPropertyEditorEditors(factory);
+    RegisterUiPropertyInspectorEditors(factory);
     BuildShell();
     BuildProperties();
     BuildData((int)Config("count"));
@@ -125,10 +125,10 @@ void UiCollectionDemo::BuildShell()
     pnl_code.Add(edit_code.HSizePos(4, 4).VSizePos(DPI(42), 4));
     btn_copy.SetIcon(ICON_CONTENT_CONTENT_COPY_48()).SetIconSize(DPI(16), DPI(16)).Tip("Copy configuration C++");
     edit_code.SetReadOnly();
-    for(PropertyEditor* editor : { &pe_inspector, &pe_overrides, &pe_data }) {
+    for(UiPropertyInspector* editor : { &pe_inspector, &pe_overrides, &pe_data }) {
         editor->SetFactory(&factory);
         editor->SetLabelRatio(48);
-        PropertyEditorStyle style = PropertyEditorStyle::System();
+        UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
         style.show_group_summaries = true;
         editor->SetStyle(style);
     }
@@ -258,17 +258,17 @@ void UiCollectionDemo::BuildProperties()
 
 Value UiCollectionDemo::Config(const String& id) const
 {
-    const PropertyEditorItem* item = inspector_model.Find(id);
+    const UiPropertyInspectorItem* item = inspector_model.Find(id);
     return item ? item->value : Value();
 }
 Value UiCollectionDemo::Override(const String& id) const
 {
-    const PropertyEditorItem* item = override_model.Find(id);
+    const UiPropertyInspectorItem* item = override_model.Find(id);
     return item ? item->value : Value();
 }
 bool UiCollectionDemo::Active(const String& id) const
 {
-    const PropertyEditorItem* item = override_model.Find(id);
+    const UiPropertyInspectorItem* item = override_model.Find(id);
     return item && item->override_active;
 }
 bool UiCollectionDemo::AnyOverride(const String& prefix) const
@@ -363,9 +363,9 @@ void UiCollectionDemo::ConnectEvents()
     };
 }
 
-void UiCollectionDemo::Reset(PropertyEditorModel& properties, const String& id)
+void UiCollectionDemo::Reset(UiPropertyInspectorModel& properties, const String& id)
 {
-    PropertyEditorItem* item = properties.Find(id);
+    UiPropertyInspectorItem* item = properties.Find(id);
     if(item->overrideable) item->override_active = false;
     properties.Reset(id);
     properties.ValueChanged(id);
@@ -462,7 +462,7 @@ void UiCollectionDemo::InspectItem(int index)
     for(const auto& row : data_model.GetItems())
         data_model.SetEnabled(row.id, valid || row.id == "index");
     btn_remove.Enable(valid);
-    if(PropertyEditorItem* row = data_model.Find("index")) row->SetRange(0, max(0, model.GetCount() - 1), 1);
+    if(UiPropertyInspectorItem* row = data_model.Find("index")) row->SetRange(0, max(0, model.GetCount() - 1), 1);
     if(valid) {
         const UiModelItem& item = model.Get(data_index);
         data_model.SetValue("index", data_index);
@@ -530,10 +530,10 @@ void UiCollectionDemo::ApplyTheme()
     page_style.metrics.face_enabled = page_style.metrics.frame_enabled = false;
     for(UiPanel* panel : { &pnl_inspector, &pnl_overrides, &pnl_data, &pnl_code })
         panel->SetCustomStyle(page_style);
-    PropertyEditorPaletteMode mode = UiTheme::GetContext().mode == UiThemeMode::Dark ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
-    for(PropertyEditor* editor : { &pe_inspector, &pe_overrides, &pe_data }) {
+    UiPropertyInspectorPaletteMode mode = UiTheme::GetContext().mode == UiThemeMode::Dark ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
+    for(UiPropertyInspector* editor : { &pe_inspector, &pe_overrides, &pe_data }) {
         editor->SetPaletteMode(mode);
-        PropertyEditorStyle editor_style = editor->GetStyle();
+        UiPropertyInspectorStyle editor_style = editor->GetStyle();
         editor_style.show_frame = false;
         editor_style.background = panel_face;
         editor_style.show_group_summaries = true;

@@ -4,8 +4,8 @@
 #include <Ui/Ui.h>
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
 #include <Ui/UiFileBrowser/UiFileBrowser.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 #include <plugin/png/png.h>
 #include "BrowserChecks.h"
 
@@ -14,8 +14,8 @@ using namespace Upp;
 namespace {
 class Demo : public TopWindow {
     enum Backend { Browser, Native, UppChooser };
-    PropertyEditorFactory factory_;
-    PropertyEditorModel models_[3];
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel models_[3];
     Backend backend_ = Browser;
     bool scan_browser_;
     UiTitleCard header_;
@@ -23,14 +23,14 @@ class Demo : public TopWindow {
     UiToolButton theme_, help_, exit_, inspector_mode_, code_mode_, copy_;
     UiPanel preview_, right_, inspector_page_, code_page_;
     UiStack pages_;
-    PropertyEditor inspector_;
+    UiPropertyInspector inspector_;
     UiMultiEdit code_, result_;
     UiButton backend_buttons_[3], launch_;
     UiLabel caption_;
     UiFileBrowser browser_;
     Color window_face_ = SColorFace();
 
-    PropertyEditorModel& Model() { return models_[backend_]; }
+    UiPropertyInspectorModel& Model() { return models_[backend_]; }
     Value ValueOf(const String& id) const {
         const auto* item = models_[backend_].Find(id);
         return item ? item->value : Value();
@@ -158,7 +158,7 @@ public:
     Demo(bool scan_browser = true) : scan_browser_(scan_browser) {
         Title("UiFileDialog Demo").Sizeable().Zoomable();
         SetRect(0, 0, DPI(1520), DPI(880));
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
         BuildModels();
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("UiFileDialog").SetSubTitle("File and folder selection: Ui browser, OS native and original U++")
@@ -401,10 +401,10 @@ void Demo::ApplyTheme()
     for(UiLabel* label : { &caption_ })
         label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
     const auto mode = dark
-                    ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                    ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
     inspector_.SetPaletteMode(mode);
-    for(PropertyEditor* editor : { &inspector_ }) {
-        PropertyEditorStyle editor_style = editor->GetStyle();
+    for(UiPropertyInspector* editor : { &inspector_ }) {
+        UiPropertyInspectorStyle editor_style = editor->GetStyle();
         editor_style.show_frame = false;
         editor_style.background = panel_face;
         editor_style.show_group_summaries = true;

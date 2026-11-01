@@ -1,7 +1,8 @@
-// Native caption raster diagnostic; source-only preparation until root allocates a run.
+// Native UiLabel caption allocation and full-raster regression.
 #include <Ui/UiLabel.h>
 #include <Ui/UiStyle.h>
-#include <Shared/UiTheme/CineSpaceTheme.h>
+#include <Ui/UiTheme.h>
+#include <Ui/UiFonts.h>
 #include <plugin/png/png.h>
 
 using namespace Upp;
@@ -52,11 +53,13 @@ Projection ProjectPlainCaption(UiLabel& label,Size advance)
     else if(s.align_v==UiAlign::CENTER)p.origin.y+=(p.main.GetHeight()-advance.cy)/2;
     return p;
 }
-void RunCaption(CineSpace::CineSpaceTheme& theme,const String& name,const String& text,bool natural_height)
+void RunCaption(const UiThemeContext& context,const String& name,const String& text,bool natural_height)
 {
-    // Exact current UIMediaSlots recipe, including its returned skin.
-    UiLabel label;auto recipe=theme.Label(UiRole::Subtle);
-    recipe.font=theme.CssFont(10);
+    // A compact Ui-owned caption recipe, including its resolved skin.
+    UiLabel label;auto recipe=UiTheme::ResolveLabel(context,UiRole::Subtle);
+    recipe.metrics.focus_enabled=false; // This diagnostic isolates display-only caption ink.
+    recipe.font=UiFonts::Inherit(SansSerifZ(10));
+    if(recipe.metrics.use_text_font)recipe.metrics.text_font=recipe.font;
     label.SetCustomStyle(recipe);label.SetAlign(UiAlign::RIGHT,UiAlign::CENTER);label.SetText(text);
     const auto& style=label.GetStyle();
     Font effective=style.metrics.use_text_font?style.metrics.text_font:style.font;
@@ -68,14 +71,24 @@ void RunCaption(CineSpace::CineSpaceTheme& theme,const String& name,const String
     Check(label.GetIcon().IsEmpty()&&!style.metrics.face_enabled&&!style.metrics.frame_enabled
           &&!style.metrics.focus_enabled&&!style.metrics.shadow.enabled&&!style.underline
           &&style.transparent&&!label.IsRichEnabled(),
-          name+" exact plain transparent caption contract");
+          name+" plain transparent caption contract");
     label.SetRect(0,0,allocated.cx,allocated.cy);label.Layout();
     Projection geometry=ProjectPlainCaption(label,advance);
 
     // Both native rasters use the same opaque parent colour. No style/font/inset
     // is changed to create a fit. Guard space belongs only to the oracle canvas.
-    Color background=theme.Tokens().panel,ink=style.palette.ink[ST_NORMAL];
-    ImageDraw native(allocated);native.DrawRect(Rect(allocated),background);label.DrawCtrl(native);
+    const auto panel=UiTheme::ResolvePanel(context);
+    Check(panel.palette.face[ST_NORMAL].IsSolid(),name+" oracle parent background is solid");
+    Color background=panel.palette.face[ST_NORMAL].color,ink=style.palette.ink[ST_NORMAL];
+    // A transparent child needs a real parent paint pass. Standalone DrawCtrl
+    // may allocate a fresh native backbuffer and discard a prefilled ImageDraw.
+    struct CaptionHost : Ctrl {
+        Color background;
+        void Paint(Draw& w) override { w.DrawRect(GetSize(),background); }
+    } host;
+    host.background=background;host.SetRect(0,0,allocated.cx,allocated.cy);
+    host.Add(label);
+    ImageDraw native(allocated);host.DrawCtrl(native);
     Image actual=native;
     const int guard=max(DPI(24),effective.GetHeight()*2);
     Size canvas(allocated.cx+2*guard,allocated.cy+2*guard);
@@ -123,7 +136,7 @@ void RunCaption(CineSpace::CineSpaceTheme& theme,const String& name,const String
     Check(PNGEncoder().SaveFile(AppendFileName(output,name+"-reference.png"),reference),name+" large reference raster saved");
     Check(PNGEncoder().SaveFile(AppendFileName(output,name+"-difference.png"),Image(difference)),name+" difference raster saved");
 
-    ValueMap row;row.Add("case",name);row.Add("text",label.GetText());row.Add("requested_css_px",10);
+    ValueMap row;row.Add("case",name);row.Add("text",label.GetText());row.Add("requested_native_font_height",DPI(10));
     row.Add("effective_font",FontValue(effective));row.Add("style_font",FontValue(style.font));
     row.Add("metrics_text_font",FontValue(style.metrics.text_font));row.Add("use_text_font",style.metrics.use_text_font);
     row.Add("align_h",int(style.align_h));row.Add("align_v",int(style.align_v));
@@ -149,22 +162,23 @@ GUI_APP_MAIN
 {
     try{
         const auto& args=CommandLine();
-        if(args.GetCount()!=1)throw Exc("Usage: UiLabelTextFitTest <owned-evidence-directory>");
-        output=args[0];RealizeDirectory(output);
-        CineSpace::CineSpaceTheme theme;theme.SetVisualProfile(CineSpace::ThemeVisualProfile::CineCastR9);
+        if(args.GetCount()>1)throw Exc("Usage: UiLabelTextFitTest [evidence-directory]");
+        output=args.IsEmpty()?AppendFileName(GetExeFolder(),"UiLabelTextFitTest-evidence"):args[0];
+        RealizeDirectory(output);
+        UiThemeContext context;context.preset=UiThemePreset::Minimal;
         for(int m=0;m<2;++m){
-            theme.SetMode(m?UiThemeMode::Light:UiThemeMode::Dark);theme.ApplyHostMode();
+            context.mode=m?UiThemeMode::Light:UiThemeMode::Dark;UiTheme::Set(context);
             String mode=m?"light":"dark";
-            RunCaption(theme,mode+"-revision-0-row","Library revision 0",false);
-            RunCaption(theme,mode+"-revision-0-natural","Library revision 0",true);
-            RunCaption(theme,mode+"-revision-12-row","Library revision 12",false);
-            RunCaption(theme,mode+"-source-count-row","0 / 16 supplied sources",false);
-            RunCaption(theme,mode+"-reference-ink-row","Mgyp 0",false);
+            RunCaption(context,mode+"-revision-0-row","Library revision 0",false);
+            RunCaption(context,mode+"-revision-0-natural","Library revision 0",true);
+            RunCaption(context,mode+"-revision-12-row","Library revision 12",false);
+            RunCaption(context,mode+"-source-count-row","0 / 16 supplied sources",false);
+            RunCaption(context,mode+"-reference-ink-row","Mgyp 0",false);
         }
         ValueMap report;report.Add("kind","UiLabelTextFitTest");report.Add("checks",checks);report.Add("failures",failures);
         report.Add("cases",cases);report.Add("result_scope","native ImageDraw/UiLabel/DrawText comparison at this process DPI; no normal window or HTML equivalence");
         if(!SaveFile(AppendFileName(output,"caption-raster.json"),AsJSON(report,true)))throw Exc("Cannot save caption raster evidence");
-        Cout()<<"UiLabelTextFitTest: "<<checks<<" checks, "<<failures<<" failures\n";
+        Cout()<<"UI_LABEL_TEXT_FIT_SUMMARY checks="<<checks<<" failed="<<failures<<"\n";
         if(checks==0||failures)SetExitCode(1);
     }catch(const Exc& error){Cerr()<<"UiLabelTextFitTest ERROR: "<<error<<"\n";SetExitCode(2);}
 }

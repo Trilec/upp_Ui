@@ -1,8 +1,8 @@
 // Self-contained media-control designer. The host owns samples, frames and playback;
 // the selected concrete control supplies the preview and generated public-API recipe.
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 #include <plugin/png/png.h>
 #include <climits>
 #include <limits>
@@ -30,15 +30,15 @@ String MediaSideCode(String side) { return "UiAlign::" + ToUpper(side); }
 }
 
 class MediaDemo : public TopWindow {
-    PropertyEditorModel model_, override_model_;
-    PropertyEditorFactory factory_;
+    UiPropertyInspectorModel model_, override_model_;
+    UiPropertyInspectorFactory factory_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ {UiDirection::H}, tools_ {UiDirection::H};
     UiToolButton theme_, help_, exit_, inspector_mode_, overrides_mode_, code_mode_, copy_;
     UiButton select_probe_, select_playback_, select_hdr_;
     UiBoxLayout selector_ {UiDirection::H};
     UiPanel preview_, right_;
-    PropertyEditor inspector_, overrides_;
+    UiPropertyInspector inspector_, overrides_;
     UiMultiEdit code_;
     UiLabel probe_header_, hint_, events_;
     UiColorProbe probe_;
@@ -53,8 +53,8 @@ class MediaDemo : public TopWindow {
     bool Active(const char* id) const { const auto* item = override_model_.Find(id); return item && item->override_active; }
     String Selected() const { return AsString(Get("control")); }
     void Log(const String& text) { events_.SetText(AsString(++event_count_) + ": " + text); }
-    PropertyEditorItem& Authored(PropertyEditorItem& item) { item.SetDefault(item.value); return item; }
-    PropertyEditorItem& Inherited(PropertyEditorItem& item) { item.SetDefault(item.value); item.overrideable = true; item.override_active = false; return item; }
+    UiPropertyInspectorItem& Authored(UiPropertyInspectorItem& item) { item.SetDefault(item.value); return item; }
+    UiPropertyInspectorItem& Inherited(UiPropertyInspectorItem& item) { item.SetDefault(item.value); item.overrideable = true; item.override_active = false; return item; }
     void BuildModels() {
         Authored(model_.AddChoice("control","Preview control","Probe","Preview").AddChoice("Probe","UiColorProbe").AddChoice("Playback","UiPlaybackBar").AddChoice("HDR","HDR range integration"));
         Authored(model_.AddBoolean("enabled","Enabled",true,"Preview"));
@@ -146,7 +146,7 @@ class MediaDemo : public TopWindow {
     }
     void QueueControlRefresh() {
         // Model notifications can originate inside an inline editor callback.
-        // Its owning PropertyEditor must not rebuild/destroy it on that stack.
+        // Its owning UiPropertyInspector must not rebuild/destroy it on that stack.
         if(control_refresh_posted_) return;
         control_refresh_posted_=true;
         Ptr<MediaDemo> self=this;
@@ -257,7 +257,7 @@ public:
     MediaDemo() {
         Title("Ui media controls designer").Sizeable().Zoomable(); SetRect(0,0,DPI(1200),DPI(780));
         UiThemeContext context=UiTheme::GetContext(); context.mode=UiThemeMode::Light; context.preset=UiThemePreset::Minimal; UiTheme::Set(context);
-        RegisterPropertyEditorEditors(factory_); BuildModels();
+        RegisterUiPropertyInspectorEditors(factory_); BuildModels();
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("Media controls").SetSubTitle("Raw colour samples and host-driven playback; select a control to inspect and generate its C++").ShowTitleLine(false).SetContentInset(DPI(8)).SetContentCell(header_actions_);
         header_actions_.SetGap(DPI(4)).SetInset(0).SetAlignItems(UiCrossAlign::Center); header_actions_.AddSpacer(1).Expand(1);
@@ -312,7 +312,7 @@ public:
         playback_.SetRect(max(DPI(16),(width-playback_size.cx)/2),max(DPI(16),(height-playback_size.cy)/2-DPI(40)),min(available,playback_size.cx),playback_size.cy);
         hdr_.SetRect(DPI(24),max(DPI(16),height/2-DPI(40)),available,DPI(44));probe_.Show(Selected()=="Probe");playback_.Show(Selected()=="Playback");hdr_.Show(Selected()=="HDR");
         hint_.SetRect(DPI(18),max(0,height-DPI(92)),max(0,width-DPI(36)),DPI(48));events_.SetRect(DPI(18),max(0,height-DPI(42)),max(0,width-DPI(36)),DPI(30));
-        tools_.SetRect(DPI(6),DPI(4),max(0,rail-DPI(12)),DPI(40));for(PropertyEditor* editor:{&inspector_,&overrides_})editor->SetRect(DPI(6),DPI(48),max(0,rail-DPI(12)),max(0,height-DPI(54)));
+        tools_.SetRect(DPI(6),DPI(4),max(0,rail-DPI(12)),DPI(40));for(UiPropertyInspector* editor:{&inspector_,&overrides_})editor->SetRect(DPI(6),DPI(48),max(0,rail-DPI(12)),max(0,height-DPI(54)));
         code_.SetRect(DPI(8),DPI(48),max(0,rail-DPI(16)),max(0,height-DPI(94)));copy_.SetRect(DPI(8),max(DPI(48),height-DPI(40)),DPI(34),DPI(32));
     }
     void RenderStates(const String& directory) {
@@ -365,11 +365,11 @@ public:
         for(UiLabel* label : { &hint_, &events_, &probe_header_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
         overrides_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_, &overrides_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -516,6 +516,14 @@ public:
         probe_.SetControlsSide(UiAlign::TOP).SetRowHeight(DPI(16));
         probe_.SetRect(0,0,DPI(180),probe_.GetMinSize().cy);
         check(probe_.Accessory().IsShown() && probe_.Accessory().GetRect().right <= DPI(116), "Top-left borrowed content leaves space for top-right icons");
+        for(UiAlign side:{UiAlign::TOP,UiAlign::BOTTOM})for(int width:{1,80,180,260}){
+            probe_.SetControlsSide(side).SetRect(0,0,DPI(width),probe_.GetMinSize().cy);
+            Ctrl* swatch=probe_.GetFirstChild();Ctrl* green=probe_.GetLastChild()->GetPrev()->GetPrev();
+            Rect sw=swatch->GetRect(),g=green->GetRect();
+            check(sw.left==g.left&&sw.Width()==g.Width()&&!sw.Intersects(g),"Row swatch aligns with green without consuming a numeric column");
+            bool contained=true;for(Ctrl* child=probe_.GetFirstChild();child;child=child->GetNext()){Rect r=child->GetRect();contained&=r.left>=0&&r.top>=0&&r.right<=probe_.GetSize().cx&&r.bottom<=probe_.GetSize().cy;}
+            check(contained&&!probe_.Accessory().GetRect().Intersects(sw),"Caption, swatch and sampling controls stay inside narrow row bounds");
+        }
         probe_.SetControlsSide(UiAlign::RIGHT);
         check(!probe_.Accessory().IsShown(), "Inline mode needs no label/header");
         check(!IsNull(UiIconFromName("ICON_MEDIA_PLAY_48")), "Transport icon in shared catalogue");

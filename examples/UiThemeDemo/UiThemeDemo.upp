@@ -1,12 +1,22 @@
+description "Compact theme workbench with shared presets and paired Light/Dark specimens";
 uses
-	Core,
-	Draw,
-	CtrlCore,
-	CtrlLib,
-	Ui;
-
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui,
+    Ui/UiFileBrowser,
+    Ui/UiOsFileDialog,
+    plugin/png;
 file
-	main.cpp;
-
+    UiThemeDemo.h,
+    UiThemeDemo.cpp,
+    ThemeSection.cpp,
+    Actions.cpp,
+    Values.cpp,
+    Surfaces.cpp,
+    Collections.cpp,
+    main.cpp,
+    README.md;
 mainconfig
-	"" = "GUI";
+    "" = "GUI";

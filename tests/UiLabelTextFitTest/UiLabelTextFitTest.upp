@@ -1,7 +1,6 @@
 description "Native UiLabel caption raster diagnostic";
 uses
     Ui,
-    Shared/UiTheme,
     plugin/png;
 file
     main.cpp,

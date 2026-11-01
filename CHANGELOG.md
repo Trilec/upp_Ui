@@ -31,6 +31,14 @@ schema versions are independent. No platform PASS is implied by this file.
 
 ### Release engineering and documentation
 
+- Moved the property system to `Ui/UiPropertyInspector`, with one public
+  `UiPropertyInspector` API and a separate headless `Core` package. Updated demos
+  and Designer; the old utility package paths and V1 subset alias are removed.
+- Moved regression, smoke and benchmark packages to `tests`, retired five
+  duplicated launchers while retaining their assertions in aggregate suites,
+  and moved graph authoring into `Ui/UiGraphWorkspace`. Utilities now contains
+  icon authoring/export tooling.
+
 - Packaged U++/Ui development and Ui-grounded HTML mockup skills, with repeatable
   packaging/install scripts and portable documentation snapshots.
 - Explicit Ptr observer, owning One/Array, safe relocation and callback lifetime

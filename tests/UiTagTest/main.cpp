@@ -339,6 +339,7 @@ CONSOLE_APP_MAIN
     TestInteractionAndDisabled();
     TestDecorationCacheAndPaintPath();
 
+    Cout() << Format("UITAG_SUMMARY checks=%d failed=%d\n", checks, failures);
     Cout() << checks << " checks, "
            << failures << " failures\n";
 

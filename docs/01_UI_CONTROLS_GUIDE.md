@@ -39,7 +39,7 @@ Native Draw is suitable for simple straight geometry/text; Painter supplies
 antialiased curves. Do not duplicate shape or raster systems per control. The
 [Drawing Guide](07_UI_DRAWING_GUIDE.md) owns geometry/cache/performance rules.
 The retired UiComposite property-row family must not return: compose Ui controls
-and the production PropertyEditor instead.
+and the production UiPropertyInspector instead.
 
 ## Catalogue
 
@@ -79,7 +79,7 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiMatrixSelector](../Ui/UiMatrixSelector.h) | Spatial cell/ordered-pair choice with shared glyphs. | [UiMatrixSelectorDemo](../examples/UiMatrixSelectorDemo) |
 | [UiColorMatrix](../Ui/UiColorMatrix.h) | One to eight ordered color values with one shared picker. | [UiColorMatrixDemo](../examples/UiColorMatrixDemo) |
 | [UiDateTime](../Ui/UiDateTime.h) | Local date/time/date-time input and picker. | [UiDateTimeDemo](../examples/UiDateTimeDemo) |
-| [UiColorPickerMicro](../Ui/UiColorPickerMicro.h) | Compact palette, Apply/hex footer, optional ramps and RGB sliders. [Contract](../Ui/UiColorPickerMicro.md). | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
+| [UiColorPickerMicro](../Ui/UiColorPickerMicro.h) | Compact palette, Apply/hex footer, optional ramps and RGB sliders. [Contract](COLOR_PICKER_MICRO.md). | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiColorPicker](../Ui/UiColorPicker/UiColorPicker.h) | Multi-slot color editing, palettes and image/screen picking. | [UiColorPickerDemo](../examples/UiColorPickerDemo) |
 | [UiDropdown](../Ui/UiDropdown.h) | Collapsed choice and model-backed popup. | [UiDropdownDemo](../examples/UiDropdownDemo) |
 | [UiMenu](../Ui/UiMenu.h) | Command/check/radio/submenu model presentation. | [UiMenuDemo](../examples/UiMenuDemo) |
@@ -101,12 +101,35 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiTree](../Ui/UiTree.h) | Stable hierarchical model identity and visible projection. | [UiTreeDemo](../examples/UiTreeDemo) |
 | [UiTable](../Ui/UiTable.h) | Coordinate/range model view with editing and headers. | [UiTableDemo](../examples/UiTableDemo) |
 | [UiGallery](../Ui/UiGallery.h) | Tile/image presentation of a list model. | [UiCollectionDemo](../examples/UiCollectionDemo) |
+| [UiPropertyInspector](../Ui/UiPropertyInspector/UiPropertyInspector.h) | Optional typed property browser with filtering, bounded inline editors and preview/commit/cancel. | [UiPropertyInspectorDemo](../examples/UiPropertyInspectorDemo) |
 | [UiDoc](../Ui/UiDoc/UiDoc.h) | Document view/editor over the authoritative UiDocCore. | [UiDocDemo](../examples/UiDocDemo) |
 | [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
 | [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileDialogDemo](../examples/UiFileDialogDemo) |
 | [UiOsFileDialog](../Ui/UiOsFileDialog/UiOsFileDialog.h) | Native file/folder selection through a platform wrapper. | [UiFileDialogDemo](../examples/UiFileDialogDemo) |
+
+## Property inspection
+
+UiPropertyInspector is an optional production control, not a demo utility.
+Declare the direct package dependency `Ui/UiPropertyInspector` and include
+`<Ui/UiPropertyInspector/UiPropertyInspector.h>`; `<Ui/Ui.h>` alone does not pull
+in this package. Its constructor registers the complete standard adapter set.
+
+Declare the borrowed `UiPropertyInspectorModel` before the inspector so it
+outlives the binding, then call `SetModel(&model)`. Typed items describe ranges,
+defaults, validation, groups, mixed/inherited values and visibility. The control
+owns filtering, row presentation and viewport-bounded editor instances; the host
+owns application state, persistence, resource providers and undo. Preview, commit
+and cancel remain separate events. Detach with `SetModel(nullptr)` before
+replacing or destroying a borrowed model when its lifetime otherwise ends first.
+
+Headless consumers depend on `Ui/UiPropertyInspector/Core` and include
+`<Ui/UiPropertyInspector/Core/UiPropertyInspectorCore.h>` without acquiring GUI
+dependencies. See the [usage recipe](CONTROL_USAGE.md#property-inspection),
+[inspector guide](05_UI_PROPERTY_EDITOR_GUIDE.md), and
+[semantic editor demo](../examples/UiPropertyInspectorSemanticDemo) for richer
+adapters, resource providers, override activation and transaction contracts.
 
 ## Prepared presentation primitives
 
@@ -431,8 +454,8 @@ Supporting public surfaces include UiBaseEdit and UiIndicatorBase, UiAxis,
 UiLayoutCursor/UiMeasure, UiStyle/UiTheme, UiGeometry/UiShapePath/UiShapes/UiDraw,
 UiRenderLayer/UiFrameTicker, UiIcons, model/render types and Graph/Doc core types.
 The separate optional UiOsFileDialog package has platform-specific integration;
-it is not evidence of native dialog validation on every platform. PropertyEditor
-and PropertyEditorCore are reusable siblings, not dependencies on UiDesigner.
+it is not evidence of native dialog validation on every platform. UiPropertyInspector
+and UiPropertyInspectorCore are reusable siblings, not dependencies on UiDesigner.
 
 These helpers need documented responsibility and dependency/lifetime coverage,
 not invented visual roles or a separate executable demo for every header. The

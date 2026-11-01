@@ -1,7 +1,7 @@
 # Prompt collection review — 2026-09-27
 
 Reviewed the legacy upp-ultimate-ai-prompt collection against the current Ui
-coding, controls, themes, models, PropertyEditor, drawing, demo and graph guides,
+coding, controls, themes, models, UiPropertyInspector, drawing, demo and graph guides,
 and relevant U++18468 / Ui headers. This is source review and packaging validation,
 not a claim that every historical example or API has been rebuilt.
 

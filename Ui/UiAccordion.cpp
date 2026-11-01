@@ -1161,11 +1161,20 @@ int UiAccordion::MeasureSectionBodyHeight(const Section& s, int width) const
         measured = max(measured, max(ms.cy, body_h));
 
         Rect r = q->GetRect();
+        const Ctrl::Logc vertical = q->GetPos().y;
+        const bool fills_height = vertical.GetAlign() == Ctrl::SIZE;
         bool fill_host = q->GetFirstChild()
                       && r.left == 0
                       && r.top == 0
                       && abs(r.GetWidth() - max(0, width)) <= 1;
-        if(r.GetWidth() <= 0 || r.GetHeight() <= 0 || fill_host)
+        // SizePos/VSizePos describes allocation, not an authored height.
+        // Measuring that last allocation again adds body chrome on every pass,
+        // even for an empty ParentCtrl. Keep explicit fixed rectangles intact.
+        if(fills_height) {
+            r.top = max(0, vertical.GetA());
+            r.bottom = r.top + max(ms.cy, body_h) + max(0, vertical.GetB());
+        }
+        else if(r.GetWidth() <= 0 || r.GetHeight() <= 0 || fill_host)
             r = RectC(0, 0, max(0, width), max(0, max(ms.cy, body_h)));
         else
             r.bottom = max(r.bottom, r.top + max(ms.cy, body_h));
@@ -1282,7 +1291,9 @@ void UiAccordion::Layout()
             if(bh > 0) {
                 s.body.Show();
                 s.content.Show();
-                s.content.SetRect(0, 0, s.body.GetSize().cx, s.body.GetSize().cy);
+                const auto& body_style = s.body.GetStyle();
+                s.content.SetRect(UiStyledInnerRect(Rect(s.body.GetSize()),
+                    body_style.metrics, body_style.skin));
                 s.content.Layout();
             }
             else {

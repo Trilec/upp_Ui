@@ -1,14 +1,14 @@
 // Native UiProgressRing reference: author behavior and appearance through the
-// production PropertyEditor and generate public-API usage C++.
+// production UiPropertyInspector and generate public-API usage C++.
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 using namespace Upp;
 
 namespace {
 
-PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
+UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item)
 {
     item.overrideable = true;
     item.override_active = false;
@@ -66,7 +66,7 @@ public:
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
 
-        RegisterPropertyEditorEditors(pe_factory_);
+        RegisterUiPropertyInspectorEditors(pe_factory_);
         BuildHeader();
         BuildPreview();
         BuildRightRail();
@@ -229,7 +229,7 @@ private:
         overrides_.SetModel(&override_model_);
         inspector_.SetLabelRatio(46);
         overrides_.SetLabelRatio(46);
-        PropertyEditorStyle style = PropertyEditorStyle::System();
+        UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
         style.show_group_summaries = true;
         inspector_.SetStyle(style);
         overrides_.SetStyle(style);
@@ -259,25 +259,25 @@ private:
 
     Value InspectorValue(const String& id, const Value& fallback = Value()) const
     {
-        const PropertyEditorItem *item = inspector_model_.Find(id);
+        const UiPropertyInspectorItem *item = inspector_model_.Find(id);
         return item ? item->value : fallback;
     }
 
     Value OverrideValue(const String& id, const Value& fallback = Value()) const
     {
-        const PropertyEditorItem *item = override_model_.Find(id);
+        const UiPropertyInspectorItem *item = override_model_.Find(id);
         return item ? item->value : fallback;
     }
 
     bool OverrideActive(const String& id) const
     {
-        const PropertyEditorItem *item = override_model_.Find(id);
+        const UiPropertyInspectorItem *item = override_model_.Find(id);
         return item && item->override_active;
     }
 
-    void ResetProperty(PropertyEditorModel& model, const String& id)
+    void ResetProperty(UiPropertyInspectorModel& model, const String& id)
     {
-        PropertyEditorItem *item = model.Find(id);
+        UiPropertyInspectorItem *item = model.Find(id);
         if(!item || !item->resettable)
             return;
         model.SetValue(id, item->default_value);
@@ -286,7 +286,7 @@ private:
 
     void SetOverrideActive(const String& id, bool active)
     {
-        PropertyEditorItem *item = override_model_.Find(id);
+        UiPropertyInspectorItem *item = override_model_.Find(id);
         if(!item || !item->overrideable)
             return;
         item->override_active = active;
@@ -449,11 +449,11 @@ private:
         for(UiLabel* label : { &caption_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
         overrides_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_, &overrides_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -486,8 +486,8 @@ private:
     }
 
 private:
-    PropertyEditorFactory pe_factory_;
-    PropertyEditorModel inspector_model_, override_model_;
+    UiPropertyInspectorFactory pe_factory_;
+    UiPropertyInspectorModel inspector_model_, override_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
     UiButton replay_;
@@ -502,7 +502,7 @@ private:
     UiToolButton inspector_mode_, overrides_mode_, code_mode_;
     UiStack pages_;
     UiPanel inspector_page_, overrides_page_, code_page_;
-    PropertyEditor inspector_, overrides_;
+    UiPropertyInspector inspector_, overrides_;
     UiMultiEdit code_;
     UiToolButton copy_code_;
 

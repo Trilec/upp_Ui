@@ -1,4 +1,4 @@
-description "Interactive UiNodeGraph model, scale and PropertyEditor reference demo";
+description "Interactive UiNodeGraph model, scale and UiPropertyInspector reference demo";
 
 uses
 	Core,
@@ -8,7 +8,7 @@ uses
 	Ui,
 	Ui/UiOsFileDialog,
 	plugin/png,
-	Utilities/PropertyEditor;
+	Ui/UiPropertyInspector;
 
 file
 	UiGraphDemo.h,

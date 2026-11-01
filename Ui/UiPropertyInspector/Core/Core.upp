@@ -1,0 +1,11 @@
+uses
+    Core,
+    Draw;
+
+file
+    UiPropertyInspectorCore.h,
+    UiPropertyInspectorModel.h,
+    UiPropertyInspectorModel.cpp,
+    README.md,
+    DESIGN.md,
+    CHANGELOG.md;

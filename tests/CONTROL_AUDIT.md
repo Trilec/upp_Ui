@@ -3,7 +3,7 @@
 ## Cleanup follow-up — 22 October 2026
 
 The redundant `Utilities/UiGalleryRegressionTest` launcher is retired in favour
-of `Utilities/UiModelViewTests`. Its 29-check Gallery suite remains unchanged in
+of `tests/UiModelViewTests`. Its 29-check Gallery suite remains unchanged in
 `GalleryRegression.cpp` and is invoked by the aggregate driver. A fresh CLANGx64
 Release/BLITZ build passes all five aggregate suites with zero failed suites.
 Other focused tests retain distinct coverage and are not retired based on age.
@@ -56,7 +56,7 @@ Source-confirmed examples:
 - [UiDoc::OnCoreChange](../Ui/UiDoc/UiDoc.cpp): WhenMapped followed by WhenChange.
 - [UiNodeGraph::SetModel](../Ui/UiGraph/UiNodeGraphModelBinding.inc): WhenSelection
   followed by more member access.
-- [PropertyEditor::ActivateRow](../Utilities/PropertyEditor/PropertyEditorInteraction.cpp):
+- [UiPropertyInspector::ActivateRow](../Ui/UiPropertyInspector/UiPropertyInspectorInteraction.cpp):
   override/commit callbacks followed by transaction and repaint work.
 
 Related paths occur in Breadcrumbs, Stack, Accordion, Splitter, RangeSliderEdit,
@@ -124,7 +124,7 @@ flip settings. UiBezierCurveField embeds this editor and inherits the problem.
 
 ### F08 — Medium: document metadata geometry test fails
 
-[UiDocGeometryTest](../Utilities/UiDocGeometryTest/main.cpp) reports **34 checks,
+[UiDocGeometryTest](../tests/UiDocGeometryTest/main.cpp) reports **34 checks,
 1 failure**: “expanded metadata edit immediately remeasures the visible reference card”.
 The metadata payload/state assertions pass, but the expected extra layout height does
 not. Root cause is not yet isolated between measurement/invalidation and the test's
@@ -151,7 +151,7 @@ coverage concern, not a reproduced failure in this audit.
 
 A full native visual matrix remains open: Minimal/Pill/Linear/Solid, Light/Dark,
 normal/hover/focus/selected/disabled, small bounds and DPI scaling. Include rounded
-collection viewports, dropdown/caret alignment and the colour picker/PropertyEditor.
+collection viewports, dropdown/caret alignment and the colour picker/UiPropertyInspector.
 No whole-library visual PASS is inferred from theme resolver tests.
 
 ## Control-by-control register
@@ -244,12 +244,12 @@ existing user applications were not closed. An interactive timeout is not a cont
 | UiGraphModelTests | Pass | UIGRAPH_HIERARCHY_SUMMARY checks=49 failed=0; UIGRAPH_MODEL_TESTS_SUMMARY suites=2 failed_suites=0 |
 | UiGraphViewTests | Pass | UINODEGRAPH_CANONICAL_SHAPE_SUMMARY checks=14 failed=0; UINODEGRAPH_HIERARCHY_VIEW_SUMMARY checks=30 failed=0; UINODEGRAPH_INTERACTION_STATE_SUMMARY checks=29 failed=0; UINODEGRAPH_SELECTION_MODIFIER_SUMMARY checks=13 failed=0; UINODEGRAPH_ROUTE_EDIT_SUMMARY checks=25 failed=0; UINODEGRAPH_DRAG_DAMAGE_SUMMARY checks=8 failed=0; UINODEGRAPH_LIVE_VIEW_SUMMARY checks=19 failed=0; UIGRAPH_VIEW_TESTS_SUMMARY suites=7 failed_suites=0 |
 | UiGraphRenderTests | Pass | UINODEGRAPH_DETAIL_LOD_SUMMARY checks=19 failed=0; UINODEGRAPH_OVERVIEW_LOD_SUMMARY checks=12 failed=0; UINODEGRAPH_RENDER_LOD_SUMMARY checks=16 failed=0; UINODEGRAPH_PATTERNED_PAINT_SUMMARY checks=10 failed=0; UINODEGRAPH_PRESENTATION_SUMMARY checks=87 failed=0; UIGRAPH_EXECUTION_PATH_SUMMARY checks=8 failed=0; UIGRAPH_COMPONENT_SUMMARY checks=21 failed=0; UIGRAPH_WORKSPACE_COMPONENT_SUMMARY checks=24 failed=0; UIGRAPH_ELLIPSE_BANDS_SUMMARY checks=16 failed=0; UIGRAPH_RENDER_TESTS_SUMMARY suites=9 failed_suites=0 |
-| PropertyEditorTests | Pass | 143 checks; 0 failures |
+| UiPropertyInspectorTests | Pass | 143 checks; 0 failures |
 
-PropertyEditor source review also checked model-binding generations, inline editor
+UiPropertyInspector source review also checked model-binding generations, inline editor
 ownership and the boolean override/commit path. Its 143-check suite passes; callback
 reentrancy from F01 remains a separate issue. Other optional/platform utility packages
-and PropertyEditor specialised suites are outside this first pass.
+and UiPropertyInspector specialised suites are outside this first pass.
 
 Raw build/run logs and the six-case native probe are retained locally in
 `E:/apps/github/upp_uidesigner/build/control-audit/`; the control aggregate logs are
@@ -343,7 +343,7 @@ native/demo gates above.
 
 This follow-up replaces the separate UiListDemo/UiGalleryDemo packages with
 `examples/UiCollectionDemo`. Both previews bind the same production UiListModel;
-Inspector, Style, Data and Code use PropertyEditor and a projection of the active
+Inspector, Style, Data and Code use UiPropertyInspector and a projection of the active
 record. The projection is not another collection model. The catalogue and release
 inventory now point both controls to this example. Historical evidence above is
 retained as evidence of the earlier state.
@@ -536,7 +536,7 @@ Later consumers are already evidenced by SetItemRender/SetCellRender APIs in
 UiTree, UiTable and UiDropdown. They can opt into the shared renderer without
 having to turn ordinary cells or menu rows into rich nodes. Live MediaCard is
 another natural consumer of the common prepare/paint functions. The shared core
-must not depend on UiNodeGraph, UiGraphWorkspace or PropertyEditor; authoring sits
+must not depend on UiNodeGraph, UiGraphWorkspace or UiPropertyInspector; authoring sits
 above it. Keep preparation bounded by visible records and recipe component limits,
 cache immutable recipe resources once, and avoid a virtual call/lookup per painted
 primitive. Final performance acceptance must measure Graph and collections,
@@ -567,10 +567,10 @@ inventory reconciliation.
 
 | Canonical package group | Source findings and disposition |
 | --- | --- |
-| UiLabelDemo, UiButtonDemo, UiRangeSegmentsDemo | Closest existing explicit PropertyEditor shells. Retain behavior; align exposed backdrop and verify page feedback/native matrix during redesign. |
-| UiMediaCardDemo, UiTagDemo, UiCollectionDemo, UiProgressRingDemo, UiChartRingDemo | Shell/theme cleanup implemented. MediaCard and Tag lacked native palette bridge and PropertyEditor palette updates; both Rings had the same omission. Apply custom styles from the current theme, paint the continuous window surface, use compact left-aligned page icons and visible selected feedback. Five Debug BLITZ builds pass. MediaCard inspected in native Light and Dark; other final native matrices remain open. |
-| UiCheckBoxDemo, UiRadioButtonDemo, UiToggleDemo, UiEditDemo, UiSliderDemo, UiTabDemo, UiDropdownDemo | Production PropertyEditor exists, but header lacks Help and rail uses expanded Properties/Code buttons. Preserve Usage/Current changes/Full explicit generation modes while adding canonical pages. Existing authored styles must be audited for unconditional light-color snapshots before claiming reset/theme inheritance. |
-| UiAccordionDemo, UiBreadcrumbsDemo, UiColorPickerDemo, UiIntFloatDemo, UiMatrixSelectorDemo, UiMenuDemo, UiScrollBarDemo, UiScrollPanelDemo, UiSplitterDemo, UiTableDemo, UiTitleCardDemo, UiTreeDemo | Depend on BuilderDemoSupport and/or DemoPropertyRows. Re-author explicit self-contained shells and production PropertyEditor; preserve model editing, popup, layout and generated-code capabilities before removing helpers. |
+| UiLabelDemo, UiButtonDemo, UiRangeSegmentsDemo | Closest existing explicit UiPropertyInspector shells. Retain behavior; align exposed backdrop and verify page feedback/native matrix during redesign. |
+| UiMediaCardDemo, UiTagDemo, UiCollectionDemo, UiProgressRingDemo, UiChartRingDemo | Shell/theme cleanup implemented. MediaCard and Tag lacked native palette bridge and UiPropertyInspector palette updates; both Rings had the same omission. Apply custom styles from the current theme, paint the continuous window surface, use compact left-aligned page icons and visible selected feedback. Five Debug BLITZ builds pass. MediaCard inspected in native Light and Dark; other final native matrices remain open. |
+| UiCheckBoxDemo, UiRadioButtonDemo, UiToggleDemo, UiEditDemo, UiSliderDemo, UiTabDemo, UiDropdownDemo | Production UiPropertyInspector exists, but header lacks Help and rail uses expanded Properties/Code buttons. Preserve Usage/Current changes/Full explicit generation modes while adding canonical pages. Existing authored styles must be audited for unconditional light-color snapshots before claiming reset/theme inheritance. |
+| UiAccordionDemo, UiBreadcrumbsDemo, UiColorPickerDemo, UiIntFloatDemo, UiMatrixSelectorDemo, UiMenuDemo, UiScrollBarDemo, UiScrollPanelDemo, UiSplitterDemo, UiTableDemo, UiTitleCardDemo, UiTreeDemo | Depend on BuilderDemoSupport and/or DemoPropertyRows. Re-author explicit self-contained shells and production UiPropertyInspector; preserve model editing, popup, layout and generated-code capabilities before removing helpers. |
 | UiPanelDemo | Bespoke builder and property rows. Keep Panel/GroupPanel teaching coverage; migrate shell/editor and generated projection. |
 | UiDateTimeDemo, UiProgressBarDemo, UiSplitButtonDemo | Need dedicated canonical editor/code/page review and redesign; existing snippets/showcases do not establish complete API coverage. |
 | UiGraphDemo | Specialist topology/model demo remains canonical; preserve authoring, diagnostics and generation behavior while aligning shell. Existing source loads image samples from tests/Images; move demo asset ownership out of test-fixture paths during self-containment work. |
@@ -629,7 +629,7 @@ be reconciled before retirement.
 | UiGraphScaleTests | UiNodeGraphModelSwitchProfileTest; UiNodeGraphPanProfileTest; UiNodeGraphPerformanceTest; UiNodeGraphScaleTest |
 
 There are 78 tracked test/probe/smoke .upp targets. Other suites include unique
-PropertyEditor transactions/adapters, MediaCard/Tag, Doc models/geometry/input,
+UiPropertyInspector transactions/adapters, MediaCard/Tag, Doc models/geometry/input,
 Menu/Dropdown interaction, shape/theme contracts and native/platform behavior.
 Their purpose and runner references must be reviewed before consolidation.
 Focused targets may remain tiny entry points linking aggregate suite sources;
@@ -754,10 +754,10 @@ audit source links point to retained packages/files. Utilities/README.md lists t
 maintained aggregate entry points and the purpose of remaining support tools.
 There are 46 Utilities package manifests after this cleanup.
 
-Focused RangeSegments, shared-source Gallery, PropertyEditor callback lifecycle,
+Focused RangeSegments, shared-source Gallery, UiPropertyInspector callback lifecycle,
 working-range/numeric, Doc, platform and other unique tests remain. Different
 ModelViewPerformance, theme-structure, styled-cache and graph-presentation bodies
-were not discarded based on a filename resemblance. PropertyEditor and its
+were not discarded based on a filename resemblance. UiPropertyInspector and its
 headless core are production dependencies. Their two capability demos, headless
 probe, icon authoring/export pipeline and rendering benchmark have distinct
 current purposes and remain; no obsolete non-test tool was proved safe to retire.
@@ -784,13 +784,13 @@ It exits successfully. Geometry/measurement and drawing now have two clear sourc
 files; the source split itself does not claim a rendering speedup.
 
 The user's MediaControls access violation (c0000005) exposed synchronous editor
-reconstruction during Choice preview/commit. PropertyEditor now guards the whole
+reconstruction during Choice preview/commit. UiPropertyInspector now guards the whole
 model and host callback dispatch, copies borrowed payloads, checks binding/lifetime
 and defers structural rebuilding until callbacks unwind, including nested native
 event pumps. Bounded Integer and SliderInt reuse the numeric number/slider editor
 while preserving their schema kind, minimum, maximum and step. Unbounded integer
 values retain their full domain. The focused lifecycle/numeric gate and four
-existing PropertyEditor suites pass 511 checks in total with zero failures.
+existing UiPropertyInspector suites pass 511 checks in total with zero failures.
 
 All multi-control builders use compact top selector buttons and one active preview:
 Button/SplitButton/ToolButton, Slider/RangeSlider/SliderEdit/RangeSliderEdit,

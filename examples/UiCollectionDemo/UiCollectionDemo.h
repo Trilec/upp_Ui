@@ -3,11 +3,11 @@
 
 // C Edwards (dodobar), Apache-2.0. One native collection designer: author a
 // List, Gallery or comparison without a second semantic item collection.
-// PropertyEditor models own configuration; the Data page projects one record
+// UiPropertyInspector models own configuration; the Data page projects one record
 // from the shared production model. Borrowed models/factory outlive their views.
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 namespace Upp {
 
@@ -41,12 +41,12 @@ private:
     Value Override(const String& id) const;
     bool Active(const String& id) const;
     bool AnyOverride(const String& prefix) const;
-    void Reset(PropertyEditorModel& model, const String& id);
+    void Reset(UiPropertyInspectorModel& model, const String& id);
 
     UiListModel model;
     Vector<Image> sample_images;
-    PropertyEditorFactory factory;
-    PropertyEditorModel inspector_model, override_model, data_model;
+    UiPropertyInspectorFactory factory;
+    UiPropertyInspectorModel inspector_model, override_model, data_model;
     UiTitleCard tc_header;
     UiBoxLayout box_header { UiDirection::H }, box_view { UiDirection::H };
     UiBoxLayout box_pages { UiDirection::H }, box_data_tools { UiDirection::H };
@@ -59,7 +59,7 @@ private:
     UiList list;
     UiGallery gallery;
     UiLabel lbl_status, lbl_list, lbl_gallery;
-    PropertyEditor pe_inspector, pe_overrides, pe_data;
+    UiPropertyInspector pe_inspector, pe_overrides, pe_data;
     UiMultiEdit edit_code;
     String generated_code;
     Color window_face = SColorFace();

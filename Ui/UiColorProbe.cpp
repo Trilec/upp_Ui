@@ -248,12 +248,12 @@ UiColorProbe& UiColorProbe::SetGap(int pixels)
 Size UiColorProbe::GetMinSize() const
 {
     bool row = controls_side_ == UiAlign::TOP || controls_side_ == UiAlign::BOTTOM;
-    int count = alpha_ ? 4 : 3;
-    int tool_count = copy_shown_ ? 5 : 4;
+    int count = alpha_ ? 4 : 3, tool_count = copy_shown_ ? 5 : 4;
     int tool_width = tool_count*DPI(20)+(tool_count-1)*gap_;
     int value_width = count*DPI(32)+count*gap_+DPI(14);
-    if(swatch_shown_) value_width += row_height_+gap_;
-    return Size(row ? max(value_width,tool_width) : value_width+gap_+tool_width,
+    if(swatch_shown_ && !row) value_width += row_height_+gap_;
+    int header_width = tool_width+(row && swatch_shown_ ? DPI(64)+2*gap_ : 0);
+    return Size(row ? max(value_width,header_width) : value_width+gap_+tool_width,
                 row ? row_height_*2+gap_ : row_height_);
 }
 void UiColorProbe::Layout()
@@ -269,21 +269,14 @@ void UiColorProbe::Layout()
         int row_gap = min(gap,max(0,values.GetHeight()-height));
         if(controls_side_ == UiAlign::TOP) { toolbar.bottom = height; values.top = height+row_gap; }
         else { toolbar.top = max(0,values.bottom-height); values.bottom = max(values.top,toolbar.top-row_gap); }
-        accessory_.SetRect(RectC(toolbar.left,toolbar.top,max(0,toolbar.GetWidth()-tools-gap),toolbar.GetHeight()));
-        toolbar.left = max(toolbar.left,toolbar.right-tools);
     }
     else if(controls_side_ == UiAlign::LEFT) { toolbar.right = tools; values.left = min(values.right,toolbar.right+gap); }
     else { toolbar.left = max(0,values.right-tools); values.right = max(values.left,toolbar.left-gap); }
-    live_button_.SetRect(toolbar.left,toolbar.top,button,toolbar.GetHeight());
-    mode_button_.SetRect(toolbar.left+button+gap,toolbar.top,button,toolbar.GetHeight());
-    area_button_.SetRect(toolbar.left+2*(button+gap),toolbar.top,button,toolbar.GetHeight());
-    space_button_.SetRect(toolbar.left+3*(button+gap),toolbar.top,button,toolbar.GetHeight());
-    copy_button_.SetRect(toolbar.left+4*(button+gap),toolbar.top,copy_shown_ ? button : 0,toolbar.GetHeight());
-    int swatch = swatch_shown_ ? min(values.GetHeight(),values.GetWidth()) : 0;
+    int swatch = swatch_shown_ && !row ? min(values.GetHeight(),values.GetWidth()) : 0;
     int start = min(values.right,values.left+swatch+(swatch ? gap : 0));
     int arrow = min(DPI(14),max(0,values.right-start));
     int finish = max(start,values.right-arrow);
-    swatch_.SetRect(values.left,values.top,swatch,values.GetHeight());
+    if(!row) swatch_.SetRect(values.left,values.top,swatch,values.GetHeight());
     int available = max(0,finish-start-count*gap);
     for(int i = 0; i < count; ++i) {
         int left = min(finish,start+available*i/count+i*gap);
@@ -291,5 +284,25 @@ void UiColorProbe::Layout()
         channels_[i].SetRect(left,values.top,max(0,right-left),values.GetHeight());
     }
     format_button_.SetRect(finish,values.top,arrow,values.GetHeight());
+    if(row) {
+        // Keep all numeric columns together; the swatch sits over G, with the
+        // borrowed caption over R and sampling actions to its right.
+        int caption_right = swatch_shown_ ? channels_[1].GetRect().left-gap : toolbar.right-tools-gap;
+        accessory_.SetRect(toolbar.left,toolbar.top,max(0,caption_right-toolbar.left),toolbar.GetHeight());
+        if(swatch_shown_) {
+            Rect green = channels_[1].GetRect();
+            swatch_.SetRect(green.left,toolbar.top,green.Width(),toolbar.GetHeight());
+            toolbar.left = min(toolbar.right,green.right+gap);
+            gap = min(gap,max(0,toolbar.GetWidth()/(tool_count-1)));
+            button = min(DPI(20),max(0,(toolbar.GetWidth()-(tool_count-1)*gap)/tool_count));
+            tools = button*tool_count+(tool_count-1)*gap;
+        }
+        toolbar.left = max(toolbar.left,toolbar.right-tools);
+    }
+    live_button_.SetRect(toolbar.left,toolbar.top,button,toolbar.GetHeight());
+    mode_button_.SetRect(toolbar.left+button+gap,toolbar.top,button,toolbar.GetHeight());
+    area_button_.SetRect(toolbar.left+2*(button+gap),toolbar.top,button,toolbar.GetHeight());
+    space_button_.SetRect(toolbar.left+3*(button+gap),toolbar.top,button,toolbar.GetHeight());
+    copy_button_.SetRect(toolbar.left+4*(button+gap),toolbar.top,copy_shown_ ? button : 0,toolbar.GetHeight());
 }
 }

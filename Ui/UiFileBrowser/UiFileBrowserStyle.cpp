@@ -115,6 +115,11 @@ void UiFileBrowser::ApplyTheme()
     table_style.metrics.radius = 0;
     table_style.metrics.content_margin = Rect(DPI(1), DPI(1), DPI(1), DPI(1));
     table_.SetCustomStyle(table_style);
+    // Density sets the preferred height, but inherited theme padding and the
+    // native bold font determine the minimum space needed by column headings.
+    One<UiItemRender> measured_header = table_.GetHeaderRender().Clone();
+    measured_header->SetData(UiMakeItemRenderData(UiTableHeader("Ag"), "Ag"));
+    table_.SetHeaderHeight(max(table_style.header_height, measured_header->GetContentSize().cy));
     for(UiToolButton *button : {&filter_button_, &sequence_button_, &view_button_, &sort_button_,
                                 &new_button_, &details_button_, &thumbnails_button_})
     {
@@ -293,7 +298,7 @@ void UiFileBrowser::ApplyTheme()
     auto swatch_style = new_image_swatch_.GetStyle();
     swatch_style.metrics.content_margin = Rect(0, 0, 0, 0);
     new_image_swatch_.SetCustomStyle(swatch_style).SetIconRenderMode(UiIconRenderMode::PreserveColor);
-    for(UiLineEdit *edit : {&search_, &address_edit_, &name_edit_, &filter_value_, &new_item_name_,
+    for(UiLineEdit *edit : {&search_, static_cast<UiLineEdit*>(&address_edit_), &name_edit_, &filter_value_, &new_item_name_,
                             &new_image_width_, &new_image_height_, &new_image_colour_})
         BrowserTypeface(*edit, font_);
     BrowserTypeface(missing_badge_, font_);

@@ -61,7 +61,7 @@ missing/empty summaries or any regression; never remove a check to pass a gate.
 ```powershell
 $umk = 'E:/upp-18468/umk.exe'
 $assembly = 'E:/apps/github/upp_Ui,E:/apps/github/upp_Ui/examples,E:/apps/github/upp_animation,E:/apps/github/upp_statemachine,E:/upp-18468/uppsrc'
-$packages = @('Core','Model','ModelBinding','Geometry','Metadata','Interaction','Image','Hygiene') | ForEach-Object { "Utilities/UiDoc$($_)Test" }
+$packages = @('Core','Model','ModelBinding','Geometry','Metadata','Interaction','Image','Hygiene') | ForEach-Object { "tests/UiDoc$($_)Test" }
 foreach ($flags in @('-brH2','-H2')) {
     foreach ($package in $packages) {
         $exe = Join-Path $PWD "build/doc-validation/$($package.Split('/')[-1]).exe"

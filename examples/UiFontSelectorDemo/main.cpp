@@ -1,20 +1,20 @@
 // Self-contained native reference: one authoritative configuration and clean public-API usage.
 
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 using namespace Upp;
 namespace {
 class Demo : public TopWindow {
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel model_;
     UiTitleCard header_;
     UiBoxLayout actions_{UiDirection::H}, tools_{UiDirection::H};
     UiToolButton theme_, help_, exit_, inspector_mode_, code_mode_, copy_;
     UiPanel preview_, right_, inspector_page_, code_page_;
     UiStack pages_;
-    PropertyEditor inspector_;
+    UiPropertyInspector inspector_;
     UiMultiEdit code_;
     UiLabel caption_;
     Color window_face_ = SColorFace();
@@ -27,7 +27,7 @@ public:
     }
     Demo() {
         Title("U++ Font Helper"); Sizeable().Zoomable(); SetRect(0,0,DPI(1160),DPI(760));
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
         Add(header_); Add(preview_); Add(right_);
         header_.SetTitle("U++ Font Helper").SetSubTitle("Select an installed font and generate its public Font configuration").ShowTitleLine(false)
                .SetContentCell(actions_);
@@ -55,7 +55,7 @@ public:
         code_.SetReadOnly();
         preview_.Add(caption_);
         caption_.SetText("Inspect font family, size and traits. Generated code contains the selected Font only.").SetAlign(UiAlign::CENTER,UiAlign::CENTER);
-        PropertyEditorItem& face=model_.AddChoice("face","Family",Font::GetFaceName(Font::SANSSERIF),"Font");
+        UiPropertyInspectorItem& face=model_.AddChoice("face","Family",Font::GetFaceName(Font::SANSSERIF),"Font");
         for(int i=0;i<Font::GetFaceCount();i++) face.AddChoice(Font::GetFaceName(i),Font::GetFaceName(i));
         model_.AddNumericInt("size","Height",24,5,96,1,"Font");
         model_.AddBoolean("bold","Bold",false,"Font"); model_.AddBoolean("italic","Italic",false,"Font");
@@ -91,7 +91,7 @@ public:
         }
         return out<<"    return font;\n}\n"; }
 private:
-    Value ValueOf(const String& id) const { const PropertyEditorItem* item=model_.Find(id); return item ? item->value : Value(); }
+    Value ValueOf(const String& id) const { const UiPropertyInspectorItem* item=model_.Find(id); return item ? item->value : Value(); }
     void SelectPage(int page) { pages_.SetActivePage(page); inspector_mode_.SetChecked(page==0); code_mode_.SetChecked(page==1); }
     void Apply() { Font font; font.FaceName(AsString(ValueOf("face"))).Height((int)ValueOf("size"));
         font.Bold((bool)ValueOf("bold")).Italic((bool)ValueOf("italic")).Underline((bool)ValueOf("underline")).Strikeout((bool)ValueOf("strikeout"));
@@ -125,10 +125,10 @@ private:
         for(UiLabel* label : { &caption_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;

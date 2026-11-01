@@ -2139,6 +2139,28 @@
 					"unresolved": false,
 					"marked_used": false,
 					"usage_note": ""
+				},
+				{
+					"catalog_id": "image/masked_transitions/outlined/20/unfilled",
+					"source_id": "image/masked_transitions",
+					"alias": "ICON_IMAGE_MASKED_TRANSITIONS_OUTLINED",
+					"size": 48,
+					"tint": "",
+					"comment": "",
+					"unresolved": false,
+					"marked_used": false,
+					"usage_note": ""
+				},
+				{
+					"catalog_id": "communicate/picture_in_picture_off/outlined/20/unfilled",
+					"source_id": "communicate/picture_in_picture_off",
+					"alias": "ICON_COMMUNICATE_PICTURE_IN_PICTURE_OFF_OUTLINED",
+					"size": 48,
+					"tint": "",
+					"comment": "",
+					"unresolved": false,
+					"marked_used": false,
+					"usage_note": ""
 				}
 			]
 		}

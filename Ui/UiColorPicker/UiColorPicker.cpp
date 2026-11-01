@@ -760,6 +760,22 @@ public:
     }
 };
 
+// The picker deliberately uses dense rows. Resolve their typography/palette
+// from the theme, then author compact insets rather than clipping normal fields.
+static UiDropdown::Style PickerDropStyle_()
+{
+    UiDropdown::Style s = UiTheme::ResolveDropdown(UiRole::Standard);
+    s.metrics.content_margin = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
+    return s;
+}
+
+static UiBaseEdit::Style PickerEditStyle_()
+{
+    UiBaseEdit::Style s = UiTheme::ResolveEdit(UiRole::Standard);
+    s.metrics.content_margin = Rect(DPI(4), DPI(2), DPI(4), DPI(2));
+    return s;
+}
+
 class LabeledDrop_ : public UiBoxLayout {
 public:
     LabeledDrop_()
@@ -807,6 +823,18 @@ public:
     }
 
     UiDropdown& Drop() { return drop_; }
+    void SyncTheme()
+    {
+        drop_.SetCustomStyle(PickerDropStyle_());
+        ItemAt(0).Fixed(max(DPI(12), label_.GetMinSize().cy));
+    }
+
+    Size GetMinSize() const override
+    {
+        const Size label = label_.GetMinSize();
+        const Size field = slider_mode_ ? slider_row_.GetMinSize() : drop_.GetMinSize();
+        return Size(max(label.cx, field.cx), max(DPI(12), label.cy) + DPI(1) + field.cy);
+    }
 
     virtual void Layout() override
     {
@@ -909,12 +937,18 @@ public:
     int GetValue() const { return slider_.GetValue(); }
     UiSlider& Slider() { return slider_; }
     CommitLineEdit_& Edit() { return edit_; }
+    void SyncTheme()
+    {
+        edit_.SetCustomStyle(PickerEditStyle_());
+        ItemAt(0).Fixed(max(DPI(78), label_.GetMinSize().cx));
+    }
 
     Event<int, bool> WhenValue;
 
     virtual void Layout() override
     {
-        int slider_width = max(DPI(52), GetSize().cx - DPI(78) - DPI(48) - DPI(8));
+        const int label_width = max(DPI(78), label_.GetMinSize().cx);
+        int slider_width = max(DPI(52), GetSize().cx - label_width - DPI(48) - DPI(8));
         slider_.SetTrackSize(Size(slider_width, DPI(5)));
         UiBoxLayout::Layout();
     }
@@ -1011,9 +1045,16 @@ public:
 
     Event<double, bool> WhenValue;
 
+    void SyncTheme()
+    {
+        edit_.SetCustomStyle(PickerEditStyle_());
+        ItemAt(0).Fixed(max(DPI(28), label_.GetMinSize().cx));
+    }
+
     virtual void Layout() override
     {
-        int slider_width = max(DPI(52), GetSize().cx - DPI(28) - DPI(70) - DPI(8));
+        const int label_width = max(DPI(28), label_.GetMinSize().cx);
+        int slider_width = max(DPI(52), GetSize().cx - label_width - DPI(70) - DPI(8));
         slider_.SetTrackSize(Size(slider_width, DPI(5)));
         UiBoxLayout::Layout();
     }
@@ -2074,6 +2115,7 @@ private:
     void LoadPaletteJson();
 
     UiColorPicker& owner_;
+    uint64 child_theme_revision_ = 0;
 
     Vector<SlotValue> slots_;
     Vector<SlotValue> previous_;
@@ -4448,6 +4490,32 @@ void UiColorPicker::Impl::LoadPaletteJson()
 
 void UiColorPicker::Impl::SyncTheme()
 {
+    child_theme_revision_ = UiTheme::GetRevision();
+    LabeledDrop_* fields[] = { &spectrum_field_, &palette_field_, &harmony_field_,
+        &distribution_field_, &generator_medium_field_, &generator_count_field_,
+        &image_analysis_field_, &image_coverage_field_, &image_medium_field_, &image_count_field_ };
+    for(LabeledDrop_* field : fields) field->SyncTheme();
+    channel_drop_.SetCustomStyle(PickerDropStyle_());
+    stash_mode_drop_.SetCustomStyle(PickerDropStyle_());
+    footer_hex_.SetCustomStyle(PickerEditStyle_());
+    footer_detail_.SetCustomStyle(PickerEditStyle_());
+    One<SliderRow_>* rows[] = { &hue_row_, &value_row_, &generator_gain_row_,
+        &generator_saturation_row_, &family_gain_row_, &image_gain_row_,
+        &image_saturation_row_, &hero_gain_row_, &tolerance_row_ };
+    for(One<SliderRow_>* row : rows) if(*row) (*row)->SyncTheme();
+    for(int i = 0; i < 5; ++i) if(numeric_row_[i]) numeric_row_[i]->SyncTheme();
+
+    UiToggle::Style toggle = UiTheme::ResolveToggle();
+    toggle.metrics.content_margin = Rect(0, 0, 0, 0);
+    toggle.track_size = Size(DPI(30), DPI(18));
+    UiToggle* switches[] = { &alpha_toggle_, &free_angles_toggle_,
+        &exclusion_toggle_[0], &exclusion_toggle_[1], &show_exclusion_toggle_ };
+    for(UiToggle* control : switches) control->SetCustomStyle(toggle);
+
+    const UiButton::Style accent = UiTheme::ResolveButton(UiRole::Accent);
+    Color selected = accent.palette.face[ST_NORMAL].IsSolid()
+                   ? accent.palette.face[ST_NORMAL].color : accent.metrics.focus_color;
+    if(IsNull(selected)) selected = SColorHighlight();
     for(int i = 0; i < PAGE_COUNT; i++) {
         bool active = i == page_mode_;
         UiButton::Style style = UiTheme::ResolveButton(UiRole::Subtle);
@@ -4455,6 +4523,8 @@ void UiColorPicker::Impl::SyncTheme()
         style.metrics.frame_enabled = false;
         style.metrics.frame_width = 0;
         style.metrics.focus_enabled = false;
+        style.metrics.content_margin = Rect(DPI(6), DPI(2), DPI(6), DPI(2));
+        if(active) for(int state = 0; state < 3; ++state) style.palette.ink[state] = selected;
         style.underline = active;
         style.underline_width = DPI(3);
         style.underline_offset = DPI(3);
@@ -4486,11 +4556,14 @@ void UiColorPicker::Impl::SyncTheme()
     }
     for(int i = 0; i < 2; i++)
         exclusion_button_[i].SetCustomStyle(swatch_style);
+    image_page_.ItemAt(0).Fixed(max(DPI(44), image_top_.GetMinSize().cy));
+    generator_page_.ItemAt(0).Fixed(max(DPI(44), generator_top_.GetMinSize().cy));
     SyncImageStatus();
 }
 
 void UiColorPicker::Impl::Layout()
 {
+    if(child_theme_revision_ != UiTheme::GetRevision()) SyncTheme();
     {
         UiBoxLayout::PauseScope pause(root_, false);
         root_.ItemAt(0).Fixed(owner_.GetStyle().navigation_height);

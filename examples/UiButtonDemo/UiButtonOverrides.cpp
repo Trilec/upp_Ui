@@ -23,7 +23,7 @@ ValueMap FillRecipe(const UiFill& fill, Color fallback)
     return recipe;
 }
 
-PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
+UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item)
 {
     item.overrideable = true;
     item.override_active = false;
@@ -56,7 +56,7 @@ void UiButtonDemo::BuildOverrideModel()
                                               "Face"));
     for(int i = 0; i < 4; i++)
         MarkOverride(pe_model_override.Add("face." + String(OverrideStateId(i)), labels[i],
-                     PropertyEditorKind::FillRecipe,
+                     UiPropertyInspectorKind::FillRecipe,
                      FillRecipe(base.palette.face[i], White()), "Face"));
 
     MarkOverride(AddPropertyImage(pe_model_override, "skin_image", "Image", String(),
@@ -138,11 +138,11 @@ void UiButtonDemo::BuildOverrideModel()
     MarkOverride(pe_model_override.AddChoice("shadow_mode", "Mode",
                     base.metrics.shadow.mode == SHADOW_HARD ? "Hard" : "Curve", "Shadow")
                     .AddChoice("Hard", "Hard").AddChoice("Curve", "Curve"));
-    Value curve = PropertyEditorMakeBezierCurve(base.metrics.shadow.curve.x1,
+    Value curve = UiPropertyInspectorMakeBezierCurve(base.metrics.shadow.curve.x1,
                                                  base.metrics.shadow.curve.y1,
                                                  base.metrics.shadow.curve.x2,
                                                  base.metrics.shadow.curve.y2);
-    PropertyEditorItem& shadow_curve =
+    UiPropertyInspectorItem& shadow_curve =
         pe_model_override.AddBezierCurve("shadow_curve", "Falloff curve", curve, "Shadow");
     shadow_curve.SetRange(0.0, 1.0, 0.001);
     MarkOverride(shadow_curve);
@@ -185,7 +185,7 @@ void UiButtonDemo::UpdateOverrideSummaries()
 {
     VectorMap<String, int> active, total;
     for(int i = 0; i < OverrideModel().GetCount(); i++) {
-        const PropertyEditorItem& item = OverrideModel()[i];
+        const UiPropertyInspectorItem& item = OverrideModel()[i];
         total.GetAdd(item.group, 0)++;
         if(item.override_active)
             active.GetAdd(item.group, 0)++;

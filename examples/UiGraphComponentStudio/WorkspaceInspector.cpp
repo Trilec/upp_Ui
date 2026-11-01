@@ -199,7 +199,7 @@ void NodeWorkspace::ApplyProperty(const String& id, const Value& value, bool fin
         String error;
         if(!Validate(next, error)) throw Exc(error);
         // Portable authoring constraints are checked on commit; image/data
-        // resources do not get decoded or transformed by PropertyEditor paint.
+        // resources do not get decoded or transformed by UiPropertyInspector paint.
         if(final) Encode(next);
         if(final) { PushUndo(property_origin_ ? *property_origin_ : document_); next.dirty = true; next.revision = document_.revision + 1; }
         document_ = next;
@@ -213,7 +213,7 @@ void NodeWorkspace::ApplyProperty(const String& id, const Value& value, bool fin
             bool schema_changed = id == "feature";
             const int scope = Scope(), page = page_, revision = document_.revision;
             const String selected = selection_.id;
-            // Run after PropertyEditor finishes its own commit transaction. A
+            // Run after UiPropertyInspector finishes its own commit transaction. A
             // queued update may not replace a newer selection/edit/document.
             PostCallback([this, scope, page, revision, selected, id, schema_changed] {
                 if(property_origin_ || Scope() != scope || page_ != page
@@ -229,7 +229,7 @@ void NodeWorkspace::ApplyProperty(const String& id, const Value& value, bool fin
     catch(const Exc& e) { properties_.SetValidationError(id, e); status_.SetText(e); }
 }
 // Refresh dependent summaries in the SAME model. Selection, expanded rows,
-// filter and scroll remain owned by PropertyEditor and are not reconstructed.
+// filter and scroll remain owned by UiPropertyInspector and are not reconstructed.
 void NodeWorkspace::SyncInspectorValues()
 {
     auto set = [&](const String& id, const Value& value) {

@@ -16,29 +16,29 @@
 
     Features
     - Centers the real UiLabel in a responsive preview surface.
-    - Uses the production PropertyEditor for authored properties and explicit
+    - Uses the production UiPropertyInspector for authored properties and explicit
       theme overrides.
     - Covers Label content, icons, sizing, typography, state palettes, frames,
       focus, shadows, highlights and optional image skin data.
     - Generates matching standalone C++ that can be selected and copied.
 
     Design
-    - PropertyEditor models are the single authored state. Preview and source
+    - UiPropertyInspector models are the single authored state. Preview and source
       generation read the same values, avoiding parallel demo-only state.
     - Theme rows remain inherited until their override action is activated.
     - Override presentation follows docs/05_UI_PROPERTY_EDITOR_GUIDE.md;
       stable runtime ids are normalized to that human-facing layout before the
-      PropertyEditor observes structure changes.
+      UiPropertyInspector observes structure changes.
 
 */
 
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 namespace Upp {
 
-class UiLabelOverrideModel : public PropertyEditorModel {
+class UiLabelOverrideModel : public UiPropertyInspectorModel {
 public:
     // Preserve stable ids/value semantics while enforcing the canonical Label
     // group paths and concise row labels used by demos and UiDesigner.
@@ -69,7 +69,7 @@ private:
     void UpdateGeneratedCode();
     void SelectPage(int page);
     void ToggleTheme();
-    void ResetProperty(PropertyEditorModel& model, const String& id);
+    void ResetProperty(UiPropertyInspectorModel& model, const String& id);
     void SetOverrideActive(const String& id, bool active);
     bool PickImage(Value& value, Ctrl *owner);
     Image LoadImageValue(const Value& value) const;
@@ -78,8 +78,8 @@ private:
     Value OverrideValue(const String& id) const;
     bool OverrideActive(const String& id) const;
 
-    PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_inspector;
+    UiPropertyInspectorFactory pe_factory;
+    UiPropertyInspectorModel pe_model_inspector;
     UiLabelOverrideModel pe_model_override;
     UiTitleCard tc_header;
     UiBoxLayout box_header_actions { UiDirection::H };
@@ -93,7 +93,7 @@ private:
     UiToolButton btn_inspector_mode, btn_overrides_mode, btn_code_mode;
     UiStack stk_right_pages;
     UiPanel pnl_inspector_page, pnl_overrides_page, pnl_code_page;
-    PropertyEditor pe_inspector, pe_overrides;
+    UiPropertyInspector pe_inspector, pe_overrides;
     UiMultiEdit edit_generated_code;
     UiToolButton btn_copy_code;
 

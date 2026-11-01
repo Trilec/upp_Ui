@@ -263,6 +263,7 @@ CONSOLE_APP_MAIN
     TestProxyAndImageAnalysis();
     TestIndependentExclusions();
     TestTransactionalStash();
+    Cout() << Format("UICOLORPICKER_PALETTE_LAB_SUMMARY checks=%d failed=%d\n", checks, failures);
     Cout() << "\nPalette Lab checks: " << checks << ", failures: " << failures << '\n';
     SetExitCode(failures ? 1 : 0);
 }

@@ -287,6 +287,7 @@ CONSOLE_APP_MAIN
     TestInteractionGuards();
     TestRendererSharesPresentation();
 
+    Cout() << Format("UIMEDIA_CARD_SUMMARY checks=%d failed=%d\n", checks, failures);
     Cout() << checks << " checks, "
            << failures << " failures\n";
 

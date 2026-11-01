@@ -1,0 +1,14 @@
+#ifndef _Ui_UiPropertyInspector_PropertySemanticEditorsInternal_h_
+#define _Ui_UiPropertyInspector_PropertySemanticEditorsInternal_h_
+
+#include "PropertyValueEditors.h"
+
+namespace Upp {
+
+void RegisterUiPropertyInspectorSemanticScalarEditors(UiPropertyInspectorFactory& factory);
+void RegisterUiPropertyInspectorSemanticCollectionEditors(UiPropertyInspectorFactory& factory);
+void RegisterUiPropertyInspectorSemanticGradientEditors(UiPropertyInspectorFactory& factory);
+
+}
+
+#endif

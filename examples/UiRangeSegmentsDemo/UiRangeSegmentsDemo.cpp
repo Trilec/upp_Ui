@@ -3,21 +3,21 @@
 namespace Upp {
 namespace {
 // Frame Accent is an authored addition to the ordinary frame, not layout padding.
-void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+void AddFrameAccentProperties(UiPropertyInspectorModel& model, const String& prefix,
                               const StyledMetrics& metrics, const String& group)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const char* label[] = { "Top", "Bottom", "Left", "Right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
                          StyledFrameAccent::Left, StyledFrameAccent::Right };
-    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    auto mark = [](UiPropertyInspectorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
     for(int i = 0; i < 4; i++)
         mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
     mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
     mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
     mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
 }
-void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const UiPropertyInspectorModel& model, const String& prefix)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
@@ -36,7 +36,7 @@ void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorMode
     row = model.Find(prefix + "color");
     if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
 }
-void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+void EmitFrameAccentProperties(String& code, const UiPropertyInspectorModel& model, const String& prefix,
                                const String& target, const String& declaration, bool& authored)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
@@ -65,7 +65,7 @@ void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, c
 }
 
 
-PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
+UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item)
 {
     item.overrideable = true;
     item.override_active = false;
@@ -155,7 +155,7 @@ UiRangeSegmentsDemo::UiRangeSegmentsDemo()
     }
     ranges_.SetRange(0, 100).SetSegments(acts).SetValueDisplay(UiRangeSegments::ValueDisplay::Percent);
 
-    RegisterPropertyEditorEditors(factory_);
+    RegisterUiPropertyInspectorEditors(factory_);
     BuildHeader();
     BuildPreview();
     BuildRightRail();
@@ -478,7 +478,7 @@ void UiRangeSegmentsDemo::ConfigureEditors()
     overrides_.SetLabelRatio(46);
     data_.SetLabelRatio(46);
 
-    PropertyEditorStyle style = PropertyEditorStyle::System();
+    UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
     style.show_group_summaries = true;
     inspector_.SetStyle(style);
     overrides_.SetStyle(style);
@@ -536,31 +536,31 @@ void UiRangeSegmentsDemo::ConnectEvents()
 
 Value UiRangeSegmentsDemo::InspectorValue(const String& id, const Value& fallback) const
 {
-    const PropertyEditorItem *item = inspector_model_.Find(id);
+    const UiPropertyInspectorItem *item = inspector_model_.Find(id);
     return item ? item->value : fallback;
 }
 
 Value UiRangeSegmentsDemo::OverrideValue(const String& id, const Value& fallback) const
 {
-    const PropertyEditorItem *item = override_model_.Find(id);
+    const UiPropertyInspectorItem *item = override_model_.Find(id);
     return item ? item->value : fallback;
 }
 
 Value UiRangeSegmentsDemo::DataValue(const String& id, const Value& fallback) const
 {
-    const PropertyEditorItem *item = data_model_.Find(id);
+    const UiPropertyInspectorItem *item = data_model_.Find(id);
     return item ? item->value : fallback;
 }
 
 bool UiRangeSegmentsDemo::OverrideActive(const String& id) const
 {
-    const PropertyEditorItem *item = override_model_.Find(id);
+    const UiPropertyInspectorItem *item = override_model_.Find(id);
     return item && item->override_active;
 }
 
-void UiRangeSegmentsDemo::ResetProperty(PropertyEditorModel& model, const String& id)
+void UiRangeSegmentsDemo::ResetProperty(UiPropertyInspectorModel& model, const String& id)
 {
-    PropertyEditorItem *item = model.Find(id);
+    UiPropertyInspectorItem *item = model.Find(id);
     if(!item || !item->resettable)
         return;
     model.SetValue(id, item->default_value);
@@ -569,7 +569,7 @@ void UiRangeSegmentsDemo::ResetProperty(PropertyEditorModel& model, const String
 
 void UiRangeSegmentsDemo::SetOverrideActive(const String& id, bool active)
 {
-    PropertyEditorItem *item = override_model_.Find(id);
+    UiPropertyInspectorItem *item = override_model_.Find(id);
     if(!item || !item->overrideable)
         return;
     item->override_active = active;
@@ -614,7 +614,7 @@ void UiRangeSegmentsDemo::SyncDataSpans()
 void UiRangeSegmentsDemo::SyncInheritedOverrides(const UiRangeSegments::Style& style)
 {
     auto SetIfInherited = [&](const String& id, const Value& value) {
-        PropertyEditorItem* item = override_model_.Find(id);
+        UiPropertyInspectorItem* item = override_model_.Find(id);
         if(!item)
             return;
         item->SetDefault(value);
@@ -675,7 +675,7 @@ void UiRangeSegmentsDemo::SyncInheritedOverrides(const UiRangeSegments::Style& s
 bool UiRangeSegmentsDemo::ApplyOverrides(UiRangeSegments::Style& style) const
 {
     bool any = false;
-    for(const PropertyEditorItem& item : override_model_.GetItems())
+    for(const UiPropertyInspectorItem& item : override_model_.GetItems())
         any = any || item.override_active;
     ApplyFrameAccentProperties(style.track_metrics, override_model_, "track_metrics.frame_accent.");
     if(OverrideActive("track.face")) style.track_palette.face[ST_NORMAL] = UiFill::Solid(Color(OverrideValue("track.face")));
@@ -843,12 +843,12 @@ void UiRangeSegmentsDemo::ApplyTheme()
         for(UiLabel* label : { &caption_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
         overrides_.SetPaletteMode(mode);
         data_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_, &overrides_, &data_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_, &overrides_, &data_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -1025,7 +1025,7 @@ void UiRangeSegmentsDemo::ExportGenerated(const String& directory)
     data_model_.SetValue("segment.0.label", "Act \"one\"", false);
     data_model_.SetValue("segment.0.subtitle", "A subtitle\nwith a second line", false);
     auto author = [&](const char* id, const Value& value) {
-        PropertyEditorItem* item = override_model_.Find(id);
+        UiPropertyInspectorItem* item = override_model_.Find(id);
         item->override_active = true;
         override_model_.SetValue(id, value, false);
     };

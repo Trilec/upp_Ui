@@ -1,0 +1,20 @@
+description "Ui built-in themes and Core-only preset catalogue";
+
+uses
+    Core;
+
+file
+    UiThemePresets.h,
+    Resolver.h,
+    StructureContract.h,
+    Minimal.h,
+    MinimalPalette.h,
+    MinimalRoles.h,
+    Pill.h,
+    Linear.h,
+    Solid.h,
+    Outline.h,
+    Compact.h,
+    Layered.h,
+    Olive.h,
+    README.md;

@@ -16,7 +16,7 @@
 | Tabs, pages, disclosure | UiTab / UiStack / UiAccordion | Active page and disclosure own visibility |
 | Adjustable panes | UiSplitter / UiQuadSplitter | Define limits and persisted proportions |
 | Flat/hierarchical/tabular/tile data | UiList / UiTree / UiTable / UiGallery | Model-driven, visible renderer pool, sparse editors |
-| Property inspector | Utilities/PropertyEditor | Typed schema, preview/commit/reset/inheritance, host undo |
+| Property inspector | Ui/UiPropertyInspector | Typed schema, preview/commit/reset/inheritance, host undo |
 | Document | UiDoc | Its own document core, not an arbitrary HTML browser |
 | Progress and proportional rings | UiProgressBar / UiProgressRing / UiChartRing | Single progress vs multiple series; legend may need composition |
 | Palettes and structured numeric/color selection | UiColorPicker / UiColorMatrix / UiMatrixSelector / UiRangeSegments | Check each control's value and capacity contract |

@@ -156,20 +156,20 @@ try {
     Write-Host "Evidence directory: $run"
 
     $render = Join-Path $run 'UiGraphRenderTests.exe'
-    Native-Checked -Executable $umk -Arguments @($assembly, 'Utilities/UiGraphRenderTests', $Method, '-b', $render) -Label 'render-build'
+    Native-Checked -Executable $umk -Arguments @($assembly, 'tests/UiGraphRenderTests', $Method, '-b', $render) -Label 'render-build'
     Native-Checked -Executable $render -Arguments @() -Label 'render-test'
     Require-Summary 'render-test' 'UIGRAPH_RENDER_TESTS_SUMMARY' 'suites' 'failed_suites' 9
     Require-Summary 'render-test' 'UIGRAPH_ELLIPSE_BANDS_SUMMARY'
 
     # Export from the actual authoring test executable, then compile the output
     # unchanged against Ui. The temporary package deliberately does not use the
-    # authoring or PropertyEditor packages.
+    # authoring or UiPropertyInspector packages.
     $probeNest = Join-Path $run 'probe-nest'
     $probe = Join-Path $probeNest 'GeneratedWorkspaceProbe'
     New-Item -ItemType Directory -Path $probe -Force | Out-Null
     $generated = Join-Path $probe 'GeneratedFamily.cpp'
     $workspace = Join-Path $run 'UiGraphWorkspaceTests.exe'
-    Native-Checked -Executable $umk -Arguments @($assembly, 'Utilities/UiGraphWorkspaceTests', $Method, '-b', $workspace) -Label 'authoring-build'
+    Native-Checked -Executable $umk -Arguments @($assembly, 'tests/UiGraphWorkspaceTests', $Method, '-b', $workspace) -Label 'authoring-build'
     Native-Checked -Executable $workspace -Arguments @("--export=$generated") -Label 'authoring-test'
     Require-Summary 'authoring-test' 'UIGRAPH_WORKSPACE_SUMMARY'
     if (!(Test-Path -LiteralPath $generated) -or (Get-Item -LiteralPath $generated).Length -eq 0) {

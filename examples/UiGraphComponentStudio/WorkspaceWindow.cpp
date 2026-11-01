@@ -50,7 +50,7 @@ NodeWorkspace::NodeWorkspace()
     UiThemeContext context = UiTheme::GetContext();
     context.preset = UiThemePreset::Minimal; context.mode = UiThemeMode::Light; UiTheme::Set(context);
     document_ = MakeDocument(); preview_image_ = SampleImage(); preview_small_ = CachedRescale(preview_image_, Size(2, 2));
-    RegisterPropertyEditorEditors(factory_);
+    RegisterUiPropertyInspectorEditors(factory_);
     factory_.RegisterPicker("workspace-image", [this](Value& v, Ctrl* owner) { return PickImage(v, owner); });
     factory_.RegisterThumbnailProvider("workspace-image", [](const Value& v) { return v.Is<Image>() ? (Image)v : Image(); });
     BuildShell(); Connect();
@@ -161,7 +161,7 @@ void NodeWorkspace::BuildShell()
     remove_.SetText("Remove"); tools_.AddSpacer(1).Expand(1); tools_.Add(remove_).Fixed(DPI(66));
     // UiBoxLayout deliberately shows its participating children during Layout.
     // Page visibility therefore belongs to this non-flow host, not to Hide() on
-    // two expanding flow items (which resurrected the empty PropertyEditor).
+    // two expanding flow items (which resurrected the empty UiPropertyInspector).
     rail_.Add(rail_content_).Expand(1);
     rail_content_.Add(inspector_.SizePos());
     rail_content_.Add(code_tools_.HSizePos().TopPos(0, DPI(28)));
@@ -262,7 +262,7 @@ void NodeWorkspace::ApplyShellTheme()
     rail_surface_.SetCustomStyle(panel); preview_surface_.SetCustomStyle(panel);
     rail_.SetInset(DPI(6));
     title_.SetCustomStyle(UiTheme::ResolveTitleCard(UiRole::Accent));
-    inspector_.SetPaletteMode(dark?PropertyEditorPaletteMode::Dark:PropertyEditorPaletteMode::Light);
+    inspector_.SetPaletteMode(dark?UiPropertyInspectorPaletteMode::Dark:UiPropertyInspectorPaletteMode::Light);
     auto editor=inspector_.GetStyle(); editor.show_frame=false; editor.background=face; inspector_.SetStyle(editor);
     auto action=UiTheme::ResolveToolButton(UiRole::Standard);
     action.transparent=true; action.underline=false;

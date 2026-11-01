@@ -1,28 +1,28 @@
 // Native UiMediaCard reference: edit content and theme overrides, compare live
 // cards with pooled Gallery rendering, and generate public-API usage C++.
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 using namespace Upp;
 
 namespace {
 // Frame Accent is an authored addition to the ordinary frame, not layout padding.
-void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+void AddFrameAccentProperties(UiPropertyInspectorModel& model, const String& prefix,
                               const StyledMetrics& metrics, const String& group)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const char* label[] = { "Top", "Bottom", "Left", "Right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
                          StyledFrameAccent::Left, StyledFrameAccent::Right };
-    auto mark = [](PropertyEditorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
+    auto mark = [](UiPropertyInspectorItem& item) { item.overrideable = true; item.SetDefault(item.value); };
     for(int i = 0; i < 4; i++)
         mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
     mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
     mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
     mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
 }
-void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const UiPropertyInspectorModel& model, const String& prefix)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
@@ -41,7 +41,7 @@ void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorMode
     row = model.Find(prefix + "color");
     if(row && row->override_active) metrics.frame_accent.color = Color(row->value);
 }
-void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+void EmitFrameAccentProperties(String& code, const UiPropertyInspectorModel& model, const String& prefix,
                                const String& target, const String& declaration, bool& authored)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
@@ -70,7 +70,7 @@ void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, c
 }
 
 
-PropertyEditorItem& MarkOverride(PropertyEditorItem& item)
+UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item)
 {
     item.overrideable = true;
     item.override_active = false;
@@ -203,7 +203,7 @@ public:
         ctx.mode = UiThemeMode::Light;
         UiTheme::Set(ctx);
 
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
 
         BuildHeader();
         BuildPreview();
@@ -615,7 +615,7 @@ private:
         inspector_.SetLabelRatio(46);
         overrides_.SetLabelRatio(46);
 
-        PropertyEditorStyle style = PropertyEditorStyle::System();
+        UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
         style.show_group_summaries = true;
         inspector_.SetStyle(style);
         overrides_.SetStyle(style);
@@ -754,26 +754,26 @@ private:
     Value InspectorValue(const String& id,
                          const Value& fallback = Value()) const
     {
-        const PropertyEditorItem *item = inspector_model_.Find(id);
+        const UiPropertyInspectorItem *item = inspector_model_.Find(id);
         return item ? item->value : fallback;
     }
 
     Value OverrideValue(const String& id,
                         const Value& fallback = Value()) const
     {
-        const PropertyEditorItem *item = override_model_.Find(id);
+        const UiPropertyInspectorItem *item = override_model_.Find(id);
         return item ? item->value : fallback;
     }
 
     bool OverrideActive(const String& id) const
     {
-        const PropertyEditorItem *item = override_model_.Find(id);
+        const UiPropertyInspectorItem *item = override_model_.Find(id);
         return item && item->override_active;
     }
 
-    void ResetProperty(PropertyEditorModel& model, const String& id)
+    void ResetProperty(UiPropertyInspectorModel& model, const String& id)
     {
-        PropertyEditorItem *item = model.Find(id);
+        UiPropertyInspectorItem *item = model.Find(id);
         if(!item || !item->resettable)
             return;
         model.SetValue(id, item->default_value);
@@ -782,7 +782,7 @@ private:
 
     void SetOverrideActive(const String& id, bool active)
     {
-        PropertyEditorItem *item = override_model_.Find(id);
+        UiPropertyInspectorItem *item = override_model_.Find(id);
         if(!item || !item->overrideable)
             return;
         item->override_active = active;
@@ -1242,11 +1242,11 @@ private:
         for(UiLabel* label : { &editable_label_, &samples_label_, &gallery_label_, &caption_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
         overrides_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_, &overrides_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -1286,8 +1286,8 @@ private:
     }
 
 private:
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_, override_model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel inspector_model_, override_model_;
     UiListModel gallery_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
@@ -1306,7 +1306,7 @@ private:
     UiToolButton inspector_mode_, overrides_mode_, code_mode_;
     UiStack pages_;
     UiPanel inspector_page_, overrides_page_, code_page_;
-    PropertyEditor inspector_, overrides_;
+    UiPropertyInspector inspector_, overrides_;
     UiMultiEdit code_;
     UiToolButton copy_;
 

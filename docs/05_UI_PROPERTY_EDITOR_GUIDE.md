@@ -1,27 +1,45 @@
-# 05 — PropertyEditor Guide
+# 05 — UiPropertyInspector Guide
 
-The reusable property system has a headless model (`Utilities/PropertyEditorCore`)
-and a Ui-backed visual editor (`Utilities/PropertyEditor`). Neither depends on
+The reusable property system has a headless model (`Ui/UiPropertyInspector/Core`)
+and a Ui-backed visual editor (`Ui/UiPropertyInspector`). Neither depends on
 UiDesigner, SymbolPicker or a demo executable. The host owns application semantics,
 commands/undo, resource providers and persistence.
 
 ## Boundaries and lifetime
 
-PropertyEditorModel describes typed values, defaults, ranges, validation, groups,
+UiPropertyInspectorModel describes typed values, defaults, ranges, validation, groups,
 help/units, mixed/inherited state, visibility, indentation/row spans and refresh
 impact. Core may store opaque custom-editor/provider identifiers without depending
 on their concrete GUI implementation. It is useful to GUI, CLI, agent and tests.
 
-PropertyEditor owns row/filter rendering, selection, inline/popup editor lifetime,
-viewport-limited creation and preview/commit/cancel interaction. PropertyEditorFactory
+UiPropertyInspector owns row/filter rendering, selection, inline/popup editor lifetime,
+viewport-limited creation and preview/commit/cancel interaction. UiPropertyInspectorFactory
 is the kind/adapter factory; do not introduce a second competing factory or duplicate
 advanced-editor implementations. Bind a model with SetModel(&model); detach with
 SetModel(nullptr) before destroying/replacing the borrowed model as required by
 its lifetime contract. Replacing the model intentionally resets active editing.
 
-Production callers normally use RegisterPropertyEditorEditors to install the
-complete standard adapters. The existing V1 registration entry remains compatible;
-do not remove it without sweeping its actual callers.
+Production callers use `RegisterUiPropertyInspectorEditors()` to install the
+complete standard adapters. There is one registration path; the obsolete V1
+registration alias has been removed.
+
+## Migrating existing callers
+
+Replace the package dependency `Utilities/PropertyEditor` with
+`Ui/UiPropertyInspector` and include
+`<Ui/UiPropertyInspector/UiPropertyInspector.h>`. Headless callers use the
+`Ui/UiPropertyInspector/Core` package and
+`<Ui/UiPropertyInspector/Core/UiPropertyInspectorCore.h>`; this does not add GUI
+dependencies. The model's direct header is `UiPropertyInspectorModel.h` in Core.
+
+Public identifiers formerly beginning with `PropertyEditor` now begin with
+`UiPropertyInspector`, including the control, model, factory, style and palette
+mode. The registration function is `RegisterUiPropertyInspectorEditors()`;
+`PropertyValueEditors` and the individual value-editor family names are unchanged.
+There is no compatibility copy in utilities. The inspector examples are now
+`examples/UiPropertyInspectorDemo` and
+`examples/UiPropertyInspectorSemanticDemo`. Graph authoring callers similarly
+use `Ui/UiGraphWorkspace` in their package declarations and includes.
 
 ## Schema and values
 
@@ -120,7 +138,7 @@ Only expose fields the control's real render/layout path consumes and generated
 code can express. The presence of a member in an old Style struct is not proof
 that every custom paint path honors it.
 
-PropertyEditor should demonstrate useful standard controls/adapters, not a generic
+UiPropertyInspector should demonstrate useful standard controls/adapters, not a generic
 bag of all properties. Domain-backed Data pages edit the same production model as
 the preview. Graph and document authoring may use dedicated transactions instead
 of pretending to be ordinary scalar rows. See the Models and Demo guides.
@@ -128,7 +146,7 @@ of pretending to be ordinary scalar rows. See the Models and Demo guides.
 ## Geometry, appearance and scale
 
 SetRowSpan and SetExpandedRowSpan describe compact/expanded capacity. Expandable
-Matrix, Curve, Image and Multiline editors use PropertyEditor-owned expansion
+Matrix, Curve, Image and Multiline editors use UiPropertyInspector-owned expansion
 state and compact action rails. Rich editors may expand inline or use a provider
 picker; the host chooses meaningful presentation rather than creating another
 layout implementation per property.
@@ -141,16 +159,17 @@ preserve the actual selected/expanded property through ordinary value changes.
 
 SetPaletteMode can follow UiTheme or select Light/Dark. Complete mode switching
 refreshes editor surfaces, filter, rows and glyphs, not just the previewed control.
-PropertyEditorStyle owns action imagery (reset/expand/collapse/dialog/browse),
+UiPropertyInspectorStyle owns action imagery (reset/expand/collapse/dialog/browse),
 filter spacing, nesting/indentation and label divider geometry. The divider gives
 resize feedback; rich inline controls receive usable space. Color chips remain
 crisp and actual colors, not a role-tinted substitute.
 
 ## Validation and documentation
 
-Retain the existing PropertyEditorTests, V1/Semantic suites, OverrideCommit,
-SortOrder, WorkingRange and CoreProbe coverage. PropertyEditorDemo is the capability
-reference; SemanticDemo is a focused semantic matrix, not automatically obsolete.
+Retain the existing UiPropertyInspectorTests, Builtin/Semantic suites,
+OverrideCommit, callback lifecycle, SortOrder, WorkingRange and CoreTest coverage
+under `tests/`. UiPropertyInspectorDemo is the capability reference;
+UiPropertyInspectorSemanticDemo is a focused semantic matrix, not automatically obsolete.
 Core must still compile without CtrlCore/CtrlLib/Ui. Visual changes need native
 edit/cancel/rebuild, picker-slot, inherited activation, mixed/partial numeric,
 filter/scroll and viewport-pool checks. Exercise repeated Light/Dark transitions.

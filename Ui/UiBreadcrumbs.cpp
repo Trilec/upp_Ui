@@ -498,15 +498,19 @@ int UiBreadcrumbs::HitTest(Point p) const
 void UiBreadcrumbs::LeftDown(Point p, dword)
 {
     int i = HitTest(p);
-    if(i < 0)
+    if(i < 0) {
+        auto notify = WhenBackgroundAction;
+        notify();
         return;
+    }
     current_ = i;
     if(trim_on_select_ && i + 1 < items_.GetCount())
         items_.SetCount(i + 1);
     layout_dirty_ = true;
     RefreshLayout();
-    WhenAction(i);
     Refresh();
+    auto notify = WhenAction;
+    notify(i);
 }
 
 void UiBreadcrumbs::MouseMove(Point p, dword)

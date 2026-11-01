@@ -1,7 +1,7 @@
 /*
     UiTheme public facade
 
-    The resolver implementation lives in UiThemeResolverImpl.h and is compiled
+    The resolver implementation lives in Themes/Resolver.h and is compiled
     as UiThemeRaw. This facade preserves the public UiTheme API while enforcing
     one ownership boundary: a theme may style a control, but it may not create,
     remove, move or change structural elements or their authored mode.
@@ -14,11 +14,11 @@
 
 #define UiTheme UiThemeRaw
 #define UiThemeDefaults UiThemeRawDefaults
-#include <Ui/UiThemeResolverImpl.h>
+#include <Ui/Themes/Resolver.h>
 #undef UiThemeDefaults
 #undef UiTheme
 
-#include <Ui/UiThemeStructureContract.h>
+#include <Ui/Themes/StructureContract.h>
 #include <Ui/UiAccordion.h>
 
 namespace Upp {

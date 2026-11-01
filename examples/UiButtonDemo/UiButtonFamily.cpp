@@ -16,7 +16,7 @@ String FamilyCppString(const String& value) {
 }
 String FamilyCppColor(Color color) { return IsNull(color)?String("Null"):Format("Color(%d, %d, %d)",color.GetR(),color.GetG(),color.GetB()); }
 String FamilyBoolCode(bool value) { return value?"true":"false"; }
-PropertyEditorItem& FamilyMarkOverride(PropertyEditorItem& item) {
+UiPropertyInspectorItem& FamilyMarkOverride(UiPropertyInspectorItem& item) {
     item.overrideable=true; item.override_active=false; item.SetDefault(item.value); return item;
 }
 }

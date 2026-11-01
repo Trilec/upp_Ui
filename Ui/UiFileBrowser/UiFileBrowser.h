@@ -107,6 +107,12 @@ public:
 
     UiFileBrowser &SetMode(Mode mode);
     Mode GetMode() const { return mode_; }
+    // Safe on protected source folders: no in-browser file creation.
+    UiFileBrowser &SetReadOnly(bool on = true);
+    bool IsReadOnly() const { return read_only_; }
+    // Logical width, subject to the browser's font/density scaling.
+    UiFileBrowser &SetPlacesWidth(int logical_pixels);
+    int GetPlacesWidth() const { return places_width_px_; }
     UiFileBrowser &SetViewSize(ViewSize size);
     ViewSize GetViewSize() const { return view_size_; }
     // Legacy entry point for the compact Search/Filter popup (on an open browser).
@@ -117,6 +123,9 @@ public:
     bool IsSequenceGrouping() const { return advanced_group_sequences_; }
 
     UiFileBrowserSelection GetSelection() const;
+    // Select an entry in the current completed scan; emits WhenSelection.
+    // Empty clears selection. Does not navigate, accept, or select an unlisted path.
+    bool SelectPath(const String& path);
     bool HasSelection() const
     {
         return !scanning_ && selected_entry_ >= 0 && selected_entry_ < model_->GetCount();
@@ -130,6 +139,9 @@ public:
     UiFileBrowser &SetFont(const Font &font);
     UiFileBrowser &UseThemeFont();
     UiFileBrowser &ShowThemeButton(bool show = true);
+    // Embedding hosts may supply their own selection/acceptance policy and
+    // footer. Navigation and double-click folder browsing remain unchanged.
+    UiFileBrowser &ShowSelectionFooter(bool show = true);
     Font GetFont() const { return font_; }
 
     Event<const UiFileBrowserSelection &> WhenAccept;
@@ -141,6 +153,25 @@ public:
 
 private:
     friend struct UiFileBrowserTest;
+    class AddressEdit : public UiLineEdit
+    {
+    public:
+        Event<> WhenCancelEdit;
+        bool Key(dword key, int count) override
+        {
+            if(key != K_ESCAPE)
+                return UiLineEdit::Key(key, count);
+            auto notify = WhenCancelEdit;
+            notify();
+            return true;
+        }
+        void LostFocus() override
+        {
+            UiLineEdit::LostFocus();
+            auto notify = WhenCancelEdit;
+            notify();
+        }
+    };
     struct RowRef : Moveable<RowRef>
     {
         int entry = -1;
@@ -162,6 +193,7 @@ private:
     void ScanCurrentFolder();
     void PollScan();
     void EditAddress(bool edit);
+    void SubmitAddress();
     void SubmitName();
     bool EffectiveGroupSequences() const;
     void SetFolderInternal(const String &folder, bool add_history);
@@ -244,6 +276,9 @@ private:
     Font base_font_, font_;
     bool font_override_ = false;
     bool show_theme_button_ = false;
+    bool show_selection_footer_ = true;
+    bool read_only_ = false;
+    int places_width_px_ = 205;
     uint64 theme_revision_ = 0;
     bool options_open_ = false;
     OptionsPage options_page_ = OptionsPage::Filter;
@@ -251,6 +286,7 @@ private:
     bool details_view_ = true;
     bool advanced_group_sequences_ = true;
     bool syncing_ = false;
+    bool editing_address_ = false;
 
     String folder_;
     Vector<String> history_;
@@ -293,7 +329,7 @@ private:
     UiToolButton back_button_, forward_button_, up_button_, home_button_;
     UiBreadcrumbs breadcrumbs_;
     UiStack address_stack_;
-    UiLineEdit address_edit_;
+    AddressEdit address_edit_;
     UiToolButton address_button_;
     UiLineEdit search_;
     UiToolButton details_button_, thumbnails_button_;

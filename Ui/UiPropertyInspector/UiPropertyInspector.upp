@@ -1,0 +1,29 @@
+uses
+	Core,
+	Draw,
+	Ui/UiPropertyInspector/Core,
+	Ui,
+	Ui/UiOsFileDialog;
+
+file
+	PropertyValueEditors.h,
+	PropertyValueEditors.cpp,
+	PropertyWorkingRangeEditors.h,
+	PropertyWorkingRangeEditors.cpp,
+	PropertyWorkingRangeAutoRegister.cpp,
+	PropertyBuiltinEditors.cpp,
+	PropertySemanticEditorsInternal.h,
+	PropertySemanticEditors.cpp,
+	PropertySemanticScalarEditors.cpp,
+	PropertySemanticCollectionEditors.cpp,
+	PropertySemanticGradientEditor.cpp,
+	UiPropertyInspector.h,
+	UiPropertyInspectorBase.cpp,
+	UiPropertyInspectorLayout.cpp,
+	UiPropertyInspectorInline.cpp,
+	UiPropertyInspectorInteraction.cpp,
+	UiPropertyInspectorPaint.cpp,
+	README.md,
+	DESIGN.md,
+	CHANGELOG.md;
+

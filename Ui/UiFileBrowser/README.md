@@ -1,3 +1,5 @@
+> **27 October 2026 CineRig integration — new explicit embedded read-only mode:** Public `UiFileBrowser::SetReadOnly(true)` prevents in-browser New file/folder creation in both Simple and Advanced layouts and guards the popup and `CreateItem()` entry point. Default is **false** for existing editor/demo clients; this mode does not make the filesystem itself read-only or affect unrelated OS utilities. Public `SetPlacesWidth(int logicalPixels)` (minimum 88, maximum 400, default 205) lets hosts show real filenames beside Places in narrow sidebars. `E:/apps/upp_3rdparty/MetaHuman/Workbench` uses `SetReadOnly(true).SetPlacesWidth(108)`, with U++ Release and Debug builds and 8/8 native GUI checks passing. The shared `examples/UiFileDialogDemo` builds with an added focused regression covering both modes, prevented creation and restoring normal behaviour (UMK job `exec-53E7C5B5000168EA606E453E00CEFA1E`, exit0). **Standalone demo runtime regression remains pending**: the Ui project's existing `ui-example-output` approval excludes build subfolders and rejected execution with `OUTPUT_NOT_ALLOWED`. This must be requalified through owner-approved output-folder rights, not an alternate runner/bypass.
+
 # UiFileBrowser
 
 Optional native browser package `Ui/UiFileBrowser`, independent of CineView and
@@ -17,6 +19,8 @@ sequence grouping; image/text preview; and small starter-file creation. Fonts an
 colours follow the host UiTheme. The inherited font uses the shared UiFonts Body
 family and the application StdFont height; compact text previews use the Code
 role. SetFont remains an explicit override; UseThemeFont restores inheritance.
+Column-heading height includes the actual bold renderer's font and inherited
+theme padding, so compact density does not cut off headings in themes such as Olive.
 Theme buttons request a host change. Semantic
 file colours and icons are centralized in `UiFileBrowserAppearance`.
 
@@ -25,6 +29,14 @@ owns enumeration generations; Layout arranges native controls; Style and
 Appearance resolve presentation; Options supplies short popups; Preview and
 Create contain bounded media/file services. Table/gallery models are projections
 of the scan model. GUI controls are never touched by worker callbacks.
+
+Click the current breadcrumb, a divider or empty address-bar space to edit the
+complete folder path; Ctrl+L and the edit-path button do the same. Enter accepts
+either slash style, quoted pasted paths and paths relative to the current folder.
+A missing directory tries its immediate parent once. If that is also missing,
+the current folder/history remain unchanged and WhenError reports the failed path.
+Escape or moving focus away restores breadcrumbs without navigating. Ancestor
+breadcrumbs continue to navigate directly.
 
 JPEG/PNG previews preserve aspect ratio; text displays up to ten physical lines
 without wrapping. Source fragments and `.url` contents are plain text: links are

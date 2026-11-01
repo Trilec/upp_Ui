@@ -1,7 +1,7 @@
 uses
     CtrlLib,
     Ui,
-    Utilities/PropertyEditor;
+    Ui/UiPropertyInspector;
 file
     main.cpp;
 mainconfig

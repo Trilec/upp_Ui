@@ -83,13 +83,18 @@ function Assert-Inventory($Inventory) {
         }
     }
     if (!$seen.Count) { throw 'Empty control inventory' }
+    foreach ($name in @($Inventory.support_packages) + @($Inventory.optional_platform_packages)) {
+        $leaf = Split-Path -Leaf $name
+        if (!(Test-Path -LiteralPath (Join-Path $Repo "$name/$leaf.upp") -PathType Leaf)) { throw "Missing support package: $name" }
+    }
     $active = Join-Path $Repo 'docs/ACTIVE_WORK.md'
     if (@(Get-Content -LiteralPath $active).Count -gt 100) { throw 'ACTIVE_WORK exceeds 100 lines' }
     $referenceDocs = if ($Inventory.PSObject.Properties['reference_docs']) { @($Inventory.reference_docs) } else { @() }
     $expected = @(@(@($Inventory.guides) + $referenceDocs | ForEach-Object { Split-Path -Leaf $_ }) + @('ACTIVE_WORK.md') | Sort-Object)
     $actual = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'docs') -File -Filter '*.md' | ForEach-Object { $_.Name } | Sort-Object)
     if (@(Compare-Object $expected $actual).Count) { throw 'Canonical guide inventory differs from docs/*.md' }
-    $readerFiles = @('README.md','GETTING_STARTED.md','CHANGELOG.md') + @($Inventory.guides) + $referenceDocs
+    $testDocs = if ($Inventory.PSObject.Properties['test_documentation']) { @($Inventory.test_documentation) } else { @() }
+    $readerFiles = @('README.md','GETTING_STARTED.md','CHANGELOG.md') + @($Inventory.guides) + $referenceDocs + $testDocs
     foreach ($relative in $readerFiles) {
         $file = Join-Path $Repo $relative
         $text = Get-Content -Raw -LiteralPath $file
@@ -130,9 +135,11 @@ function Build-Target([string]$Package, [string]$Config, [string]$VarFile = $Ass
     Record "BUILD PASS $Package $Config SHA256=$((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash)"
     return $exe
 }
-function Run-Test([string]$Exe, [string]$Summary, [long]$MinimumCount = 1) {
+function Run-Test([string]$Exe, [string]$Summary, [long]$MinimumCount = 1, [string[]]$Arguments = @()) {
     $stdout = $Exe + '.stdout.log'; $stderr = $Exe + '.stderr.log'
-    $p = Start-Process -FilePath $Exe -WorkingDirectory $Repo -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
+    $start = @{ FilePath=$Exe; WorkingDirectory=$Repo; RedirectStandardOutput=$stdout; RedirectStandardError=$stderr; PassThru=$true; WindowStyle='Hidden' }
+    if ($Arguments.Count) { $start.ArgumentList = $Arguments }
+    $p = Start-Process @start
     if (!$p.WaitForExit($TimeoutSeconds * 1000)) {
         # Only our own exact process is terminated, never an already open demo.
         $p.Kill()
@@ -157,7 +164,8 @@ function Build-Headers($Inventory, [string]$Config) {
     }
     Write-Utf8 (Join-Path $package 'main.cpp') "#include <CtrlLib/CtrlLib.h>`nGUI_APP_MAIN { Upp::SetExitCode(0); }`n"
     $files.Add('main.cpp')
-    Write-Utf8 (Join-Path $package 'UiPublicHeadersProbe.upp') ("noblitz;`nuses Core, Draw, Painter, CtrlCore, CtrlLib, Ui;`nfile`n    " + ($files -join ",`n    ") + ";`nmainconfig `"GUI`" = `"GUI`";`n")
+    $dependencies = @(@('Core','Draw','Painter','CtrlCore','CtrlLib','Ui') + @($Inventory.support_packages) + @($Inventory.optional_platform_packages) | Sort-Object -Unique)
+    Write-Utf8 (Join-Path $package 'UiPublicHeadersProbe.upp') ("noblitz;`nuses " + ($dependencies -join ', ') + ";`nfile`n    " + ($files -join ",`n    ") + ";`nmainconfig `"GUI`" = `"GUI`";`n")
     $probeVar = Join-Path $script:evidence 'Headers.var'
     $upp = ((@($nest) + $script:nests) -join ';') -replace '\\','/'
     Write-Utf8 $probeVar ("UPP = `"$upp`";`nOUTPUT = `"$($script:assemblyOutput -replace '\\','/')`";`n")
@@ -218,10 +226,12 @@ try {
         $packages = (Git-Read @('ls-files','*.upp')) -split "`n"
         $targets = @()
         foreach ($path in $packages) {
-            $isDemo = $path -like 'examples/*' -or $path -match '^Utilities/[^/]*Demo/[^/]+\.upp$'
-            $isTest = $path -match '^(Utilities|tests)/[^/]*(Test|Probe)[^/]*/[^/]+\.upp$'
+            $isDemo = $path -like 'examples/*'
+            $isTest = $path -match '^tests/[^/]+/[^/]+\.upp$'
             if ($isDemo -or ($Profile -eq 'Full' -and $isTest)) {
-                $targets += [pscustomobject]@{ package=($path -replace '/[^/]+$',''); run=($Profile -eq 'Full' -and $isTest); summary=''; minimum_checks=1 }
+                $name = $path -replace '/[^/]+$',''
+                $buildOnly = @($inventory.test_execution.build_only) -contains $name
+                $targets += [pscustomobject]@{ package=$name; run=($Profile -eq 'Full' -and $isTest -and !$buildOnly); summary=''; minimum_checks=1 }
             }
         }
         if ($Profile -eq 'Full') { $targets += @($inventory.surgical_targets | Where-Object { $_.run }) }
@@ -234,7 +244,15 @@ try {
         if ($Profile -eq 'Headers') { continue }
         foreach ($target in $targets) {
             $exe = Build-Target $target.package $config
-            if ($target.run) { Run-Test $exe $target.summary $target.minimum_checks }
+            if ($target.run) {
+                $arguments = @()
+                if (@($inventory.test_execution.evidence_directory) -contains $target.package) {
+                    $folder = Join-Path $script:evidence (($target.package -replace '[^a-zA-Z0-9_.-]', '_') + '-' + $config + '-captures')
+                    $null = New-Item -ItemType Directory -Path $folder -Force
+                    $arguments = @('"' + $folder + '"')
+                }
+                Run-Test $exe $target.summary $target.minimum_checks $arguments
+            }
         }
     }
     $null = Git-Read @('diff','--check')

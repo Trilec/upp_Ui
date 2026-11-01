@@ -1,8 +1,8 @@
 #ifndef _UiGraphWorkspaceWindow_h_
 #define _UiGraphWorkspaceWindow_h_
 #include "WorkspaceViews.h"
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 namespace Upp {
 namespace GraphWorkspace {
@@ -53,9 +53,9 @@ class NodeWorkspace : public TopWindow {
     RegionView region_, overlay_;
     PreviewGraph preview_;
     StructureView table_;
-    PropertyEditorModel properties_;
-    PropertyEditorFactory factory_;
-    PropertyEditor inspector_;
+    UiPropertyInspectorModel properties_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspector inspector_;
     UiMultiEdit code_;
     VectorMap<String, Function<void(Document&, const Value&)>> setters_;
 

@@ -221,6 +221,7 @@ GUI_APP_MAIN
         ValueMap report;report.Add("kind","UiItemRenderTextFitTest");report.Add("checks",checks);report.Add("failures",failures);
         report.Add("records",records);report.Add("scope","native public Basic layout/hit/paint and actual instrumented Dropdown collapsed clone; current process DPI only");
         if(!SaveFile(AppendFileName(output,"geometry.json"),AsJSON(report,true)))throw Exc("Cannot save geometry evidence");
+        Cout() << Format("UIITEM_RENDER_TEXT_FIT_SUMMARY checks=%d failed=%d\n", checks, failures);
         Cout()<<"UiItemRenderTextFitTest: "<<checks<<" checks, "<<failures<<" failures\n";
         if(checks==0||failures)SetExitCode(1);
     }catch(const Exc& error){Cerr()<<"UiItemRenderTextFitTest ERROR: "<<error<<"\n";SetExitCode(2);}

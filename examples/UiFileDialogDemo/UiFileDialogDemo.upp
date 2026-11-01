@@ -8,7 +8,7 @@ uses
     Ui,
     Ui/UiOsFileDialog,
     Ui/UiFileBrowser,
-    Utilities/PropertyEditor,
+    Ui/UiPropertyInspector,
     plugin/png;
 
 file

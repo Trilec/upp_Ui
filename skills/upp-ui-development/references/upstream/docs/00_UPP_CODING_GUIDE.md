@@ -2,7 +2,7 @@
 
 Reusable engineering rules for the Ui library family. Read this before changing a
 control, demo or package. The Controls Guide describes the public surface; the
-Theme, Models, Demo, PropertyEditor and Drawing guides own their respective
+Theme, Models, Demo, UiPropertyInspector and Drawing guides own their respective
 contracts. Graph usage and Graph development are separate guides.
 
 ## Packages and dependencies
@@ -18,6 +18,13 @@ that TheIDE should expose. Production never depends on demos/tests. Headless
 packages may use Core/Draw where required but never acquire CtrlCore/CtrlLib/Ui
 merely to reuse a GUI helper. Image import/export callers declare the relevant
 `plugin/png`, `plugin/jpg` or `plugin/bmp` package.
+
+Production packages belong under `Ui/`; this includes the optional visual
+`Ui/UiPropertyInspector`, its headless `Ui/UiPropertyInspector/Core`, and graph
+authoring package `Ui/UiGraphWorkspace`. Runnable demonstrations live in
+`examples/`; regression, smoke, probe and benchmark packages live in `tests/`.
+Reserve `utilities/` for actual icon authoring/export tools. Do not keep duplicate
+implementations or obsolete compatibility packages at the old utilities paths.
 
 Use the actual assembly `.var` and installed build method. The repository's
 `GitHubOut.var` is the maintainer's Windows configuration, not a portable path

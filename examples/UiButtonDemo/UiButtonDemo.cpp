@@ -14,7 +14,7 @@ UiButtonDemo::UiButtonDemo()
     context.mode = UiThemeMode::Light;
     UiTheme::Set(context);
 
-    RegisterPropertyEditorEditors(pe_factory);
+    RegisterUiPropertyInspectorEditors(pe_factory);
     pe_factory.RegisterPicker("button-demo-image",
         [=](Value& value, Ctrl *owner) { return PickImage(value, owner); });
     pe_factory.RegisterThumbnailProvider("button-demo-image",
@@ -127,7 +127,7 @@ void UiButtonDemo::ConfigureEditors()
     pe_inspector.SetLabelRatio(38);
     pe_overrides.SetLabelRatio(38);
 
-    PropertyEditorStyle style = PropertyEditorStyle::System();
+    UiPropertyInspectorStyle style = UiPropertyInspectorStyle::System();
     style.show_group_summaries = true;
     pe_inspector.SetStyle(style);
     pe_overrides.SetStyle(style);
@@ -176,19 +176,19 @@ void UiButtonDemo::ConnectEvents()
 
 Value UiButtonDemo::InspectorValue(const String& id) const
 {
-    const PropertyEditorItem *item = InspectorModel().Find(id);
+    const UiPropertyInspectorItem *item = InspectorModel().Find(id);
     return item ? item->value : Value();
 }
 
 Value UiButtonDemo::OverrideValue(const String& id) const
 {
-    const PropertyEditorItem *item = OverrideModel().Find(id);
+    const UiPropertyInspectorItem *item = OverrideModel().Find(id);
     return item ? item->value : Value();
 }
 
 bool UiButtonDemo::OverrideActive(const String& id) const
 {
-    const PropertyEditorItem *item = OverrideModel().Find(id);
+    const UiPropertyInspectorItem *item = OverrideModel().Find(id);
     return item && item->override_active;
 }
 
@@ -200,9 +200,9 @@ void UiButtonDemo::UpdateStatus()
                               (selected_kind==2 ? tool_preview.IsChecked() : selected_kind==1 ? split_preview.IsChecked() : btn_preview.IsChecked()) ? "yes" : "no"));
 }
 
-void UiButtonDemo::ResetProperty(PropertyEditorModel& model, const String& id)
+void UiButtonDemo::ResetProperty(UiPropertyInspectorModel& model, const String& id)
 {
-    PropertyEditorItem *item = model.Find(id);
+    UiPropertyInspectorItem *item = model.Find(id);
     if(!item || !item->resettable)
         return;
     model.SetValue(id, item->default_value);
@@ -211,7 +211,7 @@ void UiButtonDemo::ResetProperty(PropertyEditorModel& model, const String& id)
 
 void UiButtonDemo::SetOverrideActive(const String& id, bool active)
 {
-    PropertyEditorItem *item = OverrideModel().Find(id);
+    UiPropertyInspectorItem *item = OverrideModel().Find(id);
     if(!item)
         return;
     item->override_active = active;
@@ -296,11 +296,11 @@ void UiButtonDemo::ApplyTheme()
         for(UiLabel* label : { &lbl_preview_caption, &lbl_status })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         pe_inspector.SetPaletteMode(mode);
         pe_overrides.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &pe_inspector, &pe_overrides }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &pe_inspector, &pe_overrides }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -374,16 +374,16 @@ void UiButtonDemo::Layout()
 } // namespace Upp
 
 namespace Upp {
-PropertyEditorModel& UiButtonDemo::InspectorModel() {
+UiPropertyInspectorModel& UiButtonDemo::InspectorModel() {
     return selected_kind==1 ? split_inspector : selected_kind==2 ? tool_inspector : pe_model_inspector;
 }
-PropertyEditorModel& UiButtonDemo::OverrideModel() {
+UiPropertyInspectorModel& UiButtonDemo::OverrideModel() {
     return selected_kind==1 ? split_overrides : selected_kind==2 ? tool_overrides : pe_model_override;
 }
-const PropertyEditorModel& UiButtonDemo::InspectorModel() const {
+const UiPropertyInspectorModel& UiButtonDemo::InspectorModel() const {
     return selected_kind==1 ? split_inspector : selected_kind==2 ? tool_inspector : pe_model_inspector;
 }
-const PropertyEditorModel& UiButtonDemo::OverrideModel() const {
+const UiPropertyInspectorModel& UiButtonDemo::OverrideModel() const {
     return selected_kind==1 ? split_overrides : selected_kind==2 ? tool_overrides : pe_model_override;
 }
 void UiButtonDemo::SelectKind(int kind) {
@@ -409,11 +409,11 @@ void UiButtonDemo::ExportGenerated(const String& directory)
         InspectorModel().SetValue("text",String("Quoted \"command\"\t\r\nC:\\media"),false);
         auto& model=OverrideModel();
             for(int accent_index = 0; accent_index < model.GetCount(); accent_index++) {
-                PropertyEditorItem& row = model[accent_index];
+                UiPropertyInspectorItem& row = model[accent_index];
                 if(row.id.Find("frame_accent.") < 0) continue;
                 row.override_active = true;
-                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
-                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                if(row.kind == UiPropertyInspectorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == UiPropertyInspectorKind::Color) row.value = Color(45, 110, 180);
                 else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
                 else if(row.id.EndsWith(".alpha")) row.value = 190;
             }

@@ -3,8 +3,8 @@ noblitz;
 uses
     CtrlLib,
     Ui,
-    Utilities/PropertyEditor,
-    Utilities/UiGraphWorkspace,
+    Ui/UiPropertyInspector,
+    Ui/UiGraphWorkspace,
     plugin/png,
     plugin/jpg;
 file

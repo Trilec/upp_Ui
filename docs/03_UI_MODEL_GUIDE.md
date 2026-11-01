@@ -1,7 +1,7 @@
 # 03 — Models and Data
 
 Models remove duplicated semantic state and support shared views. A programmer
-should not need a separate model object for a simple control. PropertyEditor
+should not need a separate model object for a simple control. UiPropertyInspector
 schema, adapters and editing transactions are in its [guide](05_UI_PROPERTY_EDITOR_GUIDE.md).
 
 ## The active-model contract
@@ -163,16 +163,16 @@ APIs. Extract from proven implementation without inventing another document mode
 then validate the full document suite before using it in a Timeline or other dense
 view. Do not build a second compact document engine or one live UiDoc per card.
 
-## PropertyEditor: specialized schema, not application authority
+## UiPropertyInspector: specialized schema, not application authority
 
-PropertyEditorModel stores typed property values, defaults, mixed/inherited state,
+UiPropertyInspectorModel stores typed property values, defaults, mixed/inherited state,
 help/group/unit metadata, validation and refresh-impact information. It emits
 WhenStructureChanged, WhenValueChanged, WhenPreview, WhenCommit, WhenReset and
 WhenGroupMetadataChanged. The visual editor owns editing lifetime and delegates
 application commands/undo to the host. Core stores custom adapter/provider IDs
 without importing concrete GUI or domain implementations.
 
-Use one active semantic collection for a demo Data page. PropertyEditor rows may
+Use one active semantic collection for a demo Data page. UiPropertyInspector rows may
 project that collection; they must not become a competing editable collection
 with a separate synchronization protocol. Clear ownership is more important than
 making unlike domain model classes inherit the same base.

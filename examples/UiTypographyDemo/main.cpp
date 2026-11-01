@@ -1,7 +1,7 @@
 #include <Ui/Ui.h>
 #include <plugin/png/png.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 
 using namespace Upp;
 #include "Fonts.brc"
@@ -229,9 +229,9 @@ static int Verify(const String& path) {
     String report;
     auto Check = [&](bool ok, const char *name) { ++checks; if(!ok) ++failures; report << (ok ? "PASS " : "FAIL ") << name << "\n"; };
     UiFonts::SetCatalog(UiFontCatalog());
-    RegisterPropertyEditorEditors(PropertyEditorFactory::Global());
-    PropertyEditorItem font_item; font_item.kind = PropertyEditorKind::Custom; font_item.custom_editor = "property.font";
-    One<PropertyValueEditor> selector = PropertyEditorFactory::Global().Create(font_item);
+    RegisterUiPropertyInspectorEditors(UiPropertyInspectorFactory::Global());
+    UiPropertyInspectorItem font_item; font_item.kind = UiPropertyInspectorKind::Custom; font_item.custom_editor = "property.font";
+    One<PropertyValueEditor> selector = UiPropertyInspectorFactory::Global().Create(font_item);
     selector->SetEditorValue("project:pt-sans", false);
     auto *drop = dynamic_cast<UiDropdown*>(selector->GetFirstChild());
     Check(drop && drop->GetSelectedText().Find("Missing") >= 0, "existing selector displays missing asset identity");

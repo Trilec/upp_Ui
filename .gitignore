@@ -28,3 +28,6 @@ scripts/*
 *.ilk
 *.o
 *.obj
+
+# Authored library asset, not generated SVG output
+!Ui/Assets/UiCreateSymbol.svg

@@ -1,5 +1,5 @@
 uses
-	Utilities/PropertyEditor,
+	Ui/UiPropertyInspector,
 	Ui,
 	plugin/png,
 	plugin/bmp;

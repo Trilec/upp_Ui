@@ -1,0 +1,10 @@
+uses
+    Core,
+    Draw,
+    Ui/UiPropertyInspector/Core;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "CONSOLE";

@@ -1,0 +1,702 @@
+#include "UiPropertyInspector.h"
+#include <Ui/UiColorPicker/UiColorPicker.h>
+
+namespace Upp {
+
+UiPropertyInspector::EditorCallbackGuard::EditorCallbackGuard(UiPropertyInspector& owner,
+                                                          const String& property_id)
+    : owner_(&owner), previous_dispatch_(owner.dispatching_editor_callback_),
+      previous_preview_(owner.applying_editor_preview_),
+      previous_inline_id_(owner.inline_preview_property_id_)
+{
+    owner.dispatching_editor_callback_ = true;
+    owner.applying_editor_preview_ = true;
+    owner.inline_preview_property_id_ = property_id;
+}
+
+UiPropertyInspector::EditorCallbackGuard::~EditorCallbackGuard()
+{
+    if(!owner_)
+        return;
+    owner_->dispatching_editor_callback_ = previous_dispatch_;
+    owner_->applying_editor_preview_ = previous_preview_;
+    owner_->inline_preview_property_id_ = previous_inline_id_;
+    owner_->PostPendingStructureRefresh();
+}
+
+void UiPropertyInspector::EnsureSelectedVisible()
+{
+    if(selected_display_row_ < 0 || selected_display_row_ >= rows_.GetCount())
+        return;
+    const DisplayRow& row = rows_[selected_display_row_];
+    int page = max(1, viewport_.GetHeight());
+    int pos = scroll_.GetPos();
+    if(row.y < pos)
+        pos = row.y;
+    else if(row.y + row.cy > pos + page)
+        pos = max(0, row.y + row.cy - page);
+    scroll_.SetPos(pos);
+    RebuildInlineEditors();
+    LayoutActiveEditor();
+    LayoutInlineEditors();
+    Refresh();
+}
+
+void UiPropertyInspector::BeginTransaction(const String& property_id)
+{
+    if(!model_ || property_id.IsEmpty())
+        return;
+    if(transaction_active_ && transaction_property_id_ == property_id)
+        return;
+    EndTransaction();
+    UiPropertyInspectorItem *item = model_->Find(property_id);
+    if(!item)
+        return;
+    transaction_property_id_ = property_id;
+    transaction_original_value_ = item->value;
+    transaction_original_mixed_ = item->mixed;
+    transaction_original_inherited_ = item->inherited;
+    transaction_active_ = true;
+    WhenBeginEdit(property_id, item->value);
+}
+
+void UiPropertyInspector::EndTransaction()
+{
+    transaction_property_id_.Clear();
+    transaction_original_value_ = Value();
+    transaction_original_mixed_ = false;
+    transaction_original_inherited_ = false;
+    transaction_active_ = false;
+}
+
+bool UiPropertyInspector::CancelTransaction()
+{
+    if(!transaction_active_ || !model_)
+        return false;
+    String id = transaction_property_id_;
+    UiPropertyInspectorItem *item = model_->Find(id);
+    if(!item) {
+        EndTransaction();
+        return false;
+    }
+
+    item->value = transaction_original_value_;
+    item->mixed = transaction_original_mixed_;
+    item->inherited = transaction_original_inherited_;
+    item->validation_error.Clear();
+    Value restored = item->value;
+    model_->ValueChanged(id);
+    EndTransaction();
+    RefreshValue(id);
+    WhenCancel(id, restored);
+    return true;
+}
+
+static bool PeIsTextBoolean(const UiPropertyInspectorItem& item)
+{
+    return item.kind == UiPropertyInspectorKind::Boolean &&
+           item.boolean_presentation != PropertyBooleanPresentation::Check;
+}
+
+static String PeColorClipboardText(Color color)
+{
+    return Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB());
+}
+
+void UiPropertyInspector::ActivateRow(int display_index)
+{
+    if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
+        return;
+    const DisplayRow& row = rows_[display_index];
+    if(row.group || row.model_index < 0)
+        return;
+    const UiPropertyInspectorItem& item = (*model_)[row.model_index];
+    if(!item.enabled || item.read_only)
+        return;
+
+    if(PeIsTextBoolean(item) && item.enabled && item.value_editable && !item.read_only) {
+        const String property_id = item.id;
+        const bool activate_override = item.overrideable && !item.override_active;
+        BeginTransaction(property_id);
+        String error;
+        bool next = !(bool)item.value;
+        if(model_->Commit(property_id, next, &error)) {
+            UiPropertyInspectorItem *committed = model_->Find(property_id);
+            Value committed_value = committed ? committed->value : Value(next);
+            if(activate_override && committed && committed->overrideable && !committed->override_active)
+                WhenOverride(property_id, true);
+            WhenCommit(property_id, committed_value);
+            EndTransaction();
+            RefreshValue(property_id);
+        }
+        return;
+    }
+
+    if(item.expanded_row_span > 1 && !IsPropertyExpanded(item.id)) {
+        selected_display_row_ = display_index;
+        SetPropertyExpanded(item.id, true);
+        WhenSelection(item.id);
+        if(!item.help.IsEmpty())
+            WhenHelp(item.help);
+        return;
+    }
+
+    if(PropertyValueEditor *editor = FindInlineEditor(display_index)) {
+        if(active_editor_)
+            CommitActiveEditor();
+        DeactivateEditor();
+        selected_display_row_ = display_index;
+        BeginTransaction(item.id);
+        editor->FocusEditor();
+        WhenSelection(item.id);
+        if(!item.help.IsEmpty())
+            WhenHelp(item.help);
+        Refresh();
+        return;
+    }
+
+    if(active_display_row_ == display_index && active_editor_) {
+        active_editor_->FocusEditor();
+        return;
+    }
+
+    if(!item.value_editable || item.read_only) {
+        selected_display_row_ = display_index;
+        Refresh();
+        return;
+    }
+
+    if(active_editor_)
+        CommitActiveEditor();
+    DeactivateEditor();
+    selected_display_row_ = display_index;
+    active_display_row_ = display_index;
+    active_property_id_ = item.id;
+    active_editor_ = CreateEditor(item);
+    if(!active_editor_) {
+        active_display_row_ = -1;
+        active_property_id_.Clear();
+        Refresh();
+        return;
+    }
+
+    BeginTransaction(item.id);
+    Add(*active_editor_);
+    Ptr<UiPropertyInspector> self = this;
+    UiPropertyInspectorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    active_editor_->WhenPreview = [self, source, generation](Value value) {
+        if(self && self->model_ == source && self->model_binding_generation_ == generation)
+            self->ApplyEditorPreview(value);
+    };
+    active_editor_->WhenCommit = [self, source, generation](Value value) {
+        if(self && self->model_ == source && self->model_binding_generation_ == generation)
+            self->ApplyEditorCommit(value);
+    };
+    const String property_id = item.id;
+    active_editor_->WhenToggleExpanded = [self, property_id] {
+        if(!self)
+            return;
+        Upp::PostCallback([self, property_id] {
+            if(self)
+                self->SetPropertyExpanded(property_id,
+                                          !self->IsPropertyExpanded(property_id));
+        });
+    };
+
+    syncing_editor_ = true;
+    active_editor_->Configure(item);
+    active_editor_->SetExpanded(IsPropertyExpanded(item.id));
+    active_editor_->SetEditorValue(item.value, item.mixed);
+    syncing_editor_ = false;
+
+    LayoutActiveEditor();
+    active_editor_->FocusEditor();
+    WhenSelection(item.id);
+    if(!item.help.IsEmpty())
+        WhenHelp(item.help);
+    Refresh();
+}
+
+void UiPropertyInspector::DeactivateEditor()
+{
+    if(!active_editor_)
+        return;
+    tearing_down_editor_ = true;
+    active_display_row_ = -1;
+    active_property_id_.Clear();
+    active_editor_->WhenPreview.Clear();
+    active_editor_->WhenCommit.Clear();
+    active_editor_->WhenToggleExpanded.Clear();
+    active_editor_->Remove();
+    active_editor_.Clear();
+    tearing_down_editor_ = false;
+}
+
+void UiPropertyInspector::CommitActiveEditor()
+{
+    if(!active_editor_ || syncing_editor_)
+        return;
+    ApplyEditorCommit(active_editor_->GetEditorValue());
+}
+
+void UiPropertyInspector::ApplyEditorPreview(const Value& value)
+{
+    if(syncing_editor_ || tearing_down_editor_ || !model_ || active_property_id_.IsEmpty())
+        return;
+    const String property_id = active_property_id_;
+    const Value candidate = value;
+    UiPropertyInspectorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    Ptr<UiPropertyInspector> self = this;
+    EditorCallbackGuard guard(*this, property_id);
+    BeginTransaction(property_id);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    String error;
+    const bool applied = source->Preview(property_id, candidate, &error);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    UiPropertyInspectorItem* item = source->Find(property_id);
+    if(applied) {
+        const Value normalized = item ? item->value : candidate;
+        WhenPreview(property_id, normalized);
+    }
+    else if(active_editor_ && item) {
+        syncing_editor_ = true;
+        active_editor_->Configure(*item);
+        active_editor_->SetEditorValue(item->value, item->mixed);
+        syncing_editor_ = false;
+    }
+    if(self)
+        Refresh();
+}
+
+void UiPropertyInspector::ApplyEditorCommit(const Value& value)
+{
+    if(syncing_editor_ || tearing_down_editor_ || !model_ || active_property_id_.IsEmpty())
+        return;
+    const String property_id = active_property_id_;
+    const Value candidate = value;
+    UiPropertyInspectorItem* item = model_->Find(property_id);
+    if(!item)
+        return;
+    const bool activate_override = item->overrideable && !item->override_active;
+    UiPropertyInspectorModel* source = model_;
+    const uint64 generation = model_binding_generation_;
+    Ptr<UiPropertyInspector> self = this;
+    EditorCallbackGuard guard(*this, property_id);
+    BeginTransaction(property_id);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    String error;
+    const bool committed = source->Commit(property_id, candidate, &error);
+    if(!self || model_ != source || model_binding_generation_ != generation)
+        return;
+    item = source->Find(property_id);
+    const Value normalized = item ? item->value : candidate;
+    if(active_editor_ && item) {
+        syncing_editor_ = true;
+        active_editor_->Configure(*item);
+        active_editor_->SetEditorValue(item->value, item->mixed);
+        syncing_editor_ = false;
+    }
+    if(committed) {
+        if(activate_override && item && item->overrideable && !item->override_active)
+            WhenOverride(property_id, true);
+        if(!self || model_ != source || model_binding_generation_ != generation)
+            return;
+        WhenCommit(property_id, normalized);
+        if(!self)
+            return;
+        EndTransaction();
+    }
+    Refresh();
+}
+
+void UiPropertyInspector::ResetSelected()
+{
+    const UiPropertyInspectorItem* selected = GetSelectedProperty();
+    if(!selected || !model_ || !selected->resettable)
+        return;
+    String id = selected->id;
+    String error;
+    if(model_->Reset(id, &error)) {
+        EndTransaction();
+        RefreshValue(id);
+        WhenReset(id);
+    }
+}
+
+void UiPropertyInspector::ToggleOverride(int display_index)
+{
+    if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
+        return;
+    const DisplayRow& row = rows_[display_index];
+    if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
+        return;
+    UiPropertyInspectorItem& item = (*model_)[row.model_index];
+    if(!item.overrideable || item.read_only)
+        return;
+    WhenOverride(item.id, !item.override_active);
+}
+
+bool UiPropertyInspector::IsColorDropTarget(int display_index) const
+{
+    if(!model_ || display_index < 0 || display_index >= rows_.GetCount())
+        return false;
+    const DisplayRow& row = rows_[display_index];
+    if(row.group || row.model_index < 0 || row.model_index >= model_->GetCount())
+        return false;
+    const UiPropertyInspectorItem& item = (*model_)[row.model_index];
+    return (item.kind == UiPropertyInspectorKind::Color ||
+            item.kind == UiPropertyInspectorKind::FillRecipe) && item.enabled &&
+           !item.read_only && (item.value_editable || item.overrideable);
+}
+
+bool UiPropertyInspector::CommitColorText(const String& property_id,
+                                     const String& text,
+                                     bool allow_override_activation)
+{
+    if(!model_ || property_id.IsEmpty())
+        return false;
+
+    Color color;
+    int alpha = 255;
+    if(!UiColorPicker::ParseColorText(TrimBoth(text), color, alpha))
+        return false;
+
+    UiPropertyInspectorItem *item = model_->Find(property_id);
+    if(!item || (item->kind != UiPropertyInspectorKind::Color &&
+                 item->kind != UiPropertyInspectorKind::FillRecipe) ||
+       !item->enabled || item->read_only)
+        return false;
+
+    if(item->overrideable && !item->override_active) {
+        if(!allow_override_activation)
+            return false;
+        Ptr<UiPropertyInspector> self = this;
+        const uint64 generation = model_binding_generation_;
+        const String deferred_text = text;
+        const String deferred_id = property_id;
+        WhenOverride(deferred_id, true);
+        Upp::PostCallback([self, generation, deferred_id, deferred_text] {
+            if(self && self->model_binding_generation_ == generation)
+                self->CommitColorText(deferred_id, deferred_text, false);
+        });
+        return true;
+    }
+
+    if(!item->value_editable)
+        return false;
+
+    Value dropped = color;
+    if(item->kind == UiPropertyInspectorKind::FillRecipe) {
+        ValueMap recipe;
+        recipe.Set("mode", "Solid");
+        recipe.Set("solid", color);
+        dropped = recipe;
+    }
+    BeginTransaction(property_id);
+    String error;
+    if(!model_->Commit(property_id, dropped, &error)) {
+        EndTransaction();
+        return false;
+    }
+
+    UiPropertyInspectorItem *committed = model_->Find(property_id);
+    if(committed) {
+        EditorCallbackGuard guard(*this, property_id);
+        const Value committed_value = committed->value;
+        WhenCommit(property_id, committed_value);
+    }
+    EndTransaction();
+    RefreshValue(property_id);
+    return true;
+}
+
+void UiPropertyInspector::LeftDown(Point p, dword)
+{
+    if(GetLabelDividerRect().Contains(p)) {
+        dragging_label_divider_ = true;
+        SetCapture();
+        return;
+    }
+
+    int row = FindDisplayRow(p);
+    if(row < 0)
+        return;
+    if(rows_[row].group) {
+        Rect action = GetGroupActionRect(row);
+        if(!action.IsEmpty() && action.Contains(p)) {
+            WhenGroupAction(rows_[row].group_id);
+            return;
+        }
+        SetGroupOpen(rows_[row].group_id, !IsGroupOpen(rows_[row].group_id));
+        return;
+    }
+
+    selected_display_row_ = row;
+    const UiPropertyInspectorItem& item = (*model_)[rows_[row].model_index];
+    if(item.read_only)
+        return;
+    if(item.overrideable && GetOverrideRect(row).Contains(p)) {
+        ToggleOverride(row);
+        return;
+    }
+    if(item.resettable && !item.overrideable && GetResetRect(row).Contains(p)) {
+        ResetSelected();
+        return;
+    }
+
+    // Clicking the value/body of an inactive override is already an explicit
+    // editing intent. Ask the host to activate the local override before
+    // creating/focusing the editor so wheel/keyboard input belongs to the value
+    // immediately. The host may rebuild the model/rows synchronously from
+    // WhenOverride, so never retain the old row/item reference across it.
+    if(item.overrideable && !item.override_active) {
+        const String property_id = item.id;
+        WhenOverride(property_id, true);
+        if(!model_)
+            return;
+        const int refreshed_row = FindDisplayRowByProperty(property_id);
+        if(refreshed_row < 0)
+            return;
+        selected_display_row_ = refreshed_row;
+        ActivateRow(refreshed_row);
+        return;
+    }
+
+    ActivateRow(row);
+}
+
+void UiPropertyInspector::LeftDouble(Point p, dword keyflags)
+{
+    if(GetLabelDividerRect().Contains(p)) {
+        SetLabelAuto();
+        return;
+    }
+    LeftDown(p, keyflags);
+    if(active_editor_)
+        active_editor_->FocusEditor();
+}
+
+void UiPropertyInspector::LeftUp(Point, dword)
+{
+    if(!dragging_label_divider_)
+        return;
+    dragging_label_divider_ = false;
+    if(HasCapture())
+        ReleaseCapture();
+}
+
+void UiPropertyInspector::MouseMove(Point p, dword)
+{
+    if(dragging_label_divider_) {
+        int width = p.x - viewport_.left;
+        label_mode_ = UiPropertyInspectorLabelMode::Fixed;
+        style_.label_width = clamp(width, style_.label_min_width, style_.label_max_width);
+        LayoutActiveEditor();
+        RebuildInlineEditors();
+        Refresh();
+        return;
+    }
+
+    bool divider = GetLabelDividerRect().Contains(p);
+    if(divider != hover_label_divider_) {
+        hover_label_divider_ = divider;
+        Refresh();
+    }
+
+    int row = FindDisplayRow(p);
+    if(row == hover_display_row_)
+        return;
+    hover_display_row_ = row;
+    Refresh();
+}
+
+void UiPropertyInspector::MouseLeave()
+{
+    hover_label_divider_ = false;
+    if(!dragging_label_divider_)
+        hover_display_row_ = -1;
+    Refresh();
+}
+
+Image UiPropertyInspector::CursorImage(Point p, dword)
+{
+    return dragging_label_divider_ || GetLabelDividerRect().Contains(p)
+         ? Image::SizeHorz() : Image::Arrow();
+}
+
+void UiPropertyInspector::MouseWheel(Point p, int zdelta, dword keyflags)
+{
+    // Active value editing owns wheel gestures only inside that value surface.
+    // Delegate the actual semantics to the concrete editor instead of relying
+    // on global focus state, which can lag a synchronous override/model refresh.
+    if(active_editor_ && active_display_row_ >= 0 &&
+       active_display_row_ < rows_.GetCount() &&
+       GetValueRect(active_display_row_).Contains(p) &&
+       active_editor_->HandleMouseWheel(zdelta, keyflags))
+        return;
+
+    if(viewport_.Contains(p)) {
+        int step = max(1, style_.row_height);
+        int pos = scroll_.GetPos() + (zdelta > 0 ? -step : step);
+        scroll_.SetPos(pos);
+        RebuildInlineEditors();
+        LayoutActiveEditor();
+        LayoutInlineEditors();
+        Refresh();
+    }
+}
+
+void UiPropertyInspector::DragEnter()
+{
+    color_drop_display_row_ = -1;
+    Refresh();
+}
+
+void UiPropertyInspector::DragAndDrop(Point p, PasteClip& clip)
+{
+    const int row = FindDisplayRow(p);
+    // AcceptText returns false during drag-over even when it accepts the
+    // format; its return value means that an actual paste is taking place.
+    if(IsColorDropTarget(row))
+        AcceptText(clip);
+    if(!IsColorDropTarget(row) || !clip.IsAccepted()) {
+        clip.Reject();
+        if(color_drop_display_row_ != -1) {
+            color_drop_display_row_ = -1;
+            Refresh();
+        }
+        return;
+    }
+
+    color_drop_display_row_ = row;
+    clip.SetAction(DND_COPY);
+    Refresh();
+    if(!clip.IsPaste())
+        return;
+
+    const DisplayRow& display = rows_[row];
+    const String property_id = (*model_)[display.model_index].id;
+    const String text = GetString(clip);
+    selected_display_row_ = row;
+    color_drop_display_row_ = -1;
+    CommitColorText(property_id, text, true);
+    Refresh();
+}
+
+void UiPropertyInspector::DragLeave()
+{
+    if(color_drop_display_row_ == -1)
+        return;
+    color_drop_display_row_ = -1;
+    Refresh();
+}
+
+bool UiPropertyInspector::Key(dword key, int count)
+{
+    if(key == K_ESCAPE) {
+        if(CancelTransaction()) {
+            DeactivateEditor();
+            return true;
+        }
+    }
+
+    if(key == K_CTRL_C) {
+        const UiPropertyInspectorItem *item = GetSelectedProperty();
+        if(item && item->kind == UiPropertyInspectorKind::Color &&
+           !item->mixed && item->value.GetType() == COLOR_V) {
+            WriteClipboardText(PeColorClipboardText(Color(item->value)));
+            return true;
+        }
+    }
+
+    if(key == K_CTRL_V) {
+        const UiPropertyInspectorItem *item = GetSelectedProperty();
+        if(item && item->kind == UiPropertyInspectorKind::Color &&
+           IsClipboardAvailableText())
+            return CommitColorText(item->id, ReadClipboardText(), true);
+    }
+
+    if(key == K_CTRL_Z) {
+        String id = GetSelectedPropertyId();
+        if(!id.IsEmpty())
+            WhenUndoRequest(id);
+        return true;
+    }
+
+    if(key == K_UP || key == K_DOWN) {
+        int next = FindNextPropertyRow(selected_display_row_, key == K_UP ? -1 : 1);
+        if(next >= 0) {
+            selected_display_row_ = next;
+            EnsureSelectedVisible();
+            const UiPropertyInspectorItem& item = (*model_)[rows_[next].model_index];
+            WhenSelection(item.id);
+            if(!item.help.IsEmpty())
+                WhenHelp(item.help);
+        }
+        return true;
+    }
+
+    if((key == K_ENTER || key == K_SPACE) && selected_display_row_ >= 0) {
+        const DisplayRow& row = rows_[selected_display_row_];
+        if(!row.group && row.model_index >= 0 && model_ &&
+           (*model_)[row.model_index].overrideable &&
+           !(*model_)[row.model_index].override_active) {
+            ToggleOverride(selected_display_row_);
+            return true;
+        }
+        ActivateRow(selected_display_row_);
+        return true;
+    }
+
+    if((key == K_DELETE || key == K_BACKSPACE) && GetSelectedProperty()) {
+        if(!GetSelectedProperty()->overrideable)
+            ResetSelected();
+        return true;
+    }
+
+    if((key == K_LEFT || key == K_RIGHT) && selected_display_row_ >= 0 && model_) {
+        const DisplayRow& row = rows_[selected_display_row_];
+        if(!row.group && row.model_index >= 0) {
+            String group = (*model_)[row.model_index].group;
+            if(!group.IsEmpty())
+                SetGroupOpen(group, key == K_RIGHT);
+        }
+        return true;
+    }
+
+    return ParentCtrl::Key(key, count);
+}
+
+void UiPropertyInspector::ChildGotFocus()
+{
+    ParentCtrl::ChildGotFocus();
+    for(InlineEditorSlot& slot : inline_editors_) {
+        if(!slot.editor || !slot.editor->HasFocusDeep())
+            continue;
+        if(active_editor_)
+            CommitActiveEditor();
+        DeactivateEditor();
+        selected_display_row_ = slot.display_row;
+        if(model_ && slot.display_row >= 0 && slot.display_row < rows_.GetCount()) {
+            const DisplayRow& row = rows_[slot.display_row];
+            if(!row.group && row.model_index >= 0) {
+                const UiPropertyInspectorItem& item = (*model_)[row.model_index];
+                BeginTransaction(item.id);
+                WhenSelection(item.id);
+                if(!item.help.IsEmpty())
+                    WhenHelp(item.help);
+            }
+        }
+        Refresh();
+        return;
+    }
+    if(active_display_row_ >= 0)
+        selected_display_row_ = active_display_row_;
+}
+
+} // namespace Upp

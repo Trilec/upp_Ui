@@ -3,14 +3,14 @@
 A demo is executable documentation for a control, not another application
 framework. `examples/UiMediaCardDemo` and `examples/UiCollectionDemo` are the
 accepted shell references. Full demos
-use real Ui controls and the production PropertyEditor, remain self-contained,
+use real Ui controls and the production UiPropertyInspector, remain self-contained,
 and generate useful C++ that uses the public control API.
 
 ## Keep the construction visible
 
 No mandatory DemoBase or shared DemoFramework. A small amount of repeated header,
 exit and layout setup is preferable to hiding the example behind another layer.
-Share production controls, styles, drawing and PropertyEditor adapters; do not
+Share production controls, styles, drawing and UiPropertyInspector adapters; do not
 invent a convenience abstraction merely to remove harmless shell duplication.
 Demos never depend on UiDesigner or another demo executable.
 
@@ -20,7 +20,7 @@ authority for that mapping. A toolbar using a control is not automatically a
 feature demonstration of that control. Specialized authoring, benchmarks and
 platform integration examples are explicit exceptions, not competing canonical
 builders. Each demo keeps an explanatory source header and declares its direct
-U++/Ui dependencies; production PropertyEditor and codecs are valid dependencies.
+U++/Ui dependencies; production UiPropertyInspector and codecs are valid dependencies.
 Generated usage C++ depends only on the public control/library APIs and declared
 host resources, never on another demo or shell helper.
 
@@ -54,7 +54,7 @@ pass or reserve blank space. Resizing, page changes and theme changes keep the
 chosen page and editor state usable. Ordinary controls do not show an empty Data
 page. A Data page is appropriate for real model/domain collections.
 
-Page actions form a compact, left-aligned icon strip above the PropertyEditor:
+Page actions form a compact, left-aligned icon strip above the UiPropertyInspector:
 Inspector / Theme Overrides / optional Data / Generated Code, in that order.
 Use 17 DPI-scaled pixel icons in 38-pixel buttons, meaningful tooltips and persistent
 checked feedback. Put flexible space after the strip, rather than stretching each
@@ -64,7 +64,7 @@ UiLabelDemo reference; the same shell conventions apply to all canonical demos.
 Preview and right rail are matching opaque rounded panels (8 DPI-scaled pixels),
 slightly darker than the window: RGB 245/245/245 in Light, 18/18/18 in Dark.
 The rail contains both its action strip and editor. Inner pages are transparent;
-the PropertyEditor has no separate square outer frame. Page and header actions
+the UiPropertyInspector has no separate square outer frame. Page and header actions
 have no pill face, frame or underline: grey at rest, white on Dark hover, blue
 when selected. Exit stays red. Resolve these styles again on each theme change.
 
@@ -78,7 +78,32 @@ Use `--upp-root` when the installed tool is not beside uppsrc. The generated bui
 report in `build/demos` records each package's outcome; compilation remains
 separate from native visual and generated-code acceptance.
 
-## Inspector and PropertyEditor
+Curated Windows x64 demo bundles for GitHub Releases belong in `bin/releases`.
+Rebuild each selected executable from the intended source before packaging; do not
+copy stale binaries just because they are already in bin. Include short launch
+instructions and applicable license notices. Launch-check the selected demos
+without source-tree assets or a U++ installation. Keep tests, build logs and
+compiler caches out of the release ZIP; retain validation evidence in `build`.
+
+## Theme workbench
+
+`UiThemeDemo` is the compact themeable-control showcase. It pairs Light and Dark
+specimens of the same selected preset. The shared library catalogue populates its
+preset selector beside Role and Enabled in the header. Category buttons focus a
+modular specimen section without recreating its controls or models. Short entry
+fields and list/tree views share rows; multiline input stays full width. The
+accordion shows two sections with chevrons. Composites and the scrolling panes
+avoid duplicate slider/scroll specimens; nonvisual layouts and the node graph
+remain covered by their dedicated feature demos.
+Each section owns its native controls and model lifetime. File selection is launched
+through real modal controls rather than embedding two full browser applications.
+
+The workbench resolves explicit style snapshots for both panes, including composed
+children. It changes the application context only while resolving a specimen or
+running its modal browser, then restores the shell. Prepared tags use the same
+production tag renderer. There is no Cinespace dependency or copied app theme.
+
+## Inspector and UiPropertyInspector
 
 Inspector rows map to meaningful supported public APIs: content/value, roles,
 fonts, enabled/read-only states, selection, orientation, geometry, ranges/steps,
@@ -100,19 +125,19 @@ UiTableModel, Menu -> UiMenuModel. Graph/Doc may retain specialized authoring to
 do not flatten their data into generic row mirrors.
 
 Providers, domain interpretation, persistence and application commands stay in
-the demo/host. Do not add demo-only meaning to PropertyEditorCore or the factory.
-See [PropertyEditor](05_UI_PROPERTY_EDITOR_GUIDE.md) for adapter and transaction details.
+the demo/host. Do not add demo-only meaning to UiPropertyInspectorCore or the factory.
+See [UiPropertyInspector](05_UI_PROPERTY_EDITOR_GUIDE.md) for adapter and transaction details.
 
 ## Theme and authored overrides
 
 Minimal Standard/Subtle/Accent/Alert in Light/Dark is the common visual baseline.
 Preserve family-specific roles and data colors. Apply the complete shell/panel/
-PropertyEditor palette when switching modes, following the reference's U++ theme
+UiPropertyInspector palette when switching modes, following the reference's U++ theme
 bridge; changing only the preview is not a complete demo theme change.
 
 Synchronize the U++ native palette as well as UiTheme (the reference uses
 Ctrl::SwapDarkLight on an actual mode transition). Explicitly apply the matching
-PropertyEditorPaletteMode to every editor, including hidden pages. Resolve any
+UiPropertyInspectorPaletteMode to every editor, including hidden pages. Resolve any
 custom header/panel/label/button styles again; stale custom snapshots do not
 inherit a newly selected mode. Check the exposed window background, header icon
 contrast and filter/editor surfaces in Light / Dark / Light.
@@ -178,6 +203,10 @@ UiButtonDemo covers Button, SplitButton and ToolButton.
 Its adjacent selectors retain separate inspector and override models for each type,
 show one live preview, and generate only that concrete control. The standalone
 UiSplitButtonDemo and UiToolButtonDemo packages are retired.
+UiFileDialogDemo combines the embeddable UiFileBrowser, its modal wrapper,
+the OS-native UiOsFileDialog and the original U++ FileSel. Adjacent selectors
+retain separate inspector/code settings. The two former standalone file demos
+are retired; browser model/native checks remain in the combined package.
 Do not create a third edit-family demo or put every widget into an enormous switch.
 
 When changing a family type, show only applicable properties, preserve/restore its

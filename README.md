@@ -5,8 +5,9 @@ Style-first controls, layouts and model-backed views for Ultimate++.
 Ui supplies shared themes, four semantic roles, modern controls, drawing helpers,
 icons, media cards, and model-backed graph/document views. The optional file browser
 adds themeable navigation and image-sequence handling. Ui can coexist with ordinary CtrlLib
-controls. Reusable PropertyEditorCore and PropertyEditor packages support typed
-property inspection without depending on UiDesigner.
+controls. The reusable [UiPropertyInspector](Ui/UiPropertyInspector) and its
+headless [Core model](Ui/UiPropertyInspector/Core) support typed property
+inspection without depending on UiDesigner.
 
 ![UiButton example](Snapshot_Button.jpg)
 
@@ -15,7 +16,7 @@ property inspection without depending on UiDesigner.
 Read [Getting Started](GETTING_STARTED.md) to configure the assembly and build a
 real demo. Browse the [Controls Guide](docs/01_UI_CONTROLS_GUIDE.md) for every public
 control and its reference example. Full demos are self-contained packages with a
-live preview, production PropertyEditor and C++ examples. MediaCard and Collection
+live preview, production UiPropertyInspector and C++ examples. MediaCard and Collection
 are the accepted shell references; UiLabelDemo is a small starting example.
 
 [Control usage recipes](docs/CONTROL_USAGE.md) give a small public API example for
@@ -43,6 +44,13 @@ roles and live property editing, then see the [graph guide](docs/08_UIGRAPH_GUID
 for integration and the specialized graph examples.
 
 ![UiNodeGraph demo with connected node shapes, media nodes and a property inspector](Snapshot_NodeGraph.jpg)
+
+### Theme workbench
+
+[UiThemeDemo](examples/UiThemeDemo) compares every registered preset, including
+Olive, in paired live Light/Dark panes. Browse grouped control specimens, compare
+semantic roles and keep edits and selections while changing themes. The same
+[theme catalogue and recipes](Ui/Themes/README.md) are used by UiDesigner.
 
 ### File browsing
 
@@ -87,7 +95,7 @@ package versions and saved-data schemas are independent of the Ui release number
 | [Theme](docs/02_UI_THEME_GUIDE.md) | Minimal roles, states, inheritance and explicit styles |
 | [Models](docs/03_UI_MODEL_GUIDE.md) | model authority, binding, transactions and UiDoc |
 | [Demos](docs/04_UI_DEMO_GUIDE.md) | readable standalone demos and generated C++ |
-| [PropertyEditor](docs/05_UI_PROPERTY_EDITOR_GUIDE.md) | schema, adapters, providers and editing lifecycle |
+| [UiPropertyInspector](docs/05_UI_PROPERTY_EDITOR_GUIDE.md) | schema, adapters, providers and editing lifecycle |
 | [Drawing and Performance](docs/07_UI_DRAWING_GUIDE.md) | Draw/Painter/cache, geometry, DPI and large views |
 | [UiGraph](docs/08_UIGRAPH_GUIDE.md) | graph use, templates, routes, hierarchy and examples |
 | [UiGraph Development](docs/09_UIGRAPH_DEVELOPMENT.md) | retained layout/execution, workspace and open boundaries |
@@ -98,9 +106,11 @@ the bounded ACTIVE_WORK file; completed checkpoint history belongs in Git.
 
 ## Repository layout
 
-`Ui/` is the library. `Utilities/` contains reusable PropertyEditor/authoring/icon
-packages and regression executables. `examples/` contains demos and specialized
-authoring tools. `tests/` contains additional tests, assets and the release inventory.
+`Ui/` contains the library and optional production packages, including
+`UiPropertyInspector`, its headless `Core`, `UiGraphWorkspace`, and `UiFileBrowser`.
+`utilities/` contains only icon authoring/export tools. `examples/` contains demos
+and specialized authoring tools. `tests/` contains maintained regressions, smoke
+checks, benchmarks, assets and the release inventory; see its [package map](tests/README.md).
 `scripts/` contains focused validation entry points. `docs/` contains the canonical
 guides, focused reference contracts and ACTIVE_WORK (maximum 100 lines).
 `skills/` contains the maintained skill sources and uploadable ZIPs; local backups
@@ -120,7 +130,7 @@ records exact source/toolchain evidence and leaves existing running demos alone.
 Headers, Demos and Full profiles are explicit broader gates; they are not required
 for every small edit. The existing Graph workspace gate remains separate.
 
-**Ui and PropertyEditor are libraries, not executables.** Do not build Ui.exe or
+**Ui and UiPropertyInspector are libraries, not executables.** Do not build Ui.exe or
 add a dummy WinMain to fix an invalid library-as-application command.
 
 ## License

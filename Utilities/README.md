@@ -1,49 +1,20 @@
-# Utilities and regression tests
+# Utilities
 
-Production support packages remain `PropertyEditor`, `PropertyEditorCore`,
-`UiGraphWorkspace` and `IconExportCore`. Demos depend on their public packages;
-test executables and logs belong in `build`, not `bin/windows-x64`.
+This folder contains only the icon authoring/export tools:
 
-The following aggregate packages are the authoritative entry points for suites
-that previously had duplicate standalone implementations:
-
-| Package | Coverage |
+| Tool | Purpose |
 | --- | --- |
-| `UiControlTests` | Button, ColorMatrix, DateTime, GroupPanel, MatrixSelector, progress controls, Slider and RangeSlider families, Stack and Tab |
-| `UiDrawingTests` | Geometry, shape paths and styled surface cache |
-| `UiThemeTests` | Theme structure and surface behavior |
-| `UiModelTests` | Data models, binding and mutation |
-| `UiModelViewTests` | Collections, dropdown/menu render, list styles and tree scale |
-| `UiGraphModelTests` | Graph model and hierarchy |
-| `UiGraphViewTests` | Graph shape, hierarchy, input, selection, routes, drag damage and live views |
-| `UiGraphRenderTests` | LOD, patterned paint, components and workspace rendering |
-| `UiGraphScaleTests` | Scale, performance, camera, component and model-switch profiles |
+| `MakeIconFromSVG` | Build or export Ui icon assets from SVG artwork |
+| `IconExportCore` | Headless implementation shared by icon export callers |
+| `UpdateBrandLogoIcon.ps1` | Refresh the brand icon through that pipeline |
 
-Use `Utilities/<Package>` as the UMK package argument with the repository root
-in the assembly. The aggregate drivers invoke the retained suite implementations
-and return failure if any suite fails. Exact retired-package routes and retained
-source paths are recorded in `tests/ui_release_inventory.json` under
-`retired_test_packages`; the normalized-source audit is documented in
-`tests/CONTROL_AUDIT.md`.
+Use `Utilities/MakeIconFromSVG` or `Utilities/IconExportCore` as the UMK package
+argument with the repository root in the assembly. `IconExportCore` is a library;
+build it through a runnable caller.
 
-The inventory is maintained source metadata used by `examples/build_demos.py` and
-`scripts/ValidateUiRelease.ps1`; it is not a generated test report or private log.
-Keep it when cleaning build outputs, so canonical demos and coverage routes remain
-discoverable without scanning old executables.
-
-Focused RangeSegments, callback lifecycle, numeric, Doc, PropertyEditor,
-native/platform and other unique regression targets remain separate. Gallery
-regressions run through `UiModelViewTests`; the redundant standalone Gallery
-launcher is retired. Different test bodies are retained until their coverage has
-been reconciled.
-
-`PropertyEditorDemo` and `PropertyEditorSemanticDemo` demonstrate the property
-browser itself and its semantic editors. `PropertyEditorCoreProbe` checks the
-headless package boundary. `MakeIconFromSVG` and `IconExportCore` provide the icon
-authoring/export pipeline. `UiRenderBenchmark` measures rendering strategies;
-it is a developer benchmark, separate from the retired display demo.
-
-UiDocCore/Model/ModelBinding/Geometry/Metadata/Interaction/Image tests retain their
-independent coverage. `UiDocHygieneTest` exercises atomic rollback, shared-view
-history maps, callback destruction/rebinding, read-only input and safe native saves.
-See the [document audit](../docs/UIDOC_AUDIT.md) for commands and remaining acceptance.
+Production UI packages belong under `Ui/`, including
+[UiPropertyInspector](../Ui/UiPropertyInspector), its headless Core, and
+[UiGraphWorkspace](../Ui/UiGraphWorkspace). Their maintained demonstrations belong
+in `examples/`. Regression, smoke, probe and benchmark packages belong in
+[tests](../tests/README.md). Executables and logs belong in `build`; only maintained
+demo executables are promoted to `bin/windows-x64`.

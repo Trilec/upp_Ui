@@ -5,6 +5,7 @@ acceptflags
 
 uses
 	Core,
+	Ui/Themes,
 	Draw,
 	Painter,
 	CtrlCore,
@@ -48,9 +49,6 @@ file
 	UiIndicatorBase.cpp,
 	UiIndicatorSupport.h,
 	UiTheme.h,
-	UiThemeResolverImpl.h,
-	UiThemeOlive.h,
-	UiThemeStructureContract.h,
 	UiDataModels.h,
 	UiDataModels.cpp,
 	UiItemRender.h,
@@ -86,7 +84,7 @@ file
 	UiMeasure.cpp,
 	UiIcons.h,
 	UiIcons.iml,
-	UiCreateSymbol.svg,
+	Assets/UiCreateSymbol.svg,
 	UiIcons.symbolpicker,
 	UiIcons.cpp noblitz,
 	UiLabel.h,

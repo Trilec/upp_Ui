@@ -2,7 +2,7 @@ uses
 	CtrlLib,
 	Ui,
 	plugin/png,
-	Utilities/PropertyEditor;
+	Ui/UiPropertyInspector;
 file
 	main.cpp,
 	Fonts.brc,

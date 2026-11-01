@@ -1,8 +1,8 @@
 // Slider family: four related controls, one selected preview and a public-API recipe.
 // Authored values live in the two models; inherited style is resolved afresh.
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 using namespace Upp;
 namespace {
 String CppString(const String& value) {
@@ -20,7 +20,7 @@ String CppString(const String& value) {
 }
 String CppColor(Color c) { return IsNull(c) ? String("Null") : Format("Color(%d, %d, %d)",c.GetR(),c.GetG(),c.GetB()); }
 String BoolCode(bool b) { return b ? "true" : "false"; }
-PropertyEditorItem& MarkOverride(PropertyEditorItem& item) {
+UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item) {
     item.overrideable=true; item.override_active=false; item.SetDefault(item.value); return item;
 }
 class Demo : public TopWindow {
@@ -29,7 +29,7 @@ public:
     Demo() {
         Title("Slider family"); Sizeable().Zoomable(); SetRect(0,0,DPI(1320),DPI(840));
         UiThemeContext context=UiTheme::GetContext(); context.mode=UiThemeMode::Light; context.preset=UiThemePreset::Minimal; UiTheme::Set(context);
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
         BuildHeader(); BuildPreview(); BuildRightRail(); BuildModels();
         inspector_.SetFactory(&factory_); inspector_.SetModel(&inspector_model_); inspector_.SetLabelRatio(46);
         overrides_.SetFactory(&factory_); overrides_.SetModel(&override_model_); overrides_.SetLabelRatio(46);
@@ -82,11 +82,11 @@ public:
         }
         if(variant=="overrides") {
             for(int accent_index = 0; accent_index < override_model_.GetCount(); accent_index++) {
-                PropertyEditorItem& row = override_model_[accent_index];
+                UiPropertyInspectorItem& row = override_model_[accent_index];
                 if(row.id.Find("frame_accent.") < 0) continue;
                 row.override_active = true;
-                if(row.kind == PropertyEditorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
-                else if(row.kind == PropertyEditorKind::Color) row.value = Color(45, 110, 180);
+                if(row.kind == UiPropertyInspectorKind::Boolean) row.value = row.id.EndsWith(".top") || row.id.EndsWith(".left");
+                else if(row.kind == UiPropertyInspectorKind::Color) row.value = Color(45, 110, 180);
                 else if(row.id.EndsWith(".thickness")) row.value = DPI(3);
                 else if(row.id.EndsWith(".alpha")) row.value = 190;
             }
@@ -237,11 +237,11 @@ private:
         for(UiLabel* label : { &caption_ })
             label->SetCustomStyle(UiTheme::ResolveLabel(UiLabelRole::Caption));
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         inspector_.SetPaletteMode(mode);
         overrides_.SetPaletteMode(mode);
-        for(PropertyEditor* editor : { &inspector_, &overrides_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &inspector_, &overrides_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -284,7 +284,7 @@ private:
     Value ValueOf(const char* id) const { const auto* item=inspector_model_.Find(id); return item ? item->value : Value(); }
     bool Active(const String& id) const { const auto* item=override_model_.Find(id); return item && item->override_active; }
     Value Override(const String& id) const { const auto* item=override_model_.Find(id); return item ? item->value : Value(); }
-    void Reset(PropertyEditorModel& model,const String& id) {
+    void Reset(UiPropertyInspectorModel& model,const String& id) {
         if(auto* item=model.Find(id)) { model.SetValue(id,item->default_value); item->override_active=false; }
         overrides_.RefreshModel(); ApplyProjection();
     }
@@ -945,8 +945,8 @@ if(Active("font.face")) field_style.font.FaceName(AsString(Override("font.face")
         if(!fields) generated_.Replace("control.Slider()","control");
         code_.SetData(generated_);
     }
-    PropertyEditorFactory factory_;
-    PropertyEditorModel inspector_model_,override_model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel inspector_model_,override_model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ {UiDirection::H}; UiToolButton theme_,help_,exit_;
     UiPanel preview_,right_; UiLabel caption_; UiSliderEdit control_;
@@ -954,7 +954,7 @@ if(Active("font.face")) field_style.font.FaceName(AsString(Override("font.face")
     UiButton sample_buttons_[4]; UiBoxLayout sample_bar_ {UiDirection::H};
     UiBoxLayout tools_ {UiDirection::H}; UiToolButton inspector_mode_,overrides_mode_,code_mode_;
     UiStack pages_; UiPanel inspector_page_,overrides_page_,code_page_;
-    PropertyEditor inspector_,overrides_; UiMultiEdit code_; UiToolButton copy_;
+    UiPropertyInspector inspector_,overrides_; UiMultiEdit code_; UiToolButton copy_;
     String generated_; Color window_face_=SColorFace();
 };
 }

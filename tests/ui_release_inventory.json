@@ -8,8 +8,9 @@
     "Ui/UiIndicatorBase.h",
     "Ui/UiStyle.h",
     "Ui/UiTheme.h",
+    "Ui/Themes/UiThemePresets.h",
     "Ui/UiFonts.h",
-    "Ui/UiThemeStructureContract.h",
+    "Ui/Themes/StructureContract.h",
     "Ui/UiDraw.h",
     "Ui/UiRenderLayer.h",
     "Ui/UiFrameTicker.h",
@@ -29,13 +30,10 @@
     "Ui/UiGraph/UiGraphNodeComponent.h",
     "Ui/UiDocCore.h",
     "Ui/UiDoc/UiDocCore.h",
-    "Ui/UiColorPicker/UiColorPickerPaletteLab.h"
-  ],
-  "sibling_packages": [
-    "Utilities/PropertyEditorCore",
-    "Utilities/PropertyEditor",
-    "Utilities/UiGraphWorkspace",
-    "Utilities/IconExportCore"
+    "Ui/UiColorPicker/UiColorPickerPaletteLab.h",
+    "Ui/UiPropertyInspector/Core/UiPropertyInspectorCore.h",
+    "Ui/UiPropertyInspector/Core/UiPropertyInspectorModel.h",
+    "Ui/UiGraphWorkspace/UiGraphWorkspace.h"
   ],
   "optional_platform_packages": [
     "Ui/UiOsFileDialog",
@@ -43,13 +41,13 @@
   ],
   "surgical_targets": [
     {
-      "package": "Utilities/UiReleaseSmoke",
+      "package": "tests/UiReleaseSmoke",
       "run": true,
       "summary": "UI_RELEASE_SMOKE",
       "minimum_checks": 58
     },
     {
-      "package": "Utilities/UiRangeSegmentsRunTests",
+      "package": "tests/UiRangeSegmentsRunTests",
       "run": true,
       "summary": "UIRANGESEGMENTS_SUMMARY",
       "minimum_checks": 363
@@ -65,7 +63,7 @@
       "minimum_checks": 1
     },
     {
-      "package": "Utilities/UiDocHygieneTest",
+      "package": "tests/UiDocHygieneTest",
       "run": true,
       "summary": "UIDOC_HYGIENE_SUMMARY",
       "minimum_checks": 50
@@ -75,15 +73,15 @@
   "review_candidates": [
     {
       "paths": [
-        "Utilities/UiControlTests",
-        "Utilities/UiDrawingTests",
-        "Utilities/UiThemeTests",
-        "Utilities/UiModelTests",
-        "Utilities/UiModelViewTests",
-        "Utilities/UiGraphModelTests",
-        "Utilities/UiGraphViewTests",
-        "Utilities/UiGraphRenderTests",
-        "Utilities/UiGraphScaleTests"
+        "tests/UiControlTests",
+        "tests/UiDrawingTests",
+        "tests/UiThemeTests",
+        "tests/UiModelTests",
+        "tests/UiModelViewTests",
+        "tests/UiGraphModelTests",
+        "tests/UiGraphViewTests",
+        "tests/UiGraphRenderTests",
+        "tests/UiGraphScaleTests"
       ],
       "state": "38 copied standalone packages retired after current normalized implementation and driver/manifest checks; aggregate suite bodies preserve all assertions. See retired_test_packages for exact routes."
     }
@@ -261,8 +259,8 @@
       "example": "examples/UiRangeSegmentsDemo",
       "source_review": "focused",
       "behavior_tests": [
-        "Utilities/UiReleaseSmoke",
-        "Utilities/UiRangeSegmentsRunTests"
+        "tests/UiReleaseSmoke",
+        "tests/UiRangeSegmentsRunTests"
       ]
     },
     {
@@ -349,7 +347,7 @@
       "example": "examples/UiLayoutDemo",
       "source_review": "focused",
       "behavior_tests": [
-        "Utilities/UiReleaseSmoke"
+        "tests/UiReleaseSmoke"
       ]
     },
     {
@@ -394,8 +392,8 @@
       "example": "examples/UiTabDemo",
       "source_review": "pending",
       "behavior_tests": [
-        "Utilities/UiTabThemePaintTest",
-        "Utilities/UiControlTests"
+        "tests/UiTabThemePaintTest",
+        "tests/UiControlTests"
       ]
     },
     {
@@ -523,6 +521,13 @@
       "header": "Ui/UiFileBrowser/UiFileBrowser.h",
       "example": "examples/UiFileDialogDemo",
       "source_review": "focused migration review; Windows model/native checks; other platforms and 100k performance acceptance pending"
+    },
+    {
+      "type": "UiPropertyInspector",
+      "family": "authoring",
+      "header": "Ui/UiPropertyInspector/UiPropertyInspector.h",
+      "example": "examples/UiPropertyInspectorDemo",
+      "source_review": "package/API relocation; Release and Debug BLITZ regressions plus independent no-BLITZ headers/documented C++ usage pass; broader native/DPI acceptance remains separate"
     }
   ],
   "specialist_examples": [
@@ -544,11 +549,15 @@
     },
     {
       "package": "UiThemeDemo",
-      "purpose": "Compare Minimal and Pill presets"
+      "purpose": "Compact themeable-control showcase of every registered preset in paired Light/Dark panes"
     },
     {
       "package": "UiFontSelectorDemo",
       "purpose": "Select an installed U++ Font and generate its configuration"
+    },
+    {
+      "package": "UiPropertyInspectorSemanticDemo",
+      "purpose": "Focused semantic property editors and value/model contracts"
     }
   ],
   "retired_examples": [
@@ -569,246 +578,300 @@
     "generator_contract": "Minimal selected-concrete-control public API usage; actual unchanged exports compiled, with counts in CONTROL_AUDIT",
     "native_acceptance": "Full per-demo Light/Dark/Light, resize, keyboard and DPI sweep remains a separate open gate; successful compilation is not visual acceptance"
   },
-  "retired_test_packages": [
-    {
-      "package": "Utilities/UiGalleryRegressionTest",
-      "replacement": "Utilities/UiModelViewTests",
-      "retained_source": "Utilities/UiModelViewTests/GalleryRegression.cpp",
-      "suite": "RunGalleryRegressionSuite"
-    },
-    {
-      "package": "Utilities/UiButtonInteractionContractTest",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/Button.cpp",
-      "suite": "RunButtonSuite"
-    },
-    {
-      "package": "Utilities/UiChartRingRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/ChartRing.cpp",
-      "suite": "RunChartRingSuite"
-    },
-    {
-      "package": "Utilities/UiColorMatrixRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/ColorMatrix.cpp",
-      "suite": "RunColorMatrixSuite"
-    },
-    {
-      "package": "Utilities/UiDateTimeRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/DateTime.cpp",
-      "suite": "RunDateTimeSuite"
-    },
-    {
-      "package": "Utilities/UiGroupPanelRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/GroupPanel.cpp",
-      "suite": "RunGroupPanelSuite"
-    },
-    {
-      "package": "Utilities/UiMatrixSelectorRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/MatrixSelector.cpp",
-      "suite": "RunMatrixSelectorSuite"
-    },
-    {
-      "package": "Utilities/UiProgressBarRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/ProgressBar.cpp",
-      "suite": "RunProgressBarSuite"
-    },
-    {
-      "package": "Utilities/UiProgressRingRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/ProgressRing.cpp",
-      "suite": "RunProgressRingSuite"
-    },
-    {
-      "package": "Utilities/UiRangeSliderEditRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/RangeSliderEdit.cpp",
-      "suite": "RunRangeSliderEditSuite"
-    },
-    {
-      "package": "Utilities/UiRangeSliderRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/RangeSlider.cpp",
-      "suite": "RunRangeSliderSuite"
-    },
-    {
-      "package": "Utilities/UiSliderRunTests",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/Slider.cpp",
-      "suite": "RunSliderSuite"
-    },
-    {
-      "package": "Utilities/UiStackMeasureTest",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/Stack.cpp",
-      "suite": "RunStackSuite"
-    },
-    {
-      "package": "Utilities/UiTabMeasureTest",
-      "replacement": "Utilities/UiControlTests",
-      "retained_source": "Utilities/UiControlTests/Tab.cpp",
-      "suite": "RunTabSuite"
-    },
-    {
-      "package": "Utilities/UiGeometryContractTest",
-      "replacement": "Utilities/UiDrawingTests",
-      "retained_source": "Utilities/UiDrawingTests/GeometryContract.cpp",
-      "suite": "RunGeometryContractSuite"
-    },
-    {
-      "package": "Utilities/UiShapePathTest",
-      "replacement": "Utilities/UiDrawingTests",
-      "retained_source": "Utilities/UiDrawingTests/ShapePath.cpp",
-      "suite": "RunShapePathSuite"
-    },
-    {
-      "package": "Utilities/UiThemeSurfaceRegressionTest",
-      "replacement": "Utilities/UiThemeTests",
-      "retained_source": "Utilities/UiThemeTests/ThemeSurface.cpp",
-      "suite": "RunThemeSurfaceSuite"
-    },
-    {
-      "package": "Utilities/UiDataModelsTest",
-      "replacement": "Utilities/UiModelTests",
-      "retained_source": "Utilities/UiModelTests/DataModels.cpp",
-      "suite": "RunDataModelsSuite"
-    },
-    {
-      "package": "Utilities/UiModelBindingContractTest",
-      "replacement": "Utilities/UiModelTests",
-      "retained_source": "Utilities/UiModelTests/ModelBinding.cpp",
-      "suite": "RunModelBindingSuite"
-    },
-    {
-      "package": "Utilities/UiModelMutationContractTest",
-      "replacement": "Utilities/UiModelTests",
-      "retained_source": "Utilities/UiModelTests/ModelMutation.cpp",
-      "suite": "RunModelMutationSuite"
-    },
-    {
-      "package": "Utilities/UiDropdownMenuRenderTest",
-      "replacement": "Utilities/UiModelViewTests",
-      "retained_source": "Utilities/UiModelViewTests/DropdownMenuRender.cpp",
-      "suite": "RunDropdownMenuRenderSuite"
-    },
-    {
-      "package": "Utilities/UiListStyleContractTest",
-      "replacement": "Utilities/UiModelViewTests",
-      "retained_source": "Utilities/UiModelViewTests/ListStyle.cpp",
-      "suite": "RunListStyleSuite"
-    },
-    {
-      "package": "Utilities/UiTreeScaleTest",
-      "replacement": "Utilities/UiModelViewTests",
-      "retained_source": "Utilities/UiModelViewTests/TreeScale.cpp",
-      "suite": "RunTreeScaleSuite"
-    },
-    {
-      "package": "Utilities/UiGraphHierarchyTest",
-      "replacement": "Utilities/UiGraphModelTests",
-      "retained_source": "Utilities/UiGraphModelTests/UiGraphHierarchy.cpp",
-      "suite": "RunUiGraphHierarchySuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphCanonicalShapeTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/CanonicalShape.cpp",
-      "suite": "RunCanonicalShapeSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphDragDamageTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/DragDamage.cpp",
-      "suite": "RunDragDamageSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphHierarchyViewTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/HierarchyView.cpp",
-      "suite": "RunHierarchyViewSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphInteractionStateTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/InteractionState.cpp",
-      "suite": "RunInteractionStateSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphLiveViewTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/LiveView.cpp",
-      "suite": "RunLiveViewSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphRouteEditTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/RouteEdit.cpp",
-      "suite": "RunRouteEditSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphSelectionModifierTest",
-      "replacement": "Utilities/UiGraphViewTests",
-      "retained_source": "Utilities/UiGraphViewTests/SelectionModifier.cpp",
-      "suite": "RunSelectionModifierSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphDetailLodTest",
-      "replacement": "Utilities/UiGraphRenderTests",
-      "retained_source": "Utilities/UiGraphRenderTests/DetailLod.cpp",
-      "suite": "RunDetailLodSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphOverviewLodTest",
-      "replacement": "Utilities/UiGraphRenderTests",
-      "retained_source": "Utilities/UiGraphRenderTests/OverviewLod.cpp",
-      "suite": "RunOverviewLodSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphPatternedPaintTest",
-      "replacement": "Utilities/UiGraphRenderTests",
-      "retained_source": "Utilities/UiGraphRenderTests/PatternedPaint.cpp",
-      "suite": "RunPatternedPaintSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphRenderLodTest",
-      "replacement": "Utilities/UiGraphRenderTests",
-      "retained_source": "Utilities/UiGraphRenderTests/RenderLod.cpp",
-      "suite": "RunRenderLodSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphModelSwitchProfileTest",
-      "replacement": "Utilities/UiGraphScaleTests",
-      "retained_source": "Utilities/UiGraphScaleTests/ModelSwitchProfile.cpp",
-      "suite": "RunModelSwitchProfileSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphPanProfileTest",
-      "replacement": "Utilities/UiGraphScaleTests",
-      "retained_source": "Utilities/UiGraphScaleTests/PanProfile.cpp",
-      "suite": "RunPanProfileSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphPerformanceTest",
-      "replacement": "Utilities/UiGraphScaleTests",
-      "retained_source": "Utilities/UiGraphScaleTests/Performance.cpp",
-      "suite": "RunPerformanceSuite"
-    },
-    {
-      "package": "Utilities/UiNodeGraphScaleTest",
-      "replacement": "Utilities/UiGraphScaleTests",
-      "retained_source": "Utilities/UiGraphScaleTests/Scale.cpp",
-      "suite": "RunScaleSuite"
-    }
-  ],
   "reference_docs": [
     "docs/CONTROL_USAGE.md",
     "docs/PROJECT_FONTS.md",
     "docs/MEDIA_CONTROLS.md",
-    "docs/UIDOC_AUDIT.md"
+    "docs/UIDOC_AUDIT.md",
+    "docs/COLOR_PICKER_MICRO.md",
+    "docs/WRAPPED_STACK_SCROLL.md"
+  ],
+  "support_packages": [
+    "Ui/UiPropertyInspector/Core",
+    "Ui/UiPropertyInspector",
+    "Ui/UiGraphWorkspace",
+    "Utilities/IconExportCore"
+  ],
+  "test_documentation": [
+    "tests/README.md",
+    "tests/CONTROL_AUDIT.md"
+  ],
+  "test_execution": {
+    "build_only": [
+      "tests/UiTableRunTests",
+      "tests/UiTreeRunTests",
+      "tests/UiRenderBenchmark"
+    ],
+    "evidence_directory": [
+      "tests/UiItemRenderTextFitTest",
+      "tests/UiLabelTextFitTest"
+    ],
+    "scope": "Full builds manual table/tree harnesses and the benchmark, but does not launch them unattended. Raster diagnostics receive owned evidence directories."
+  },
+  "retired_test_packages": [
+    {
+      "package": "Utilities/UiGalleryRegressionTest",
+      "replacement": "tests/UiModelViewTests",
+      "retained_source": "tests/UiModelViewTests/GalleryRegression.cpp",
+      "suite": "RunGalleryRegressionSuite"
+    },
+    {
+      "package": "Utilities/UiButtonInteractionContractTest",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/Button.cpp",
+      "suite": "RunButtonSuite"
+    },
+    {
+      "package": "Utilities/UiChartRingRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/ChartRing.cpp",
+      "suite": "RunChartRingSuite"
+    },
+    {
+      "package": "Utilities/UiColorMatrixRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/ColorMatrix.cpp",
+      "suite": "RunColorMatrixSuite"
+    },
+    {
+      "package": "Utilities/UiDateTimeRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/DateTime.cpp",
+      "suite": "RunDateTimeSuite"
+    },
+    {
+      "package": "Utilities/UiGroupPanelRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/GroupPanel.cpp",
+      "suite": "RunGroupPanelSuite"
+    },
+    {
+      "package": "Utilities/UiMatrixSelectorRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/MatrixSelector.cpp",
+      "suite": "RunMatrixSelectorSuite"
+    },
+    {
+      "package": "Utilities/UiProgressBarRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/ProgressBar.cpp",
+      "suite": "RunProgressBarSuite"
+    },
+    {
+      "package": "Utilities/UiProgressRingRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/ProgressRing.cpp",
+      "suite": "RunProgressRingSuite"
+    },
+    {
+      "package": "Utilities/UiRangeSliderEditRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/RangeSliderEdit.cpp",
+      "suite": "RunRangeSliderEditSuite"
+    },
+    {
+      "package": "Utilities/UiRangeSliderRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/RangeSlider.cpp",
+      "suite": "RunRangeSliderSuite"
+    },
+    {
+      "package": "Utilities/UiSliderRunTests",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/Slider.cpp",
+      "suite": "RunSliderSuite"
+    },
+    {
+      "package": "Utilities/UiStackMeasureTest",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/Stack.cpp",
+      "suite": "RunStackSuite"
+    },
+    {
+      "package": "Utilities/UiTabMeasureTest",
+      "replacement": "tests/UiControlTests",
+      "retained_source": "tests/UiControlTests/Tab.cpp",
+      "suite": "RunTabSuite"
+    },
+    {
+      "package": "Utilities/UiGeometryContractTest",
+      "replacement": "tests/UiDrawingTests",
+      "retained_source": "tests/UiDrawingTests/GeometryContract.cpp",
+      "suite": "RunGeometryContractSuite"
+    },
+    {
+      "package": "Utilities/UiShapePathTest",
+      "replacement": "tests/UiDrawingTests",
+      "retained_source": "tests/UiDrawingTests/ShapePath.cpp",
+      "suite": "RunShapePathSuite"
+    },
+    {
+      "package": "Utilities/UiThemeSurfaceRegressionTest",
+      "replacement": "tests/UiThemeTests",
+      "retained_source": "tests/UiThemeTests/ThemeSurface.cpp",
+      "suite": "RunThemeSurfaceSuite"
+    },
+    {
+      "package": "Utilities/UiDataModelsTest",
+      "replacement": "tests/UiModelTests",
+      "retained_source": "tests/UiModelTests/DataModels.cpp",
+      "suite": "RunDataModelsSuite"
+    },
+    {
+      "package": "Utilities/UiModelBindingContractTest",
+      "replacement": "tests/UiModelTests",
+      "retained_source": "tests/UiModelTests/ModelBinding.cpp",
+      "suite": "RunModelBindingSuite"
+    },
+    {
+      "package": "Utilities/UiModelMutationContractTest",
+      "replacement": "tests/UiModelTests",
+      "retained_source": "tests/UiModelTests/ModelMutation.cpp",
+      "suite": "RunModelMutationSuite"
+    },
+    {
+      "package": "Utilities/UiDropdownMenuRenderTest",
+      "replacement": "tests/UiModelViewTests",
+      "retained_source": "tests/UiModelViewTests/DropdownMenuRender.cpp",
+      "suite": "RunDropdownMenuRenderSuite"
+    },
+    {
+      "package": "Utilities/UiListStyleContractTest",
+      "replacement": "tests/UiModelViewTests",
+      "retained_source": "tests/UiModelViewTests/ListStyle.cpp",
+      "suite": "RunListStyleSuite"
+    },
+    {
+      "package": "Utilities/UiTreeScaleTest",
+      "replacement": "tests/UiModelViewTests",
+      "retained_source": "tests/UiModelViewTests/TreeScale.cpp",
+      "suite": "RunTreeScaleSuite"
+    },
+    {
+      "package": "Utilities/UiGraphHierarchyTest",
+      "replacement": "tests/UiGraphModelTests",
+      "retained_source": "tests/UiGraphModelTests/UiGraphHierarchy.cpp",
+      "suite": "RunUiGraphHierarchySuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphCanonicalShapeTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/CanonicalShape.cpp",
+      "suite": "RunCanonicalShapeSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphDragDamageTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/DragDamage.cpp",
+      "suite": "RunDragDamageSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphHierarchyViewTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/HierarchyView.cpp",
+      "suite": "RunHierarchyViewSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphInteractionStateTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/InteractionState.cpp",
+      "suite": "RunInteractionStateSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphLiveViewTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/LiveView.cpp",
+      "suite": "RunLiveViewSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphRouteEditTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/RouteEdit.cpp",
+      "suite": "RunRouteEditSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphSelectionModifierTest",
+      "replacement": "tests/UiGraphViewTests",
+      "retained_source": "tests/UiGraphViewTests/SelectionModifier.cpp",
+      "suite": "RunSelectionModifierSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphDetailLodTest",
+      "replacement": "tests/UiGraphRenderTests",
+      "retained_source": "tests/UiGraphRenderTests/DetailLod.cpp",
+      "suite": "RunDetailLodSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphOverviewLodTest",
+      "replacement": "tests/UiGraphRenderTests",
+      "retained_source": "tests/UiGraphRenderTests/OverviewLod.cpp",
+      "suite": "RunOverviewLodSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphPatternedPaintTest",
+      "replacement": "tests/UiGraphRenderTests",
+      "retained_source": "tests/UiGraphRenderTests/PatternedPaint.cpp",
+      "suite": "RunPatternedPaintSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphRenderLodTest",
+      "replacement": "tests/UiGraphRenderTests",
+      "retained_source": "tests/UiGraphRenderTests/RenderLod.cpp",
+      "suite": "RunRenderLodSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphModelSwitchProfileTest",
+      "replacement": "tests/UiGraphScaleTests",
+      "retained_source": "tests/UiGraphScaleTests/ModelSwitchProfile.cpp",
+      "suite": "RunModelSwitchProfileSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphPanProfileTest",
+      "replacement": "tests/UiGraphScaleTests",
+      "retained_source": "tests/UiGraphScaleTests/PanProfile.cpp",
+      "suite": "RunPanProfileSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphPerformanceTest",
+      "replacement": "tests/UiGraphScaleTests",
+      "retained_source": "tests/UiGraphScaleTests/Performance.cpp",
+      "suite": "RunPerformanceSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphScaleTest",
+      "replacement": "tests/UiGraphScaleTests",
+      "retained_source": "tests/UiGraphScaleTests/Scale.cpp",
+      "suite": "RunScaleSuite"
+    },
+    {
+      "package": "Utilities/UiStyledSurfaceCacheTest",
+      "replacement": "tests/UiDrawingTests",
+      "retained_source": "tests/UiDrawingTests/StyledSurfaceCache.cpp",
+      "suite": "RunStyledSurfaceCacheSuite"
+    },
+    {
+      "package": "Utilities/UiThemeStructureContractTest",
+      "replacement": "tests/UiThemeTests",
+      "retained_source": "tests/UiThemeTests/ThemeStructure.cpp",
+      "suite": "RunThemeStructureSuite"
+    },
+    {
+      "package": "Utilities/UiGraphTest",
+      "replacement": "tests/UiGraphModelTests",
+      "retained_source": "tests/UiGraphModelTests/UiGraphCore.cpp",
+      "suite": "RunUiGraphCoreSuite"
+    },
+    {
+      "package": "Utilities/UiNodeGraphPresentationTest",
+      "replacement": "tests/UiGraphRenderTests",
+      "retained_source": "tests/UiGraphRenderTests/Presentation.cpp",
+      "suite": "RunPresentationSuite"
+    },
+    {
+      "package": "Utilities/UiModelViewPerformanceTest",
+      "replacement": "tests/UiModelViewTests",
+      "retained_source": "tests/UiModelViewTests/ModelViewPerformance.cpp",
+      "suite": "RunModelViewPerformanceSuite"
+    }
   ]
 }

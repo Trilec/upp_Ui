@@ -31,6 +31,7 @@ void UiFileBrowser::BuildNavigation()
     home_button_.SetIcon(ICON_DESIGN_HOME_48()).SetIconSize(DPI(16), DPI(16)).Tip("Home");
 
     breadcrumbs_.SetDivider("›").SetTrimOnSelect(false);
+    breadcrumbs_.Tip("Click the current folder or empty space to edit the path (Ctrl+L)");
     address_edit_.SetPlaceholder("Folder path · Enter to navigate");
     address_stack_.Add(breadcrumbs_, "crumbs");
     address_stack_.Add(address_edit_, "edit");
@@ -85,7 +86,11 @@ void UiFileBrowser::RebuildNavigation()
         theme_button_.Hide();
     if(mode_ == Mode::Simple)
     {
-        for(UiToolButton *button : {&new_button_, &details_button_, &thumbnails_button_, &options_button_})
+        if(!read_only_)
+            navigation_layout_.Add(new_button_).Fixed(SizePx(28));
+        else
+            new_button_.Hide();
+        for(UiToolButton *button : {&details_button_, &thumbnails_button_, &options_button_})
             navigation_layout_.Add(*button).Fixed(SizePx(28));
     }
     navigation_layout_.Add(refresh_button_).Fixed(SizePx(28));
@@ -384,10 +389,16 @@ void UiFileBrowser::WireEvents()
     refresh_button_.WhenAction = [this] { RefreshFolder(); };
     breadcrumbs_.WhenAction = [this](int i)
     {
+        if(i == breadcrumbs_.GetCount() - 1)
+        {
+            EditAddress(true);
+            return;
+        }
         Value data = breadcrumbs_.GetItemData(i);
         if(!IsNull(data))
             SetFolderInternal(AsString(data), true);
     };
+    breadcrumbs_.WhenBackgroundAction = [this] { EditAddress(true); };
     search_.WhenChange = [this] { SetTimeCallback(120, [this] { RefreshProjection(true); }, 2); };
     details_button_.WhenAction = [this] { SetDetailsView(true); };
     thumbnails_button_.WhenAction = [this] { SetDetailsView(false); };
@@ -480,14 +491,9 @@ void UiFileBrowser::WireEvents()
         return HasSelection() && (*model_)[selected_entry_].IsDirectory() ? (*model_)[selected_entry_].path
                                                                           : String();
     };
-    address_button_.WhenAction = [this] { EditAddress(address_stack_.GetActiveKey() != "edit"); };
-    address_edit_.WhenAction = [this]
-    {
-        String path = TrimBoth(AsString(address_edit_.GetData()));
-        if(!path.IsEmpty())
-            SetFolderInternal(IsFullPath(path) ? path : AppendFileName(folder_, path), true);
-        EditAddress(false);
-    };
+    address_button_.WhenAction = [this] { EditAddress(true); };
+    address_edit_.WhenAction = [this] { SubmitAddress(); };
+    address_edit_.WhenCancelEdit = [this] { EditAddress(false); };
 
     file_type_.WhenSelect = [this](int) { RefreshProjection(true); };
     name_edit_.WhenAction = [this] { SubmitName(); };

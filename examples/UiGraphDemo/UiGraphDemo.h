@@ -7,10 +7,10 @@
 
     Interactive reference for UiNodeGraph.
 
-    - Uses the approved rounded MediaCard/Collection shell and production PropertyEditor.
+    - Uses the approved rounded MediaCard/Collection shell and production UiPropertyInspector.
     - Reference mode uses UiNodeGraph's retained internal model.
     - Scale mode binds a separate deterministic 10,000-node external model.
-    - Selection projects the active UiGraphNode or UiGraphEdge into PropertyEditor;
+    - Selection projects the active UiGraphNode or UiGraphEdge into UiPropertyInspector;
       there is no parallel graph store.
     - Style editing is view/presentation state. Semantic topology remains solely
       in UiGraphModel.
@@ -34,9 +34,9 @@
 #include <Ui/Ui.h>
 #undef UIGRAPH_ENABLE_LEGACY_SHAPE_NAMES
 #include <Ui/UiOsFileDialog/UiOsFileDialog.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
-#include <Utilities/PropertyEditor/PropertyValueEditors.h>
-#include <Utilities/PropertyEditor/PropertyWorkingRangeEditors.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <Ui/UiPropertyInspector/PropertyValueEditors.h>
+#include <Ui/UiPropertyInspector/PropertyWorkingRangeEditors.h>
 
 namespace Upp {
 
@@ -184,8 +184,8 @@ private:
 
 private:
     // Borrowed models and editor factories outlive their observing controls.
-    PropertyEditorFactory pe_factory;
-    PropertyEditorModel pe_model_node, pe_model_edge, pe_model_style;
+    UiPropertyInspectorFactory pe_factory;
+    UiPropertyInspectorModel pe_model_node, pe_model_edge, pe_model_style;
     UiGraphModel scale_model_;
     Color window_face_ = SColorFace();
     UiTitleCard tc_header;
@@ -209,7 +209,7 @@ private:
     UiToolButton btn_inspector_mode, btn_style_mode, btn_code_mode, btn_diagnostics_mode;
     UiStack stk_right_pages;
     UiPanel pnl_inspector_page, pnl_style_page, pnl_code_page, pnl_diagnostics_page;
-    PropertyEditor pe_inspector, pe_style;
+    UiPropertyInspector pe_inspector, pe_style;
     UiMultiEdit edit_generated_code;
     UiDropdown code_recipe_;
     UiToolButton btn_copy_code, btn_save_code;

@@ -1,27 +1,27 @@
 // Self-contained UiTabDemo reference: one authored model drives the preview and public-API C++ recipe.
 #include <CtrlLib/CtrlLib.h>
 #include <Ui/Ui.h>
-#include <Utilities/PropertyEditor/PropertyEditor.h>
+#include <Ui/UiPropertyInspector/UiPropertyInspector.h>
 
 using namespace Upp;
 
 namespace {
 // Frame Accent is an authored addition to the ordinary frame, not layout padding.
-void AddFrameAccentProperties(PropertyEditorModel& model, const String& prefix,
+void AddFrameAccentProperties(UiPropertyInspectorModel& model, const String& prefix,
                               const StyledMetrics& metrics, const String& group)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const char* label[] = { "Top", "Bottom", "Left", "Right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
                          StyledFrameAccent::Left, StyledFrameAccent::Right };
-    auto mark = [](PropertyEditorItem& item) { item.SetDefault(item.value); };
+    auto mark = [](UiPropertyInspectorItem& item) { item.SetDefault(item.value); };
     for(int i = 0; i < 4; i++)
         mark(model.AddBoolean(prefix + edge[i], label[i], bool(metrics.frame_accent.edges & mask[i]), group));
     mark(model.AddNumericInt(prefix + "thickness", "Thickness", metrics.frame_accent.thickness, 0, DPI(12), 1, group).SetUnit("px"));
     mark(model.AddNumericInt(prefix + "alpha", "Opacity", metrics.frame_accent.alpha, 0, 255, 1, group));
     mark(model.AddColor(prefix + "color", "Colour (Null follows frame)", metrics.frame_accent.color, group));
 }
-void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorModel& model, const String& prefix)
+void ApplyFrameAccentProperties(StyledMetrics& metrics, const UiPropertyInspectorModel& model, const String& prefix)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
     const int mask[] = { StyledFrameAccent::Top, StyledFrameAccent::Bottom,
@@ -40,7 +40,7 @@ void ApplyFrameAccentProperties(StyledMetrics& metrics, const PropertyEditorMode
     row = model.Find(prefix + "color");
     if(row && row->enabled && row->value != row->default_value) metrics.frame_accent.color = Color(row->value);
 }
-void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, const String& prefix,
+void EmitFrameAccentProperties(String& code, const UiPropertyInspectorModel& model, const String& prefix,
                                const String& target, const String& declaration, bool& authored)
 {
     const char* edge[] = { "top", "bottom", "left", "right" };
@@ -68,9 +68,9 @@ void EmitFrameAccentProperties(String& code, const PropertyEditorModel& model, c
     }
 }
 
-bool HasFrameAccentChanges(const PropertyEditorModel& model)
+bool HasFrameAccentChanges(const UiPropertyInspectorModel& model)
 {
-    for(const PropertyEditorItem& item : model.GetItems())
+    for(const UiPropertyInspectorItem& item : model.GetItems())
         if(item.id.Find(".frame_accent.") >= 0 && item.enabled && item.value != item.default_value) return true;
     return false;
 }
@@ -133,7 +133,7 @@ public:
         context.preset = UiThemePreset::Minimal;
         context.mode = UiThemeMode::Light;
         UiTheme::Set(context);
-        RegisterPropertyEditorEditors(factory_);
+        RegisterUiPropertyInspectorEditors(factory_);
 
         Add(header_);
         Add(preview_panel_);
@@ -200,7 +200,7 @@ public:
         properties_.SetFactory(&factory_);
         properties_.SetModel(&model_);
         properties_.SetLabelRatio(38);
-        PropertyEditorStyle pe_style = PropertyEditorStyle::System();
+        UiPropertyInspectorStyle pe_style = UiPropertyInspectorStyle::System();
         pe_style.show_group_summaries = true;
         properties_.SetStyle(pe_style);
 
@@ -250,7 +250,7 @@ public:
         code_mode_.SelectByData("explicit"); UpdateCode();
         SaveFile(AppendFileName(directory, "UiTabDemo_single_explicit.cpp"), code_.GetTextUtf8());
         {
-        if(PropertyEditorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
+        if(UiPropertyInspectorItem* text = model_.Find("text")) model_.SetValue("text", String("Quoted \"title\"\t\r\nC:\\media"), false);
         static const char* colors[] = { "face", "body_face", "track_color", "track_face", "tab_face" };
         for(const char* id : colors) if(model_.Find(id)) { model_.SetValue(id, Color(88, 99, 111), false); break; }
         ApplyProjection();
@@ -262,11 +262,11 @@ public:
 private:
     Value Get(const char *id) const
     {
-        const PropertyEditorItem *item = model_.Find(id);
+        const UiPropertyInspectorItem *item = model_.Find(id);
         return item ? item->value : Value();
     }
 
-    PropertyEditorItem& Resettable(PropertyEditorItem& item)
+    UiPropertyInspectorItem& Resettable(UiPropertyInspectorItem& item)
     {
         item.SetDefault(item.value);
         return item;
@@ -274,7 +274,7 @@ private:
 
     bool Changed(const char *id) const
     {
-        const PropertyEditorItem *item = model_.Find(id);
+        const UiPropertyInspectorItem *item = model_.Find(id);
         return item && item->value != item->default_value;
     }
 
@@ -284,11 +284,11 @@ private:
             .AddChoice("Classic", "Classic").AddChoice("Underline", "Underline")
             .AddChoice("Segmented", "Segmented").AddChoice("Rail", "Rail")
             .AddChoice("Document", "Document"));
-        PropertyEditorItem& placement = Resettable(model_.AddChoice("placement", "Placement", "Top", "General")
+        UiPropertyInspectorItem& placement = Resettable(model_.AddChoice("placement", "Placement", "Top", "General")
             .AddChoice("Left", "Left").AddChoice("Right", "Right")
             .AddChoice("Top", "Top").AddChoice("Bottom", "Bottom"));
-        placement.kind = PropertyEditorKind::Custom;
-        placement.custom_editor = PropertyEditorMatrixId();
+        placement.kind = UiPropertyInspectorKind::Custom;
+        placement.custom_editor = UiPropertyInspectorMatrixId();
         placement.editor_variant = "Cardinal4";
         Resettable(model_.AddNumericInt("active", "Active tab", 0, 0, 2, 1, "General"));
         Resettable(model_.AddBoolean("expand_tabs", "Expand tabs", false, "General"));
@@ -305,11 +305,11 @@ private:
         Resettable(model_.AddNumericInt("padding_x", "Horizontal padding", 14, 0, 40, 1, "Tab Layout").SetUnit("px"));
         Resettable(model_.AddNumericInt("padding_y", "Vertical padding", 8, 0, 28, 1, "Tab Layout").SetUnit("px"));
         Resettable(model_.AddNumericInt("icon_size", "Icon size", 16, 0, 40, 1, "Tab Layout").SetUnit("px"));
-        PropertyEditorItem& icon_side = Resettable(model_.AddChoice("icon_side", "Icon side", "Left", "Tab Layout")
+        UiPropertyInspectorItem& icon_side = Resettable(model_.AddChoice("icon_side", "Icon side", "Left", "Tab Layout")
             .AddChoice("Left", "Left").AddChoice("Right", "Right")
             .AddChoice("Top", "Top").AddChoice("Bottom", "Bottom"));
-        icon_side.kind = PropertyEditorKind::Custom;
-        icon_side.custom_editor = PropertyEditorMatrixId();
+        icon_side.kind = UiPropertyInspectorKind::Custom;
+        icon_side.custom_editor = UiPropertyInspectorMatrixId();
         icon_side.editor_variant = "Cardinal4";
 
         Resettable(model_.AddNumericInt("indicator_thickness", "Indicator thickness", 3, 0, 12, 1, "Indicator").SetUnit("px"));
@@ -361,7 +361,7 @@ private:
         properties_.WhenPreview = [=](String, Value) { ApplyProjection(); };
         properties_.WhenCommit = [=](String, Value) { ApplyProjection(); };
         properties_.WhenReset = [=](String id) {
-            PropertyEditorItem *item = model_.Find(id);
+            UiPropertyInspectorItem *item = model_.Find(id);
             if(item && item->resettable) {
                 model_.SetValue(id, item->default_value);
                 properties_.RefreshModel();
@@ -380,7 +380,7 @@ private:
     {
         const UiTabVisual visual = ParseVisual(AsString(Get("visual")));
         for(int i = 0; i < model_.GetCount(); i++) {
-            PropertyEditorItem& row = model_[i];
+            UiPropertyInspectorItem& row = model_[i];
             bool supported = row.enabled;
             if(row.id.StartsWith("tab_metrics.frame_accent.")) { supported = visual == UITAB_SEGMENTED; row.help = "Tab accents require closed caps; choose Segmented. Values are retained for the next supported visual."; }
             if(row.enabled != supported) {
@@ -654,7 +654,7 @@ private:
 
     void UpdatePropertyPage()
     {
-        for(const PropertyEditorItem& item : model_.GetItems())
+        for(const UiPropertyInspectorItem& item : model_.GetItems())
             model_.SetVisible(item.id, IsStyleProperty(item.id) == overrides_view_, false);
         model_.StructureChanged();
     }
@@ -689,11 +689,11 @@ private:
 
 
         const auto mode = dark
-                        ? PropertyEditorPaletteMode::Dark : PropertyEditorPaletteMode::Light;
+                        ? UiPropertyInspectorPaletteMode::Dark : UiPropertyInspectorPaletteMode::Light;
         properties_.SetPaletteMode(mode);
 
-        for(PropertyEditor* editor : { &properties_ }) {
-            PropertyEditorStyle editor_style = editor->GetStyle();
+        for(UiPropertyInspector* editor : { &properties_ }) {
+            UiPropertyInspectorStyle editor_style = editor->GetStyle();
             editor_style.show_frame = false;
             editor_style.background = panel_face;
             editor_style.show_group_summaries = true;
@@ -736,8 +736,8 @@ private:
 private:
     bool overrides_view_ = false;
     Color window_face_ = SColorFace();
-    PropertyEditorFactory factory_;
-    PropertyEditorModel model_;
+    UiPropertyInspectorFactory factory_;
+    UiPropertyInspectorModel model_;
     UiTitleCard header_;
     UiBoxLayout header_actions_ { UiDirection::H };
     UiToolButton theme_button_, help_button_, exit_button_;
@@ -748,7 +748,7 @@ private:
 
     UiBoxLayout view_bar_ { UiDirection::H };
     UiToolButton props_button_, overrides_button_, code_button_;
-    PropertyEditor properties_;
+    UiPropertyInspector properties_;
     UiDropdown code_mode_;
     UiMultiEdit code_;
     bool code_view_ = false;

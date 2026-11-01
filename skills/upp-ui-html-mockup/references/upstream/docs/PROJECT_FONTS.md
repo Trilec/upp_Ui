@@ -144,7 +144,7 @@ All 19 files in the supplied source inventory were reviewed:
 
 | Files | Treatment |
 | --- | --- |
-| UiTheme.h, UiThemeResolverImpl.h | Central Body/Heading/Code inheritance; fresh resolvers retain palette inheritance. |
+| UiTheme.h, Themes/Resolver.h | Central Body/Heading/Code inheritance; fresh resolvers retain palette inheritance. |
 | UiAccordion.cpp, UiBreadcrumbs.h, UiCheckBox.cpp, UiRadioButton.cpp, UiSplitter.cpp, UiMediaCard.h, UiGroupPanel.h, UiTitleCard.h | Existing builtin family/size defaults preserved; resolved/nested theme fields receive roles. Explicit custom styles remain explicit. |
 | UiBaseEdit.cpp, UiButton.cpp, UiGroupPanel.cpp | Genuine face normalization for custom styles; edit caret uses the same effective text font as painting and warms measurement before Paint. |
 | UiDoc.cpp, UiDocPaint.cpp, UiDocPaintOverlay.cpp, UiDocMetadataPrivate.h | Body/Heading/Code and stable local selection resolution; typography revision invalidates glyph/paragraph/caret caches. Removed double DPI conversion at reviewed annotation/code sites. |
@@ -203,7 +203,7 @@ Current evidence lives in `build/font-work` (local build artifacts, not source):
 
 Final focused acceptance: UiTypographyDemo Release/BLITZ and Debug/no-BLITZ each
 pass 83 checks; ProjectFontTest passes 43; AssistantDesignerTests passes 318;
-PropertyEditorTests passes 143; UiThemeTests passes 1,092 structure checks and
+UiPropertyInspectorTests passes 143; UiThemeTests passes 1,092 structure checks and
 13 surface checks; fresh-process generated export passes 9. Ui Release
 and Designer font tests/export were rebuilt against the staged Ui snapshot, without
 concurrent/unrelated Ui changes. The full Designer Release application builds.

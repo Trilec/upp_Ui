@@ -1,0 +1,14 @@
+description "UiPropertyInspector stable sort_order presentation contract";
+
+uses
+    Core,
+    Draw,
+    CtrlCore,
+    CtrlLib,
+    Ui/UiPropertyInspector;
+
+file
+    main.cpp;
+
+mainconfig
+    "" = "CONSOLE";

@@ -45,7 +45,7 @@ optional copy icon offers displayed values or the independently transformed
 display swatch as RGB hex. Alpha, swatch and copy are independently optional.
 `SetControlsSide` puts sampling/copy icons left, right, top or bottom; the format
 arrow stays beside the values. `SetRowHeight` allows a 16-pixel row for dense
-headers. Four-pixel gaps are configurable through `SetGap`; the swatch fills the value-row height and the format arrow uses an eight-pixel glyph. The control divides the allocated width between its visible values.
+headers. Four-pixel gaps are configurable through `SetGap`; inline Left/Right layouts keep the swatch beside the values. In Top/Bottom layouts it occupies the control row aligned with the green value, leaving RGB/RGBA together on one numeric row. The format arrow uses an eight-pixel glyph. The control divides the allocated width between its visible values.
 
 For the reference layout, supply the caption as borrowed host content:
 
@@ -57,8 +57,8 @@ probe.Accessory().SetContent(caption);
 ```
 
 `Accessory()` is an existing `UiDirectContentHost`, not a new label system.
-It occupies the space opposite the icons in a top/bottom row. Supply one label,
-button or a layout containing several controls; the host retains ownership.
+In a Top/Bottom row with a swatch, the accessory occupies the caption space over the red value; the swatch sits over green and sampling/copy actions follow it. Without a swatch it occupies the space opposite the icons. Supply one label,
+button or a compact layout containing several controls; the host retains ownership.
 It is hidden for inline Left/Right layouts. Clear/reassign its content through
 the standard content-host API.
 
@@ -73,7 +73,7 @@ The revised native demo passed 48 checks, including number-format mapping,
 unchanged HDR values, copy text, borrowed-header placement, catalogue lookup,
 per-command icon replacement and all four playback sides in both directions.
 An early demo layout lookup caused a startup access violation; the lookup now
-uses a safe default until the PropertyEditor model exists. The corrected native
+uses a safe default until the UiPropertyInspector model exists. The corrected native
 startup smoke run, interaction checks and render export all exit successfully.
 
 All controls operate on the GUI thread. Programmatic setters are silent.
@@ -100,7 +100,7 @@ Coverage is passive host-supplied information, not a cache implementation.
 
 ## Review and validation
 
-The native `examples/UiMediaControlsDemo` package contains a PropertyEditor,
+The native `examples/UiMediaControlsDemo` package contains a UiPropertyInspector,
 theme toggle, usage-code export and `--self-test <result-file>` interaction
 checks. The checks cover HDR preservation, silent setters, extreme frame indices,
 rejected domains, disabled requests, marker navigation, range width/clamping,
@@ -108,7 +108,7 @@ Escape, capture loss, disabled-during-drag, vertical bounds and callback deletio
 The generated standalone C++ example is compiled separately.
 
 Validation on 2026-10-04: 25 focused interaction checks passed against the
-shared-source demo; the RangeSlider suite passed 50 checks (now retained in `Utilities/UiControlTests/RangeSlider.cpp`).
+shared-source demo; the RangeSlider suite passed 50 checks (now retained in `tests/UiControlTests/RangeSlider.cpp`).
 Debug and Release BLITZ builds succeeded, as did a Release build without BLITZ.
 The exported usage example compiled directly against the shared Ui package.
 `git diff --check` passed. Native Light/Dark, disabled and narrow-size renders
