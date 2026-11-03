@@ -1126,6 +1126,14 @@ public:
         edit_.ClearDirty();
     }
     String GetValue() const { return edit_.GetTextUtf8(); }
+    void SyncTheme()
+    {
+        edit_.SetCustomStyle(PickerEditStyle_());
+        UiToolButton::Style copy = UiTheme::ResolveToolButton(UiRole::Subtle);
+        copy.metrics.content_margin = Rect(DPI(2), DPI(2), DPI(2), DPI(2));
+        copy_.SetCustomStyle(copy);
+        ItemAt(0).Fixed(max(DPI(60), title_.GetMinSize().cx));
+    }
     Event<String> WhenCommitText;
 
 private:
@@ -3517,12 +3525,15 @@ UiColorPicker& UiColorPicker::Impl::SetChannelMode(ChannelMode mode)
         mode = CHANNEL_RGB_FLOAT;
     if(channel_mode_ == mode) {
         SyncChannelRows();
+        Layout();
         return owner_;
     }
     channel_mode_ = mode;
     ConfigureChannelRows();
     SyncChannelRows();
     channel_drop_.SetDataSilently((int)mode);
+    // Four-to-five channel changes alter the measured stack height.
+    Layout();
     SaveSession(false);
     if(owner_.WhenChannelModeChanged)
         owner_.WhenChannelModeChanged(channel_mode_);
@@ -4504,6 +4515,18 @@ void UiColorPicker::Impl::SyncTheme()
         &image_saturation_row_, &hero_gain_row_, &tolerance_row_ };
     for(One<SliderRow_>* row : rows) if(*row) (*row)->SyncTheme();
     for(int i = 0; i < 5; ++i) if(numeric_row_[i]) numeric_row_[i]->SyncTheme();
+    for(int i = 0; i < 6; ++i) if(readout_[i]) readout_[i]->SyncTheme();
+    // Readout rows share the compact field recipe; measure after applying it.
+    // Fixed 30px rows with the full-size edit insets clipped the text baseline.
+    int readout_height = 0;
+    for(int row = 0; row < 3; ++row) {
+        const int height = max(DPI(30), readout_pair_[row]->GetMinSize().cy);
+        readout_stack_.ItemAt(row).Fixed(height);
+        readout_height += height + (row ? DPI(3) : 0);
+    }
+    color_right_.ItemAt(4).Fixed(readout_height);
+    color_right_.ItemAt(0).Fixed(max(DPI(28), color_mode_row_.GetMinSize().cy));
+    color_left_.ItemAt(0).Fixed(max(DPI(44), spectrum_field_.GetMinSize().cy));
 
     UiToggle::Style toggle = UiTheme::ResolveToggle();
     toggle.metrics.content_margin = Rect(0, 0, 0, 0);

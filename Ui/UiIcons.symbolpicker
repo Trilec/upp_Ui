@@ -2161,6 +2161,39 @@
 					"unresolved": false,
 					"marked_used": false,
 					"usage_note": ""
+				},
+				{
+					"catalog_id": "ui_action/deployed_code/outlined/20/unfilled",
+					"source_id": "ui_action/deployed_code",
+					"alias": "ICON_UI_ACTION_DEPLOYED_CODE_OUTLINED",
+					"size": 48,
+					"tint": "",
+					"comment": "",
+					"unresolved": false,
+					"marked_used": false,
+					"usage_note": ""
+				},
+				{
+					"catalog_id": "image/video_camera_back/outlined/20/unfilled",
+					"source_id": "image/video_camera_back",
+					"alias": "ICON_IMAGE_VIDEO_CAMERA_BACK_OUTLINED",
+					"size": 48,
+					"tint": "",
+					"comment": "",
+					"unresolved": false,
+					"marked_used": false,
+					"usage_note": ""
+				},
+				{
+					"catalog_id": "ui_action/responsive_layout/outlined/20/unfilled",
+					"source_id": "ui_action/responsive_layout",
+					"alias": "ICON_UI_ACTION_RESPONSIVE_LAYOUT_OUTLINED",
+					"size": 48,
+					"tint": "",
+					"comment": "",
+					"unresolved": false,
+					"marked_used": false,
+					"usage_note": ""
 				}
 			]
 		}
