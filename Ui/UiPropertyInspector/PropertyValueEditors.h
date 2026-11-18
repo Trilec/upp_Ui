@@ -52,6 +52,11 @@ protected:
     UiPropertyInspectorActionIcons action_icons_;
 };
 
+// Shared measurement for the vector editor grid and inspector row allocation.
+// Explicit row_span keeps the caller's compact layout; the default wraps by width.
+int PropertyVectorColumnCount(int components, int available_width, int decimals,
+                              bool expansion_button);
+
 typedef Function<One<PropertyValueEditor>()> PropertyValueEditorCreator;
 typedef Function<bool(Value& value, Ctrl *owner)> PropertyValuePicker;
 typedef Function<Image(const Value& value)> PropertyValueThumbnailProvider;

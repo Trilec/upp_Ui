@@ -169,6 +169,7 @@ private:
     bool has_custom_style_ = false;
 
     Vector<int> pos_;
+    Vector<int> layout_pos_; // Applied pixel edges, recalculated for each allocation.
     Vector<int> mins_;
     Vector<int> minpx_;
     int zoom_index_ = -1;
@@ -181,14 +182,15 @@ private:
     void SyncThemeStyle();
 
     int FindIndex(Point p) const;
-    int GetMins(int i) const;
+    int GetSplitPixel(int index) const;
+    int GetLayoutSplitWidth() const;
     void SyncMin();
     Rect GetHitRect(int index) const;
     Rect GetTrackRect(int index) const;
     Rect GetThumbRect(int index) const;
     void PaintGrip(Draw& w, const Rect& r, StyledState st) const;
     UiSplitter& SetSplitUnits(int units, int index = 0);
-    int GetSplitUnits(int index = 0) const { return index < pos_.GetCount() ? pos_[index] : 10000; }
+    int GetSplitUnits(int index = 0) const { return index >= 0 && index < pos_.GetCount() ? pos_[index] : 10000; }
 
 public:
     UiSplitter();
@@ -250,8 +252,8 @@ public:
     void NoZoom() { Zoom(-1); }
     int GetZoom() const { return zoom_index_; }
 
-    UiSplitter& SetMin(int i, int w) { mins_.At(i, 0) = w; SyncMin(); return *this; }
-    UiSplitter& SetMinPixels(int i, int w) { minpx_.At(i, 0) = w; SyncMin(); return *this; }
+    UiSplitter& SetMin(int i, int w) { if(i >= 0) mins_.At(i, 0) = clamp(w, 0, 10000); SyncMin(); return *this; }
+    UiSplitter& SetMinPixels(int i, int w) { if(i >= 0) minpx_.At(i, 0) = max(0, w); SyncMin(); return *this; }
     UiSplitter& SetLabel(const String& s);
     UiSplitter& SetThumbIcon(const Image& img);
     UiSplitter& SetGripVisual(UiSplitterGripVisual visual);

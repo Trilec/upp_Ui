@@ -89,10 +89,11 @@ public:
 
     virtual Size GetMinSize() const override;
     // Width-aware measurement for hosts containing wrapped layout controls.
-    // This does not inspect the last allocated rectangle.
-    Size MeasureSizeForWidth(int outer_width) const;
-    Size GetMinWrapSize() const;
-    bool HasWidthDependentContent() const;
+    // Intrinsically sized subclasses override this contract as well as
+    // GetMinSize, so UiMeasureLayout never measures their allocated children.
+    virtual Size MeasureSizeForWidth(int outer_width) const;
+    virtual Size GetMinWrapSize() const;
+    virtual bool HasWidthDependentContent() const;
     // Logical extent of visible child controls. UiPanel remains a styled host;
     // use UiBoxLayout/UiGridLayout when children need automatic flow.
     Size GetContentSize() const;

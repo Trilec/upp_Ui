@@ -741,7 +741,7 @@ public:
             if(count == 1 || remaining > 0 || count == 0) {
                 summary_.Show();
                 summary_.SetText(remaining > 0 ? Format("+%d...", remaining) :
-                                 count == 0 ? "<none>" : AsString(ImageValue(0)));
+                                 count == 0 ? String("<none>") : AsString(ImageValue(0)));
                 summary_.SetRect(x, 0, max(0, available - x), row);
             }
             else
@@ -779,7 +779,7 @@ private:
     void SyncSummary()
     {
         const int count = PreviewCount();
-        summary_.SetText(mixed_ ? "<multiple values>" : IsNull(value_) ? "<none>" :
+        summary_.SetText(mixed_ ? String("<multiple values>") : IsNull(value_) ? String("<none>") :
                          count > 1 ? Format("%d images", count) : AsString(value_));
         for(int i = 0; i < 4; i++) {
             Value item;

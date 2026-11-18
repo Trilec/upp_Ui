@@ -208,6 +208,7 @@ private:
 
     void RebuildRows();
     void RecomputeAutoLabelWidth();
+    void ReflowRows();
     int ResolveRowSpan(const UiPropertyInspectorItem& item) const;
     void SyncScrollBar();
     void LayoutActiveEditor();

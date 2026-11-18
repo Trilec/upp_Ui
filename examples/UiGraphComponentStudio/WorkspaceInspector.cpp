@@ -165,7 +165,7 @@ void NodeWorkspace::RebuildInspector()
         integer("items", "Maximum rows / items", r.max_items, 1, 12, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.max_items = (int)v; }));
         integer("preferred_width", "Preferred width", Logical(r.preferred_size.cx), 0, 1000, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cx = Metric(v); }));
         integer("preferred_height", "Preferred height", Logical(r.preferred_size.cy), 0, 1000, "Layout", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.preferred_size.cy = Metric(v); }));
-        choice("small", "Small representation", (int)r.small, "Hidden|Bar|Bar then dot|Dot", "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.small = (UiGraphNodeSmallMode)(int)v; }));
+        choice("small", "Small representation", (int)r.small_mode, "Hidden|Bar|Bar then dot|Dot", "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.small_mode = (UiGraphNodeSmallMode)(int)v; }));
         integer("readable", "Readable minimum (pixels)", r.readable_min_px, 1, 128, "LOD representation", mutate([](UiGraphNodeSlotRule& r, const Value& v) { r.readable_min_px = (int)v; }));
         for(int field = 0; field < 3; field++) for(int state = 0; state < 4; state++) {
             const char* names[] = {"Ink", "Face", "Frame"};

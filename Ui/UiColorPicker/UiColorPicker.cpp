@@ -1529,8 +1529,8 @@ private:
                           number, font, SColorText());
             if(family.locked) {
                 String lock = "L";
-                Font small = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
-                UiDrawText(draw,marker.right - DPI(2), marker.bottom - DPI(7), lock, small, SColorText());
+                Font lock_font = UiFonts::Inherit(SansSerif().Height(DPI(7)).Bold());
+                UiDrawText(draw,marker.right - DPI(2), marker.bottom - DPI(7), lock, lock_font, SColorText());
             }
         }
     }
@@ -3195,7 +3195,7 @@ void UiColorPicker::Impl::SetStaticPalette(int index)
     if(!display.IsEmpty())
         palette_flow_.SetSelectedIndex(0);
     palette_field_.Drop().SetDataSilently(index);
-    palette_badge_.SetText(palette.authoritative ? "Reference" : palette.category);
+    palette_badge_.SetText(palette.authoritative ? String("Reference") : palette.category);
     palette_badge_.Tip(palette.source_reference);
     if(!display.IsEmpty())
         SyncPaletteSelection(0, display[0].value);
@@ -3410,7 +3410,7 @@ void UiColorPicker::Impl::RefreshImageDisplay(bool preserve_selection)
     hero_gain_row_->Enable(image_hero_ >= 0 && image_hero_ < image_display_.GetCount());
     hero_label_.SetText(image_hero_ >= 0 && image_hero_ < image_display_.GetCount()
                       ? Format("Hero: %d", image_hero_ + 1)
-                      : "Hero: none");
+                      : String("Hero: none"));
     image_gain_row_->SetValue(image_gain_);
     image_saturation_row_->SetValue(image_saturation_);
     hero_gain_row_->SetValue(image_hero_gain_);
@@ -3478,7 +3478,7 @@ void UiColorPicker::Impl::SendImageToGenerator()
         family.authored_saturation = saturation;
         family.gain = value - base_value;
         family.priority = image_display_.GetCount() - i;
-        family.role = i == 0 ? "Primary" : Format("Family %d", i + 1);
+        family.role = i == 0 ? String("Primary") : Format("Family %d", i + 1);
     }
     recipe_.free_angles = true;
     PopulateGeneratorControls();

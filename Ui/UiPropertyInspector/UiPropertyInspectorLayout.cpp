@@ -45,8 +45,7 @@ void UiPropertyInspector::SetLabelAuto()
 {
     label_mode_ = UiPropertyInspectorLabelMode::Auto;
     RecomputeAutoLabelWidth();
-    LayoutActiveEditor();
-    RebuildInlineEditors();
+    Layout();
     Refresh();
 }
 
@@ -54,8 +53,7 @@ void UiPropertyInspector::SetLabelWidth(int cx)
 {
     label_mode_ = UiPropertyInspectorLabelMode::Fixed;
     style_.label_width = max(DPI(60), cx);
-    LayoutActiveEditor();
-    RebuildInlineEditors();
+    Layout();
     Refresh();
 }
 
@@ -63,8 +61,7 @@ void UiPropertyInspector::SetLabelRatio(int percent)
 {
     label_mode_ = UiPropertyInspectorLabelMode::Ratio;
     style_.label_ratio = clamp(percent, 20, 70);
-    LayoutActiveEditor();
-    RebuildInlineEditors();
+    Layout();
     Refresh();
 }
 
@@ -101,12 +98,17 @@ void UiPropertyInspector::Layout()
     else
         filter_.Hide();
 
+    // Reflow existing rows without replacing editors or changing their values.
+    // Measure at full width first; a required scrollbar can only add wrapping.
+    viewport_ = r;
+    ReflowRows();
     int scroll_cx = ScrollBarSize();
     bool needs_scroll = content_height_ > r.GetHeight();
     if(needs_scroll) {
         scroll_.Show();
         scroll_.SetRect(r.right - scroll_cx, r.top, scroll_cx, r.GetHeight());
         viewport_ = Rect(r.left, r.top, r.right - scroll_cx, r.bottom);
+        ReflowRows();
     }
     else {
         scroll_.Hide();
@@ -301,7 +303,30 @@ int UiPropertyInspector::ResolveRowSpan(const UiPropertyInspectorItem& item) con
         return clamp(item.expanded_row_span, 2, 8);
     if(item.row_span > 0)
         return clamp(item.row_span, 1, 8);
+    const int count = item.kind == UiPropertyInspectorKind::Vector3 ? 3
+                    : item.kind == UiPropertyInspectorKind::Vector2 ? 2 : 0;
+    if(count && item.value_editable && !item.read_only) {
+        const Rect row = viewport_.IsEmpty() ? GetClientArea() : viewport_;
+        const int width = max(0, row.GetWidth() - GetLabelColumnWidth(row) -
+            style_.cell_padding - style_.action_width - 2 * DPI(2));
+        const int columns = PropertyVectorColumnCount(count, width, item.decimals,
+                                                     item.expanded_row_span > 1);
+        return (count + columns - 1) / columns;
+    }
     return 1;
+}
+
+void UiPropertyInspector::ReflowRows()
+{
+    content_height_ = 0;
+    for(DisplayRow& row : rows_) {
+        row.y = content_height_;
+        if(row.group)
+            row.cy = style_.group_height;
+        else if(model_ && row.model_index >= 0)
+            row.cy = style_.row_height * ResolveRowSpan((*model_)[row.model_index]);
+        content_height_ += row.cy;
+    }
 }
 
 void UiPropertyInspector::RecomputeAutoLabelWidth()
@@ -403,6 +428,7 @@ void UiPropertyInspector::RebuildRows()
     }
 
     RecomputeAutoLabelWidth();
+    ReflowRows();
     selected_display_row_ = selected.IsEmpty()
         ? -1 : FindDisplayRowByProperty(selected);
     if(selected_display_row_ < 0)

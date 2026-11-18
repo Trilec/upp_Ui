@@ -265,7 +265,7 @@ private:
         int nl = text.Find('\n');
         if(nl >= 0)
             text = text.Left(nl) + "...";
-        summary_.SetText(text.IsEmpty() ? "<empty>" : text);
+        summary_.SetText(text.IsEmpty() ? String("<empty>") : text);
     }
 
     void OpenDialog()
@@ -861,7 +861,7 @@ public:
     {
         color_ = color;
         mixed_ = mixed;
-        Tip(mixed ? "Multiple colours" :
+        Tip(mixed ? String("Multiple colours") :
             Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB()));
         Refresh();
         return *this;
@@ -953,7 +953,7 @@ private:
     void SetDisplay(Color color, bool mixed = false)
     {
         swatch_.SetColor(color, mixed);
-        hex_.SetText(mixed ? "<multiple values>"
+        hex_.SetText(mixed ? String("<multiple values>")
                            : Format("#%02X%02X%02X", color.GetR(), color.GetG(), color.GetB()));
     }
 
@@ -1393,7 +1393,7 @@ private:
         const int count = mode == "QuadGradient" ? 4 : mode == "Solid" ? 1 : 0;
         for(int i = 0; i < 4; i++) {
             swatches_[i].Show(i < count);
-            const String key = mode == "Solid" ? "solid" : Key(i);
+            const String key = mode == "Solid" ? String("solid") : Key(i);
             swatches_[i].SetColor(RecipeColor(key, Color(128, 128, 128)), mixed_);
         }
         const Color solid = RecipeColor("solid", Color(128, 128, 128));
@@ -1425,14 +1425,14 @@ private:
 
         dlg.picker.SetSlotCount(count);
         for(int i = 0; i < count; i++) {
-            const String slot_key = mode == "Solid" ? "solid" : Key(i);
+            const String slot_key = mode == "Solid" ? String("solid") : Key(i);
             dlg.picker.SetSlotColor(i,
                 RecipeColor(slot_key, Color(128, 128, 128)), false);
         }
         dlg.picker.SetActiveSlot(index);
         const auto sync_all_slots = [&] {
             for(int i = 0; i < count; i++) {
-                const String slot_key = mode == "Solid" ? "solid" : Key(i);
+                const String slot_key = mode == "Solid" ? String("solid") : Key(i);
                 recipe_.Set(slot_key, dlg.picker.GetSlotColor(i));
             }
         };
@@ -1531,23 +1531,70 @@ private:
     int decimals_ = 3;
 };
 
+int PropertyVectorColumnCount(int components, int available_width, int decimals,
+                              bool expansion_button)
+{
+    components = clamp(components, 1, 4);
+    if(available_width <= 0)
+        return components; // Unrealized controls retain intrinsic one-row measurement.
+    const UiBaseEdit::Style style = UiTheme::ResolveEdit();
+    Font edit_font = style.metrics.use_text_font ? style.metrics.text_font : style.font;
+    if(IsNull(edit_font))
+        edit_font = StdFont();
+    String sample = "-00";
+    if(decimals > 0) {
+        sample.Cat('.');
+        for(int i = 0; i < min(decimals, 6); ++i)
+            sample.Cat('0');
+    }
+    Size text = GetTextSize(sample, edit_font);
+    // Match UiBaseEdit's intrinsic four-character floor as well as the numeric
+    // sample. A grid cannot fit two cells merely because their text fits if
+    // its actual child controls still measure wider.
+    text.cx = max(text.cx, 4 * GetTextSize("A", edit_font).cx);
+    const int edit_width = UiStyledOuterSizeFromContent(text, style.metrics, style.skin).cx;
+    const UiLabel::Style label_style = UiTheme::ResolveLabel(UiRole::Subtle);
+    Font label_font = label_style.metrics.use_text_font
+                    ? label_style.metrics.text_font : label_style.font;
+    if(IsNull(label_font))
+        label_font = StdFont();
+    int label_width = DPI(14);
+    for(const char* label : {"X", "Y", "Z"}) {
+        Size label_text = GetTextSize(label, label_font);
+        label_text.cx = max(label_text.cx, DPI(8));
+        label_width = max(label_width, UiStyledOuterSizeFromContent(
+            label_text, label_style.metrics, label_style.skin).cx);
+    }
+    const int cell = max(1, edit_width + label_width);
+    const int gap = DPI(4);
+    const int content_width = max(0, available_width - (expansion_button ? DPI(31) : 0));
+    return clamp((content_width + gap) / (cell + gap), 1, components);
+}
+
 class PropertyVectorValueEditor : public PropertyValueEditor {
 public:
     explicit PropertyVectorValueEditor(int count)
         : count_(count)
     {
-        Add(expand_);
+        Add(content_.SizePos());
+        content_.SetInset(0).SetGap(DPI(3));
+        components_.SetInset(0).SetGap(DPI(4)).SetGridSize(count_, 1);
+        content_.Add(components_).Expand().MinMaxMain(0, INT_MAX);
+        content_.Add(expand_).Fixed(DPI(28)).MaxCross(DPI(28)).AlignSelf(UiCrossAlign::Start);
         ConfigurePropertyAction(expand_, ICON_DESIGN_UNFOLD_MORE_48(),
                                 "Expand or collapse vector components");
         expand_.WhenAction = [=] { WhenToggleExpanded(); };
         for(int i = 0; i < count_; i++) {
             PropertyCommitFloatEdit& edit = edits_.Add();
             UiLabel& label = labels_.Add();
-            Add(edit);
-            Add(label);
+            UiBoxLayout& cell = cells_.Add();
+            cell.SetDirection(UiDirection::H).SetInset(0).SetGap(0);
             label.SetAlign(UiAlign::CENTER, UiAlign::CENTER);
             label.SetCustomStyle(UiTheme::ResolveLabel(UiRole::Subtle));
             label.SetText(i == 0 ? "X" : i == 1 ? "Y" : "Z");
+            cell.Add(label).Fit().MinMaxMain(DPI(14), INT_MAX);
+            cell.Add(edit).Expand().MinMaxMain(0, INT_MAX);
+            components_.Add(cell, 0, i, true, true);
             edit.SetTextAlign(UiAlign::RIGHT);
             edit.WhenChange = [=] {
                 if(!syncing_ && AllInputsComplete())
@@ -1563,15 +1610,16 @@ public:
     virtual void Configure(const UiPropertyInspectorItem& item) override
     {
         decimals_ = max(0, item.decimals);
-        expand_.Show(item.expanded_row_span > 1);
-        expand_.Enable(item.expanded_row_span > 1 && item.enabled && !item.read_only);
-        for(UiLabel& label : labels_)
-            label.Show();
+        responsive_ = item.row_span == 0;
+        expansion_button_ = item.expanded_row_span > 1;
+        content_.ItemAt(content_.FindItem(expand_)).Visible(expansion_button_);
+        expand_.Enable(expansion_button_ && item.enabled && !item.read_only);
         for(PropertyCommitFloatEdit& edit : edits_) {
             edit.Enable(item.enabled && !item.read_only);
             edit.SetPlaceholder(item.mixed ? "<mixed>" : item.inherited ? "<inherited>" : "");
             edit.Precision(decimals_);
         }
+        Layout();
     }
 
     virtual void SetEditorValue(const Value& value, bool mixed) override
@@ -1595,34 +1643,24 @@ public:
 
     virtual void Layout() override
     {
-        Size sz = GetSize();
-        const int gap = DPI(4);
-        const int label_cx = DPI(14);
-        const int action = expand_.IsShown() ? min(DPI(28), sz.cy) : 0;
-        const int content_cx = max(0, sz.cx - action - (action ? DPI(3) : 0));
-        if(expanded_) {
-            const int row = max(1, sz.cy / count_);
-            for(int i = 0; i < edits_.GetCount(); i++) {
-                const int y = i * row;
-                const int cy = i + 1 == edits_.GetCount() ? sz.cy - y : row;
-                labels_[i].SetRect(0, y, min(label_cx, content_cx), cy);
-                edits_[i].SetRect(min(label_cx, content_cx), y,
-                                  max(0, content_cx - label_cx), cy);
-            }
-            expand_.SetRect(content_cx + DPI(3), 0, action, min(action, sz.cy));
+        if(components_.GetItemCount() != count_) {
+            ParentCtrl::Layout();
             return;
         }
-        const int columns = 4;
-        int cell = max(1, (content_cx - gap * (columns - 1)) / columns);
-        int x = 0;
-        for(int i = 0; i < edits_.GetCount(); i++) {
-            int cx = min(cell, max(0, content_cx - x));
-            labels_[i].SetRect(x, 0, min(label_cx, cx), sz.cy);
-            edits_[i].SetRect(x + min(label_cx, cx), 0,
-                              max(0, cx - label_cx), sz.cy);
-            x += cell + gap;
+        const int columns = expanded_ ? 1 : responsive_
+            ? PropertyVectorColumnCount(count_, GetSize().cx, decimals_, expansion_button_) : count_;
+        if(columns != columns_) {
+            columns_ = columns;
+            UiGridLayout::PauseScope pause(components_);
+            components_.SetGridSize(columns, (count_ + columns - 1) / columns);
+            for(int i = 0; i < count_; ++i)
+                components_.SetItem(i, i / columns, i % columns, true, true);
         }
-        expand_.SetRect(content_cx + DPI(3), 0, action, min(action, sz.cy));
+        ParentCtrl::Layout();
+        // Changing grid topology also changes its intrinsic width. Reallocate
+        // the containing Box from those new tracks before using its cells;
+        // otherwise a narrow editor can retain the preceding wide allocation.
+        content_.Layout();
     }
 
     void SetExpanded(bool expanded) override
@@ -1657,13 +1695,19 @@ private:
         return true;
     }
 
+    UiBoxLayout content_{UiDirection::H};
+    UiGridLayout components_;
+    Array<UiBoxLayout> cells_;
     Array<PropertyCommitFloatEdit> edits_;
     Array<UiLabel> labels_;
     UiToolButton expand_;
     int count_ = 2;
     int decimals_ = 3;
+    int columns_ = -1;
     bool syncing_ = false;
     bool expanded_ = false;
+    bool responsive_ = true;
+    bool expansion_button_ = false;
 };
 
 class PropertyReadOnlyValueEditor : public PropertyValueEditor {
@@ -1682,7 +1726,7 @@ public:
     virtual void SetEditorValue(const Value& value, bool mixed) override
     {
         value_ = value;
-        label_.SetText(mixed ? "<multiple values>" : AsString(value));
+        label_.SetText(mixed ? String("<multiple values>") : AsString(value));
     }
 
     virtual Value GetEditorValue() const override
@@ -1847,7 +1891,7 @@ public:
         value_ = bezier_mode_ ? UiPropertyInspectorNormalizeBezierCurve(value)
                               : UiPropertyInspectorNormalizeCurve(value);
         SetCanvases();
-        summary_.SetText(mixed ? "<multiple curves>" : FormatSummary());
+        summary_.SetText(mixed ? String("<multiple curves>") : FormatSummary());
     }
 
     virtual Value GetEditorValue() const override

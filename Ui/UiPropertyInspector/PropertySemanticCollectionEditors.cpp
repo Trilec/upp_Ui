@@ -86,7 +86,7 @@ private:
         for(const UiPropertyInspectorChoice& choice : choices_)
             if(PeContainsValue(selected_, choice.value))
                 labels.Add(choice.label);
-        summary_.SetText(labels.IsEmpty() ? "<none>" : PeJoinLabels(labels));
+        summary_.SetText(labels.IsEmpty() ? String("<none>") : PeJoinLabels(labels));
     }
 
     void OpenDialog()
@@ -438,8 +438,8 @@ public:
 private:
     void SyncSummary()
     {
-        summary_.SetText(mixed_ ? "<multiple references>"
-            : IsNull(value_) ? "<none>" : AsString(value_));
+        summary_.SetText(mixed_ ? String("<multiple references>")
+            : IsNull(value_) ? String("<none>") : AsString(value_));
     }
 
     void Pick()

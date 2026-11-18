@@ -373,50 +373,47 @@ void UiScrollPanel::MouseWheel(Point, int zdelta, dword keyflags)
 
 void UiScrollPanel::Layout()
 {
-    const Style& style = GetEffectiveStyle();
+    // Scrollbars change the width supplied to responsive descendants. Start from
+    // the requested mode and add only bars justified by content measured at that
+    // actual page size. At most two bars can be added, so three passes suffice.
+    // Keeping the initial unbarred width as a minimum used to manufacture a
+    // horizontal overflow whenever a vertical scrollbar appeared.
+    bool showx = mode_ == UIPANELSCROLL_HORIZONTAL;
+    bool showy = mode_ == UIPANELSCROLL_VERTICAL;
+    for(int pass = 0; pass < 3; ++pass) {
+        sbx_.Show(showx);
+        sby_.Show(showy);
+        const Rect page = GetViewportRect();
+        const Size page_size(max(0, page.GetWidth()), max(0, page.GetHeight()));
+        viewport_.SetRect(page);
+        content_.SetRect(0, 0, page_size.cx, page_size.cy);
+        content_.Layout();
+        content_bounds_ = MeasureContentBounds();
+        content_size_ = Size(max(page_size.cx, content_bounds_.GetWidth()),
+                             max(page_size.cy, content_bounds_.GetHeight()));
+        if(mode_ != UIPANELSCROLL_AUTO)
+            break;
+        const bool nextx = showx || content_bounds_.GetWidth() > page_size.cx;
+        const bool nexty = showy || content_bounds_.GetHeight() > page_size.cy;
+        if(nextx == showx && nexty == showy)
+            break;
+        showx = nextx;
+        showy = nexty;
+    }
+    // Measurements are intrinsic and width-dependent, independent of the previous
+    // content allocation. This also permits content and scroll ranges to shrink
+    // when a window grows, a wrapped row unwraps, or a model removes items.
+    UpdateScrollbars();
 
     Rect view = GetFaceRect();
-    Rect seed_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_margin));
-    Size seed_size(max(0, seed_view.GetWidth()), max(0, seed_view.GetHeight()));
-
-    // Seed the content host with the viewport before measuring. This prevents
-    // expanding children from feeding a stale, oversized content width back into
-    // the next scroll-panel measurement pass.
-    content_size_ = seed_size;
-    content_bounds_ = Rect(0, 0, seed_size.cx, seed_size.cy);
-    viewport_.SetRect(seed_view);
-    content_.SetRect(0, 0, seed_size.cx, seed_size.cy);
-    content_.Layout();
-    content_bounds_ = MeasureContentBounds();
-
-    content_size_ = Size(max(seed_size.cx, content_bounds_.GetWidth()),
-                         max(seed_size.cy, content_bounds_.GetHeight()));
-    UpdateScrollbars();
-
-    view = GetFaceRect();
-    int vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
-    int hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
+    const int vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
+    const int hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
     if(vbarw)
         view.right -= vbarw;
     if(hbarh)
         view.bottom -= hbarh;
-    Rect content_view = UiApplyThicknessRect(view, UiNonNegativeThickness(style.metrics.content_margin));
-
-    Size page_size(max(0, content_view.GetWidth()), max(0, content_view.GetHeight()));
-    content_size_ = Size(max(page_size.cx, content_bounds_.GetWidth()),
-                         max(page_size.cy, content_bounds_.GetHeight()));
-    UpdateScrollbars();
-
-    view = GetFaceRect();
-    vbarw = sby_.IsShown() ? max(DPI(12), sby_.GetMinSize().cx) : 0;
-    hbarh = sbx_.IsShown() ? max(DPI(12), sbx_.GetMinSize().cy) : 0;
-    if(vbarw)
-        view.right -= vbarw;
-    if(hbarh)
-        view.bottom -= hbarh;
-
-    int vgap = sby_.IsShown() ? DPI(2) : 0;
-    int hgap = sbx_.IsShown() ? DPI(2) : 0;
+    const int vgap = sby_.IsShown() ? DPI(2) : 0;
+    const int hgap = sbx_.IsShown() ? DPI(2) : 0;
     if(sby_.IsShown())
         sby_.SetRect(view.right + vgap, view.top + hgap, max(0, vbarw - vgap), max(0, view.GetHeight() - hgap));
     if(sbx_.IsShown())
@@ -425,22 +422,8 @@ void UiScrollPanel::Layout()
     ApplyScroll();
     content_.Layout();
 
-    // Re-measure after children have been laid out against the final content
-    // size. If real content is wider/taller, update once more and keep bars in sync.
-    Rect final_bounds = MeasureContentBounds();
-    Size final_size(max(content_size_.cx, final_bounds.GetWidth()),
-                    max(content_size_.cy, final_bounds.GetHeight()));
-    if(final_size != content_size_ || final_bounds != content_bounds_) {
-        content_bounds_ = final_bounds;
-        content_size_ = final_size;
-        UpdateScrollbars();
-        ApplyScroll();
-        content_.Layout();
-    }
-
     // A restore/fullscreen transition can move the bars under a stationary
-    // mouse cursor without generating a fresh enter event. Resync hover state
-    // explicitly so the painted hot gutter/thumb reflects reality.
+    // cursor without generating a fresh enter event.
     sby_.SyncHoverFromMouse();
     sbx_.SyncHoverFromMouse();
 }

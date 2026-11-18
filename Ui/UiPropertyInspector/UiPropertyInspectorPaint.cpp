@@ -257,7 +257,7 @@ String UiPropertyInspector::FormatValueSummary(const UiPropertyInspectorItem& it
         if(item.value.Is<ValueMap>()) {
             ValueMap recipe = item.value;
             const int q = recipe.Find("mode");
-            return q >= 0 ? AsString(recipe.GetValue(q)) : "None";
+            return q >= 0 ? AsString(recipe.GetValue(q)) : String("None");
         }
         return "None";
     case UiPropertyInspectorKind::Multiline:
@@ -274,12 +274,12 @@ String UiPropertyInspector::FormatValueSummary(const UiPropertyInspectorItem& it
     case UiPropertyInspectorKind::SliderInt:
     case UiPropertyInspectorKind::NumericInt:
         return AsString((int)item.value) +
-               (item.unit.IsEmpty() ? "" : " " + item.unit);
+               (item.unit.IsEmpty() ? String() : " " + item.unit);
     case UiPropertyInspectorKind::Double:
     case UiPropertyInspectorKind::SliderDouble:
     case UiPropertyInspectorKind::NumericDouble:
         return Format("%.*f", max(0, item.decimals), (double)item.value) +
-               (item.unit.IsEmpty() ? "" : " " + item.unit);
+               (item.unit.IsEmpty() ? String() : " " + item.unit);
     default:
         return AsString(item.value);
     }

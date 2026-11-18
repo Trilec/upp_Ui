@@ -486,7 +486,7 @@ VectorMap<String, String> UiFontCatalog::Choices(bool system) const {
             representative = &face; break;
         }
         out.Add(key, "Project / " + (representative->family.IsEmpty() ? a.family_id : representative->family) +
-            (representative->status == UiFontStatus::Loaded ? "" : " (" + String(UiFontStatusName(representative->status)) +
+            (representative->status == UiFontStatus::Loaded ? String() : " (" + String(UiFontStatusName(representative->status)) +
              "; using " + Resolve(key, StdFont(), UiFonts::GetTypography().fallback).resolved_family + ")"));
     }
     if(system) for(int i = 0; i < Font::GetFaceCount(); ++i) {

@@ -809,6 +809,9 @@ UiLabel& UiLabel::SetText(const String& text)
     layout_dirty_ = true;
     layout_content_ = Rect(0, 0, 0, 0);
     RefreshLayout();
+    // A Fit/Box/Grid parent owns this label's rectangle. Re-measure it after
+    // content changes; repainting the old empty-label height clips new text.
+    RefreshParentLayout();
     Refresh();
     return *this;
 }

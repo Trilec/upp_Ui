@@ -177,8 +177,8 @@ void UiColorProbe::UpdateReadout()
         channels_[i].SetText(GetChannelText(i) + (IsChannelClipped(i) ? "*" : ""));
         channels_[i].Tip(String(names[i])+" raw: "+AsString(values[i])+"  "+sample_.space+"  "+sample_.quality + (IsChannelClipped(i) ? " - * conversion clipped to 0-1; raw value preserved" : ""));
     }
-    format_button_.Tip(format_ == Format::Float ? "Number format: raw float" : format_ == Format::Hex ?
-        "Number format: RGB hex (raw values clamped to 0-1)" : Upp::Format("Number format: %d-bit integer (0–1 mapped to full scale)",bits_));
+    format_button_.Tip(format_ == Format::Float ? String("Number format: raw float") : format_ == Format::Hex ?
+        String("Number format: RGB hex (raw values clamped to 0-1)") : Upp::Format("Number format: %d-bit integer (0–1 mapped to full scale)",bits_));
 }
 void UiColorProbe::UpdateButtons()
 {
@@ -214,7 +214,7 @@ void UiColorProbe::OpenFormats()
     formats_.ClearModel();
     const int ids[] = {0,5,8,10,12,16,-1};
     for(int id : ids) {
-        UiMenuItem item(id == 0 ? "Float (raw, including HDR)" : id == -1 ? "Hex #RRGGBB / AA (clamped 0-1)" : Upp::Format("%d-bit integer",id),id);
+        UiMenuItem item(id == 0 ? String("Float (raw, including HDR)") : id == -1 ? String("Hex #RRGGBB / AA (clamped 0-1)") : Upp::Format("%d-bit integer",id),id);
         item.radio = item.checkable = true;
         item.checked = id == 0 ? format_ == Format::Float : id == -1 ? format_ == Format::Hex : format_ == Format::Integer && bits_ == id;
         formats_.Model().AddChild(formats_.Model().Root(),item);

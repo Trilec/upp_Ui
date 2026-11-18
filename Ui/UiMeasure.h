@@ -58,6 +58,15 @@ struct UiLayoutMeasureResult {
 	bool width_dependent = false;
 };
 
+// Optional contract for reusable controls with intrinsic height-for-width.
+// Measurement is read-only: providers must not resize children, notify parents,
+// or call UiMeasureLayout() on themselves from this method. Returned extents
+// are nonnegative; preferred is unconstrained, min is the useful shrink limit.
+class UiLayoutMeasureProvider {
+public:
+    virtual ~UiLayoutMeasureProvider() = default;
+    virtual UiLayoutMeasureResult MeasureLayout(const UiLayoutMeasureSpec&) const = 0;
+};
 
 UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& spec = UiLayoutMeasureSpec());
 

@@ -171,20 +171,25 @@ int UiSplitter::PosToClient(int pos) const
     return axis * pos / 10000;
 }
 
-int UiSplitter::GetMins(int i) const
+int UiSplitter::GetSplitPixel(int index) const
 {
-    int min_ratio = i < mins_.GetCount() ? mins_[i] : 0;
-    int min_pixels = 0;
-    int axis = vertical_ ? GetSize().cy : GetSize().cx;
-    if(axis > 0)
-        min_pixels = (i < minpx_.GetCount() ? minpx_[i] : 0) * 10000 / axis;
-    return max(min_ratio, min_pixels);
+    return index >= 0 && index < layout_pos_.GetCount()
+         ? layout_pos_[index] : PosToClient(GetSplitUnits(index));
+}
+
+int UiSplitter::GetLayoutSplitWidth() const
+{
+    const int count = max(0, GetViewChildCount() - 1);
+    const int axis = max(0, vertical_ ? GetSize().cy : GetSize().cx);
+    return count ? min(GetSplitWidth(), axis / count) : GetSplitWidth();
 }
 
 void UiSplitter::SyncMin()
 {
-    for(int i = 0; i < pos_.GetCount(); i++)
-        SetSplitUnits(pos_[i], i);
+    // Minimums are solved together at the current allocated size. Calling
+    // SetSplitUnits recursively here used the previous size during reflow.
+    Layout();
+    Refresh();
 }
 
 Rect UiSplitter::GetHitRect(int index) const
@@ -192,8 +197,8 @@ Rect UiSplitter::GetHitRect(int index) const
     if(index < 0 || index >= pos_.GetCount())
         return Rect(0, 0, 0, 0);
     Size sz = GetSize();
-    int width = GetSplitWidth();
-    int p = PosToClient(pos_[index]) - (width >> 1);
+    int width = GetLayoutSplitWidth();
+    int p = GetSplitPixel(index) - (width >> 1);
     return vertical_ ? RectC(0, p, sz.cx, width) : RectC(p, 0, width, sz.cy);
 }
 
@@ -205,7 +210,7 @@ Rect UiSplitter::GetTrackRect(int index) const
         return r;
     r.Deflate(style.track_inset);
     int thick = max(1, style.track_thickness);
-    int p = PosToClient(pos_[index]);
+    int p = GetSplitPixel(index);
     if(vertical_) {
         int y = p - (thick >> 1);
         return RectC(r.left, y, r.GetWidth(), thick);
@@ -244,7 +249,7 @@ Rect UiSplitter::GetFeedbackTrackRect(int index, StyledState st) const
     Rect hit = GetHitRect(index);
     if(hit.IsEmpty())
         return hit;
-    int p = PosToClient(pos_[index]);
+    int p = GetSplitPixel(index);
     thick = max(1, thick);
     if(vertical_) {
         int y = p - (thick >> 1);
@@ -262,7 +267,7 @@ Rect UiSplitter::GetThumbRect(int index) const
         return hit;
     int main = max(DPI(8), style.thumb_main);
     int cross = max(1, style.thumb_cross);
-    int p = PosToClient(pos_[index]);
+    int p = GetSplitPixel(index);
     if(vertical_) {
         Rect r = RectC(hit.left + (hit.GetWidth() - main) / 2,
                        p - (cross >> 1),
@@ -284,7 +289,7 @@ int UiSplitter::FindIndex(Point p) const
     int best = -1;
     int maxdist = GetSplitWidth();
     for(int i = 0; i < pos_.GetCount(); i++) {
-        int dist = abs((vertical_ ? p.y : p.x) - PosToClient(pos_[i]));
+        int dist = abs((vertical_ ? p.y : p.x) - GetSplitPixel(i));
         if(dist <= maxdist) {
             best = i;
             maxdist = dist;
@@ -332,17 +337,60 @@ void UiSplitter::Layout()
         return;
     }
 
-    int width = GetSplitWidth();
+    int width = GetLayoutSplitWidth();
     int lw = width >> 1;
     int rw = width - lw;
+
+    const int axis = max(0, vertical_ ? sz.cy : sz.cx);
+    const int available = max(0, axis - width * count);
+    Vector<int> minimum;
+    minimum.SetCount(count + 1);
+    int64 requested = 0;
+    for(int pane = 0; pane <= count; ++pane) {
+        const int ratio = clamp(mins_[pane], 0, 10000);
+        const int ratio_px = (int)(((int64)axis * ratio + 9999) / 10000);
+        minimum[pane] = max(max(0, minpx_[pane]), ratio_px);
+        requested += minimum[pane];
+    }
+    // An undersized host cannot satisfy every minimum. Distribute its actual
+    // content space proportionally, without inverted clamps or overlapping
+    // panes; GetContentSize advertises the full pixel minimum to scroll hosts.
+    if(requested > available) {
+        int64 prefix = 0;
+        int previous = 0;
+        for(int pane = 0; pane <= count; ++pane) {
+            prefix += minimum[pane];
+            const int edge = prefix == requested ? available
+                : (int)((long double)prefix * available / requested);
+            minimum[pane] = edge - previous;
+            previous = edge;
+        }
+    }
+    int remaining = 0;
+    for(int value : minimum)
+        remaining += value;
+    layout_pos_.SetCount(count);
+    int left = 0;
+    for(int split = 0; split < count; ++split) {
+        remaining -= minimum[split];
+        const int lower = left + minimum[split] + lw;
+        const int upper = axis - remaining - width * (count - split - 1) - rw;
+        const int pixel = clamp(PosToClient(pos_[split]), lower, upper);
+        layout_pos_[split] = pixel;
+        // Keep the public percentage and serialized position consistent with
+        // the applied constraints; cached pixel edges avoid rounding overlap.
+        if(axis > 0)
+            pos_[split] = (int)(((int64)pixel * 10000 + axis / 2) / axis);
+        left = pixel + rw;
+    }
 
     int i = 0;
     for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
         if(q->InFrame())
             continue;
 
-        int lo = i > 0 ? PosToClient(pos_[i - 1]) + rw : 0;
-        int hi = i < count ? PosToClient(pos_[i]) - lw : (vertical_ ? sz.cy : sz.cx);
+        int lo = i > 0 ? GetSplitPixel(i - 1) + rw : 0;
+        int hi = i < count ? GetSplitPixel(i) - lw : (vertical_ ? sz.cy : sz.cx);
         q->Show();
         if(vertical_)
             q->SetRect(0, lo, sz.cx, max(0, hi - lo));
@@ -521,24 +569,28 @@ Size UiSplitter::GetMinSize() const
 Size UiSplitter::GetContentSize() const
 {
     Size out(0, 0);
-    int visible_count = 0;
+    int visible_count = 0, pane = 0;
     for(Ctrl* q = GetFirstChild(); q; q = q->GetNext()) {
+        if(q->InFrame())
+            continue;
+        const int minimum = pane < minpx_.GetCount() ? max(0, minpx_[pane]) : 0;
+        ++pane;
         if(!q->IsShown())
             continue;
         Size sz = q->GetMinSize();
         if(vertical_) {
             out.cx = max(out.cx, sz.cx);
-            out.cy += sz.cy;
+            out.cy += max(sz.cy, minimum);
         }
         else {
-            out.cx += sz.cx;
+            out.cx += max(sz.cx, minimum);
             out.cy = max(out.cy, sz.cy);
         }
         visible_count++;
     }
     if(visible_count <= 0)
         return Size(DPI(80), DPI(80));
-    int split = max(1, GetSplitWidth()) * max(0, visible_count - 1);
+    int split = GetSplitWidth() * max(0, visible_count - 1);
     if(vertical_)
         out.cy += split;
     else
@@ -550,9 +602,7 @@ UiSplitter& UiSplitter::SetSplitUnits(int p, int i)
 {
     if(i < 0)
         return *this;
-    int l = (i > 0 && i - 1 < pos_.GetCount() ? pos_[i - 1] : 0) + GetMins(i);
-    int h = (i + 1 < pos_.GetCount() ? pos_[i + 1] : 10000) - GetMins(i + 1);
-    pos_.At(i) = minmax(p, l, h);
+    pos_.At(i) = clamp(p, 0, 10000);
     Layout();
     Refresh();
     return *this;
@@ -624,6 +674,7 @@ void UiSplitter::Clear()
     while(GetFirstChild())
         RemoveChild(GetFirstChild());
     pos_.Clear();
+    layout_pos_.Clear();
     mins_.Clear();
     minpx_.Clear();
     hot_index_ = -1;

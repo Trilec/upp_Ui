@@ -27,7 +27,7 @@ UiGraphNodeSlotRule Rule(const char* id, Kind kind)
     r.component_kind = kind;
     r.region = Region::ContentMain;
     r.placement = Place::Fill;
-    r.small = kind == Kind::Icon ? UiGraphNodeSmallMode::Dot : UiGraphNodeSmallMode::BarThenDot;
+    r.small_mode = kind == Kind::Icon ? UiGraphNodeSmallMode::Dot : UiGraphNodeSmallMode::BarThenDot;
     r.font_height = DPI(18);
     r.readable_min_px = 9;
     return r;

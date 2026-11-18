@@ -252,7 +252,7 @@ bool RunWorkspaceViewTests(String& error)
     text_rule.id = "height-fit"; text_rule.component_kind = UiGraphNodeComponentKind::Text;
     text_rule.feature = UiGraphNodeSlotFeature::Title;
     text_rule.font_height = 24; text_rule.readable_min_px = 9;
-    text_rule.small = UiGraphNodeSmallMode::BarThenDot;
+    text_rule.small_mode = UiGraphNodeSmallMode::BarThenDot;
     UiGraphNode text_node;
     text_node.title = "A deliberately long asset name to elide";
     UiGraphNodeStyle text_style = UiNodeGraph::StyleDefault().node;

@@ -113,18 +113,18 @@ UiGraphNodeTemplate MakeProfileTemplate()
     icon.component_kind = UiGraphNodeComponentKind::Icon;
     icon.region = UiGraphNodeSlotRegion::ContentMain;
     icon.placement = UiGraphNodeSlotPlacement::Left; icon.extent = 12;
-    icon.gap_after = 2; icon.small = UiGraphNodeSmallMode::Dot;
+    icon.gap_after = 2; icon.small_mode = UiGraphNodeSmallMode::Dot;
     auto& text = t.slots[t.slot_count++];
     text.id = "title"; text.feature = UiGraphNodeSlotFeature::Title;
     text.component_kind = UiGraphNodeComponentKind::Text;
     text.region = UiGraphNodeSlotRegion::ContentMain;
-    text.small = UiGraphNodeSmallMode::BarThenDot;
+    text.small_mode = UiGraphNodeSmallMode::BarThenDot;
     text.font_height = 14; text.readable_min_px = 9;
     auto& progress = t.slots[t.slot_count++];
     progress.id = "progress"; progress.component_kind = UiGraphNodeComponentKind::Progress;
     progress.region = UiGraphNodeSlotRegion::OverlayMain;
     progress.placement = UiGraphNodeSlotPlacement::Bottom; progress.extent = 4;
-    progress.data_key = "progress"; progress.small = UiGraphNodeSmallMode::Bar;
+    progress.data_key = "progress"; progress.small_mode = UiGraphNodeSmallMode::Bar;
     return t;
 }
 

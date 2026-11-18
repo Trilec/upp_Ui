@@ -51,6 +51,9 @@ Size MeasureUiStackForWidth(const UiStack& stack, int total_width)
 
 UiLayoutMeasureResult UiMeasureLayout(const Ctrl& c, const UiLayoutMeasureSpec& spec)
 {
+	if(const auto* provider = dynamic_cast<const UiLayoutMeasureProvider*>(&c))
+		return provider->MeasureLayout(spec);
+
 	UiLayoutMeasureResult out;
 	out.preferred = c.GetMinSize();
 	out.min = out.preferred;

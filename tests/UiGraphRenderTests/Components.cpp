@@ -25,7 +25,7 @@ UiGraphNodeSlotRule Rule(const char* id, Feature feature, Region region, Place p
     r.id = id; r.feature = feature; r.region = region; r.placement = place;
     r.extent = extent;
     r.readable_min_px = DPI(12);
-    r.small = feature == Feature::Icon ? UiGraphNodeSmallMode::Dot : UiGraphNodeSmallMode::BarThenDot;
+    r.small_mode = feature == Feature::Icon ? UiGraphNodeSmallMode::Dot : UiGraphNodeSmallMode::BarThenDot;
     return r;
 }
 

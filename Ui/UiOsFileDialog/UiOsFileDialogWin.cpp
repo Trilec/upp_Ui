@@ -1,10 +1,15 @@
-#include "UiOsFileDialog.h"
-
-#ifdef PLATFORM_WIN32
-
+// Parse the Windows SDK shell/COM interfaces before U++ establishes its
+// framework headers. The shell declarations must see the SDK's native types.
+#ifdef _WIN32
+#include <winsock2.h>
 #include <windows.h>
 #include <commdlg.h>
 #include <shlobj.h>
+#endif
+
+#include "UiOsFileDialog.h"
+
+#ifdef PLATFORM_WIN32
 #include <string>
 
 namespace Upp {

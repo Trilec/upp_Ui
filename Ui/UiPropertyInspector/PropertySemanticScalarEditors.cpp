@@ -844,7 +844,7 @@ UiPropertyInspectorItem& AddPropertyOptional(UiPropertyInspectorModel& model,
                                         const String& group)
 {
     String use_variant = variant == "int" || variant == "double"
-                       ? variant : "text";
+                       ? variant : String("text");
     UiPropertyInspectorItem& item = model.Add(
         id, label, UiPropertyInspectorKind::Custom, value, group);
     item.custom_editor = UiPropertyInspectorOptionalId();

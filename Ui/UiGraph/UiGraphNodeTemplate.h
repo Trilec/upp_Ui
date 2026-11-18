@@ -167,7 +167,7 @@ struct UiGraphNodeSlotRule {
     String data_key; // empty = existing node field selected by feature
     UiAlign align_h = UiAlign::LEFT;
     UiAlign align_v = UiAlign::CENTER;
-    UiGraphNodeSmallMode small = UiGraphNodeSmallMode::Hidden;
+    UiGraphNodeSmallMode small_mode = UiGraphNodeSmallMode::Hidden;
     Color ink = Null; // inherit current visual-state ink from the feature role
     int font_height = 0; // authored height; 0 = feature style font
     int readable_min_px = 9; // final device pixels, not a zoom threshold
@@ -196,7 +196,7 @@ struct UiGraphNodeSlotRule {
     UiGraphNodeSlotRule& Literal(const Value& value) { literal = value; use_literal = true; return *this; }
     UiGraphNodeSlotRule& Align(UiAlign h, UiAlign v = UiAlign::CENTER)
     { align_h = h; align_v = v; return *this; }
-    UiGraphNodeSlotRule& Small(UiGraphNodeSmallMode mode) { small = mode; return *this; }
+    UiGraphNodeSlotRule& Small(UiGraphNodeSmallMode mode) { small_mode = mode; return *this; }
     UiGraphNodeSlotRule& Ink(Color color) { ink = color; return *this; }
     UiGraphNodeSlotRule& FontHeight(int height) { font_height = height; return *this; }
     UiGraphNodeSlotRule& Lod(bool normal, bool lod1, bool lod2, bool lod3)
@@ -422,7 +422,7 @@ inline bool UiGraphNodeTemplate::Validate(String& error) const
                && r.feature != UiGraphNodeSlotFeature::Icon)
            || (r.align_h != UiAlign::LEFT && r.align_h != UiAlign::CENTER && r.align_h != UiAlign::RIGHT)
            || (r.align_v != UiAlign::TOP && r.align_v != UiAlign::CENTER && r.align_v != UiAlign::BOTTOM)
-           || (int)r.small > (int)UiGraphNodeSmallMode::Dot
+           || (int)r.small_mode > (int)UiGraphNodeSmallMode::Dot
            || r.font_height < 0 || r.font_height > 512 || r.readable_min_px < 1 || r.readable_min_px > 128
            || r.max_items < 1 || r.max_items > 12
            || r.preferred_size.cx < 0 || r.preferred_size.cy < 0

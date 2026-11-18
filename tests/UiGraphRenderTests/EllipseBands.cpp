@@ -15,7 +15,7 @@ UiGraphNodeSlotRule BandText(const char* id, Region region)
     r.region = region;
     r.Literal(id);
     r.font_height = DPI(18);
-    r.small = UiGraphNodeSmallMode::BarThenDot;
+    r.small_mode = UiGraphNodeSmallMode::BarThenDot;
     return r;
 }
 bool InEllipse(const UiGraphNode& n, Rect surface, Rect r)

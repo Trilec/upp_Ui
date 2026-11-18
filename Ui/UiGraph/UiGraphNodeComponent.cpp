@@ -89,13 +89,13 @@ void PrepareProxy(const UiGraphNodeSlotRule& rule, Size natural, Rect area,
                   double width, double height, UiAlign h, UiAlign v,
                   UiGraphNodeComponentPresentation& out)
 {
-    if(rule.small == UiGraphNodeSmallMode::Hidden || width < 0.75 || height < 0.75) {
+    if(rule.small_mode == UiGraphNodeSmallMode::Hidden || width < 0.75 || height < 0.75) {
         out.reason = Reason::TooSmall;
         return;
     }
     Size size;
-    if(rule.small == UiGraphNodeSmallMode::Dot
-       || (rule.small == UiGraphNodeSmallMode::BarThenDot && min(natural.cx, area.GetWidth()) < 4)) {
+    if(rule.small_mode == UiGraphNodeSmallMode::Dot
+       || (rule.small_mode == UiGraphNodeSmallMode::BarThenDot && min(natural.cx, area.GetWidth()) < 4)) {
         int side = min(2, min(min(natural.cx, natural.cy), min(area.GetWidth(), area.GetHeight())));
         size = Size(side, side);
         out.representation = Rep::Dot;
@@ -253,7 +253,7 @@ void PrepareNodeComponent(const UiGraphNodeSlotRule& r,
     Size natural(max(0, fround(width)), max(0, fround(height)));
     if(micro) {
         if(kind == Kind::Image && !IsNull(value.overview)
-           && r.small != UiGraphNodeSmallMode::Hidden && area.GetWidth() >= value.overview.GetWidth()
+           && r.small_mode != UiGraphNodeSmallMode::Hidden && area.GetWidth() >= value.overview.GetWidth()
            && area.GetHeight() >= value.overview.GetHeight()) {
             out.image = value.overview;
             out.footprint = AlignComponent(area, value.overview.GetSize(), h, v);
