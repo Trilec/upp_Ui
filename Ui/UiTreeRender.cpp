@@ -417,14 +417,17 @@ void UiTree::PaintRow(Draw& w, int index, const Rect& row) const
             Rect gr = GetGlyphRect(row, depth);
             return gr.left + gr.GetWidth() / 2;
         };
-        auto has_next_below_depth = [&](int depth) {
-            return index + 1 < visible_rows_.GetCount() && visible_rows_[index + 1].depth > depth;
-        };
-        for(int depth = 0; depth < vr.depth; depth++)
-            if(has_next_below_depth(depth)) {
-                int x = branch_x(depth);
-                w.DrawLine(x, row.top, x, row.bottom, 1, style.line_color);
+        // Each ancestor with another sibling continues its parent's guide.
+        // The final child receives the incoming half-line up to its elbow.
+        for(int child = index; visible_rows_[child].parent_row >= 0; ) {
+            const VisibleRow& branch = visible_rows_[child];
+            int parent = branch.parent_row;
+            if(branch.next_sibling || child == index) {
+                int x = branch_x(visible_rows_[parent].depth);
+                w.DrawLine(x, row.top, x, branch.next_sibling ? row.bottom : gy, 1, style.line_color);
             }
+            child = parent;
+        }
         if(vr.depth > 0) {
             int x0 = branch_x(vr.depth - 1);
             int x1 = vr.has_children ? glyph.left - DPI(1) : gx;

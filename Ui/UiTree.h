@@ -258,6 +258,8 @@ private:
     struct VisibleRow : Moveable<VisibleRow> {
         int id = -1;
         int depth = 0;
+        int parent_row = -1;
+        bool next_sibling = false;
         bool has_children = false;
         bool expanded = false;
         bool placeholder = false;
@@ -288,7 +290,7 @@ private:
     void SyncModel();
 
     void RebuildVisibleRows();
-    void AddVisibleSubtree(int id, int depth);
+    void AddVisibleSubtree(int id, int depth, int parent_row = -1, bool next_sibling = false);
     int FindVisibleRow(int id) const;
     void EnsureLazyChildren(UiTreeNodeRef node);
     void ClampScroll();

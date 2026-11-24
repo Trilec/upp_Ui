@@ -18,7 +18,8 @@ void UiFileBrowser::ApplyViewSizeLayout()
     navigation_layout_.SetInset(Rect(SizePx(6), SizePx(3), SizePx(6), SizePx(3))).SetGap(SizePx(2));
     RebuildNavigation();
     footer_layout_.SetInset(Rect(SizePx(9), SizePx(7), SizePx(9), SizePx(7))).SetGap(SizePx(6));
-    footer_layout_.ItemAt(3).Fixed(SizePx(220));
+    footer_layout_.ItemAt(1).MinMain(SizePx(110));
+    footer_layout_.ItemAt(3).MinMaxMain(SizePx(138), SizePx(220));
     footer_layout_.ItemAt(4).Fixed(SizePx(78));
     footer_layout_.ItemAt(5).Fixed(SizePx(132));
     places_layout_.SetInset(SizePx(7)).SetGap(SizePx(4));

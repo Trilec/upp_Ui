@@ -380,7 +380,9 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             Size ms = it.c ? measure.preferred : Size(0, 0);
             int w = it.fixed >= 0 ? it.fixed : ms.cx;
             int min_w = it.minw;
-            bool can_shrink = false;
+            // A horizontal viewport must give up preferred width before
+            // pushing fixed actions past the end of a non-wrapping row.
+            bool can_shrink = wrap == UiBoxWrap::None && it.fixed < 0 && it.expandingWeight > 0;
             if(fixed_column > 0)
                 w = min(w, fixed_column);
             if(it.c && it.fixed < 0 && it.fit && measure.width_dependent) {

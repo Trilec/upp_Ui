@@ -181,7 +181,7 @@ void UiTree::RebuildVisibleRows()
     }
 }
 
-void UiTree::AddVisibleSubtree(int id, int depth)
+void UiTree::AddVisibleSubtree(int id, int depth, int parent_row, bool next_sibling)
 {
     UiTreeNodeRef node{id};
     if(!model_->IsValid(node))
@@ -191,6 +191,8 @@ void UiTree::AddVisibleSubtree(int id, int depth)
     VisibleRow& row = visible_rows_.Add();
     row.id = id;
     row.depth = depth;
+    row.parent_row = parent_row;
+    row.next_sibling = next_sibling;
     visible_row_by_id_.Add(id, row_index);
     const UiModelItem& item = model_->Get(node);
     row.has_children = model_->GetChildCount(node) > 0 || item.lazy_children || IsNodeLoading(node);
@@ -203,11 +205,12 @@ void UiTree::AddVisibleSubtree(int id, int depth)
         VisibleRow& ph = visible_rows_.Add();
         ph.id = id;
         ph.depth = depth + 1;
+        ph.parent_row = row_index;
         ph.placeholder = true;
         return;
     }
     for(int i = 0; i < n; i++)
-        AddVisibleSubtree(model_->GetChild(node, i).id, depth + 1);
+        AddVisibleSubtree(model_->GetChild(node, i).id, depth + 1, row_index, i + 1 < n);
 }
 
 int UiTree::FindVisibleRow(int id) const

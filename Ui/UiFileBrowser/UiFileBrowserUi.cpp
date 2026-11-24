@@ -370,9 +370,9 @@ void UiFileBrowser::BuildFooter()
     open_button_.SetPopupMinWidth(DPI(180));
 
     footer_layout_.Add(name_label_).Fit();
-    footer_layout_.Add(name_edit_).Expand(1).MinMain(DPI(220));
+    footer_layout_.Add(name_edit_).Expand(2).MinMain(DPI(110));
     footer_layout_.Add(type_label_).Fit();
-    footer_layout_.Add(file_type_).Fixed(DPI(220));
+    footer_layout_.Add(file_type_).Expand(1).MinMain(DPI(138)).MaxMain(DPI(220));
     footer_layout_.Add(cancel_button_).Fixed(DPI(78));
     footer_layout_.Add(open_button_).Fixed(DPI(132));
 }
