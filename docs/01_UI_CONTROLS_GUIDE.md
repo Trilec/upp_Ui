@@ -103,7 +103,8 @@ The generic media composites [UiColorProbe and UiPlaybackBar](MEDIA_CONTROLS.md)
 | [UiGallery](../Ui/UiGallery.h) | Tile/image presentation of a list model. | [UiCollectionDemo](../examples/UiCollectionDemo) |
 | [UiPropertyInspector](../Ui/UiPropertyInspector/UiPropertyInspector.h) | Optional typed property browser with filtering, bounded inline editors and preview/commit/cancel. | [UiPropertyInspectorDemo](../examples/UiPropertyInspectorDemo) |
 | [UiDoc](../Ui/UiDoc/UiDoc.h) | Document view/editor over the authoritative UiDocCore. | [UiDocDemo](../examples/UiDocDemo) |
-| [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Editable cubic curve with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
+| [UiCurveEditor](../Ui/UiCurveEditor.h) | Multi-key curve canvas and standard tool panel for editable series, snapping and tangents. | [Key curves in UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
+| [UiBezierCurveEditor](../Ui/UiBezierCurveEditor.h) | Fixed-endpoint cubic easing editor with selection and data binding. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiBezierCurveField](../Ui/UiBezierCurveField.h) | Curve editor with optional formula and copy composition. | [UiBezierCurveDemo](../examples/UiBezierCurveDemo) |
 | [UiNodeGraph](../Ui/UiGraph/UiNodeGraph.h) | Retained graph topology, routing, hierarchy and presentation. | [UiGraphDemo](../examples/UiGraphDemo) |
 | [UiFileBrowser](../Ui/UiFileBrowser/UiFileBrowser.h) | Optional embeddable file/sequence browser, previews and starter files. [Contract](../Ui/UiFileBrowser/README.md). | [UiFileDialogDemo](../examples/UiFileDialogDemo) |
@@ -130,6 +131,19 @@ dependencies. See the [usage recipe](CONTROL_USAGE.md#property-inspection),
 [inspector guide](05_UI_PROPERTY_EDITOR_GUIDE.md), and
 [semantic editor demo](../examples/UiPropertyInspectorSemanticDemo) for richer
 adapters, resource providers, override activation and transaction contracts.
+
+## Curve editing
+
+Use UiCurveEditor as a canvas in an existing layout. UiCurveEditorPanel adds
+series selection, interpolation, snapping, subdivisions, tangent visibility
+and key insertion/deletion. Either control can live in an application pane or
+in a TopWindow owned by the application.
+
+SetSeries supplies ascending keys in application units. SetRange defines
+display bounds, value limits and optional time quantization. WhenPreview
+provides transient edits, and WhenEdit lets an application validate and
+commit the edit through its own undo and storage system. An application that
+owns the series can feed its accepted state back with SetSeries.
 
 ## Prepared presentation primitives
 
@@ -166,6 +180,23 @@ style behavior. Concrete Line/Password/Multi/Mask/Int/Float types retain their o
 input policy; sharing a base is not proof that specialized validation is identical.
 UiEditDemo is the maintained text-family demo; UiIntFloatDemo is its numeric
 companion. Their selectors show one concrete control and generate its actual API.
+
+Drag a complete value horizontally to adjust it. Shift doubles the current
+drag speed. Hold Ctrl when starting a drag to select text. The focused field's
+wheel steps by the digit immediately
+left of the caret. Just after the decimal point, it uses the first fractional
+digit. With a selection or a caret in the exponent, the wheel uses Step.
+
+An automatic drag maps one configured Step to about 33 device-independent
+pixels for integers. For floats, about 25 pixels correspond to one increment
+of the digit beside the starting caret. Start in blank space to use the last
+displayed digit. SetDragSpeed takes a nominal units-per-pixel rate that uses
+the shared 85% calibration. Pass zero to restore automatic speed. The default
+acceleration cap is 1×.
+SetDragAcceleration allows faster pointer movement to raise the rate up to
+the given cap. EnableDrag(false) restores ordinary pointer selection.
+A drag previews the value and commits on release.
+Escape restores the original value while the drag is active.
 
 UiFloatEdit supports decimal/scientific notation, signed exponents and temporarily
 incomplete text. Min/Max/MinMax constrain committed values; Step drives numeric

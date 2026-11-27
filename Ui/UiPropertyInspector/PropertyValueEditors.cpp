@@ -2072,251 +2072,55 @@ Vector<String> UiPropertyInspectorFactory::GetCustomIds() const
 
 PropertyCurveCanvas::PropertyCurveCanvas()
 {
-    WantFocus();
+    Policy policy;
+    policy.minimum_keys = 2;
+    policy.minimum_gap = .000001;
+    policy.keep_outer_times = true;
+    policy.insert_near_curve = true;
+    SetPolicy(policy);
+    Style style;
+    style.axis_labels = false;
+    style.stroke = DPI(2);
+    SetStyle(style);
+    WhenPreview = [this](const Edit*) { WhenCurvePreview(GetCurve()); };
+    WhenCommit = [this] { WhenCurveCommit(GetCurve()); };
     ResetLinear();
 }
 
 void PropertyCurveCanvas::SetCurve(const Value& value)
 {
-    const int previous = selected_;
-    points_ = UiPropertyInspectorReadCurve(UiPropertyInspectorNormalizeCurve(value));
-    selected_ = points_.IsEmpty() ? -1 : minmax(previous, 0, points_.GetCount() - 1);
-    dragging_ = -1;
-    Refresh();
+    const auto normalized = UiPropertyInspectorNormalizeCurve(value);
+    if(!GetSeries().empty() && normalized == GetCurve()) return;
+    const auto points = UiPropertyInspectorReadCurve(normalized);
+    Series series;
+    series.keys.reserve(points.GetCount());
+    for(const auto& p : points) series.keys.push_back({p});
+    const double selected = SelectedKey() ? SelectedKey()->point.x : points[0].x;
+    const auto nearest = std::min_element(points.begin(), points.end(),
+        [=](const Pointf& a, const Pointf& b) { return abs(a.x - selected) < abs(b.x - selected); });
+    SetSeries({std::move(series)});
+    Select(0, nearest->x);
 }
 
 Value PropertyCurveCanvas::GetCurve() const
 {
-    return UiPropertyInspectorMakeCurve(points_);
+    Vector<Pointf> points;
+    const auto& series = GetSeries();
+    if(!series.empty())
+        for(const auto& key : series.front().keys) points.Add(key.point);
+    return UiPropertyInspectorNormalizeCurve(UiPropertyInspectorMakeCurve(points));
 }
 
 void PropertyCurveCanvas::ResetLinear()
 {
-    points_.Clear();
-    points_.Add(Pointf(0.0, 0.0));
-    points_.Add(Pointf(1.0, 1.0));
-    selected_ = 0;
-    dragging_ = -1;
-    Refresh();
-    EmitPreview();
-    EmitCommit();
-}
-
-void PropertyCurveCanvas::DeleteSelected()
-{
-    if(selected_ < 0 || selected_ >= points_.GetCount() || points_.GetCount() <= 2)
-        return;
-    points_.Remove(selected_);
-    selected_ = min(selected_, points_.GetCount() - 1);
-    Normalize();
-    Refresh();
-    EmitPreview();
-    EmitCommit();
-}
-
-Rect PropertyCurveCanvas::GetGraphRect() const
-{
-    Rect r = GetSize();
-    r.Deflate(DPI(16));
-    return r;
-}
-
-Point PropertyCurveCanvas::CurveToClient(const Pointf& p) const
-{
-    Rect r = GetGraphRect();
-    int x = r.left + (int)floor(p.x * r.GetWidth() + 0.5);
-    int y = r.bottom - (int)floor(p.y * r.GetHeight() + 0.5);
-    return Point(x, y);
-}
-
-Pointf PropertyCurveCanvas::ClientToCurve(Point p) const
-{
-    Rect r = GetGraphRect();
-    if(r.GetWidth() <= 0 || r.GetHeight() <= 0)
-        return Pointf(0, 0);
-    double x = (double)(p.x - r.left) / (double)r.GetWidth();
-    double y = (double)(r.bottom - p.y) / (double)r.GetHeight();
-    return Pointf(minmax(x, 0.0, 1.0), minmax(y, 0.0, 1.0));
-}
-
-int PropertyCurveCanvas::HitPoint(Point p) const
-{
-    int radius = DPI(7);
-    int best = -1;
-    int best_d2 = radius * radius;
-    for(int i = 0; i < points_.GetCount(); i++) {
-        Point q = CurveToClient(points_[i]);
-        int dx = p.x - q.x;
-        int dy = p.y - q.y;
-        int d2 = dx * dx + dy * dy;
-        if(d2 <= best_d2) {
-            best_d2 = d2;
-            best = i;
-        }
-    }
-    return best;
-}
-
-static double PropertyCurveSegmentDistance_(Point p, Point a, Point b)
-{
-    const Pointf ab(b.x - a.x, b.y - a.y);
-    const Pointf ap(p.x - a.x, p.y - a.y);
-    const double length2 = ab.x * ab.x + ab.y * ab.y;
-    const double t = length2 > 0.0
-        ? minmax((ap.x * ab.x + ap.y * ab.y) / length2, 0.0, 1.0) : 0.0;
-    const double dx = p.x - (a.x + t * ab.x);
-    const double dy = p.y - (a.y + t * ab.y);
-    return sqrt(dx * dx + dy * dy);
-}
-
-void PropertyCurveCanvas::Normalize()
-{
-    Value normalized = UiPropertyInspectorNormalizeCurve(UiPropertyInspectorMakeCurve(points_));
-    points_ = UiPropertyInspectorReadCurve(normalized);
-    if(selected_ >= points_.GetCount())
-        selected_ = points_.GetCount() - 1;
-}
-
-void PropertyCurveCanvas::EmitPreview()
-{
+    Vector<Pointf> points;
+    points.Add({0, 0});
+    points.Add({1, 1});
+    SetCurve(UiPropertyInspectorMakeCurve(points));
+    Select(0, 0);
+    Ptr<PropertyCurveCanvas> alive(this);
     WhenCurvePreview(GetCurve());
-}
-
-void PropertyCurveCanvas::EmitCommit()
-{
-    WhenCurveCommit(GetCurve());
-}
-
-void PropertyCurveCanvas::Paint(Draw& w)
-{
-    Size sz = GetSize();
-    Color paper = SColorPaper();
-    Color frame = SColorShadow();
-    Color grid = Blend(SColorPaper(), SColorText(), 28);
-    Color line = SColorHighlight();
-
-    w.DrawRect(sz, paper);
-    Rect r = GetGraphRect();
-    w.DrawRect(r, paper);
-    DrawFrame(w, r, frame);
-
-    for(int i = 1; i < 4; i++) {
-        int x = r.left + r.GetWidth() * i / 4;
-        int y = r.top + r.GetHeight() * i / 4;
-        w.DrawLine(x, r.top, x, r.bottom, 1, grid);
-        w.DrawLine(r.left, y, r.right, y, 1, grid);
-    }
-
-    for(int i = 1; i < points_.GetCount(); i++) {
-        Point a = CurveToClient(points_[i - 1]);
-        Point b = CurveToClient(points_[i]);
-        w.DrawLine(a.x, a.y, b.x, b.y, DPI(2), line);
-    }
-
-    int radius = DPI(5);
-    for(int i = 0; i < points_.GetCount(); i++) {
-        Point p = CurveToClient(points_[i]);
-        Color fill = i == selected_ ? SColorHighlight() : SColorFace();
-        Color ink = i == selected_ ? SColorHighlightText() : SColorText();
-        w.DrawEllipse(RectC(p.x - radius, p.y - radius, 2 * radius + 1, 2 * radius + 1),
-                      fill, 1, ink);
-    }
-    if(dragging_ >= 0 && dragging_ < points_.GetCount()) {
-        const Point p = CurveToClient(points_[dragging_]);
-        const String text = Format("x %.4f  y %.4f", points_[dragging_].x, points_[dragging_].y);
-        const Font font = SansSerif().Height(DPI(10));
-        const Size ts = GetTextSize(text, font);
-        Rect badge = RectC(minmax(p.x + DPI(8), r.left, max(r.left, r.right - ts.cx - DPI(10))),
-                           max(r.top, p.y - ts.cy - DPI(10)), ts.cx + DPI(8), ts.cy + DPI(4));
-        w.DrawRect(badge, SColorPaper());
-        DrawFrame(w, badge, SColorShadow());
-        w.DrawText(badge.left + DPI(4), badge.top + DPI(2), text, font, SColorText());
-    }
-}
-
-void PropertyCurveCanvas::LeftDown(Point p, dword)
-{
-    SetFocus();
-    int hit = HitPoint(p);
-    if(hit < 0) {
-        double nearest = 1e9;
-        for(int i = 1; i < points_.GetCount(); i++)
-            nearest = min(nearest, PropertyCurveSegmentDistance_(p,
-                          CurveToClient(points_[i - 1]), CurveToClient(points_[i])));
-        if(nearest > DPI(9))
-            return;
-        points_.Add(ClientToCurve(p));
-        Normalize();
-        hit = HitPoint(p);
-    }
-    selected_ = hit;
-    dragging_ = hit;
-    SetCapture();
-    Refresh();
-    EmitPreview();
-}
-
-void PropertyCurveCanvas::MouseMove(Point p, dword keyflags)
-{
-    if(dragging_ < 0 || !(keyflags & K_MOUSELEFT))
-        return;
-
-    Pointf value = ClientToCurve(p);
-    if(dragging_ == 0)
-        value.x = 0.0;
-    if(dragging_ == points_.GetCount() - 1)
-        value.x = 1.0;
-
-    points_[dragging_] = value;
-    Normalize();
-    selected_ = HitPoint(CurveToClient(value));
-    dragging_ = selected_;
-    Refresh();
-    EmitPreview();
-}
-
-void PropertyCurveCanvas::LeftUp(Point, dword)
-{
-    if(dragging_ < 0)
-        return;
-    dragging_ = -1;
-    ReleaseCapture();
-    Normalize();
-    Refresh();
-    EmitCommit();
-}
-
-bool PropertyCurveCanvas::Key(dword key, int count)
-{
-    if(key == K_DELETE || key == K_BACKSPACE) {
-        DeleteSelected();
-        return true;
-    }
-    if(selected_ >= 0 && selected_ < points_.GetCount() &&
-       (key == K_LEFT || key == K_RIGHT || key == K_UP || key == K_DOWN)) {
-        Pointf next = points_[selected_];
-        const double step = 0.01 * max(1, count);
-        if(key == K_LEFT) next.x -= step;
-        if(key == K_RIGHT) next.x += step;
-        if(key == K_UP) next.y += step;
-        if(key == K_DOWN) next.y -= step;
-        if(selected_ == 0) next.x = 0.0;
-        if(selected_ == points_.GetCount() - 1) next.x = 1.0;
-        next.x = minmax(next.x, 0.0, 1.0);
-        next.y = minmax(next.y, 0.0, 1.0);
-        points_[selected_] = next;
-        Normalize();
-        Refresh();
-        EmitPreview();
-        EmitCommit();
-        return true;
-    }
-    return Ctrl::Key(key, count);
-}
-
-Size PropertyCurveCanvas::GetMinSize() const
-{
-    return Size(DPI(280), DPI(220));
+    if(alive) WhenCurveCommit(GetCurve());
 }
 
 bool EditPropertyCurve(Value& value, Ctrl *owner)

@@ -1,4 +1,4 @@
-// UiIntFloat: Choose an integer or floating-point editor; design its range, step, spin and precision.
+// UiIntFloat: Configure integer and floating-point entry, drag sensitivity, and spin buttons.
 // Self-contained native demo. Models outlive their bound views; generated code uses only Ui APIs.
 
 #include <Ui/Ui.h>
@@ -87,17 +87,20 @@ struct NumericEditConfig {
     int int_step = 5;
     bool int_spin = true;
     bool int_loop = false;
-    double float_value = 1.5;
-    double float_min = -10.0;
-    double float_max = 10.0;
+    double float_value = 12.34;
+    double float_min = -100.0;
+    double float_max = 100.0;
     double float_step = 0.25;
-    int float_precision = 3;
+    int float_precision = 5;
     bool float_spin = true;
+    bool drag_enabled = true;
+    double drag_speed = 0.0;
+    double drag_acceleration = 1.0;
 };
 class Demo : public TopWindow {
 public:
     Demo() {
-        BuildShell("UiIntFloat","Choose an integer or floating-point editor; design its range, step, spin and precision.");
+        BuildShell("UiIntFloat", "Drag to adjust. In a float, start beside a digit to choose its place. Shift doubles speed. Ctrl-drag selects text.");
 
         Preview().Add(int_label_);
         Preview().Add(int_edit_);
@@ -107,6 +110,8 @@ public:
         sync_btn_.SetText("Copy float to int"); sync_btn_.WhenAction=[=]{ cfg_.int_value=(int)float_edit_.GetValue(); inspector_model_.SetValue("int_value",cfg_.int_value); ApplyProjection(); };
         int_edit_.WhenChange=[=]{ cfg_.int_value=int_edit_.GetValue(); inspector_model_.SetValue("int_value",cfg_.int_value); SetUsageCode(BuildUsageCode()); };
         float_edit_.WhenChange=[=]{ cfg_.float_value=float_edit_.GetValue(); inspector_model_.SetValue("float_value",cfg_.float_value); SetUsageCode(BuildUsageCode()); };
+        int_edit_.WhenAction = int_edit_.WhenChange;
+        float_edit_.WhenAction = float_edit_.WhenChange;
         BuildProperties();
         Preview().Add(family_buttons_[0]); family_buttons_[0].SetText("Integer").SetCheckable();
         family_buttons_[0].WhenAction=[=] { SelectConcreteExample("--int"); };
@@ -138,10 +143,38 @@ public:
             family_buttons_[i].WhenAction(); Ctrl::ProcessEvents();
             pass &= int_edit_.IsShown()==(i==0) && float_edit_.IsShown()==(i==1);
             pass &= generated_.Find(i==0 ? "UiIntEdit edit;" : "UiFloatEdit edit;")>=0;
-            pass &= cfg_.int_value==20 && fabs(cfg_.float_value-1.5)<1e-9;
+            pass &= cfg_.int_value==20 && fabs(cfg_.float_value-NumericEditConfig().float_value)<1e-9;
         }
         TopWindow::Close(); return pass;
     }
+    bool VerifyWheelAdjustment()
+    {
+        TopWindow::Open();
+        Ctrl::ProcessEvents();
+        int_edit_.SetFocus();
+        int_edit_.SetCursor(1);
+        int_edit_.MouseWheel(Point(5, 5), 120, 0);
+        bool pass = int_edit_.GetValue() == 30;
+        int_edit_.MouseWheel(Point(5, 5), -120, 0);
+        pass &= int_edit_.GetValue() == 20;
+
+        SelectConcreteExample("--float");
+        float_edit_.SetFocus();
+        float_edit_.SetCursor(4);
+        float_edit_.MouseWheel(Point(5, 5), 120, 0);
+        pass &= fabs(float_edit_.GetValue() - 12.44) < 1e-9;
+        float_edit_.SetCursor(5);
+        float_edit_.MouseWheel(Point(5, 5), -120, 0);
+        pass &= fabs(float_edit_.GetValue() - 12.43) < 1e-9;
+        float_edit_.SetValue(11.99);
+        float_edit_.SetCursor(4);
+        float_edit_.MouseWheel(Point(5, 5), 120, 0);
+        float_edit_.MouseWheel(Point(5, 5), 120, 0);
+        pass &= fabs(float_edit_.GetValue() - 12.19) < 1e-9;
+        TopWindow::Close();
+        return pass;
+    }
+
     String GetGeneratedCode() const { return generated_; }
     void SelectConcreteExample(const String& type) { inspector_model_.SetValue("kind",type=="--float" ? 1 : 0); ReadProperties(); ApplyProjection(); }
     void ConfigureExample() {
@@ -319,9 +352,12 @@ private:
         inspector_model_.AddInteger("float_precision","Float precision",cfg_.float_precision,"Appearance").SetRange(0,12,1).SetDefault(cfg_.float_precision);
 
         inspector_model_.AddBoolean("float_spin","Float spin",cfg_.float_spin,"Control").SetDefault(cfg_.float_spin);
+        inspector_model_.AddBoolean("drag_enabled", "Enable drag", cfg_.drag_enabled, "Drag").SetDefault(cfg_.drag_enabled);
+        inspector_model_.AddNumericDouble("drag_speed", "Drag rate (0 = auto)", cfg_.drag_speed, 0.0, 20.0, 0.01, "Drag").SetDefault(cfg_.drag_speed)
+            .SetHelp("Auto uses one integer step per 33 pixels or one float digit step per 25 pixels at 1×.");
+        inspector_model_.AddNumericDouble("drag_acceleration", "Maximum speed multiplier", cfg_.drag_acceleration, 1.0, 10.0, 0.25, "Drag").SetDefault(cfg_.drag_acceleration);
     }
     void ReadProperties() {
-        NumericEditConfig defaults;
         cfg_.int_value = int(inspector_model_.Find("int_value")->value);
         cfg_.int_min = int(inspector_model_.Find("int_min")->value);
         cfg_.int_max = int(inspector_model_.Find("int_max")->value);
@@ -334,6 +370,9 @@ private:
         cfg_.float_step = double(inspector_model_.Find("float_step")->value);
         cfg_.float_precision=(int)inspector_model_.Find("float_precision")->value;
         cfg_.float_spin = bool(inspector_model_.Find("float_spin")->value);
+        cfg_.drag_enabled = bool(inspector_model_.Find("drag_enabled")->value);
+        cfg_.drag_speed = double(inspector_model_.Find("drag_speed")->value);
+        cfg_.drag_acceleration = double(inspector_model_.Find("drag_acceleration")->value);
     }
 
     void ApplyDemoTheme()
@@ -410,7 +449,9 @@ private:
         float_edit_.SetValue(cfg_.float_value);
         float_edit_.SetPlaceholder("float");
 
-
+        for(UiNumericEdit* edit : { static_cast<UiNumericEdit*>(&int_edit_),
+                                    static_cast<UiNumericEdit*>(&float_edit_) })
+            edit->EnableDrag(cfg_.drag_enabled).SetDragSpeed(cfg_.drag_speed).SetDragAcceleration(cfg_.drag_acceleration);
 
         SetUsageCode(BuildUsageCode());
 
@@ -428,6 +469,9 @@ private:
             code << "edit.MinMax(" << Format("%.17g",cfg_.float_min) << ", " << Format("%.17g",cfg_.float_max) << ").Step(" << Format("%.17g",cfg_.float_step) << ").Precision(" << cfg_.float_precision << ").ShowSpin(" << (cfg_.float_spin ? "true" : "false") << ");\n";
             code << "edit.SetValue(" << Format("%.17g",cfg_.float_value) << ");\n";
         }
+        code << "edit.EnableDrag(" << (cfg_.drag_enabled ? "true" : "false") << ")"
+             << ".SetDragSpeed(" << Format("%.12g", cfg_.drag_speed) << ")"
+             << ".SetDragAcceleration(" << Format("%.12g", cfg_.drag_acceleration) << ");\n";
         if(override_model_.Find("edit.radius")->override_active) code << "UiBaseEdit::Style style=edit.GetStyle();\nstyle.metrics.radius=" << (int)override_model_.Find("edit.radius")->value << ";\nedit.SetCustomStyle(style);\n";
         { bool authored = false; EmitFrameAccentProperties(code, override_model_, "metrics.frame_accent.", "accent_style.metrics", "UiBaseEdit::Style accent_style = edit.GetStyle();\n", authored); if(authored) code << "edit.SetCustomStyle(accent_style);\n"; }
         return code;
@@ -438,10 +482,57 @@ private:
     UiIntEdit int_edit_; UiFloatEdit float_edit_; UiButton sync_btn_;
 };
 }
+static bool VerifyInspectorDrag()
+{
+    UiPropertyInspectorModel model;
+    model.AddDouble("amount", "Amount", 12.3456).decimals = 6;
+    UiPropertyInspector inspector;
+    inspector.ShowFilter(false);
+    inspector.SetLabelWidth(DPI(96));
+    inspector.SetModel(&model);
+
+    TopWindow window;
+    window.SetRect(0, 0, DPI(420), DPI(120));
+    window.Add(inspector.SizePos());
+    window.Open();
+    Ctrl::ProcessEvents();
+
+    int commits = 0;
+    inspector.WhenCommit = [&](String, const Value&) { ++commits; };
+    const Point start(DPI(170), inspector.GetStyle().row_height / 2);
+    auto drag = [&](dword modifiers) {
+        inspector.LeftDown(start, modifiers);
+        Ptr<UiFloatEdit> edit = dynamic_cast<UiFloatEdit*>(Ctrl::GetCaptureCtrl());
+        if(!edit)
+            return false;
+        Point end = start + inspector.GetScreenView().TopLeft() - edit->GetScreenView().TopLeft();
+        end.x += DPI(24);
+        edit->MouseMove(end, K_MOUSELEFT | modifiers);
+        if(!edit)
+            return false;
+        edit->LeftUp(end, modifiers);
+        return true;
+    };
+
+    const bool ordinary = drag(0) && fabs(double(model.Find("amount")->value) - 12.3457) < 1e-9;
+    const bool shifted = drag(K_SHIFT) && fabs(double(model.Find("amount")->value) - 12.3459) < 1e-9;
+    inspector.SetModel(nullptr);
+    window.Close();
+    return ordinary && shifted && commits == 2;
+}
+
 GUI_APP_MAIN {
     Demo demo;
     const Vector<String>& args=CommandLine();
     if(args.GetCount()==1 && args[0]=="--verify-selectors") { SetExitCode(demo.VerifySelectors()?0:1); return; }
+    if(args.GetCount() == 1 && args[0] == "--verify-inspector-drag") {
+        SetExitCode(VerifyInspectorDrag() ? 0 : 1);
+        return;
+    }
+    if(args.GetCount() == 1 && args[0] == "--verify-wheel") {
+        SetExitCode(demo.VerifyWheelAdjustment() ? 0 : 1);
+        return;
+    }
     if(args.GetCount()>=2 && args[0]=="--emit-code") { for(int i=2;i<args.GetCount();i++) { if(args[i]=="--configured") demo.ConfigureExample(); else demo.SelectConcreteExample(args[i]); } SaveFile(args[1],demo.GetGeneratedCode()); return; }
     demo.Run();
 }

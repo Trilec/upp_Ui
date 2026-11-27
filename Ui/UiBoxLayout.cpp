@@ -291,24 +291,39 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
 
             Vector<int> grow;
             grow.SetCount(n, 0);
-            if(extra > 0 && weight_sum > 0) {
+            while(extra > 0 && weight_sum > 0) {
                 int consumed = 0;
+                int remaining_weight = 0;
                 for(int i = 0; i < n; i++) {
-                    int w = items[row[i]].expandingWeight;
+                    const Item& it = items[row[i]];
+                    int w = it.expandingWeight;
                     if(w <= 0)
                         continue;
-                    int g = (extra * w) / weight_sum;
-                    grow[i] = g;
+                    int room = wrap == UiBoxWrap::None ? it.maxw - main[i] - grow[i] : extra;
+                    if(room <= 0)
+                        continue;
+                    int g = (int)min<int64>(room, (int64)extra * w / weight_sum);
+                    grow[i] += g;
                     consumed += g;
+                    if(g < room)
+                        remaining_weight += w;
                 }
-                if(consumed < extra) {
-                    for(int i = n - 1; i >= 0 && consumed < extra; i--) {
-                        if(items[row[i]].expandingWeight > 0) {
-                            grow[i] += (extra - consumed);
-                            consumed = extra;
-                        }
-                    }
+                extra -= consumed;
+                if(remaining_weight != weight_sum && wrap == UiBoxWrap::None) {
+                    weight_sum = remaining_weight;
+                    continue;
                 }
+                // Preserve the row's existing right-to-left rounding rule.
+                for(int i = n - 1; i >= 0 && extra > 0; i--) {
+                    const Item& it = items[row[i]];
+                    if(it.expandingWeight <= 0)
+                        continue;
+                    int room = wrap == UiBoxWrap::None ? it.maxw - main[i] - grow[i] : extra;
+                    int g = min(extra, max(0, room));
+                    grow[i] += g;
+                    extra -= g;
+                }
+                break;
             }
 
             Vector<int> final_h;
@@ -380,8 +395,8 @@ void UiBoxLayout::RebuildLayoutCache(const Rect& irc)
             Size ms = it.c ? measure.preferred : Size(0, 0);
             int w = it.fixed >= 0 ? it.fixed : ms.cx;
             int min_w = it.minw;
-            // A horizontal viewport must give up preferred width before
-            // pushing fixed actions past the end of a non-wrapping row.
+            // Keep fixed actions visible when an unwrapped row is too narrow
+            // for the preferred width of an expanding viewport.
             bool can_shrink = wrap == UiBoxWrap::None && it.fixed < 0 && it.expandingWeight > 0;
             if(fixed_column > 0)
                 w = min(w, fixed_column);

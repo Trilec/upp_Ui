@@ -129,13 +129,16 @@ UiFileBrowser::UiFileBrowser()
 void UiFileBrowser::RebuildShell()
 {
     // Reparent toolbar controls deliberately; no duplicate widgets or settings.
+    bool restore_find_focus = search_.HasFocus();
     commands_layout_.PauseLayout().ClearItems();
     view_display_row_.PauseLayout().ClearItems();
     RebuildNavigation();
     shell_.ClearItems();
     shell_.SetGap(0).SetInset(0);
     shell_.Add(navigation_panel_).Fixed(SizePx(38));
-    if(mode_ == Mode::Advanced)
+    bool advanced = mode_ == Mode::Advanced;
+    filter_layout_.ItemAt(0).Visible(!advanced);
+    if(advanced)
     {
         if(!read_only_)
         {
@@ -144,11 +147,16 @@ void UiFileBrowser::RebuildShell()
         }
         else
             new_button_.Hide();
-        for(UiToolButton *button : {&filter_button_, &sequence_button_, &view_button_, &sort_button_})
+        for(UiToolButton *button : {&sequence_button_, &view_button_, &sort_button_})
             commands_layout_.Add(*button).Fit();
-        commands_layout_.AddSpacer(1).Expand(1);
+        if(search_.GetParent() != &find_layout_)
+        {
+            find_layout_.Add(search_).Expand(1).MinMain(SizePx(120));
+            find_layout_.Add(filter_button_).Fit();
+        }
+        commands_layout_.Add(find_layout_).Expand(1).MinMain(SizePx(192));
         commands_layout_.Add(item_count_).Fit();
-        shell_.Add(commands_panel_).Fixed(SizePx(34));
+        shell_.Add(commands_panel_).Fit().MinMain(SizePx(34));
         details_button_.SetText("Details");
         thumbnails_button_.SetText("Thumbnails");
         view_display_row_.Add(details_button_).Expand(1);
@@ -156,6 +164,9 @@ void UiFileBrowser::RebuildShell()
     }
     else
     {
+        find_layout_.ClearItems();
+        if(search_.GetParent() != &popup_search_slot_)
+            popup_search_slot_.Add(search_.SizePos());
         commands_panel_.Hide();
         new_button_.SetText("");
         details_button_.SetText("");
@@ -169,6 +180,8 @@ void UiFileBrowser::RebuildShell()
     shell_.Add(footer_panel_).Fixed(SizePx(48)).Visible(show_selection_footer_);
     RefreshModeVisuals();
     RefreshLayout();
+    if(restore_find_focus)
+        search_.SetFocus();
 }
 
 UiFileBrowser& UiFileBrowser::ShowSelectionFooter(bool show)
@@ -263,6 +276,7 @@ void UiFileBrowser::SetFolderInternal(const String &folder, bool add_history)
     folder_ = normalized;
     if(changed)
     {
+        KillTimeCallback(2);
         search_.SetData("");
         restore_path_.Clear();
         restore_frame_ = Null;
@@ -412,7 +426,10 @@ bool UiFileBrowser::Key(dword key, int count)
 {
     if(key == K_CTRL_F)
     {
-        SetOptionsOpen(true);
+        if(mode_ == Mode::Advanced)
+            CloseOptions();
+        else
+            SetOptionsOpen(true);
         search_.SetFocus();
         search_.SelectAll();
         return true;
@@ -591,6 +608,14 @@ void UiFileBrowser::RefreshPlaces()
             place(name, path, ICON_DESIGN_FOLDER_48());
     }
 #endif
+    String downloads = GetDownloadFolder();
+    if(downloads.IsEmpty())
+    {
+        String fallback = AppendFileName(GetHomeDirectory(), "Downloads");
+        if(DirectoryExists(fallback))
+            downloads = fallback;
+    }
+    place("Downloads", downloads, ICON_DESIGN_FOLDER_48());
     place("Application folder", GetExeFolder(), ICON_DESIGN_FOLDER_48());
     heading("PINNED FOLDERS");
     for(const String &path : Session().places)
@@ -708,12 +733,11 @@ bool UiFileBrowser::PassesBaseFileType(const UiFileBrowserEntry &entry) const
     }
 }
 
-bool UiFileBrowser::PassesProjection(const UiFileBrowserEntry &entry) const
+bool UiFileBrowser::PassesProjection(const UiFileBrowserEntry &entry, const String &query) const
 {
     if(!PassesBaseFileType(entry))
         return false;
 
-    String query = ToLower(TrimBoth(search_.GetData().ToString()));
     if(!query.IsEmpty())
     {
         String hay =
@@ -786,12 +810,13 @@ void UiFileBrowser::RefreshProjection(bool keep_selection)
             selected_number = old.frames[selected_frame_].number;
     }
 
+    String query = ToLower(TrimBoth(AsString(search_.GetData())));
     Vector<int> visible;
     for(int i = 0; i < model_->GetCount(); ++i)
-        if(PassesProjection((*model_)[i]))
+        if(PassesProjection((*model_)[i], query))
             visible.Add(i);
 
-    int sort = sort_key_.HasSelection() ? (int)sort_key_.GetSelectedData() : 0;
+    SortOrder sort = GetSortOrder();
     int placement = folder_placement_.HasSelection() ? (int)folder_placement_.GetSelectedData() : 0;
     Sort(visible,
          [&](int ai, int bi)
@@ -800,23 +825,26 @@ void UiFileBrowser::RefreshProjection(bool keep_selection)
              const UiFileBrowserEntry &b = (*model_)[bi];
              if(placement != 2 && a.IsDirectory() != b.IsDirectory())
                  return placement == 0 ? a.IsDirectory() : !a.IsDirectory();
-             if(sort == 2 || sort == 3)
+             if(sort == SortOrder::ModifiedDesc || sort == SortOrder::ModifiedAsc)
              {
                  int cmp = SgnCompare(a.modified, b.modified);
                  if(cmp != 0)
-                     return sort == 2 ? cmp > 0 : cmp < 0;
+                     return sort == SortOrder::ModifiedDesc ? cmp > 0 : cmp < 0;
              }
-             else if(sort == 4)
+             else if(sort == SortOrder::SizeDesc || sort == SortOrder::SizeAsc)
              {
                  if(a.size != b.size)
-                     return a.size > b.size;
+                     return sort == SortOrder::SizeDesc ? a.size > b.size : a.size < b.size;
              }
-             else
+             else if(sort == SortOrder::TypeAsc || sort == SortOrder::TypeDesc)
              {
-                 int cmp = UiFileBrowserModel::CompareNames(a.friendly_name, b.friendly_name);
+                 int cmp = CompareNoCase(a.type_label, b.type_label);
                  if(cmp != 0)
-                     return sort == 1 ? cmp > 0 : cmp < 0;
+                     return sort == SortOrder::TypeAsc ? cmp < 0 : cmp > 0;
              }
+             int cmp = UiFileBrowserModel::CompareNames(a.friendly_name, b.friendly_name);
+             if(cmp != 0)
+                 return sort == SortOrder::NameDesc ? cmp > 0 : cmp < 0;
              return ai < bi;
          });
 
@@ -881,17 +909,71 @@ void UiFileBrowser::RefreshProjection(bool keep_selection)
     RefreshFooter();
 }
 
+UiFileBrowser::SortOrder UiFileBrowser::GetSortOrder() const
+{
+    return sort_key_.HasSelection() ? (SortOrder)(int)sort_key_.GetSelectedData() : SortOrder::NameAsc;
+}
+
+UiFileBrowser::SortOrder UiFileBrowser::GetColumnDefaultSort(int col) const
+{
+    if(mode_ == Mode::Simple)
+    {
+        switch(col)
+        {
+        case 0: return SortOrder::NameAsc;
+        case 1: return SortOrder::TypeAsc;
+        case 2: return SortOrder::ModifiedDesc;
+        }
+    }
+    else
+    {
+        switch(col)
+        {
+        case 1: return SortOrder::NameAsc;
+        case 3: return SortOrder::TypeAsc;
+        case 4: return show_size_.IsOn() ? SortOrder::SizeDesc : SortOrder::None;
+        case 5: return SortOrder::ModifiedDesc;
+        }
+    }
+    return SortOrder::None;
+}
+
+UiFileBrowser::SortOrder UiFileBrowser::ReverseSort(SortOrder order)
+{
+    // Each pair of adjacent dropdown values represents opposite directions.
+    return order == SortOrder::None ? order : (SortOrder)((int)order ^ 1);
+}
+
+void UiFileBrowser::SortByColumn(int col)
+{
+    SortOrder first = GetColumnDefaultSort(col);
+    if(first != SortOrder::None)
+        sort_key_.SelectByData((int)(GetSortOrder() == first ? ReverseSort(first) : first));
+}
+
 void UiFileBrowser::RefreshTable()
 {
     UiModelUpdate update(table_model_);
     int cols = mode_ == Mode::Simple ? 3 : 6;
     table_model_.SetSize(rows_.GetCount(), cols);
+    SortOrder sort = GetSortOrder();
+    auto set_header = [&](int col, const char *label)
+    {
+        UiTableHeader header(label);
+        SortOrder first = GetColumnDefaultSort(col);
+        SortOrder reverse = ReverseSort(first);
+        if(sort == first || sort == reverse)
+            header.sort = sort == SortOrder::NameAsc || sort == SortOrder::TypeAsc ||
+                          sort == SortOrder::ModifiedAsc || sort == SortOrder::SizeAsc
+                              ? UITABLE_SORT_ASC : UITABLE_SORT_DESC;
+        table_model_.SetHeader(UITABLE_COLUMN_AXIS, col, header);
+    };
 
     if(mode_ == Mode::Simple)
     {
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 0, UiTableHeader("Name"));
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 1, UiTableHeader("Type"));
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 2, UiTableHeader("Modified"));
+        set_header(0, "Name");
+        set_header(1, "Type");
+        set_header(2, "Modified");
         table_.SetColumnWidth(0, SizePx(390));
         table_.SetColumnWidth(1, SizePx(150));
         table_.SetColumnWidth(2, SizePx(145));
@@ -901,11 +983,11 @@ void UiFileBrowser::RefreshTable()
         UiTableHeader disclosure_header("›");
         disclosure_header.tooltip = "Sequence members · activate an arrow to expand or collapse";
         table_model_.SetHeader(UITABLE_COLUMN_AXIS, 0, disclosure_header);
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 1, UiTableHeader("Name"));
+        set_header(1, "Name");
         table_model_.SetHeader(UITABLE_COLUMN_AXIS, 2, UiTableHeader("Frames"));
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 3, UiTableHeader("Type"));
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 4, UiTableHeader("Size"));
-        table_model_.SetHeader(UITABLE_COLUMN_AXIS, 5, UiTableHeader("Modified"));
+        set_header(3, "Type");
+        set_header(4, "Size");
+        set_header(5, "Modified");
         table_.SetColumnWidth(0, SizePx(18));
         table_.SetColumnWidth(1, SizePx(330));
         table_.SetColumnWidth(2, show_frames_.IsOn() ? SizePx(110) : SizePx(1));
@@ -1155,7 +1237,8 @@ void UiFileBrowser::RefreshStatus()
                         : !scan_error_.IsEmpty() ? scan_error_
                                                  : Format("%d visible / %d items",
                                                           gallery_entries_.GetCount(), model_->GetCount()));
-    filter_button_.SetText(filters_.IsEmpty() ? "Filter ▾" : Format("Filter (%d) ▾", filters_.GetCount()));
+    filter_button_.Tip(filters_.IsEmpty() ? "Advanced filters"
+                                         : Format("Advanced filters (%d rules)", filters_.GetCount()));
     sequence_button_.Tip(EffectiveGroupSequences() ? "Sequence · grouped" : "Sequence · individual frames");
 }
 
@@ -1180,7 +1263,7 @@ void UiFileBrowser::RefreshModeVisuals()
     options_button_.Tip(query.IsEmpty() ? "Search / filter (Ctrl+F)"
                                         : "Search / filter · active search: " + query);
     filter_enable_.Enable(mode_ == Mode::Advanced);
-    filter_hint_.SetText(mode_ == Mode::Advanced ? "Rules are ordered; search filters this folder."
+    filter_hint_.SetText(mode_ == Mode::Advanced ? "Rules are applied alongside Find."
                                                  : "Search this folder; advanced rules are inactive.");
     details_button_.SetChecked(details_view_);
     thumbnails_button_.SetChecked(!details_view_);

@@ -28,12 +28,12 @@
     - 2026-03: removed redundant alias setters/getters during public API cleanup.
 */
 
-#include <Ui/UiBaseEdit.h>
+#include <Ui/UiNumericEdit.h>
 #include <Ui/UiButton.h>
 
 namespace Upp {
 
-class UiIntEdit : public UiBaseEdit {
+class UiIntEdit : public UiNumericEdit {
 public:
     typedef UiIntEdit CLASSNAME;
 
@@ -68,10 +68,14 @@ public:
     virtual Value GetData() const override;
     
     virtual bool  Key(dword key, int count) override;
-    virtual void  MouseWheel(Point p, int zdelta, dword keyflags) override;
     virtual void  LostFocus() override;
 
 protected:
+    bool        CanAdjustNumericValue() const override;
+    double      GetAdjustmentStep() const override { return step_val_; }
+    WString     FormatNumericAdjustment(const WString& origin, double delta,
+                                        int decimal_place, bool wheel) const override;
+
     void        OnSpinUp();
     void        OnSpinDown();
     void        CheckValue();

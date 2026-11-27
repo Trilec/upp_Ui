@@ -38,7 +38,7 @@ void UiFileBrowser::BuildNavigation()
     address_button_.SetIcon(ICON_DESIGN_EDIT_TEXT_48())
         .SetIconSize(DPI(14), DPI(14))
         .Tip("Edit path (Ctrl+L)");
-    search_.SetPlaceholder("Search this folder");
+    search_.SetPlaceholder("Find in this folder");
 
     details_button_.SetIcon(ICON_DESIGN_TABLE_48())
         .SetIconSize(DPI(16), DPI(16))
@@ -102,11 +102,14 @@ void UiFileBrowser::BuildOptions()
     commands_panel_.Add(commands_layout_.SizePos());
     commands_layout_.SetInset(Rect(DPI(8), DPI(2), DPI(8), DPI(2)))
         .SetGap(DPI(8))
+        .SetWrap(UiBoxWrap::Flow)
+        .SetWrapAutoResize(true)
         .SetAlignItems(UiCrossAlign::Center);
-    filter_button_.SetText("Filter ▾")
+    find_layout_.SetGap(DPI(4)).SetAlignItems(UiCrossAlign::Center);
+    filter_button_.SetText("Filters ▾")
         .SetIcon(ICON_DESIGN_TUNE_48())
         .SetIconSize(DPI(16), DPI(16))
-        .Tip("Search and ordered filters");
+        .Tip("Advanced filters");
     sequence_button_.SetText("Sequence ▾")
         .SetIcon(ICON_DESIGN_IMAGE_48())
         .SetIconSize(DPI(16), DPI(16))
@@ -167,8 +170,8 @@ void UiFileBrowser::BuildOptions()
     filter_editor_.Add(filter_delete_button_).Fixed(DPI(58));
     filter_hint_.SetText("Rules are ordered. Simple mode bypasses this stack.");
 
+    filter_layout_.Add(popup_search_slot_).Fixed(DPI(24));
     filter_layout_.Add(filter_header_).Fixed(DPI(22));
-    filter_layout_.Add(search_).Fixed(DPI(24));
     filter_layout_.Add(filter_list_).Expand(1).MinMain(DPI(58));
     filter_layout_.Add(filter_editor_).Fixed(DPI(26));
     filter_layout_.Add(filter_hint_).Fixed(DPI(16));
@@ -227,12 +230,15 @@ void UiFileBrowser::BuildOptions()
     sort_group_.Add(sort_layout_.SizePos());
     sort_layout_.SetInset(DPI(6)).SetGap(DPI(4));
     sort_title_.SetText("SORT");
-    sort_key_.Add("Name A–Z", 0)
-        .Add("Name Z–A", 1)
-        .Add("Modified newest", 2)
-        .Add("Modified oldest", 3)
-        .Add("Size largest", 4)
-        .SelectByData(0);
+    sort_key_.Add("Name A–Z", (int)SortOrder::NameAsc)
+        .Add("Name Z–A", (int)SortOrder::NameDesc)
+        .Add("Type A–Z", (int)SortOrder::TypeAsc)
+        .Add("Type Z–A", (int)SortOrder::TypeDesc)
+        .Add("Modified newest", (int)SortOrder::ModifiedDesc)
+        .Add("Modified oldest", (int)SortOrder::ModifiedAsc)
+        .Add("Size largest", (int)SortOrder::SizeDesc)
+        .Add("Size smallest", (int)SortOrder::SizeAsc)
+        .SelectByData((int)SortOrder::NameAsc);
     folder_placement_.Add("Folders first", 0).Add("Folders last", 1).Add("Inline", 2).SelectByData(0);
     sort_layout_.Add(sort_title_).Fixed(DPI(22));
     sort_layout_.Add(sort_key_).Fixed(DPI(28));
@@ -372,7 +378,7 @@ void UiFileBrowser::BuildFooter()
     footer_layout_.Add(name_label_).Fit();
     footer_layout_.Add(name_edit_).Expand(2).MinMain(DPI(110));
     footer_layout_.Add(type_label_).Fit();
-    footer_layout_.Add(file_type_).Expand(1).MinMain(DPI(138)).MaxMain(DPI(220));
+    footer_layout_.Add(file_type_).Expand(1).MinMaxMain(DPI(138), DPI(220));
     footer_layout_.Add(cancel_button_).Fixed(DPI(78));
     footer_layout_.Add(open_button_).Fixed(DPI(132));
 }
@@ -399,7 +405,7 @@ void UiFileBrowser::WireEvents()
             SetFolderInternal(AsString(data), true);
     };
     breadcrumbs_.WhenBackgroundAction = [this] { EditAddress(true); };
-    search_.WhenChange = [this] { SetTimeCallback(120, [this] { RefreshProjection(true); }, 2); };
+    search_.WhenChange = [this] { KillSetTimeCallback(120, [this] { RefreshProjection(true); }, 2); };
     details_button_.WhenAction = [this] { SetDetailsView(true); };
     thumbnails_button_.WhenAction = [this] { SetDetailsView(false); };
     options_button_.WhenAction = [this] { OpenOptions(OptionsPage::Filter, options_button_); };
@@ -469,6 +475,11 @@ void UiFileBrowser::WireEvents()
     folder_placement_.WhenSelect = [this](int) { RefreshProjection(true); };
 
     table_.WhenSelection = [this] { HandleTableSelection(); };
+    table_.WhenHeaderAction = [this](UiTableAxis axis, int col)
+    {
+        if(axis == UITABLE_COLUMN_AXIS)
+            SortByColumn(col);
+    };
     table_.WhenAction = [this] { HandleTableAction(); };
     gallery_.WhenSelection = [this] { HandleGallerySelection(); };
     gallery_.WhenAction = [this] { HandleGalleryAction(); };

@@ -1,7 +1,9 @@
 // UiBezierCurve: a self-contained UiPropertyInspector builder and public-API usage example.
 // Authored values live in the two models; inherited style is resolved afresh.
 #include <Ui/Ui.h>
+#include <Ui/UiCurveEditor.h>
 #include <Ui/UiPropertyInspector/UiPropertyInspector.h>
+#include <cmath>
 #include <Ui/UiPropertyInspector/PropertyValueEditors.h>
 using namespace Upp;
 namespace {
@@ -23,6 +25,109 @@ String BoolCode(bool b) { return b ? "true" : "false"; }
 UiPropertyInspectorItem& MarkOverride(UiPropertyInspectorItem& item) {
     item.overrideable=true; item.override_active=false; item.SetDefault(item.value); return item;
 }
+class KeyCurveExample : public TopWindow {
+public:
+    KeyCurveExample()
+    {
+        Title("Key curves").Sizeable().SetRect(0, 0, DPI(720), DPI(450));
+        Add(panel_.HSizePos(DPI(10), DPI(10)).VSizePos(DPI(10), DPI(10)));
+        auto& editor = panel_.Editor();
+        editor.SetRange({0, 100, 0, 100, 0, 1, 5, 1, false});
+        editor.SetSnap(UiCurveEditor::Snap::Steps);
+        editor.SetPlayhead(40);
+        editor.WhenSeek = [&editor](double time) { editor.SetPlayhead(time); };
+        editor.SetSeries({
+            {"Strength", Color(20, 130, 180), 0, {
+                {{0, .12}, UiCurveEditor::Interpolation::Bezier},
+                {{45, .84}, UiCurveEditor::Interpolation::Bezier},
+                {{100, .35}, UiCurveEditor::Interpolation::Flat}
+            }},
+            {"Weight", Color(170, 95, 70), 0, {
+                {{0, .8}}, {{30, .4}}, {{72, .6}}, {{100, .24}}
+            }}
+        });
+        editor.Select(0, 45);
+    }
+private:
+    UiCurveEditorPanel panel_;
+};
+
+bool VerifySharedCurves()
+{
+    using Curve = UiCurveEditor;
+    TopWindow window;
+    PropertyCurveCanvas property;
+    UiCurveEditorPanel panel;
+    auto& graph = panel.Editor();
+    window.SetRect(0, 0, DPI(760), DPI(580));
+    window.Add(property.HSizePos(0, 0).TopPos(0, DPI(240)));
+    window.Add(panel.HSizePos(0, 0).VSizePos(DPI(250), 0));
+    window.Open();
+    Ctrl::ProcessEvents();
+
+    int failures = 0;
+    auto check = [&](bool ok, const char* description) {
+        if(!ok) {
+            Cout() << "FAIL " << description << '\n';
+            ++failures;
+        }
+    };
+    int previews = 0, commits = 0;
+    Value preview;
+    property.WhenCurvePreview = [&](Value value) { preview = value; ++previews; };
+    property.WhenCurveCommit = [&](Value) { ++commits; };
+    Vector<Pointf> points;
+    points.Add({0, 0});
+    points.Add({.5, .5});
+    points.Add({1, 1});
+    const auto original = UiPropertyInspectorMakeCurve(points);
+    property.SetCurve(original);
+    const Rect prop_plot = Rect(property.GetSize()).Deflated(DPI(16));
+    const Point middle(prop_plot.left + prop_plot.Width() / 2, prop_plot.bottom - prop_plot.Height() / 2);
+    property.LeftDown(middle, 0);
+    property.MouseMove(middle - Size(0, DPI(20)), K_MOUSELEFT | K_CTRL);
+    check(previews > 0 && property.GetCurve() != original && commits == 0, "normalized property live preview");
+    property.Key(K_ESCAPE, 1);
+    check(property.GetCurve() == original && preview == original && commits == 0, "normalized property cancel");
+    property.LeftDown(middle, 0);
+    property.MouseMove(middle - Size(0, DPI(20)), K_MOUSELEFT | K_CTRL);
+    property.LeftUp(middle - Size(0, DPI(20)), K_CTRL);
+    check(commits == 1 && property.GetCurve() != original, "normalized property commit");
+
+    graph.SetRange({0, 100, 0, 100, 0, 1, 10, 1, false});
+    graph.SetSnap(Curve::Snap::Steps);
+    graph.SetSeries({{"Test", Null, 0, {{{0, 0}}, {{50, .5}}, {{100, 1}}}}});
+    graph.SetPlayhead(40);
+    graph.AddKey();
+    check(graph.GetSeries()[0].keys.size() == 4 && graph.SelectedKey() && graph.SelectedKey()->point.x == 40,
+          "independent shared panel add");
+
+    const Rect plot(DPI(55), DPI(21), graph.GetSize().cx - DPI(15), graph.GetSize().cy - DPI(23));
+    const Point key(plot.left + plot.Width() / 2, plot.bottom - plot.Height() / 2);
+    const Point time_target = key + Size(int(std::round(plot.Width() * .085)), -DPI(18));
+    graph.LeftDown(key, 0);
+    graph.MouseMove(time_target, K_MOUSELEFT | K_SHIFT);
+    graph.LeftUp(time_target, K_SHIFT);
+    const auto* moved = graph.SelectedKey();
+    check(moved && moved->point.x == 60 && moved->point.y == .5, "shift constrains and snaps time");
+
+    graph.SetInterpolation(Curve::Interpolation::Flat);
+    graph.ShowTangents(true);
+    const Point tangent(plot.left + int(std::round(plot.Width() * (60. + 40. / 3.) / 100)),
+                        plot.bottom - int(std::round(plot.Height() * .5)));
+    graph.LeftDown(tangent, 0);
+    graph.MouseMove(tangent - Size(0, DPI(14)), K_MOUSELEFT);
+    graph.LeftUp(tangent - Size(0, DPI(14)), 0);
+    const auto* edited = graph.SelectedKey();
+    check(edited && edited->interpolation == Curve::Interpolation::Bezier && edited->tangent_out &&
+          *edited->tangent_out > 0, "shared tangent handle commits");
+    graph.DeleteSelected();
+    check(graph.GetSeries()[0].keys.size() == 3, "shared key delete");
+    window.Close();
+    if(!failures) Cout() << "PASS shared curve panel and normalized property preview, cancel and commit\n";
+    return failures == 0;
+}
+
 class Demo : public TopWindow {
 public:
     typedef Demo CLASSNAME;
@@ -98,6 +203,12 @@ private:
              .SetIconSize(DPI(16), DPI(16))
              .Tip("Close demo");
 
+        key_curves_.SetText("Key curves");
+        key_curves_.WhenAction = [this] {
+            if(!key_example_.IsOpen()) key_example_.CenterOwner().Open(this);
+            else key_example_.SetForeground();
+        };
+        header_actions_.Add(key_curves_).Fit();
         header_actions_.Add(theme_).Fixed(DPI(34));
         header_actions_.Add(help_).Fixed(DPI(34));
         header_actions_.Add(exit_).Fixed(DPI(34));
@@ -363,6 +474,8 @@ private:
     UiPropertyInspectorFactory factory_;
     UiPropertyInspectorModel inspector_model_,override_model_;
     UiTitleCard header_;
+    UiButton key_curves_;
+    KeyCurveExample key_example_;
     UiBoxLayout header_actions_ {UiDirection::H}; UiToolButton theme_,help_,exit_;
     UiPanel preview_,right_; UiLabel caption_; UiBezierCurveField control_;
     UiBezierCurveEditor direct_;
@@ -374,8 +487,12 @@ private:
 };
 }
 GUI_APP_MAIN {
-    Demo demo;
     const auto& args=CommandLine();
+    if(args.GetCount() && args[0]=="--verify-shared-curve") {
+        SetExitCode(VerifySharedCurves() ? 0 : 1);
+        return;
+    }
+    Demo demo;
     if(args.GetCount()>=2 && args[0]=="--generate") demo.Export(args[1],args.GetCount()>2 && args[2]!="dark");
     else if(args.GetCount() && args[0]=="--verify-selectors") SetExitCode(demo.VerifySelectors() ? 0 : 1);
     else demo.Run();

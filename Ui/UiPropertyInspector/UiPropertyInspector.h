@@ -226,6 +226,7 @@ private:
     void EnsureSelectedVisible();
 
     void ActivateRow(int display_index);
+    void ForwardNumericPress(int row, Point p, dword flags);
     void DeactivateEditor();
     void CommitActiveEditor();
     void ApplyEditorPreview(const Value& value);

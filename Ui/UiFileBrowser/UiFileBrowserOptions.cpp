@@ -94,7 +94,12 @@ void UiFileBrowser::OpenOptions(OptionsPage page, Ctrl &anchor)
     // The owning browser remains alive; children and callbacks are members.
     options_popup_.PopUp(this, true, true, false);
     if(page == OptionsPage::Filter)
-        search_.SetFocus();
+    {
+        if(mode_ == Mode::Simple)
+            search_.SetFocus();
+        else
+            filter_value_.SetFocus();
+    }
     else if(page == OptionsPage::NewItem)
         new_item_name_.SetFocus();
     else if(page == OptionsPage::Sequence)
@@ -112,7 +117,8 @@ void UiFileBrowser::PositionOptions()
         return;
     Rect anchor = options_anchor_->GetScreenRect();
     Rect work = Ctrl::GetWorkArea(anchor.CenterPoint());
-    Size size = options_page_ == OptionsPage::Filter     ? Size(SizePx(460), SizePx(236))
+    Size size = options_page_ == OptionsPage::Filter
+                    ? Size(SizePx(460), SizePx(mode_ == Mode::Simple ? 236 : 208))
                 : options_page_ == OptionsPage::Sequence ? Size(SizePx(260), SizePx(220))
                 : options_page_ == OptionsPage::View     ? Size(SizePx(270), SizePx(168))
                 : options_page_ == OptionsPage::Sort

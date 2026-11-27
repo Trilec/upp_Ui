@@ -65,7 +65,9 @@ void UiFloatEdit::SetValue(double v)
 {
     if(v < min_val_) v = min_val_;
     if(v > max_val_) v = max_val_;
-    
+    if(HasNumericAdjustmentText() && GetValue() == v)
+        return;
+
     internal_change_ = true;
     SetText(FormatDouble(v, precision_).ToWString());
     internal_change_ = false;
@@ -135,13 +137,16 @@ void UiFloatEdit::CheckValue()
     if(v < min_val_) SetValue(min_val_);
     if(v > max_val_) SetValue(max_val_);
     
-    SetValue(v); // Reformat
+    if(!HasNumericAdjustmentText())
+        SetValue(v); // Reformat typed values.
 }
 
 void UiFloatEdit::LostFocus()
 {
-    CheckValue();
-    UiBaseEdit::LostFocus();
+    Ptr<UiFloatEdit> alive(this);
+    UiNumericEdit::LostFocus();
+    if(alive)
+        CheckValue();
 }
 
 void UiFloatEdit::OnSpinUp()
@@ -192,7 +197,7 @@ Value UiFloatEdit::GetData() const
 
 bool UiFloatEdit::Key(dword key, int count)
 {
-    if(IsReadOnly()) return UiBaseEdit::Key(key, count);
+    if(IsReadOnly()) return UiNumericEdit::Key(key, count);
     
     if(key == K_UP) {
         OnSpinUp();
@@ -210,14 +215,43 @@ bool UiFloatEdit::Key(dword key, int count)
             return true;
     }
     
-    return UiBaseEdit::Key(key, count);
+    return UiNumericEdit::Key(key, count);
 }
 
-void UiFloatEdit::MouseWheel(Point p, int zdelta, dword keyflags)
+bool UiFloatEdit::CanAdjustNumericValue() const
 {
-    if(IsReadOnly()) return;
-    if(zdelta > 0) OnSpinUp();
-    else OnSpinDown();
+    double value;
+    return TryGetValue(value);
+}
+
+WString UiFloatEdit::FormatNumericAdjustment(const WString& origin, double delta,
+                                             int decimal_place, bool wheel) const
+{
+    const double before = ScanDouble(TrimBoth(origin.ToString()));
+    const double value = minmax(before + delta, min_val_, max(min_val_, max_val_));
+    if(value == before)
+        return origin;
+
+    String text;
+    if(decimal_place == INT_MIN) {
+        text = FormatDouble(value, precision_);
+    }
+    else if(std::abs(value) < 1e12 && decimal_place >= -12) {
+        text = FormatDoubleFix(value, max(0, -decimal_place));
+    }
+    else {
+        const int decade = value ? static_cast<int>(std::floor(std::log10(std::abs(value)))) : 0;
+        const int places = minmax(decade - decimal_place, 0, 16);
+        text = FormatDoubleExp(value, places);
+    }
+
+    const double displayed = ScanDouble(text);
+    if(displayed < min_val_ || displayed > max_val_)
+        text = FormatDouble(value, 17);
+    // A drag smaller than the display increment must leave the original text alone.
+    if(!wheel && ScanDouble(text) == before)
+        return origin;
+    return text.ToWString();
 }
 
 } // namespace Upp

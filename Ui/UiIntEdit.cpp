@@ -1,6 +1,7 @@
 #include "UiIntEdit.h"
 #include <Ui/UiDraw.h>
 #include <Ui/UiTheme.h>
+#include <cmath>
 
 namespace Upp {
 
@@ -65,7 +66,9 @@ void UiIntEdit::SetValue(int v)
 {
     if(v < min_val_) v = min_val_;
     if(v > max_val_) v = max_val_;
-    
+    if(HasNumericAdjustmentText() && GetValue() == v)
+        return;
+
     internal_change_ = true;
     SetText(AsString(v).ToWString());
     internal_change_ = false;
@@ -94,8 +97,10 @@ void UiIntEdit::CheckValue()
 
 void UiIntEdit::LostFocus()
 {
-    CheckValue();
-    UiBaseEdit::LostFocus();
+    Ptr<UiIntEdit> alive(this);
+    UiNumericEdit::LostFocus();
+    if(alive)
+        CheckValue();
 }
 
 void UiIntEdit::OnSpinUp()
@@ -149,7 +154,7 @@ Value UiIntEdit::GetData() const
 
 bool UiIntEdit::Key(dword key, int count)
 {
-    if(IsReadOnly()) return UiBaseEdit::Key(key, count);
+    if(IsReadOnly()) return UiNumericEdit::Key(key, count);
     
     if(key == K_UP) {
         OnSpinUp();
@@ -165,14 +170,33 @@ bool UiIntEdit::Key(dword key, int count)
         if(!IsDigit(key) && key != '-') return true; // Consume invalid key
     }
     
-    return UiBaseEdit::Key(key, count);
+    return UiNumericEdit::Key(key, count);
 }
 
-void UiIntEdit::MouseWheel(Point p, int zdelta, dword keyflags)
+bool UiIntEdit::CanAdjustNumericValue() const
 {
-    if(IsReadOnly()) return;
-    if(zdelta > 0) OnSpinUp();
-    else OnSpinDown();
+    const String text = TrimBoth(GetTextUtf8());
+    int i = 0;
+    if(!text.IsEmpty() && (text[0] == '-' || text[0] == '+'))
+        i++;
+    if(i == text.GetCount())
+        return false;
+    for(; i < text.GetCount(); i++)
+        if(!IsDigit(text[i]))
+            return false;
+    return !IsNull(ScanInt(text));
+}
+
+WString UiIntEdit::FormatNumericAdjustment(const WString& origin, double delta, int, bool wheel) const
+{
+    const int before = ScanInt(TrimBoth(origin.ToString()));
+    const double next = double(before) + std::round(delta);
+    const int low = max(min_val_, INT_MIN + 1);
+    const int high = max(low, max_val_);
+    const int value = wheel && loop_ && next > high ? low
+                    : wheel && loop_ && next < low ? high
+                    : static_cast<int>(minmax(next, double(low), double(high)));
+    return value == before ? origin : AsString(value).ToWString();
 }
 
 } // namespace Upp

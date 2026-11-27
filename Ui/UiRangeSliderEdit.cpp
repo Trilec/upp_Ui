@@ -228,8 +228,12 @@ void UiRangeSliderEdit::SyncSliderFromFields_(bool commit)
 
     syncing_ = true;
     slider_.SetValues(lower_field_.GetValue(), upper_field_.GetValue());
-    lower_field_.SetValue(slider_.GetLowerValue());
-    upper_field_.SetValue(slider_.GetUpperValue());
+    // Numeric edits are still in progress during preview. Normalizing the
+    // active text here would interrupt caret editing and drag adjustment.
+    if(commit || !lower_field_.HasFocus())
+        lower_field_.SetValue(slider_.GetLowerValue());
+    if(commit || !upper_field_.HasFocus())
+        upper_field_.SetValue(slider_.GetUpperValue());
     syncing_ = false;
 
     const bool changed = before_lower != slider_.GetLowerValue() ||

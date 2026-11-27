@@ -264,7 +264,7 @@ private:
         model_.SetGroupSubtitle("Content", "text, multiline and Boolean presentations");
         model_.SetGroupSubtitle("Content/Hierarchy", "one-level property indentation");
         model_.SetGroupSubtitle("Content/Hierarchy/Subheading", "nested heading and two-level indentation");
-        model_.SetGroupSubtitle("Numbers", "direct, toggle and slider numeric editors");
+        model_.SetGroupSubtitle("Numbers", "Drag number fields or place the caret and scroll.");
         model_.SetGroupSubtitle("Appearance", "colour, palette, fill recipes and Reset action");
         model_.SetGroupSubtitle("Layout", "range and matrix adapters");
         model_.SetGroupSubtitle("Composites", "compact vectors and dialog-backed curve editing");

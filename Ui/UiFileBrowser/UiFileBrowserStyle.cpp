@@ -100,7 +100,7 @@ void UiFileBrowser::ApplyTheme()
     table_style.show_column_headers = true;
     table_style.show_grid = false;
     table_style.alternate_rows = false;
-    table_style.show_sort_indicator = false;
+    table_style.show_sort_indicator = true;
     table_style.header_height = max(SizePx(28), font_.GetHeight() + SizePx(10));
     table_style.font = font_;
     table_style.header_font = font_;

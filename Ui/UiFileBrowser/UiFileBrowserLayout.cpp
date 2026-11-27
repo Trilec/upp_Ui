@@ -24,11 +24,14 @@ void UiFileBrowser::ApplyViewSizeLayout()
     footer_layout_.ItemAt(5).Fixed(SizePx(132));
     places_layout_.SetInset(SizePx(7)).SetGap(SizePx(4));
     places_layout_.ItemAt(0).Fixed(SizePx(26));
-    commands_layout_.SetInset(Rect(SizePx(8), SizePx(2), SizePx(8), SizePx(2))).SetGap(SizePx(10));
+    commands_layout_.SetInset(Rect(SizePx(8), SizePx(2), SizePx(8), SizePx(2))).SetGap(SizePx(8), SizePx(4));
+    find_layout_.SetGap(SizePx(4));
+    if(find_layout_.GetItemCount())
+        find_layout_.ItemAt(0).MinMain(SizePx(120));
     for(UiBoxLayout *layout : {&filter_layout_, &sequence_layout_, &view_layout_, &sort_layout_})
         layout->SetInset(SizePx(6)).SetGap(SizePx(4));
-    filter_layout_.ItemAt(0).Fixed(SizePx(22));
-    filter_layout_.ItemAt(1).Fixed(SizePx(24));
+    filter_layout_.ItemAt(0).Fixed(SizePx(24));
+    filter_layout_.ItemAt(1).Fixed(SizePx(22));
     filter_layout_.ItemAt(3).Fixed(SizePx(26));
     filter_layout_.ItemAt(4).Fixed(SizePx(16));
     filter_editor_.SetGap(SizePx(4));

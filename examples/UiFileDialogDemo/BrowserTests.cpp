@@ -39,6 +39,9 @@ struct UiFileBrowserTest
             Ctrl::ProcessEvents();
             check(!browser.IsScanning() && browser.scan_error_.IsEmpty(), "scan completes without error");
         };
+        check(FileSetTime(AppendFileName(root, "slate.png"), Time(2024, 1, 1)) &&
+                  FileSetTime(AppendFileName(root, "010_020_review_v012.mov"), Time(2025, 1, 1)),
+              "Fixture files have distinct modification times");
         browser.SetFolder(root);
         wait();
         check(browser.GetEntryCount() == 7, "browser consumes grouped scan result");
@@ -117,13 +120,15 @@ struct UiFileBrowserTest
         check(browser.FormatFrameNumber(7, 5) == "00007", "frame padding is stable across build modes");
         check(browser.navigation_panel_.GetStyle().metrics.radius == 0 &&
                   browser.shell_.GetItemCount() == 6 &&
-                  browser.search_.GetParent() == &browser.filter_layout_,
-              "one navigation row and one compact command row; search belongs to its popup");
+                  browser.search_.GetParent() == &browser.find_layout_ &&
+                  browser.filter_button_.GetParent() == &browser.find_layout_ &&
+                  browser.search_.GetRect().right <= browser.filter_button_.GetRect().left,
+              "Advanced commands show Find immediately before Filters");
         browser.ShowOptions(true);
         check(browser.options_popup_.IsOpen() &&
                   browser.filter_group_.GetParent() == &browser.options_layout_ &&
                   !browser.sequence_group_.GetParent(),
-              "Filter popup contains only search/filter controls");
+              "Advanced filter popup leaves Find in the command bar");
         check(browser.filter_title_.GetStyle().font == browser.places_title_.GetStyle().font &&
                   browser.filter_title_.GetStyle().palette.ink[ST_NORMAL] ==
                       browser.places_title_.GetStyle().palette.ink[ST_NORMAL] &&
@@ -175,8 +180,9 @@ struct UiFileBrowserTest
               "Escape dismisses the options popup without cancelling the dialog");
         browser.Key(K_CTRL_F, 1);
         browser.Key(K_CTRL_F, 1);
-        check(browser.options_open_ && browser.search_.HasFocus(),
-              "Repeated Ctrl+F retains the search popup and focus");
+        check(!browser.options_open_ && browser.search_.HasFocus(),
+              "Repeated Ctrl+F focuses Find without opening the filters");
+        browser.filter_button_.WhenAction();
         browser.filter_button_.LeftDown(browser.filter_button_.GetSize() / 2, 0);
         browser.options_popup_.WhenDismiss();
         check(browser.options_open_ && browser.filter_button_.HasCapture(),
@@ -184,6 +190,15 @@ struct UiFileBrowserTest
         browser.filter_button_.LeftUp(browser.filter_button_.GetSize() / 2, 0);
         check(!browser.options_open_, "Anchor mouse-up toggles its popup closed");
         browser.CloseOptions();
+        Rect normal_window = window.GetRect();
+        window.SetRect(RectC(normal_window.left, normal_window.top, DPI(540), normal_window.GetHeight()));
+        Ctrl::ProcessEvents();
+        check(browser.find_layout_.GetRect().right <= browser.commands_layout_.GetSize().cx &&
+                  browser.find_layout_.GetRect().bottom <= browser.commands_layout_.GetSize().cy &&
+                  browser.filter_button_.GetRect().right <= browser.find_layout_.GetSize().cx,
+              "Find and Filters stay visible together when the command bar wraps");
+        window.SetRect(normal_window);
+        Ctrl::ProcessEvents();
         browser.sort_button_.WhenAction();
         Ctrl::ProcessEvents();
         check(browser.sort_group_.GetParent() == &browser.options_layout_, "Sort has its own popup");
@@ -214,6 +229,22 @@ struct UiFileBrowserTest
                     item.use_custom_font && item.custom_font.GetHeight() < browser.GetFont().GetHeight();
         }
         check(hint && small_headings, "small sidebar headings and non-navigable drop hint");
+        String downloads = GetDownloadFolder();
+        if(downloads.IsEmpty())
+        {
+            String fallback = AppendFileName(GetHomeDirectory(), "Downloads");
+            if(DirectoryExists(fallback))
+                downloads = fallback;
+        }
+        int download_rows = 0;
+        for(int i = 0; i < browser.places_.Model().GetCount(); ++i)
+        {
+            const auto &item = browser.places_.Model().Get(i);
+            if(TrimBoth(item.text) == "Downloads" && !IsNull(item.data) &&
+               AsString(item.data) == downloads)
+                ++download_rows;
+        }
+        check(download_rows == (downloads.IsEmpty() ? 0 : 1), "Downloads links to the platform folder");
         check(browser.breadcrumbs_.GetCount() > 2, "Windows path has separate clickable crumbs");
         int last = browser.breadcrumbs_.GetCount() - 1;
         check(NormalizePath(AsString(browser.breadcrumbs_.GetItemData(last))) == NormalizePath(root),
@@ -238,10 +269,79 @@ struct UiFileBrowserTest
         browser.SetFolder(root);
         wait();
         browser.search_.SetData("no-matching-fixture-entry");
-        browser.RefreshProjection(true);
+        browser.search_.WhenChange();
+        for(int i = 0; i < 100 && browser.HasSelection(); ++i)
+        {
+            Sleep(5);
+            Ctrl::ProcessEvents();
+        }
         check(!browser.HasSelection() && browser.rows_.IsEmpty(), "filtered-out selection cannot be opened");
         browser.search_.SetData("");
         browser.RefreshProjection(true);
+        browser.SetMode(UiFileBrowser::Mode::Simple);
+        Ctrl::ProcessEvents();
+        auto click_heading = [&](int col)
+        {
+            const auto &style = browser.table_.GetStyle();
+            Rect face = UiStyledFaceRect(browser.table_.GetSize(), style.metrics, style.skin);
+            int x = face.left + style.metrics.content_margin.left + DPI(20);
+            for(int i = 0; i < col; ++i)
+                x += browser.table_.GetColumnWidth(i);
+            Point p(x, face.top + style.metrics.content_margin.top + style.header_height / 2);
+            browser.table_.LeftDown(p, 0);
+            browser.table_.LeftUp(p, 0);
+        };
+        auto header_sort = [&](int col) { return browser.table_model_.GetHeader(UITABLE_COLUMN_AXIS, col).sort; };
+        using SortOrder = UiFileBrowser::SortOrder;
+        String before_sort = browser.GetSelection().path;
+        click_heading(1);
+        check(browser.GetSortOrder() == SortOrder::TypeAsc && header_sort(1) == UITABLE_SORT_ASC &&
+                  header_sort(0) == UITABLE_SORT_NONE && browser.GetSelection().path == before_sort &&
+                  !browser.IsScanning(),
+              "Clicking Type updates the Sort menu and arrow while preserving selection without a scan");
+        auto type_ordered = [&](bool descending)
+        {
+            String previous;
+            for(int i : browser.gallery_entries_)
+            {
+                const auto &entry = (*browser.model_)[i];
+                if(entry.IsDirectory())
+                    continue;
+                int cmp = CompareNoCase(previous, entry.type_label);
+                if(!previous.IsEmpty() && (descending ? cmp < 0 : cmp > 0))
+                    return false;
+                previous = entry.type_label;
+            }
+            return !previous.IsEmpty();
+        };
+        check(type_ordered(false), "Type sorts the visible files by their displayed type");
+        click_heading(1);
+        check(header_sort(1) == UITABLE_SORT_DESC && type_ordered(true), "Second Type click reverses order");
+        auto visible_index = [&](const char *name)
+        {
+            for(int i = 0; i < browser.gallery_entries_.GetCount(); ++i)
+                if((*browser.model_)[browser.gallery_entries_[i]].name == name)
+                    return i;
+            return -1;
+        };
+        click_heading(2);
+        check(browser.GetSortOrder() == SortOrder::ModifiedDesc && header_sort(2) == UITABLE_SORT_DESC &&
+                  visible_index("010_020_review_v012.mov") < visible_index("slate.png"),
+              "Modified starts with the newest files");
+        click_heading(2);
+        check(browser.GetSortOrder() == SortOrder::ModifiedAsc && header_sort(2) == UITABLE_SORT_ASC &&
+                  visible_index("slate.png") < visible_index("010_020_review_v012.mov"),
+              "Second Modified click starts with the oldest files");
+        click_heading(0);
+        click_heading(0);
+        check(browser.GetSortOrder() == SortOrder::NameDesc && header_sort(0) == UITABLE_SORT_DESC,
+              "Clicking Name twice selects reverse natural order");
+        browser.sort_key_.SelectByData((int)SortOrder::NameAsc);
+        browser.SetMode(UiFileBrowser::Mode::Advanced);
+        browser.table_.WhenHeaderAction(UITABLE_COLUMN_AXIS, 3);
+        check(browser.GetSortOrder() == SortOrder::TypeAsc && header_sort(3) == UITABLE_SORT_ASC,
+              "Advanced Type heading uses the same sort state");
+        browser.sort_key_.SelectByData((int)SortOrder::NameAsc);
         auto medium_font = browser.GetFont();
         int medium_rows = browser.places_.GetStyle().row_height;
         String selected_path = browser.GetSelection().path;

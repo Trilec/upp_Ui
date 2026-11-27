@@ -90,9 +90,9 @@ NEXT: existing ValidateUiGraphWorkspace Debug/launch gate and positive Overlay s
 held-button Escape/DND, diagram inventory, post-port zones, undo and compact lifecycle.
 Preserve one presentation geometry authority, immutable camera baseline, independent
 Content/Overlay and native component/Micro budgets. See [Graph Development](09_UIGRAPH_DEVELOPMENT.md).
-## Shared browser and micro picker — 2026-10-27
+## Shared browser and micro picker — 2026-11-24
 CONTRACT: optional Ui/UiFileBrowser; core UiColorPickerMicro; demos UiFileDialogDemo/UiColorPickerDemo; Ui/UiFileBrowser/README.md and docs/COLOR_PICKER_MICRO.md.
-VALIDATION: heading renderer measures bold glyphs/theme padding; Release BLITZ + Debug no-BLITZ each pass 383 native checks, model 25/0; captures/commands/hashes in build/file-browser-headings-2026-10-27. Physical DPI/cross-platform/100k acceptance remains separate.
+STATUS: platform Downloads, clickable sorting and separate Find/Filters in Advanced. Windows Release BLITZ passes 393 native, 25 model and 52 demo shell checks. macOS folder and shortcut APIs checked in source; native macOS validation remains open.
 ## Compact media controls — 2026-10-07
 Playback Style adds per-command icon sizes, combined transport inset and cache-line thickness.
 Probe defaults to a neutral selected outline; geometry and sampling contracts remain intact.

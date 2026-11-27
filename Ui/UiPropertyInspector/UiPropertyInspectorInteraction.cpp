@@ -415,7 +415,30 @@ bool UiPropertyInspector::CommitColorText(const String& property_id,
     return true;
 }
 
-void UiPropertyInspector::LeftDown(Point p, dword)
+void UiPropertyInspector::ForwardNumericPress(int row, Point p, dword flags)
+{
+    if(row < 0 || !GetValueRect(row).Contains(p))
+        return;
+    Ctrl* control = FindInlineEditor(row);
+    if(!control && row == active_display_row_ && active_editor_)
+        control = &*active_editor_;
+    if(!control)
+        return;
+
+    const Point screen = p + GetScreenView().TopLeft();
+    Point local = screen - control->GetScreenRect().TopLeft();
+    while(Ctrl* child = control->ChildFromPoint(local)) {
+        if(auto* numeric = dynamic_cast<UiNumericEdit*>(child)) {
+            const Rect view = numeric->GetScreenView();
+            if(view.Contains(screen))
+                numeric->BeginNumericPointerEdit(screen - view.TopLeft(), flags);
+            return;
+        }
+        control = child;
+    }
+}
+
+void UiPropertyInspector::LeftDown(Point p, dword flags)
 {
     if(GetLabelDividerRect().Contains(p)) {
         dragging_label_divider_ = true;
@@ -454,20 +477,23 @@ void UiPropertyInspector::LeftDown(Point p, dword)
     // creating/focusing the editor so wheel/keyboard input belongs to the value
     // immediately. The host may rebuild the model/rows synchronously from
     // WhenOverride, so never retain the old row/item reference across it.
+    Ptr<UiPropertyInspector> alive(this);
+    const String property_id = item.id;
     if(item.overrideable && !item.override_active) {
-        const String property_id = item.id;
         WhenOverride(property_id, true);
-        if(!model_)
+        if(!alive || !model_)
             return;
-        const int refreshed_row = FindDisplayRowByProperty(property_id);
-        if(refreshed_row < 0)
+        row = FindDisplayRowByProperty(property_id);
+        if(row < 0)
             return;
-        selected_display_row_ = refreshed_row;
-        ActivateRow(refreshed_row);
-        return;
+        selected_display_row_ = row;
     }
 
     ActivateRow(row);
+    // The first press can create the value editor under the mouse. Hand that
+    // same press to its numeric field so a drag does not require a second click.
+    if(alive)
+        ForwardNumericPress(FindDisplayRowByProperty(property_id), p, flags);
 }
 
 void UiPropertyInspector::LeftDouble(Point p, dword keyflags)

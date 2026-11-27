@@ -2,6 +2,7 @@
 #define _Ui_UiPropertyInspector_PropertyValueEditors_h_
 
 #include <Ui/Ui.h>
+#include <Ui/UiCurveEditor.h>
 #include <Ui/UiPropertyInspector/Core/UiPropertyInspectorCore.h>
 
 namespace Upp {
@@ -275,40 +276,17 @@ UiPropertyInspectorItem& AddPropertyOptional(UiPropertyInspectorModel& model,
                                         const String& variant = "text",
                                         const String& group = String());
 
-class PropertyCurveCanvas : public Ctrl {
+// Normalized property value adapter over the shared multi-key editor.
+class PropertyCurveCanvas : public UiCurveEditor {
 public:
     typedef PropertyCurveCanvas CLASSNAME;
-
     PropertyCurveCanvas();
-
     void SetCurve(const Value& value);
     Value GetCurve() const;
-
     void ResetLinear();
-    void DeleteSelected();
-
-    virtual void Paint(Draw& w) override;
-    virtual void LeftDown(Point p, dword keyflags) override;
-    virtual void MouseMove(Point p, dword keyflags) override;
-    virtual void LeftUp(Point p, dword keyflags) override;
-    virtual bool Key(dword key, int count) override;
-    virtual Size GetMinSize() const override;
 
     Event<Value> WhenCurvePreview;
     Event<Value> WhenCurveCommit;
-
-private:
-    Rect GetGraphRect() const;
-    Point CurveToClient(const Pointf& p) const;
-    Pointf ClientToCurve(Point p) const;
-    int HitPoint(Point p) const;
-    void Normalize();
-    void EmitPreview();
-    void EmitCommit();
-
-    Vector<Pointf> points_;
-    int selected_ = -1;
-    int dragging_ = -1;
 };
 
 bool EditPropertyCurve(Value& value, Ctrl *owner = nullptr);

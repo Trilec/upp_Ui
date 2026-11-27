@@ -2216,8 +2216,14 @@ void UiBaseEdit::LostFocus()
 
 void UiBaseEdit::LeftDown(Point p, dword flags)
 {
+    if(HasMouse())
+        BeginPointerEdit(p, flags);
+}
+
+void UiBaseEdit::BeginPointerEdit(Point p, dword flags)
+{
     Ptr<UiBaseEdit> alive(this);
-    if(!IsShowEnabled() || !HasMouse()) return;
+    if(!IsShowEnabled()) return;
     if(click_focus_ && !HasFocus())
         SetFocus();
     if(!alive) return;

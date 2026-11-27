@@ -24,6 +24,17 @@ theme padding, so compact density does not cut off headings in themes such as Ol
 Theme buttons request a host change. Semantic
 file colours and icons are centralized in `UiFileBrowserAppearance`.
 
+Places includes the platform's Downloads folder when available. In Details
+view, click Name, Type or Modified to sort, then click the same heading to
+reverse the order. Advanced mode also supports sorting by Size when that
+column is visible. The arrow and Sort menu reflect the same order, and folder
+placement applies to both.
+
+Advanced mode shows Find in the command bar next to Filters, which opens the
+stack of Include and Exclude rules. Find narrows the current folder as you type
+and works alongside those rules. Ctrl+F (Command+F on macOS) focuses the field.
+In Simple mode, the magnifier and the same shortcut open the compact search popup.
+
 Responsibilities are separated: Model parses/groups filesystem entries; Scanner
 owns enumeration generations; Layout arranges native controls; Style and
 Appearance resolve presentation; Options supplies short popups; Preview and

@@ -114,7 +114,7 @@ private:
     {
         Add(header_);
         header_.SetTitle("Slider family")
-               .SetSubTitle("Scalar and interval sliders, with optional numeric fields; inspect and generate one selected control")
+               .SetSubTitle("Sliders and intervals. Drag numeric fields or place the caret and scroll.")
                .ShowTitleLine(false)
                .SetContentInset(DPI(8))
                .SetContentCell(header_actions_);

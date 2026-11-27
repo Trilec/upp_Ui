@@ -216,7 +216,7 @@ private:
     void RefreshStatus();
     void RefreshModeVisuals();
 
-    bool PassesProjection(const UiFileBrowserEntry &entry) const;
+    bool PassesProjection(const UiFileBrowserEntry &entry, const String &query) const;
     bool PassesBaseFileType(const UiFileBrowserEntry &entry) const;
     String EntryDisplayName(const UiFileBrowserEntry &entry) const;
     String SequenceFrameRange(const UiFileBrowserEntry &entry) const;
@@ -224,6 +224,14 @@ private:
     Image EntryIcon(const UiFileBrowserEntry &entry) const;
 
     void HandleTableSelection();
+    enum class SortOrder
+    {
+        None = -1, NameAsc, NameDesc, ModifiedDesc, ModifiedAsc, SizeDesc, SizeAsc, TypeAsc, TypeDesc
+    };
+    SortOrder GetSortOrder() const;
+    SortOrder GetColumnDefaultSort(int col) const;
+    static SortOrder ReverseSort(SortOrder order);
+    void SortByColumn(int col);
     void HandleTableAction();
     void HandleGallerySelection();
     void HandleGalleryAction();
@@ -332,6 +340,7 @@ private:
     AddressEdit address_edit_;
     UiToolButton address_button_;
     UiLineEdit search_;
+    Ctrl popup_search_slot_;
     UiToolButton details_button_, thumbnails_button_;
     UiToolButton options_button_;
     UiToolButton refresh_button_;
@@ -339,6 +348,7 @@ private:
 
     UiPanel commands_panel_;
     UiBoxLayout commands_layout_{UiDirection::H};
+    UiBoxLayout find_layout_{UiDirection::H};
     UiToolButton filter_button_, sequence_button_, view_button_, sort_button_, new_button_;
     UiFileBrowserOptionsPopup options_popup_;
     UiBoxLayout options_layout_{UiDirection::V};

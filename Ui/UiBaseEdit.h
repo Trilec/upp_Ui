@@ -320,6 +320,7 @@ protected:
     void    ScrollToCaret();
     Point   GetScrollPos() const { return sb_; }
     int64   GetMousePos(Point p, bool *upstream=nullptr) const;
+    void    BeginPointerEdit(Point p, dword flags);
     int64   NextEditingPosition(int64 pos,int direction,bool word=false) const;
     bool    MoveVisualCaret(int direction,bool select,bool word=false);
     bool    MoveVerticalCaret(int delta,bool select);
